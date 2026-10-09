@@ -1,0 +1,16 @@
+{
+  "name": "@school-erp/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Modular Multi-School ERP Platform",
+  "scripts": {
+    "dev:web": "pnpm --filter @school-erp/web dev",
+    "dev:api": "pnpm --filter @school-erp/api dev",
+    "dev:mobile": "pnpm --filter @school-erp/mobile start",
+    "build:web": "pnpm --filter @school-erp/web build",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write ."
+  },
+  "packageManager": "pnpm@10.18.0"
+}
