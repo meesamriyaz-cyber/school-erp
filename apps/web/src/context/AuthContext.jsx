@@ -1,0 +1,163 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import { apiRequest } from "../lib/api.js";
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [accessToken, setAccessToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [schoolContext, setSchoolContext] = useState(null);
+  const [status, setStatus] = useState("loading");
+
+  const loadSchoolContext = useCallback(async (token) => {
+    const response = await apiRequest("/school/context", {
+      accessToken: token,
+    });
+
+    setSchoolContext(response.data);
+    return response.data;
+  }, []);
+
+  const restoreSession = useCallback(async () => {
+    try {
+      const response = await apiRequest("/auth/refresh", {
+        method: "POST",
+        body: {},
+      });
+
+      if (!response.accessToken || !response.user) {
+        throw new Error("The session response was incomplete.");
+      }
+
+      if (response.user.role === "platform_admin") {
+        throw new Error("A school administrator account is required.");
+      }
+
+      setAccessToken(response.accessToken);
+      setUser(response.user);
+
+      await loadSchoolContext(response.accessToken);
+      setStatus("authenticated");
+    } catch {
+      setAccessToken(null);
+      setUser(null);
+      setSchoolContext(null);
+      setStatus("unauthenticated");
+    }
+  }, [loadSchoolContext]);
+
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
+
+  const login = useCallback(
+    async ({ tenantSlug, email, password }) => {
+      const response = await apiRequest("/auth/login", {
+        method: "POST",
+        body: {
+          tenantSlug: tenantSlug.trim().toLowerCase(),
+          email: email.trim().toLowerCase(),
+          password,
+          clientType: "web",
+        },
+      });
+
+      if (!response.accessToken || !response.user) {
+        throw new Error("The login response was incomplete.");
+      }
+
+      if (response.user.role === "platform_admin") {
+        // Do not retain a platform-admin session in the school dashboard.
+        await apiRequest("/auth/logout", {
+          method: "POST",
+          body: {},
+        });
+
+        throw new Error(
+          "Use a school administrator account to access this dashboard.",
+        );
+      }
+
+      setAccessToken(response.accessToken);
+      setUser(response.user);
+
+      try {
+        await loadSchoolContext(response.accessToken);
+        setStatus("authenticated");
+      } catch (error) {
+        setAccessToken(null);
+        setUser(null);
+        setSchoolContext(null);
+        setStatus("unauthenticated");
+
+        await apiRequest("/auth/logout", {
+          method: "POST",
+          body: {},
+        }).catch(() => {});
+
+        throw error;
+      }
+    },
+    [loadSchoolContext],
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await apiRequest("/auth/logout", {
+        method: "POST",
+        body: {},
+        accessToken,
+      });
+    } finally {
+      setAccessToken(null);
+      setUser(null);
+      setSchoolContext(null);
+      setStatus("unauthenticated");
+    }
+  }, [accessToken]);
+
+  const value = useMemo(
+    () => ({
+      accessToken,
+      user,
+      schoolContext,
+      status,
+      login,
+      logout,
+      restoreSession,
+    }),
+    [
+      accessToken,
+      user,
+      schoolContext,
+      status,
+      login,
+      logout,
+      restoreSession,
+    ],
+  );
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider.");
+  }
+
+  return context;
+}
