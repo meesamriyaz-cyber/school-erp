@@ -1,7 +1,8 @@
 
 import { useState } from "react";
 import "./App.css";
-import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+import { AuthProvider } from "./context/AuthContext.jsx";
+import { useAuth } from "./context/authContext.js";
 import LoginPage from "./components/LoginPage.jsx";
 import StudentDirectory from "./components/StudentDirectory.jsx";
 const navigation = [
@@ -43,7 +44,6 @@ function DashboardApp() {
   }
 
   const schoolName = schoolContext?.school?.name || "School workspace";
-  const firstName = user?.firstName || "Administrator";
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
     .join(" ") || "School Administrator";

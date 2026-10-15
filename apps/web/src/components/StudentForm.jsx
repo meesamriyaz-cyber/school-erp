@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { apiRequest } from "../lib/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useAuth } from "../context/authContext.js";
 
 const initialForm = {
   admissionNumber: "",

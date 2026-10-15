@@ -1,15 +1,12 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
 } from "react";
-
+import { AuthContext } from "./authContext.js";
 import { apiRequest } from "../lib/api.js";
 
-const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(null);
@@ -54,9 +51,20 @@ export function AuthProvider({ children }) {
     }
   }, [loadSchoolContext]);
 
-  useEffect(() => {
-    restoreSession();
-  }, [restoreSession]);
+useEffect(() => {
+  let cancelled = false;
+
+  const timerId = setTimeout(() => {
+    if (!cancelled) {
+      void restoreSession();
+    }
+  }, 0);
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timerId);
+  };
+}, [restoreSession]);
 
   const login = useCallback(
     async ({ tenantSlug, email, password }) => {
@@ -150,14 +158,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider.");
-  }
-
-  return context;
 }

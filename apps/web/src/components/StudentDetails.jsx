@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { apiRequest } from "../lib/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useAuth } from "../context/authContext.js";
 import EditStudentForm from "./EditStudentForm.jsx";
 
 function formatDate(value) {

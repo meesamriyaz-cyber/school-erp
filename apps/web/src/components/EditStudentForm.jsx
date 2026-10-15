@@ -1,20 +1,8 @@
 
-import { useEffect, useState } from "react";
+import {  useState } from "react";
 import { apiRequest } from "../lib/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
 
-const INITIAL_FIELDS = {
-  admissionNumber: "",
-  firstName: "",
-  lastName: "",
-  dateOfBirth: "",
-  gender: "not_specified",
-  admissionDate: "",
-  guardianName: "",
-  guardianPhone: "",
-  guardianEmail: "",
-  status: "active",
-};
+import { useAuth } from "../context/authContext.js";
 
 function toDateInput(value) {
   if (!value) return "";
@@ -52,10 +40,7 @@ export default function EditStudentForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    setForm(getInitialFields(student));
-  }, [student]);
-
+ 
   function handleChange(event) {
     const { name, value } = event.target;
 

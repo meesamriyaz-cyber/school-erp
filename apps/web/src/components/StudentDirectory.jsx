@@ -1,7 +1,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "../lib/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useAuth } from "../context/authContext.js";
 import StudentForm from "./StudentForm.jsx";
 import StudentDetails from "./StudentDetails.jsx";
 
@@ -167,17 +167,20 @@ export default function StudentDirectory() {
     [accessToken, page, search, statusFilter],
   );
 
-  useEffect(() => {
-    const controller = new AbortController();
+ useEffect(() => {
+  const controller = new AbortController();
 
+  const timeoutId = setTimeout(() => {
     void loadStudents(controller.signal);
+  }, 0);
 
-    return () => controller.abort();
-  }, [loadStudents, refreshKey]);
+  return () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
+}, [loadStudents, refreshKey]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, statusFilter]);
+ 
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -227,7 +230,10 @@ export default function StudentDirectory() {
           <input
             type="search"
             value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
+            onChange={(event) => {
+            setSearchInput(event.target.value);
+            setPage(1);
+          }}
             placeholder="Search name or admission number…"
           />
         </label>
@@ -236,7 +242,10 @@ export default function StudentDirectory() {
           <span className="sr-only">Filter by status</span>
           <select
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
+            onChange={(event) => {
+            setStatusFilter(event.target.value);
+            setPage(1);
+          }}
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
