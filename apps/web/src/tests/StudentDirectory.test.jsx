@@ -272,4 +272,47 @@ it("loads the next page when Next is clicked", async () => {
   );
 });
 
+
+it("displays an empty state when no students are found", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [],
+    pagination: { total: 0 },
+  });
+
+  render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/students?page=1&limit=10",
+      expect.any(Object),
+    );
+  });
+
+  expect(
+    await screen.findAllByText(
+      /No students found\. Try another search or add your first student\./i,
+    ),
+  ).toHaveLength(2);
+
+  expect(screen.getByText("No records")).toBeInTheDocument();
+});
+
+it("handles an unexpected API response", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: false,
+    data: null,
+  });
+
+  render(<StudentDirectory />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The server returned an unexpected response.",
+  );
+
+  expect(
+    screen.getByRole("button", { name: "Retry" }),
+  ).toBeInTheDocument();
+});
+
 });
