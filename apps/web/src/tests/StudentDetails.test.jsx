@@ -162,5 +162,26 @@ apiRequest.mockResolvedValueOnce({
   expect(await screen.findByText("Sara Updated Ahmad")).toBeInTheDocument();
 });
 
+it("handles an unexpected API response", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: false,
+    data: null,
+  });
+
+  render(
+    <StudentDetails
+      studentId="student-invalid"
+      onBack={vi.fn()}
+    />,
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Unable to load student details.",
+  );
+
+  expect(
+    screen.getByRole("button", { name: /Back to Students/i }),
+  ).toBeInTheDocument();
+});
 
 });
