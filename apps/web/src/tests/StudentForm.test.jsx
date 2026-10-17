@@ -141,4 +141,34 @@ it("closes the form when Cancel is clicked", async () => {
 });
 
 
+it("handles an unsuccessful API response", async () => {
+  const user = userEvent.setup();
+
+  apiRequest.mockResolvedValueOnce({
+    success: false,
+    data: null,
+  });
+
+  render(<StudentForm onClose={onClose} onCreated={onCreated} />);
+
+  await user.type(
+    screen.getByLabelText(/Admission number/i),
+    "ADM-303",
+  );
+ 
+  await user.type(
+    screen.getByLabelText(/First name/i),
+    "Ayaan",
+  );
+
+ await user.click(screen.getByRole("button", { name: "Save student" }));
+
+expect(apiRequest).toHaveBeenCalledTimes(1);
+
+expect(await screen.findByRole("alert")).toHaveTextContent(
+  "The server returned an unexpected response.",
+);
+  expect(onCreated).not.toHaveBeenCalled();
+});
+
 });
