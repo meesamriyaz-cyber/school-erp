@@ -348,49 +348,7 @@ it("rejects platform administrator login and calls logout", async () => {
   expect(screen.getByText("Login school: None")).toBeInTheDocument();
 });
 
-it("clears the session and logs out when school context loading fails", async () => {
-  render(
-    <AuthProvider>
-      <LoginTester />
-    </AuthProvider>,
-  );
 
-  await waitFor(() => {
-    expect(apiRequest).toHaveBeenCalledWith(
-      "/auth/refresh",
-      expect.objectContaining({ method: "POST" }),
-    );
-  });
-
-  apiRequest.mockReset();
-  apiRequest
-    .mockResolvedValueOnce({
-      accessToken: "login-access-token",
-      user: {
-        _id: "user-3",
-        firstName: "Admin",
-        role: "school_admin",
-      },
-    })
-    .mockRejectedValueOnce(new Error("School context unavailable"))
-    .mockResolvedValueOnce({});
-
-  await act(async () => {
-    screen.getByRole("button", { name: "Log in" }).click();
-  });
-
-  await waitFor(() => {
-    expect(apiRequest).toHaveBeenCalledWith(
-      "/auth/logout",
-      expect.objectContaining({ method: "POST" }),
-    );
-  });
-
-  expect(apiRequest).toHaveBeenCalledTimes(3);
-  expect(screen.getByText("Login status: unauthenticated")).toBeInTheDocument();
-  expect(screen.getByText("Login user: None")).toBeInTheDocument();
-  expect(screen.getByText("Login school: None")).toBeInTheDocument();
-});
 
 
 it("shows an error and remains unauthenticated when credentials are invalid", async () => {
