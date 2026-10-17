@@ -133,4 +133,30 @@ describe("EditStudentForm", () => {
 
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+  
+it("handles an unsuccessful API response", async () => {
+  const user = userEvent.setup();
+  const onSaved = vi.fn();
+
+  apiRequest.mockResolvedValueOnce({
+    success: false,
+    data: null,
+  });
+
+  render(
+    <EditStudentForm
+      student={student}
+      onCancel={vi.fn()}
+      onSaved={onSaved}
+    />,
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Save Changes" }),
+  );
+
+  expect(await screen.findByRole("alert")).toBeInTheDocument();
+  expect(onSaved).not.toHaveBeenCalled();
+});
+
 });
