@@ -139,4 +139,21 @@ describe("App", () => {
       screen.getByRole("button", { name: "Back to overview" }),
     ).toBeInTheDocument();
   });
+  
+it("uses fallback values when user and school details are missing", () => {
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {},
+    schoolContext: null,
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+
+expect(screen.getAllByText("School workspace").length).toBeGreaterThan(0);
+  expect(screen.getByText("School Administrator")).toBeInTheDocument();
+  expect(screen.getByText("SA")).toBeInTheDocument();
+  expect(screen.getByText("School user")).toBeInTheDocument();
+});
+
 });

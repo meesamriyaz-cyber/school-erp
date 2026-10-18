@@ -14,11 +14,31 @@ vi.mock("../context/authContext.js", () => ({
 }));
 
 vi.mock("../components/StudentForm.jsx", () => ({
-  default: () => null,
+  default: ({ onClose, onCreated }) => (
+    <div>
+      <p>Mock Student Form</p>
+      <button onClick={onClose}>Cancel form</button>
+      <button
+        onClick={() =>
+          onCreated({
+            firstName: "Ayaan",
+            lastName: "Khan",
+          })
+        }
+      >
+        Create test student
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../components/StudentDetails.jsx", () => ({
-  default: () => null,
+  default: ({ studentId, onBack }) => (
+    <div>
+      <p>Student details: {studentId}</p>
+      <button onClick={onBack}>Back to directory</button>
+    </div>
+  ),
 }));
 
 describe("StudentDirectory", () => {
@@ -312,6 +332,219 @@ it("handles an unexpected API response", async () => {
 
   expect(
     screen.getByRole("button", { name: "Retry" }),
+  ).toBeInTheDocument();
+});
+
+it("creates a student, displays success notice, and refreshes the directory", async () => {
+  apiRequest
+    .mockResolvedValueOnce({
+      success: true,
+      data: [],
+      pagination: { total: 0 },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: [],
+      pagination: { total: 0 },
+    });
+
+  render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  await act(async () => {
+    screen.getByRole("button", { name: "+ Add student" }).click();
+  });
+
+  expect(screen.getByText("Mock Student Form")).toBeInTheDocument();
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Create test student" }).click();
+  });
+
+  expect(
+    await screen.findByRole("status"),
+  ).toHaveTextContent("Student Ayaan Khan added successfully.");
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(2);
+  });
+
+  expect(apiRequest).toHaveBeenLastCalledWith(
+    "/students?page=1&limit=10",
+    expect.objectContaining({
+      accessToken: "test-access-token",
+    }),
+  );
+
+  expect(screen.queryByText("Mock Student Form")).not.toBeInTheDocument();
+});
+
+it("opens student details and returns to the directory", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [
+      {
+        _id: "student-details-1",
+        firstName: "Ayaan",
+        lastName: "Khan",
+        admissionNumber: "ADM-101",
+        status: "active",
+      },
+    ],
+    pagination: { total: 1 },
+  });
+
+  render(<StudentDirectory />);
+
+  expect(
+    await screen.findAllByText("Ayaan Khan"),
+  ).not.toHaveLength(0);
+
+  await act(async () => {
+    screen.getAllByRole("button", { name: "View" })[0].click();
+  });
+
+  expect(
+    screen.getByText("Student details: student-details-1"),
+  ).toBeInTheDocument();
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Back to directory" }).click();
+  });
+
+  expect(
+    screen.getAllByText("Ayaan Khan").length,
+  ).toBeGreaterThan(0);
+
+  expect(
+    screen.queryByText("Student details: student-details-1"),
+  ).not.toBeInTheDocument();
+});
+
+it("returns to the previous page when Previous is clicked", async () => {
+  apiRequest
+    .mockResolvedValueOnce({
+      success: true,
+      data: Array.from({ length: 10 }, (_, index) => ({
+        _id: `student-${index + 1}`,
+        firstName: `Student${index + 1}`,
+        admissionNumber: `ADM-${String(index + 1).padStart(3, "0")}`,
+        status: "active",
+      })),
+      pagination: { total: 11 },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: [
+        {
+          _id: "student-11",
+          firstName: "Student11",
+          admissionNumber: "ADM-011",
+          status: "active",
+        },
+      ],
+      pagination: { total: 11 },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: Array.from({ length: 10 }, (_, index) => ({
+        _id: `student-${index + 1}`,
+        firstName: `Student${index + 1}`,
+        admissionNumber: `ADM-${String(index + 1).padStart(3, "0")}`,
+        status: "active",
+      })),
+      pagination: { total: 11 },
+    });
+
+  render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  });
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Next" }).click();
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+  });
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Previous" }).click();
+  });
+
+  await waitFor(() => {
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  });
+
+  expect(screen.getByText("Showing 1–10 of 11")).toBeInTheDocument();
+
+  expect(apiRequest).toHaveBeenLastCalledWith(
+    "/students?page=1&limit=10",
+    expect.objectContaining({
+      accessToken: "test-access-token",
+    }),
+  );
+});
+
+it("closes the Add Student form when Cancel is clicked", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [],
+    pagination: { total: 0 },
+  });
+
+  render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  await act(async () => {
+    screen.getByRole("button", { name: "+ Add student" }).click();
+  });
+
+  expect(screen.getByText("Mock Student Form")).toBeInTheDocument();
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Cancel form" }).click();
+  });
+
+  expect(screen.queryByText("Mock Student Form")).not.toBeInTheDocument();
+});
+
+it("opens student details from the mobile student card", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [
+      {
+        _id: "mobile-student-1",
+        firstName: "Sara",
+        lastName: "Ahmad",
+        admissionNumber: "ADM-201",
+        gender: "female",
+        status: "active",
+      },
+    ],
+    pagination: { total: 1 },
+  });
+
+  render(<StudentDirectory />);
+
+  expect(
+    await screen.findAllByText("Sara Ahmad"),
+  ).not.toHaveLength(0);
+
+  await act(async () => {
+    screen.getByRole("button", { name: "View student" }).click();
+  });
+
+  expect(
+    screen.getByText("Student details: mobile-student-1"),
   ).toBeInTheDocument();
 });
 
