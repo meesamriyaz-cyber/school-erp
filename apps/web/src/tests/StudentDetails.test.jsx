@@ -184,4 +184,89 @@ it("handles an unexpected API response", async () => {
   ).toBeInTheDocument();
 });
 
+it("displays student initials when no photo is available", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      _id: "student-103",
+      firstName: "Sara",
+      lastName: "Ahmad",
+      admissionNumber: "ADM-103",
+      status: "active",
+    },
+  });
+
+  render(
+    <StudentDetails studentId="student-103" onBack={vi.fn()} />,
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: /Sara Ahmad/ }),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.getByLabelText("Student photo not available"),
+  ).toHaveTextContent("SA");
+});
+
+it("handles invalid dates and missing student initials", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      _id: "student-104",
+      firstName: "",
+      lastName: "",
+      admissionNumber: "ADM-104",
+      dateOfBirth: "invalid-date",
+      admissionDate: "invalid-date",
+      status: "active",
+    },
+  });
+
+  render(
+    <StudentDetails studentId="student-104" onBack={vi.fn()} />,
+  );
+
+  expect(
+    //await screen.findByRole("heading", { name: /ADM-104|^\s*$/ }),
+    await screen.findByText("Admission No.: ADM-104")
+  ).toBeInTheDocument();
+
+  expect(screen.getAllByText("Not provided").length).toBeGreaterThan(0);
+  expect(
+    screen.getByLabelText("Student photo not available"),
+  ).toHaveTextContent("S");
+});
+
+it("returns to student details when editing is cancelled", async () => {
+  const user = userEvent.setup();
+
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      _id: "student-105",
+      firstName: "Sara",
+      lastName: "Ahmad",
+      admissionNumber: "ADM-105",
+      status: "active",
+    },
+  });
+
+  render(
+    <StudentDetails studentId="student-105" onBack={vi.fn()} />,
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: /Sara Ahmad/ }),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Edit Student" }));
+  await user.click(screen.getByRole("button", { name: "Cancel editing" }));
+
+  expect(
+    await screen.findByRole("button", { name: "Edit Student" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Admission No.: ADM-105")).toBeInTheDocument();
+});
+
 });

@@ -9,17 +9,17 @@ vi.mock("../lib/api.js", () => ({
   apiRequest: vi.fn(),
 }));
 
-function AuthStatus() {
-  const { status, user, schoolContext } = useAuth();
+  function AuthStatus() {
+    const { status, user, schoolContext } = useAuth();
 
-  return (
-    <div>
-      <p>Status: {status}</p>
-      <p>User: {user?.firstName || "None"}</p>
-      <p>School: {schoolContext?.school?.name || "None"}</p>
-    </div>
-  );
-}
+    return (
+      <div>
+        <p>Status: {status}</p>
+        <p>User: {user?.firstName || "None"}</p>
+        <p>School: {schoolContext?.school?.name || "None"}</p>
+      </div>
+    );
+  }
 
 
 function LoginTester() {
@@ -507,5 +507,122 @@ it("clears the session even when the logout API request fails", async () => {
     }),
   );
 });
+
+it("clears the session and logs out when school context loading fails", async () => {
+  render(
+    <AuthProvider>
+      <LoginTester />
+    </AuthProvider>,
+  );
+
+  // Wait for automatic session restoration to finish.
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/auth/refresh",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  apiRequest.mockReset();
+  apiRequest
+    .mockResolvedValueOnce({
+      accessToken: "login-access-token",
+      user: {
+        _id: "user-5",
+        firstName: "Admin",
+        role: "school_admin",
+      },
+    })
+    .mockRejectedValueOnce(new Error("School context unavailable"))
+    .mockResolvedValueOnce({});
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Log in" }).click();
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Login error: School context unavailable",
+  );
+
+  expect(
+    screen.getByText("Login status: unauthenticated"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Login user: None")).toBeInTheDocument();
+  expect(screen.getByText("Login school: None")).toBeInTheDocument();
+
+  expect(apiRequest).toHaveBeenCalledTimes(3);
+  expect(apiRequest).toHaveBeenLastCalledWith(
+    "/auth/logout",
+    {
+      method: "POST",
+      body: {},
+    },
+  );
+});
+
+
+it("rejects an incomplete login response", async () => {
+  render(
+    <AuthProvider>
+      <LoginTester />
+    </AuthProvider>,
+  );
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/auth/refresh",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  apiRequest.mockReset();
+  apiRequest.mockResolvedValueOnce({
+    accessToken: null,
+    user: null,
+  });
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Log in" }).click();
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The login response was incomplete.",
+  );
+
+  expect(screen.getByText("Login status: unauthenticated")).toBeInTheDocument();
+});
+
+
+it("rejects an incomplete session restoration response", async () => {
+  apiRequest.mockResolvedValueOnce({
+    accessToken: null,
+    user: null,
+  });
+
+  render(
+    <AuthProvider>
+      <AuthStatus />
+    </AuthProvider>,
+  );
+
+  await waitFor(() => {
+    expect(screen.getByText("Status: unauthenticated")).toBeInTheDocument();
+  });
+
+  expect(screen.getByText("User: None")).toBeInTheDocument();
+  expect(screen.getByText("School: None")).toBeInTheDocument();
+});
+
+it("throws when useAuth is used outside an AuthProvider", () => {
+  function AuthConsumer() {
+    useAuth();
+    return null;
+  }
+
+  expect(() => render(<AuthConsumer />)).toThrow(
+    "useAuth must be used within an AuthProvider.",
+  );
+});
+
 
 });

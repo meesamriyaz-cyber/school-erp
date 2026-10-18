@@ -159,4 +159,31 @@ it("handles an unsuccessful API response", async () => {
   expect(onSaved).not.toHaveBeenCalled();
 });
 
+it("uses defaults for missing student fields and invalid dates", () => {
+  const incompleteStudent = {
+    _id: "student-202",
+    dateOfBirth: "invalid-date",
+    admissionDate: null,
+  };
+
+  render(
+    <EditStudentForm
+      student={incompleteStudent}
+      onCancel={vi.fn()}
+      onSaved={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByLabelText("Admission Number")).toHaveValue("");
+  expect(screen.getByLabelText("First Name")).toHaveValue("");
+  expect(screen.getByLabelText("Last Name")).toHaveValue("");
+  expect(screen.getByLabelText("Date of Birth")).toHaveValue("");
+  expect(screen.getByLabelText("Gender")).toHaveValue("not_specified");
+  expect(screen.getByLabelText("Admission Date")).toHaveValue("");
+  expect(screen.getByLabelText("Guardian Name")).toHaveValue("");
+  expect(screen.getByLabelText("Guardian Phone")).toHaveValue("");
+  expect(screen.getByLabelText("Guardian Email")).toHaveValue("");
+  expect(screen.getByLabelText("Status")).toHaveValue("active");
+});
+
 });

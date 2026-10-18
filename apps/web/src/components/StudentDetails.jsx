@@ -130,10 +130,17 @@ export default function StudentDetails({ studentId, onBack }) {
         alt={`${student.firstName} ${student.lastName || ""}`}
       />
     ) : (
-      <div className="student-profile-avatar" aria-label="Student photo not available">
-        {student.firstName?.charAt(0)?.toUpperCase() || "S"}
-        {student.lastName?.charAt(0)?.toUpperCase() || ""}
-      </div>
+      <div
+  className="student-profile-avatar"
+  aria-label="Student photo not available"
+>
+  {student.firstName
+    ? student.firstName.charAt(0).toUpperCase()
+    : "S"}
+  {student.lastName
+    ? student.lastName.charAt(0).toUpperCase()
+    : ""}
+</div>
     )}
         <div>
           <h2>
