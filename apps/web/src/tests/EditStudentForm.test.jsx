@@ -186,4 +186,59 @@ it("uses defaults for missing student fields and invalid dates", () => {
   expect(screen.getByLabelText("Status")).toHaveValue("active");
 });
 
+it("shows a fallback error when the API error has no message", async () => {
+  const user = userEvent.setup();
+
+  apiRequest.mockRejectedValueOnce({});
+
+  render(
+    <EditStudentForm
+      student={student}
+      onCancel={vi.fn()}
+      onSaved={vi.fn()}
+    />,
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Save Changes" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Unable to save student changes.",
+  );
+});
+
+it("sends null for empty optional date of birth", async () => {
+  const user = userEvent.setup();
+
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: student,
+  });
+
+  render(
+    <EditStudentForm
+      student={{ ...student, dateOfBirth: null }}
+      onCancel={vi.fn()}
+      onSaved={vi.fn()}
+    />,
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Save Changes" }),
+  );
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/students/student-201",
+      expect.objectContaining({
+        body: expect.objectContaining({
+          dateOfBirth: null,
+          admissionDate: "2026-04-10",
+        }),
+      }),
+    );
+  });
+});
+
 });

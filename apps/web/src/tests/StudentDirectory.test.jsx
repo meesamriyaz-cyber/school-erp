@@ -28,6 +28,16 @@ vi.mock("../components/StudentForm.jsx", () => ({
       >
         Create test student
       </button>
+      <button
+      onClick={() =>
+        onCreated({
+          firstName: "Ayaan",
+          lastName: "",
+        })
+      }
+    >
+      Create student without last name
+    </button>
     </div>
   ),
 }));
@@ -96,9 +106,9 @@ it("displays an error and a Retry button when loading students fails", async () 
 
   render(<StudentDirectory />);
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Unable to load students.",
-  );
+ expect(await screen.findByRole("alert")).toHaveTextContent(
+  "Unable to load students.",
+);
 
   expect(
     screen.getByRole("button", { name: "Retry" }),
@@ -282,7 +292,9 @@ it("loads the next page when Next is clicked", async () => {
   });
 
   expect(screen.getByText("Showing 11–11 of 11")).toBeInTheDocument();
-  expect(screen.getAllByText("Student11").length).toBeGreaterThan(0);
+  expect(
+  await screen.findAllByText("Student11"),
+).not.toHaveLength(0);
 
   expect(apiRequest).toHaveBeenLastCalledWith(
     "/students?page=2&limit=10",
@@ -546,6 +558,186 @@ it("opens student details from the mobile student card", async () => {
   expect(
     screen.getByText("Student details: mobile-student-1"),
   ).toBeInTheDocument();
+});
+
+it("shows a fallback message when the loading error has no message", async () => {
+  apiRequest.mockRejectedValueOnce({});
+
+  render(<StudentDirectory />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+  "Unable to load students.",
+);
+
+  expect(
+    screen.getByRole("button", { name: "Retry" }),
+  ).toBeInTheDocument();
+});
+
+it("shows fallback values for missing student details on the mobile card", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [
+      {
+        _id: "student-fallback",
+        firstName: "",
+        lastName: "",
+        admissionNumber: "",
+        admissionDate: null,
+        gender: "",
+        status: "",
+        guardianName: "",
+        guardianPhone: "",
+      },
+    ],
+    pagination: { total: 1 },
+  });
+
+  render(<StudentDirectory />);
+
+ expect(
+  await screen.findAllByText("Unnamed student"),
+).toHaveLength(2);
+
+  expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Gender not specified").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
+});
+
+it("shows the success notice when the new student has no last name", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [],
+    pagination: { total: 0 },
+  });
+
+  render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  await act(async () => {
+    screen.getByRole("button", { name: "+ Add student" }).click();
+  });
+
+  await act(async () => {
+    screen.getByRole("button", { name: "Create test student" }).click();
+  });
+
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "Student Ayaan Khan added successfully.",
+  );
+});
+it("shows the success notice when the student has no last name", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [],
+    pagination: { total: 0 },
+  });
+
+  render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  await act(async () => {
+    screen.getByRole("button", {
+      name: "+ Add student",
+    }).click();
+  });
+
+  await act(async () => {
+    screen.getByRole("button", {
+      name: "Create student without last name",
+    }).click();
+  });
+
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "Student Ayaan added successfully.",
+  );
+});
+
+it("shows a fallback for an invalid admission date", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [
+      {
+        _id: "student-invalid-date",
+        firstName: "Ayaan",
+        lastName: "Khan",
+        admissionNumber: "ADM-INVALID",
+        admissionDate: "not-a-valid-date",
+        gender: "male",
+        status: "active",
+      },
+    ],
+    pagination: { total: 1 },
+  });
+
+  render(<StudentDirectory />);
+
+  expect(
+    await screen.findAllByText("Ayaan Khan"),
+  ).not.toHaveLength(0);
+
+  expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+});
+
+it("displays the unspecified gender label for a student on the mobile card", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [
+      {
+        _id: "student-gender-default",
+        firstName: "Ayaan",
+        lastName: "Khan",
+        admissionNumber: "ADM-GENDER",
+        gender: "not_specified",
+        status: "active",
+      },
+    ],
+    pagination: { total: 1 },
+  });
+
+  render(<StudentDirectory />);
+
+  expect(
+    await screen.findAllByText("Ayaan Khan"),
+  ).not.toHaveLength(0);
+
+  expect(
+    screen.getAllByText("Gender not specified"),
+  ).toHaveLength(2);
+});
+it("uses the student count when pagination metadata is missing", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [
+      { _id: "student-a", firstName: "Ayaan", status: "active" },
+      { _id: "student-b", firstName: "Sara", status: "active" },
+    ],
+  });
+
+  render(<StudentDirectory />);
+
+  expect(await screen.findByText("Showing 1–2 of 2")).toBeInTheDocument();
+});
+
+it("does not show an error when loading is aborted", async () => {
+  const abortError = new Error("Request aborted");
+  abortError.name = "AbortError";
+
+  apiRequest.mockRejectedValueOnce(abortError);
+
+  render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 });

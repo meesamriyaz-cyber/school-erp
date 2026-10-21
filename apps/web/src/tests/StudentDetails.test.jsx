@@ -269,4 +269,57 @@ it("returns to student details when editing is cancelled", async () => {
   expect(screen.getByText("Admission No.: ADM-105")).toBeInTheDocument();
 });
 
+it("shows a fallback error when the API error has no message", async () => {
+  apiRequest.mockRejectedValueOnce({});
+
+  render(<StudentDetails studentId="student-123" onBack={vi.fn()} />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Unable to load student details.",
+  );
+});
+
+it("does not show an error when the student request is aborted", async () => {
+  const abortError = new Error("Request aborted");
+  abortError.name = "AbortError";
+
+  apiRequest.mockRejectedValueOnce(abortError);
+
+  render(<StudentDetails studentId="student-123" onBack={vi.fn()} />);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+expect(screen.getByRole("alert")).toHaveTextContent(
+  "Student details could not be found.",
+);});
+
+it("displays the student photo when a photo URL is available", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      _id: "student-photo-1",
+      firstName: "Ayaan",
+      lastName: "Khan",
+      admissionNumber: "ADM-PHOTO",
+      photoUrl: "https://example.com/student.jpg",
+      status: "active",
+    },
+  });
+
+  render(
+    <StudentDetails studentId="student-photo-1" onBack={vi.fn()} />,
+  );
+
+  const photo = await screen.findByRole("img", {
+    name: "Ayaan Khan",
+  });
+
+  expect(photo).toHaveAttribute(
+    "src",
+    "https://example.com/student.jpg",
+  );
+});
+
 });

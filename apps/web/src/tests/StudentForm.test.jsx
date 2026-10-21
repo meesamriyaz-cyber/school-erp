@@ -171,4 +171,18 @@ expect(await screen.findByRole("alert")).toHaveTextContent(
   expect(onCreated).not.toHaveBeenCalled();
 });
 
+it("closes when the modal backdrop is clicked", async () => {
+  const onClose = vi.fn();
+
+  const { container } = render(
+    <StudentForm onClose={onClose} onCreated={vi.fn()} />,
+  );
+
+  const backdrop = container.querySelector(".student-modal-backdrop");
+
+  await userEvent.setup().click(backdrop);
+
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
 });
