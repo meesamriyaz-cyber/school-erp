@@ -156,4 +156,212 @@ expect(screen.getAllByText("School workspace").length).toBeGreaterThan(0);
   expect(screen.getByText("School user")).toBeInTheDocument();
 });
 
+
+it("opens mobile navigation and closes it after selecting a page", async () => {
+  const user = userEvent.setup();
+
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "SCHOOL_ADMIN",
+    },
+    schoolContext: {
+      school: { name: "Green Valley School" },
+    },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+
+  await user.click(
+    screen.getByRole("button", { name: "Open navigation" }),
+  );
+
+  expect(
+    screen.getByRole("button", { name: "Close navigation" }),
+  ).toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("button", { name: "Guardians" }),
+  );
+
+  expect(
+    screen.queryByRole("button", { name: "Close navigation" }),
+  ).not.toBeInTheDocument();
+
+  expect(
+    screen.getByRole("button", { name: "Back to overview" }),
+  ).toBeInTheDocument();
+});
+
+it("closes mobile navigation using the close menu button", async () => {
+  const user = userEvent.setup();
+
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "SCHOOL_ADMIN",
+    },
+    schoolContext: {
+      school: { name: "Green Valley School" },
+    },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+
+  await user.click(
+    screen.getByRole("button", { name: "Open navigation" }),
+  );
+
+  expect(
+    screen.getByRole("button", { name: "Close navigation" }),
+  ).toBeInTheDocument();
+
+  await user.click(
+    screen.getByRole("button", { name: "Close menu" }),
+  );
+
+  expect(
+    screen.queryByRole("button", { name: "Close navigation" }),
+  ).not.toBeInTheDocument();
+});
+
+it("opens the student directory from the Student management module", async () => {
+  const user = userEvent.setup();
+
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "SCHOOL_ADMIN",
+    },
+    schoolContext: {
+      school: { name: "Green Valley School" },
+    },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+
+  await user.click(
+    screen.getByRole("button", { name: /Student management/ }),
+  );
+
+  expect(
+    screen.getByRole("heading", { name: "Student directory displayed" }),
+  ).toBeInTheDocument();
+});
+
+
+it("opens the student directory from the Student management module", async () => {
+  const user = userEvent.setup();
+
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "SCHOOL_ADMIN",
+    },
+    schoolContext: {
+      school: { name: "Green Valley School" },
+    },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+
+  await user.click(
+    screen.getByRole("button", { name: /Student management/ }),
+  );
+
+  expect(
+    screen.getByRole("heading", { name: "Student directory displayed" }),
+  ).toBeInTheDocument();
+});
+
+it("opens the student directory from the Student management module", async () => {
+  const user = userEvent.setup();
+
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "SCHOOL_ADMIN",
+    },
+    schoolContext: {
+      school: { name: "Green Valley School" },
+    },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+
+  await user.click(
+    screen.getByRole("button", { name: /Student management/ }),
+  );
+
+  expect(
+    screen.getByRole("heading", { name: "Student directory displayed" }),
+  ).toBeInTheDocument();
+});
+
+it("closes mobile navigation using the backdrop and returns to overview", async () => {
+  const user = userEvent.setup();
+
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "SCHOOL_ADMIN",
+    },
+    schoolContext: {
+      school: { name: "Green Valley School" },
+    },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+
+  // Open the mobile navigation.
+  await user.click(
+    screen.getByRole("button", { name: "Open navigation" }),
+  );
+
+  // Click the backdrop to close it.
+  await user.click(
+    screen.getByRole("button", { name: "Close navigation" }),
+  );
+
+  expect(
+    screen.queryByRole("button", { name: "Close navigation" }),
+  ).not.toBeInTheDocument();
+
+  // Open an unfinished module.
+  await user.click(
+    screen.getByRole("button", { name: /Attendance/ }),
+  );
+
+  expect(
+    screen.getByRole("button", { name: "Back to overview" }),
+  ).toBeInTheDocument();
+
+  // Return to the dashboard overview.
+  await user.click(
+    screen.getByRole("button", { name: "Back to overview" }),
+  );
+
+  expect(
+    screen.getByRole("heading", { name: "Good day, Administrator" }),
+  ).toBeInTheDocument();
+});
+
 });
