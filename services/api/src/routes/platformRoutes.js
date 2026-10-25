@@ -4,7 +4,7 @@ import { Router } from "express";
 import authenticate from "../middleware/authenticate.js";
 import requireTrustedOrigin from "../middleware/requireTrustedOrigin.js";
 import { authorizeRoles } from "../middleware/authorizeRoles.js";
-import { createSchool } from "../controllers/platformController.js";
+import { createSchool, listSchools } from "../controllers/platformController.js";
 
 const router = Router();
 
