@@ -102,6 +102,12 @@ export const createSchool = async (req, res, next) => {
       throw createHttpError(400, "Provide a valid timezone");
     }
 
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+    } catch {
+      throw createHttpError(400, "Provide a valid timezone");
+    }
+
     if (!firstName || firstName.length > 80) {
       throw createHttpError(
         400,
