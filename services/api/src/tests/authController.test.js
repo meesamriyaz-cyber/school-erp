@@ -27,6 +27,7 @@ vi.mock("../models/User.js", () => ({
 vi.mock("../models/Tenant.js", () => ({
   default: {
     findOne: vi.fn(),
+    findById: vi.fn(),
   },
 }));
 
@@ -541,6 +542,73 @@ describe("authController.refresh", () => {
 
 
   
+  it("blocks refresh when the school is suspended", async () => {
+    req.body = { clientType: "mobile", refreshToken: "old-refresh-token" };
+    mocks.verifyRefreshToken.mockReturnValue({ sub: "user-123", sid: "session-123" });
+    const User = (await import("../models/User.js")).default;
+    const Tenant = (await import("../models/Tenant.js")).default;
+    User.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({
+        _id: "user-123", status: "active", role: "school_admin",
+        tenantId: "tenant-123", firstName: "Test", lastName: "User", email: "user@example.test",
+      }) }),
+    });
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: "tenant-123", status: "suspended" }) }),
+    });
+
+    await refresh(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "School is inactive; access is not available" });
+    expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
+    expect(res.clearCookie).toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("blocks refresh when the school record is missing", async () => {
+    req.body = { clientType: "mobile", refreshToken: "old-refresh-token" };
+    mocks.verifyRefreshToken.mockReturnValue({ sub: "user-123", sid: "session-123" });
+    const User = (await import("../models/User.js")).default;
+    const Tenant = (await import("../models/Tenant.js")).default;
+    User.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({
+        _id: "user-123", status: "active", role: "school_admin", tenantId: "tenant-123",
+        firstName: "Test", lastName: "User", email: "user@example.test",
+      }) }),
+    });
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(null) }),
+    });
+
+    await refresh(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("does not look up a tenant when refreshing a platform administrator session", async () => {
+    req.body = { clientType: "mobile", refreshToken: "old-refresh-token" };
+    mocks.verifyRefreshToken.mockReturnValue({ sub: "admin-123", sid: "session-123" });
+    const User = (await import("../models/User.js")).default;
+    const Tenant = (await import("../models/Tenant.js")).default;
+    User.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({
+        _id: "admin-123", status: "active", role: "platform_admin", tenantId: null,
+        firstName: "Platform", lastName: "Admin", email: "admin@example.test",
+      }) }),
+    });
+    mocks.rotateRefreshToken.mockResolvedValue({ accessToken: "new-access-token", refreshToken: "new-refresh-token" });
+
+    await refresh(req, res, next);
+
+    expect(Tenant.findById).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(mocks.rotateRefreshToken).toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it("refreshes tokens successfully for a mobile client", async () => {
     req.body = {
       clientType: "mobile",
