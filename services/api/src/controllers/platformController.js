@@ -216,3 +216,86 @@ export const createSchool = async (req, res, next) => {
     }
   }
 };
+
+
+const SCHOOL_STATUSES = ["pending", "active", "suspended"];
+
+// GET /api/v1/platform/schools
+export const listSchools = async (req, res, next) => {
+  try {
+    const page = Number.parseInt(req.query.page ?? "1", 10);
+    const limit = Number.parseInt(req.query.limit ?? "20", 10);
+
+    if (
+      !Number.isInteger(page) ||
+      page < 1 ||
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Page must be positive and limit must be between 1 and 100",
+      });
+    }
+
+    const filter = {};
+    if (req.query.status !== undefined) {
+      if (
+        typeof req.query.status !== "string" ||
+        !SCHOOL_STATUSES.includes(req.query.status)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid school status filter",
+        });
+      }
+      filter.status = req.query.status;
+    }
+
+    if (req.query.search !== undefined) {
+      if (
+        typeof req.query.search !== "string" ||
+        req.query.search.trim().length > 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Search must not exceed 100 characters",
+        });
+      }
+
+      const search = req.query.search.trim();
+      if (search) {
+        const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(escapedSearch, "i");
+        filter.$or = [{ name: pattern }, { slug: pattern }];
+      }
+    }
+
+    const [schools, total] = await Promise.all([
+      Tenant.find(filter)
+        .select("_id name slug status contactEmail timezone createdAt updatedAt")
+        .sort({ name: 1, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Tenant.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: schools.map((school) => ({
+        ...school,
+        id: String(school._id),
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
