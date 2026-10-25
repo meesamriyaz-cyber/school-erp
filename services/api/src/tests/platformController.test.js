@@ -198,6 +198,7 @@ describe("createSchool controller", () => {
     ["slug too long", { slug: "a".repeat(81) }, "Slug must contain lowercase letters, numbers, and single hyphens"],
     ["invalid contact email", { contactEmail: "not-an-email" }, "Provide a valid school contact email"],
     ["empty timezone", { timezone: "   " }, "Provide a valid timezone"],
+    ["unknown timezone", { timezone: "Mars/Olympus_Mons" }, "Provide a valid timezone"],
     ["first name missing", { adminFirstName: "   " }, "Administrator first name is required and must not exceed 80 characters"],
     ["last name too long", { adminLastName: "L".repeat(81) }, "Administrator last name must not exceed 80 characters"],
     ["invalid administrator email", { adminEmail: "bad-email" }, "Provide a valid administrator email"],
