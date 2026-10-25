@@ -177,6 +177,14 @@
         return invalidCredentials(res);
       }
 
+      if (user.role !== "platform_admin") {
+        const tenant = await Tenant.findById(user.tenantId).select("_id status").lean();
+        if (!tenant || tenant.status !== "active") {
+          clearRefreshCookie(res);
+          return res.status(403).json({ success: false, message: "School is inactive; access is not available" });
+        }
+      }
+
       let tokens;
 
       try {
