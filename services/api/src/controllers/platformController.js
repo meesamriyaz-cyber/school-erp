@@ -353,6 +353,15 @@ export const updateSchoolStatus = async (req, res, next) => {
       });
     }
 
+    // If an earlier suspension could not revoke every session, retry before
+    // reactivation. A revocation error must leave the school suspended.
+    if (school.status === "suspended" && status === "active") {
+      await Session.updateMany(
+        { tenantId: school._id, revokedAt: null },
+        { $set: { revokedAt: new Date() } },
+      );
+    }
+
     // Include the current status in the update filter to prevent stale writes.
     const updatedSchool = await Tenant.findOneAndUpdate(
       { _id: school._id, status: school.status },
