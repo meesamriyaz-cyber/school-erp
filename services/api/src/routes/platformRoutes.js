@@ -8,6 +8,14 @@ import { createSchool, listSchools } from "../controllers/platformController.js"
 
 const router = Router();
 
+router.get(
+  "/schools",
+  requireTrustedOrigin,
+  authenticate,
+  authorizeRoles("platform_admin"),
+  listSchools
+);
+
 router.post(
   "/schools",
   requireTrustedOrigin,
