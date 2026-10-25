@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findById, findOneAndUpdate } = vi.hoisted(() => ({
+const { findById, findOneAndUpdate, updateMany } = vi.hoisted(() => ({
   findById: vi.fn(),
   findOneAndUpdate: vi.fn(),
+  updateMany: vi.fn(),
 }));
 
 vi.mock("../models/Tenant.js", () => ({
   default: { findById, findOneAndUpdate, create: vi.fn() },
 }));
 vi.mock("../models/User.js", () => ({ default: { create: vi.fn() } }));
+vi.mock("../models/Session.js", () => ({ default: { updateMany } }));
 vi.mock("../utils/password.js", () => ({ hashPassword: vi.fn() }));
 
 import { updateSchoolStatus } from "../controllers/platformController.js";
@@ -62,7 +64,21 @@ describe("updateSchoolStatus", () => {
         school: expect.objectContaining({ id: schoolId, status: "suspended" }),
       },
     }));
+    expect(updateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId, revokedAt: null },
+      { $set: { revokedAt: expect.any(Date) } },
+    );
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it("does not revoke sessions when activating a pending school", async () => {
+    req.body.status = "active";
+    schoolQuery.lean.mockResolvedValue({ ...activeSchool, status: "pending" });
+    updateQuery.lean.mockResolvedValue({ ...activeSchool, status: "active" });
+
+    await updateSchoolStatus(req, res, next);
+
+    expect(updateMany).not.toHaveBeenCalled();
   });
 
   it("activates a pending school", async () => {
