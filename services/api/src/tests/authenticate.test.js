@@ -8,11 +8,18 @@ vi.mock("../models/User.js", () => ({
   },
 }));
 
+vi.mock("../models/Tenant.js", () => ({
+  default: {
+    findById: vi.fn(),
+  },
+}));
+
 vi.mock("../utils/tokens.js", () => ({
   verifyAccessToken: vi.fn(),
 }));
 
 import User from "../models/User.js";
+import Tenant from "../models/Tenant.js";
 import { verifyAccessToken } from "../utils/tokens.js";
 import authenticate from "../middleware/authenticate.js";
 
@@ -60,6 +67,15 @@ describe("authenticate middleware", () => {
     User.findById.mockReturnValue({
       select: vi.fn().mockReturnValue({
         lean: vi.fn().mockResolvedValue({ ...activeUser }),
+      }),
+    });
+
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({
+          _id: tenantId,
+          status: "active",
+        }),
       }),
     });
   });
@@ -227,6 +243,44 @@ describe("authenticate middleware", () => {
       success: false,
       message: "Account permissions have changed; sign in again",
     });
+  });
+
+  it("rejects a school user when the school is suspended", async () => {
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({
+          _id: tenantId,
+          status: "suspended",
+        }),
+      }),
+    });
+
+    await authenticate(req, res, next);
+
+    expect(Tenant.findById).toHaveBeenCalledWith(tenantId);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: "School is inactive; access is not available",
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("rejects a school user when the school record is missing", async () => {
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue(null),
+      }),
+    });
+
+    await authenticate(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: "School is inactive; access is not available",
+    });
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("sets authentication context for a valid school user", async () => {
