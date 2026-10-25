@@ -280,6 +280,20 @@ describe("createSchool controller", () => {
     expect(dbSession.endSession).toHaveBeenCalledOnce();
   });
 
+  it("forwards administrator creation failures and always ends the transaction session", async () => {
+    const error = new Error("Administrator creation failed");
+    User.create.mockRejectedValue(error);
+
+    await createSchool(req, res, next);
+
+    expect(withTransaction).toHaveBeenCalledOnce();
+    expect(Tenant.create).toHaveBeenCalledOnce();
+    expect(User.create).toHaveBeenCalledOnce();
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(dbSession.endSession).toHaveBeenCalledOnce();
+  });
+
   it("passes transaction failures to next and ends the session", async () => {
     withTransaction.mockRejectedValue(new Error("Transaction failed"));
 
