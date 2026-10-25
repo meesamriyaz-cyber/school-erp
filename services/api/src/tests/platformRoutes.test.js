@@ -45,7 +45,7 @@ describe("platform school-management route authorization", () => {
       server.once("listening", resolve);
       server.once("error", reject);
     });
-    baseUrl = `http://127.0.0.1:${server.address().port}`;
+    baseUrl = `http://127.0.0.1:${server.address().port}/api/v1/platform`;
   });
 
   afterAll(async () => {
