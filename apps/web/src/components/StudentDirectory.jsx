@@ -148,10 +148,10 @@ export default function StudentDirectory() {
           throw new Error("The server returned an unexpected response.");
         }
 
-        setStudents(response.data ?? []);
+        setStudents(response.data);
         setTotal(
-          response.pagination?.total ?? response.data?.length ?? 0,
-        );
+  response.pagination?.total ?? response.data.length,
+);
       } catch (err) {
         if (err.name === "AbortError") return;
 

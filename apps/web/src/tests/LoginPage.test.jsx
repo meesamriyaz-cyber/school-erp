@@ -107,4 +107,34 @@ describe("LoginPage", () => {
 
     resolveLogin();
   });
+  
+it("displays a fallback error when the login error has no message", async () => {
+  const user = userEvent.setup();
+
+  login.mockRejectedValueOnce({});
+
+  render(<LoginPage />);
+
+  await user.type(
+    screen.getByLabelText("School ID"),
+    "green-valley-school",
+  );
+  await user.type(
+    screen.getByLabelText("Email address"),
+    "admin@school.com",
+  );
+  await user.type(
+    screen.getByLabelText("Password"),
+    "SecurePass123!",
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Sign in to workspace" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Unable to sign in. Please try again.",
+  );
+});
+
 });

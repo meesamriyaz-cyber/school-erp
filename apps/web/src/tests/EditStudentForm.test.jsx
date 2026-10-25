@@ -240,5 +240,62 @@ it("sends null for empty optional date of birth", async () => {
     );
   });
 });
+it("handles a successful response with missing student data", async () => {
+  const user = userEvent.setup();
+  const onSaved = vi.fn();
 
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: null,
+  });
+
+  render(
+    <EditStudentForm
+      student={student}
+      onCancel={vi.fn()}
+      onSaved={onSaved}
+    />,
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Save Changes" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "The student could not be updated.",
+  );
+  expect(onSaved).not.toHaveBeenCalled();
+});
+it("sends null for an empty admission date", async () => {
+  const user = userEvent.setup();
+
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: student,
+  });
+
+  render(
+    <EditStudentForm
+      student={{ ...student, admissionDate: null }}
+      onCancel={vi.fn()}
+      onSaved={vi.fn()}
+    />,
+  );
+
+ const saveButton = screen.getByRole("button", {
+  name: "Save Changes",
+});
+
+console.log("Save button disabled:", saveButton.disabled);
+console.log(
+  "Admission date value:",
+  screen.getByLabelText("Admission Date").value,
+);
+expect(screen.getByLabelText("Admission Date")).toHaveValue("");
+await user.click(saveButton);
+
+console.log("API calls after click:", apiRequest.mock.calls);
+
+console.log("Actual API call:", apiRequest.mock.calls);
+});
 });

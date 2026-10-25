@@ -740,4 +740,63 @@ it("does not show an error when loading is aborted", async () => {
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
+it("handles a successful response with missing student data", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+  });
+
+  render(<StudentDirectory />);
+
+  expect(
+    await screen.findByText("No records"),
+  ).toBeInTheDocument();
+
+});
+
+
+it("does not update loading state after an in-flight request is aborted", async () => {
+  let rejectRequest;
+  let requestSignal;
+
+  apiRequest.mockImplementationOnce((_url, { signal }) => {
+    requestSignal = signal;
+
+    return new Promise((_resolve, reject) => {
+      rejectRequest = reject;
+    });
+  });
+
+  const { unmount } = render(<StudentDirectory />);
+
+  await waitFor(() => {
+    expect(rejectRequest).toBeDefined();
+  });
+
+  unmount();
+
+  expect(requestSignal.aborted).toBe(true);
+
+  await act(async () => {
+    const error = new Error("Request aborted");
+    error.name = "AbortError";
+    rejectRequest(error);
+  });
+});
+it("uses the student data length when pagination total is null", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [
+      { _id: "student-a", firstName: "Ayaan", status: "active" },
+      { _id: "student-b", firstName: "Sara", status: "active" },
+    ],
+    pagination: { total: null },
+  });
+
+  render(<StudentDirectory />);
+
+  expect(
+    await screen.findByText("Showing 1–2 of 2"),
+  ).toBeInTheDocument();
+});
+
 });

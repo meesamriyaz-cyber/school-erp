@@ -534,7 +534,7 @@ it("clears the session and logs out when school context loading fails", async ()
       },
     })
     .mockRejectedValueOnce(new Error("School context unavailable"))
-    .mockResolvedValueOnce({});
+    .mockRejectedValueOnce(new Error("Logout request failed"));
 
   await act(async () => {
     screen.getByRole("button", { name: "Log in" }).click();
@@ -623,6 +623,70 @@ it("throws when useAuth is used outside an AuthProvider", () => {
     "useAuth must be used within an AuthProvider.",
   );
 });
+
+it("clears the session when school context loading fails during restoration", async () => {
+  apiRequest
+    .mockResolvedValueOnce({
+      accessToken: "test-access-token",
+      user: {
+        _id: "user-6",
+        firstName: "School",
+        role: "school_admin",
+      },
+    })
+    .mockRejectedValueOnce(new Error("School context unavailable"));
+
+  render(
+    <AuthProvider>
+      <AuthStatus />
+    </AuthProvider>,
+  );
+
+  await waitFor(() => {
+    expect(
+      screen.getByText("Status: unauthenticated"),
+    ).toBeInTheDocument();
+  });
+
+  expect(screen.getByText("User: None")).toBeInTheDocument();
+  expect(screen.getByText("School: None")).toBeInTheDocument();
+
+  expect(apiRequest).toHaveBeenCalledTimes(2);
+});
+
+
+it("cancels pending session restoration when the provider unmounts", async () => {
+  vi.useFakeTimers();
+
+  try {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+
+    const { unmount } = render(
+      <AuthProvider>
+        <AuthStatus />
+      </AuthProvider>,
+    );
+
+    const scheduledCallback = setTimeoutSpy.mock.calls.find(
+      ([, delay]) => delay === 0,
+    )?.[0];
+
+    expect(scheduledCallback).toBeTypeOf("function");
+
+    unmount();
+
+    await act(async () => {
+      scheduledCallback();
+    });
+
+    expect(apiRequest).not.toHaveBeenCalled();
+
+    setTimeoutSpy.mockRestore();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 
 
 });

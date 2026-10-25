@@ -185,4 +185,32 @@ it("closes when the modal backdrop is clicked", async () => {
   expect(onClose).toHaveBeenCalledTimes(1);
 });
 
+it("displays a fallback message when the API error has no message", async () => {
+  const user = userEvent.setup();
+
+  apiRequest.mockRejectedValueOnce({});
+
+  render(<StudentForm onClose={onClose} onCreated={onCreated} />);
+
+  await user.type(
+    screen.getByLabelText(/Admission number/i),
+    "ADM-404",
+  );
+
+  await user.type(
+    screen.getByLabelText(/First name/i),
+    "Ayaan",
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Save student" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Unable to create student.",
+  );
+
+  expect(onCreated).not.toHaveBeenCalled();
+});
+
 });

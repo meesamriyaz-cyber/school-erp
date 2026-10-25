@@ -322,4 +322,60 @@ it("displays the student photo when a photo URL is available", async () => {
   );
 });
 
+it("does not update loading state after the request is aborted", async () => {
+  let rejectRequest;
+
+  apiRequest.mockImplementationOnce(
+    () =>
+      new Promise((resolve, reject) => {
+        rejectRequest = reject;
+      }),
+  );
+
+  const { unmount } = render(
+    <StudentDetails studentId="student-abort" onBack={vi.fn()} />,
+  );
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  unmount();
+
+  const abortError = new Error("Request aborted");
+  abortError.name = "AbortError";
+  rejectRequest(abortError);
+
+  await waitFor(() => {
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("displays a student photo with an empty last name", async () => {
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      _id: "student-photo-2",
+      firstName: "Ayaan",
+      lastName: "",
+      admissionNumber: "ADM-PHOTO-2",
+      photoUrl: "https://example.com/student.jpg",
+      status: "active",
+    },
+  });
+
+  render(
+    <StudentDetails
+      studentId="student-photo-2"
+      onBack={vi.fn()}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("img", { name: "Ayaan" }),
+  ).toHaveAttribute("src", "https://example.com/student.jpg");
+});
+
 });
