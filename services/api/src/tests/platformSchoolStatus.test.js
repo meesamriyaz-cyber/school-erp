@@ -81,6 +81,37 @@ describe("updateSchoolStatus", () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
+  it("revokes any lingering sessions before reactivating a suspended school", async () => {
+    req.body.status = "active";
+    schoolQuery.lean.mockResolvedValue({ ...activeSchool, status: "suspended" });
+    updateQuery.lean.mockResolvedValue({ ...activeSchool, status: "active" });
+
+    await updateSchoolStatus(req, res, next);
+
+    expect(updateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId, revokedAt: null },
+      { $set: { revokedAt: expect.any(Date) } },
+    );
+    expect(updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      findOneAndUpdate.mock.invocationCallOrder[0],
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("keeps a suspended school suspended if session revocation fails during reactivation", async () => {
+    const error = new Error("Session store unavailable");
+    req.body.status = "active";
+    schoolQuery.lean.mockResolvedValue({ ...activeSchool, status: "suspended" });
+    updateMany.mockRejectedValue(error);
+
+    await updateSchoolStatus(req, res, next);
+
+    expect(updateMany).toHaveBeenCalled();
+    expect(findOneAndUpdate).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(error);
+  });
+
   it("activates a pending school", async () => {
     req.body.status = "active";
     schoolQuery.lean.mockResolvedValue({ ...activeSchool, status: "pending" });
