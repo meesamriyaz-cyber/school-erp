@@ -1,5 +1,6 @@
 
 import User from "../models/User.js";
+import Tenant from "../models/Tenant.js";
 import { verifyAccessToken } from "../utils/tokens.js";
 
 const authenticate = async (req, res, next) => {
@@ -64,6 +65,21 @@ if (
     const actualTenantId = user.tenantId
       ? String(user.tenantId)
       : null;
+
+    // A school user's account must not remain usable after the school
+    // itself is suspended, even if the access token has not expired.
+    if (user.role !== "platform_admin") {
+      const tenant = await Tenant.findById(user.tenantId)
+        .select("_id status")
+        .lean();
+
+      if (!tenant || tenant.status !== "active") {
+        return res.status(403).json({
+          success: false,
+          message: "School is inactive; access is not available",
+        });
+      }
+    }
 
     // The database, not the request or token alone,
     // determines the user's current role and school.
