@@ -325,8 +325,12 @@ describe("authController.refresh", () => {
   let res;
   let next;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const Tenant = (await import("../models/Tenant.js")).default;
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: "tenant-123", status: "active" }) }),
+    });
 
     req = { body: {}, cookies: {} };
     res = createResponse();
