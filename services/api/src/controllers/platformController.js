@@ -299,3 +299,52 @@ export const listSchools = async (req, res, next) => {
     return next(error);
   }
 };
+
+// GET /api/v1/platform/schools/:schoolId
+export const getSchoolDetails = async (req, res, next) => {
+  try {
+    const { schoolId } = req.params ?? {};
+
+    if (!mongoose.isObjectIdOrHexString(schoolId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid school ID",
+      });
+    }
+
+    const school = await Tenant.findById(schoolId)
+      .select("_id name slug status contactEmail timezone createdAt updatedAt")
+      .lean();
+
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    const administrators = await User.find({
+      tenantId: school._id,
+      role: "school_admin",
+    })
+      .select("_id firstName lastName email status lastLoginAt createdAt")
+      .sort({ firstName: 1, lastName: 1, _id: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        school: {
+          ...school,
+          id: String(school._id),
+        },
+        administrators: administrators.map((administrator) => ({
+          ...administrator,
+          id: String(administrator._id),
+        })),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
