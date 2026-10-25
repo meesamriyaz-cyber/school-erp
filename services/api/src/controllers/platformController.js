@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
+import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -369,6 +370,16 @@ export const updateSchoolStatus = async (req, res, next) => {
         success: false,
         message: "School status changed during this request; reload and try again",
       });
+    }
+
+    // Revoke every outstanding school session when suspending it. Access-token
+    // checks block use immediately; revocation also prevents old refresh tokens
+    // from becoming usable if the school is later reactivated.
+    if (status === "suspended") {
+      await Session.updateMany(
+        { tenantId: school._id, revokedAt: null },
+        { $set: { revokedAt: new Date() } },
+      );
     }
 
     return res.status(200).json({
