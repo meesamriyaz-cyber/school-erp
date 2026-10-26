@@ -1,14 +1,45 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/authContext.js";
+import { apiRequest } from "../lib/api.js";
 
 const navigation = [
   { label: "Overview", icon: "▦" },
   { label: "Schools", icon: "⌂" },
 ];
 
+const PAGE_SIZE = 20;
+
+function formatDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : new Intl.DateTimeFormat("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+}
+
+function statusLabel(status) {
+  return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown";
+}
+
 export default function PlatformAdminWorkspace() {
-  const { user, logout } = useAuth();
+  const { user, logout, accessToken } = useAuth();
   const [activePage, setActivePage] = useState("Overview");
+  const [schools, setSchools] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: PAGE_SIZE,
+    total: 0,
+    totalPages: 0,
+  });
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [loadingSchools, setLoadingSchools] = useState(false);
+  const [schoolsError, setSchoolsError] = useState("");
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -20,6 +51,60 @@ export default function PlatformAdminWorkspace() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  useEffect(() => {
+    if (activePage !== "Schools") return undefined;
+
+    const controller = new AbortController();
+    const loadSchools = async () => {
+      setLoadingSchools(true);
+      setSchoolsError("");
+
+      const params = new URLSearchParams({
+        page: String(pagination.page),
+        limit: String(PAGE_SIZE),
+      });
+      if (search) params.set("search", search);
+      if (statusFilter) params.set("status", statusFilter);
+
+      try {
+        const response = await apiRequest(
+          `/platform/schools?${params.toString()}`,
+          { accessToken, signal: controller.signal },
+        );
+        setSchools(Array.isArray(response?.data) ? response.data : []);
+        setPagination((current) => ({
+          ...current,
+          ...(response?.pagination ?? {}),
+        }));
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setSchoolsError(error.message || "Unable to load the school directory.");
+          setSchools([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingSchools(false);
+      }
+    };
+
+    void loadSchools();
+    return () => controller.abort();
+  }, [activePage, accessToken, pagination.page, search, statusFilter]);
+
+  const submitSearch = (event) => {
+    event.preventDefault();
+    setPagination((current) => ({ ...current, page: 1 }));
+    setSearch(searchInput.trim());
+  };
+
+  const changeStatusFilter = (value) => {
+    setPagination((current) => ({ ...current, page: 1 }));
+    setStatusFilter(value);
+  };
+
+  const totalPages = pagination.totalPages || 0;
+  const startItem = pagination.total === 0 ? 0 : (pagination.page - 1) * PAGE_SIZE + 1;
+  const endItem = Math.min(pagination.page * PAGE_SIZE, pagination.total);
 
   return (
     <div className="platform-shell">
@@ -46,10 +131,10 @@ export default function PlatformAdminWorkspace() {
               key={item.label}
               className={`platform-nav-link ${activePage === item.label ? "platform-nav-link-active" : ""}`}
               onClick={() => setActivePage(item.label)}
+              aria-current={activePage === item.label ? "page" : undefined}
             >
               <span aria-hidden="true">{item.icon}</span>
               {item.label}
-              {item.label === "Schools" && <span className="platform-nav-tag">Next</span>}
             </button>
           ))}
         </nav>
@@ -85,7 +170,7 @@ export default function PlatformAdminWorkspace() {
           <p className="platform-page-description">
             {activePage === "Overview"
               ? "Manage schools and their access from one secure workspace."
-              : "The school directory will be available in the next implementation phase."}
+              : "Search registered schools, review their status, and move through the directory."}
           </p>
 
           {activePage === "Overview" ? (
@@ -106,7 +191,7 @@ export default function PlatformAdminWorkspace() {
                 <article className="platform-summary-card">
                   <span className="platform-summary-icon">⌂</span>
                   <span className="platform-summary-label">School directory</span>
-                  <strong>Coming next</strong>
+                  <strong>Available</strong>
                   <p>Search and inspect registered schools.</p>
                 </article>
                 <article className="platform-summary-card">
@@ -124,11 +209,114 @@ export default function PlatformAdminWorkspace() {
               </section>
             </>
           ) : (
-            <section className="platform-empty-state">
-              <div className="platform-empty-icon" aria-hidden="true">⌂</div>
-              <h2>School directory is next</h2>
-              <p>Phase 2 will connect this workspace to the protected school directory API, including search, status filters and pagination.</p>
-              <button type="button" onClick={() => setActivePage("Overview")}>Back to overview</button>
+            <section className="platform-directory" aria-label="School directory">
+              <div className="platform-directory-toolbar">
+                <form className="platform-search-form" onSubmit={submitSearch} role="search">
+                  <label className="platform-search-field">
+                    <span className="platform-search-icon" aria-hidden="true">⌕</span>
+                    <span className="sr-only">Search schools</span>
+                    <input
+                      type="search"
+                      value={searchInput}
+                      onChange={(event) => setSearchInput(event.target.value)}
+                      placeholder="Search by school name or slug"
+                      maxLength={100}
+                    />
+                  </label>
+                  <button type="submit" className="platform-primary-button">Search</button>
+                </form>
+                <label className="platform-status-filter">
+                  <span>Status</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => changeStatusFilter(event.target.value)}
+                    aria-label="Filter schools by status"
+                  >
+                    <option value="">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="platform-directory-meta">
+                <strong>{pagination.total} {pagination.total === 1 ? "school" : "schools"}</strong>
+                <span>{loadingSchools ? "Refreshing directory…" : search || statusFilter ? "Filtered results" : "All registered schools"}</span>
+              </div>
+
+              {schoolsError && (
+                <div className="platform-directory-error" role="alert">
+                  <p>{schoolsError}</p>
+                  <button type="button" onClick={() => setPagination((current) => ({ ...current }))}>
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              <div className="platform-table-wrap">
+                <table className="platform-school-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">School</th>
+                      <th scope="col">School ID</th>
+                      <th scope="col">Contact email</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingSchools && schools.length === 0 ? (
+                      <tr><td colSpan="5" className="platform-table-message" role="status">Loading schools…</td></tr>
+                    ) : schools.length > 0 ? (
+                      schools.map((school) => (
+                        <tr key={school.id || school._id}>
+                          <td>
+                            <strong className="platform-school-name">{school.name || "Unnamed school"}</strong>
+                          </td>
+                          <td><code>{school.slug || "—"}</code></td>
+                          <td>{school.contactEmail || "—"}</td>
+                          <td><span className={`platform-status-pill platform-status-${school.status || "unknown"}`}>{statusLabel(school.status)}</span></td>
+                          <td>{formatDate(school.createdAt)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="platform-table-message">
+                          {schoolsError ? "School records could not be loaded." : "No schools match these filters."}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="platform-pagination">
+                <span>
+                  {pagination.total === 0 ? "No results" : `Showing ${startItem}–${endItem} of ${pagination.total}`}
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    className="platform-page-button"
+                    disabled={loadingSchools || pagination.page <= 1}
+                    onClick={() => setPagination((current) => ({ ...current, page: current.page - 1 }))}
+                  >
+                    Previous
+                  </button>
+                  <span className="platform-page-count">
+                    Page {pagination.page}{totalPages > 0 ? ` of ${totalPages}` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="platform-page-button"
+                    disabled={loadingSchools || totalPages === 0 || pagination.page >= totalPages}
+                    onClick={() => setPagination((current) => ({ ...current, page: current.page + 1 }))}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </section>
           )}
         </div>
