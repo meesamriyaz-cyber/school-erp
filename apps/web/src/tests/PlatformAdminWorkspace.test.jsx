@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import PlatformAdminWorkspace from "../components/PlatformAdminWorkspace.jsx";
 import { useAuth } from "../context/authContext.js";
@@ -43,7 +43,7 @@ describe("PlatformAdminWorkspace school directory", () => {
     expect(await screen.findByText("Green Valley School")).toBeInTheDocument();
     expect(screen.getByText("green-valley")).toBeInTheDocument();
     expect(screen.getByText("office@greenvalley.example")).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(within(screen.getByRole("table", { name: "School directory" })).getByText("Active")).toBeInTheDocument();
 
     expect(apiRequest).toHaveBeenCalledWith(
       "/platform/schools?page=1&limit=20",
@@ -85,6 +85,12 @@ describe("PlatformAdminWorkspace school directory", () => {
   });
 
   it("moves between result pages", async () => {
+    const pageTwo = {
+      ...pageOne,
+      data: [{ ...pageOne.data[0], id: "school-21", name: "North School", slug: "north-school" }],
+      pagination: { page: 2, limit: 20, total: 21, totalPages: 2 },
+    };
+    apiRequest.mockResolvedValueOnce(pageOne).mockResolvedValueOnce(pageTwo);
     const user = userEvent.setup();
     render(<PlatformAdminWorkspace />);
     await user.click(screen.getByRole("button", { name: /Schools/ }));
