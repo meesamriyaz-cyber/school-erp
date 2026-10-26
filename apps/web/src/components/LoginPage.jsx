@@ -3,6 +3,7 @@ import { useAuth } from "../context/authContext.js";
 export default function LoginPage() {
   const { login } = useAuth();
 
+  const [workspace, setWorkspace] = useState("school");
   const [tenantSlug, setTenantSlug] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,7 +16,7 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      await login({ tenantSlug, email, password });
+      await login({ tenantSlug, email, password, workspace });
     } catch (err) {
       setError(err.message || "Unable to sign in. Please try again.");
     } finally {
@@ -32,29 +33,58 @@ export default function LoginPage() {
           School<span>Suite</span>
         </div>
 
-        <p className="auth-eyebrow">SCHOOL MANAGEMENT</p>
+        <p className="auth-eyebrow">SCHOOL MANAGEMENT PLATFORM</p>
 
         <h1>Welcome back</h1>
         <p className="auth-description">
-          Sign in to access your school workspace.
+          Choose your workspace, then sign in with your account.
         </p>
 
+        <div className="workspace-choice" role="group" aria-label="Choose workspace">
+          <button
+            type="button"
+            className={workspace === "school" ? "workspace-choice-active" : ""}
+            aria-pressed={workspace === "school"}
+            onClick={() => {
+              setWorkspace("school");
+              setError("");
+            }}
+          >
+            School workspace
+          </button>
+          <button
+            type="button"
+            className={workspace === "platform" ? "workspace-choice-active" : ""}
+            aria-pressed={workspace === "platform"}
+            onClick={() => {
+              setWorkspace("platform");
+              setError("");
+            }}
+          >
+            Platform Admin
+          </button>
+        </div>
+
         <form className="auth-form" onSubmit={handleSubmit}>
-          <label htmlFor="tenantSlug">School ID</label>
-          <input
-            id="tenantSlug"
-            name="tenantSlug"
-            type="text"
-            autoComplete="organization"
-            placeholder="e.g. green-valley-school"
-            value={tenantSlug}
-            onChange={(event) => setTenantSlug(event.target.value)}
-            required
-            maxLength={100}
-          />
-          <small className="auth-field-hint">
-            Enter the school ID provided by your administrator.
-          </small>
+          {workspace === "school" && (
+            <>
+              <label htmlFor="tenantSlug">School ID</label>
+              <input
+                id="tenantSlug"
+                name="tenantSlug"
+                type="text"
+                autoComplete="organization"
+                placeholder="e.g. green-valley-school"
+                value={tenantSlug}
+                onChange={(event) => setTenantSlug(event.target.value)}
+                required
+                maxLength={100}
+              />
+              <small className="auth-field-hint">
+                Enter the school ID provided by your administrator.
+              </small>
+            </>
+          )}
 
           <label htmlFor="email">Email address</label>
           <input
@@ -92,13 +122,18 @@ export default function LoginPage() {
             type="submit"
             disabled={submitting}
           >
-            {submitting ? "Signing in…" : "Sign in to workspace"}
+            {submitting
+              ? "Signing in…"
+              : workspace === "platform"
+                ? "Sign in to Platform Admin"
+                : "Sign in to school workspace"}
           </button>
         </form>
 
         <p className="auth-security-note">
-          Your school data is protected by secure authentication and
-          school-specific access controls.
+          {workspace === "platform"
+            ? "Platform administration is restricted to authorized platform administrator accounts."
+            : "Your school data is protected by secure authentication and school-specific access controls."}
         </p>
       </section>
     </main>
