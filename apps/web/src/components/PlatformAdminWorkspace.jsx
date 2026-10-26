@@ -40,6 +40,7 @@ export default function PlatformAdminWorkspace() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [schoolsError, setSchoolsError] = useState("");
+  const [reloadCount, setReloadCount] = useState(0);
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -89,7 +90,7 @@ export default function PlatformAdminWorkspace() {
 
     void loadSchools();
     return () => controller.abort();
-  }, [activePage, accessToken, pagination.page, search, statusFilter]);
+  }, [activePage, accessToken, pagination.page, search, statusFilter, reloadCount]);
 
   const submitSearch = (event) => {
     event.preventDefault();
@@ -248,14 +249,14 @@ export default function PlatformAdminWorkspace() {
               {schoolsError && (
                 <div className="platform-directory-error" role="alert">
                   <p>{schoolsError}</p>
-                  <button type="button" onClick={() => setPagination((current) => ({ ...current }))}>
+                  <button type="button" onClick={() => setReloadCount((count) => count + 1)}>
                     Retry
                   </button>
                 </div>
               )}
 
               <div className="platform-table-wrap">
-                <table className="platform-school-table">
+                <table className="platform-school-table" aria-label="School directory">
                   <thead>
                     <tr>
                       <th scope="col">School</th>
