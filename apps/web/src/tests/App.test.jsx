@@ -21,9 +21,36 @@ vi.mock("../components/StudentDirectory.jsx", () => ({
   default: () => <h2>Student directory displayed</h2>,
 }));
 
+vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({
+  default: () => <h1>Platform Administrator workspace displayed</h1>,
+}));
+
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("routes platform administrators to the separate platform workspace", () => {
+    useAuth.mockReturnValue({
+      status: "authenticated",
+      user: {
+        firstName: "Platform",
+        lastName: "Admin",
+        role: "platform_admin",
+        tenantId: null,
+      },
+      schoolContext: null,
+      logout: vi.fn(),
+    });
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Platform Administrator workspace displayed" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Good day, Administrator" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the session loading screen", () => {
