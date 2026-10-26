@@ -2656,3 +2656,253 @@ body {
     max-width: 100%;
   }
 }
+
+
+/* Role-separated authentication */
+.workspace-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 5px;
+  margin: 22px 0 20px;
+  border: 1px solid #e5eaf3;
+  border-radius: 11px;
+  background: #f6f8fc;
+}
+.workspace-choice button {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #718096;
+  font-size: 12px;
+  font-weight: 700;
+}
+.workspace-choice button.workspace-choice-active {
+  border-color: #e2e8ff;
+  background: #fff;
+  color: #3654cf;
+  box-shadow: 0 2px 7px #243a8f0d;
+}
+
+/* Dedicated Platform Administrator workspace */
+.platform-shell {
+  min-height: 100vh;
+  display: flex;
+  color: #202c42;
+  background: #f5f7fb;
+}
+.platform-sidebar {
+  width: 258px;
+  flex: 0 0 258px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #fff;
+  border-right: 1px solid #e7ebf2;
+}
+.platform-brand {
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 23px;
+  border-bottom: 1px solid #f0f2f7;
+}
+.platform-brand-mark {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(145deg, #5378ff, #3651ce);
+  font: 800 22px "Plus Jakarta Sans", sans-serif;
+}
+.platform-brand-name {
+  color: #1e2b44;
+  font: 800 18px "Plus Jakarta Sans", sans-serif;
+  letter-spacing: -.7px;
+}
+.platform-brand-name span { color: #4263eb; }
+.platform-brand-caption {
+  margin-top: 3px;
+  color: #9aa4b5;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.05px;
+}
+.platform-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 20px 15px 16px;
+  padding: 16px 13px;
+  border: 1px solid #e9edf5;
+  border-radius: 12px;
+}
+.platform-identity-label, .platform-nav-heading {
+  color: #929caf;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+}
+.platform-identity strong { font-size: 12px; }
+.platform-identity > span:last-child { color: #929caf; font-size: 10px; line-height: 1.5; }
+.platform-navigation { flex: 1; padding: 8px 13px; }
+.platform-nav-heading { display: block; padding: 8px 11px; }
+.platform-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 43px;
+  margin: 3px 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #738096;
+  text-align: left;
+  font-size: 12px;
+}
+.platform-nav-link > span:first-child { width: 19px; text-align: center; font-size: 18px; }
+.platform-nav-link:hover, .platform-nav-link-active { color: #3e5dde; background: #edf1ff; }
+.platform-nav-link-active { font-weight: 700; }
+.platform-nav-tag {
+  margin-left: auto;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #f0f2f7;
+  color: #7e8a9e;
+  font-size: 9px;
+}
+.platform-sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f7f8fc;
+  color: #718096;
+  font-size: 10px;
+}
+.platform-security-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: #28b883; }
+.platform-main { flex: 1; min-width: 0; }
+.platform-topbar {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 36px;
+  background: #fff;
+  border-bottom: 1px solid #e7ebf2;
+}
+.platform-breadcrumb { color: #929caf; font-size: 12px; }
+.platform-breadcrumb-divider { padding: 0 12px; color: #c5ccd7; }
+.platform-topbar > div:first-child > strong { color: #34415a; font-size: 12px; }
+.platform-user-actions { display: flex; align-items: center; gap: 11px; }
+.platform-user-avatar {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #e5edff;
+  color: #4263eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+.platform-user-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.platform-user-copy strong { color: #34415a; font-size: 12px; }
+.platform-user-copy span { color: #929caf; font-size: 10px; }
+.platform-logout {
+  margin-left: 8px;
+  padding: 9px 12px;
+  border: 1px solid #e5eaf3;
+  border-radius: 8px;
+  background: #fff;
+  color: #52617a;
+  font-size: 11px;
+  font-weight: 700;
+}
+.platform-logout:hover { background: #f7f8fc; }
+.platform-content { max-width: 1500px; margin: 0 auto; padding: 34px 36px; }
+.platform-eyebrow { margin-bottom: 9px; color: #8592a8; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+.platform-content > h1 { margin-bottom: 9px; font-size: clamp(24px, 2.4vw, 31px); letter-spacing: -1px; }
+.platform-page-description { margin-bottom: 26px; color: #8b96a9; font-size: 12px; line-height: 1.7; }
+.platform-welcome-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 220px;
+  padding: 32px 36px;
+  overflow: hidden;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(112deg, #263caa 0%, #4969e8 62%, #7182ef 100%);
+  box-shadow: 0 12px 28px #4664d51b;
+}
+.platform-card-kicker { color: #dbe3ff; font-size: 9px; font-weight: 800; letter-spacing: 1.4px; }
+.platform-welcome-card h2 { margin: 12px 0 10px; color: #fff; font-size: clamp(22px, 2.4vw, 30px); letter-spacing: -.7px; }
+.platform-welcome-card p { max-width: 480px; margin-bottom: 20px; color: #e0e6ff; font-size: 12px; line-height: 1.8; }
+.platform-welcome-card button, .platform-empty-state button {
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: #3d59d5;
+  font-size: 11px;
+  font-weight: 800;
+}
+.platform-card-art {
+  width: 140px;
+  height: 140px;
+  flex: 0 0 140px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ffffff4d;
+  border-radius: 34px;
+  background: #ffffff14;
+  color: #fff;
+  font-size: 72px;
+  transform: rotate(8deg);
+}
+.platform-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 22px; }
+.platform-summary-card { display: flex; flex-direction: column; align-items: flex-start; min-height: 175px; padding: 20px; border: 1px solid #e7ebf2; border-radius: 14px; background: #fff; box-shadow: 0 3px 12px #1d31540d; }
+.platform-summary-icon { width: 36px; height: 36px; display: grid; place-items: center; margin-bottom: 17px; border-radius: 10px; background: #edf1ff; color: #4263eb; font-size: 19px; }
+.platform-summary-label { color: #7f8aa0; font-size: 11px; }
+.platform-summary-card strong { margin-top: 7px; font-size: 16px; }
+.platform-summary-card p { margin: 8px 0 0; color: #929caf; font-size: 11px; line-height: 1.6; }
+.platform-empty-state { display: flex; flex-direction: column; align-items: flex-start; padding: 32px; border: 1px solid #e7ebf2; border-radius: 14px; background: #fff; }
+.platform-empty-icon { width: 48px; height: 48px; display: grid; place-items: center; margin-bottom: 18px; border-radius: 12px; background: #edf1ff; color: #4263eb; font-size: 25px; }
+.platform-empty-state h2 { margin-bottom: 8px; font-size: 18px; }
+.platform-empty-state p { max-width: 600px; color: #7f8aa0; font-size: 12px; line-height: 1.7; }
+.platform-empty-state button { background: #4263eb; color: #fff; }
+@media (max-width: 760px) {
+  .platform-sidebar { width: 218px; flex-basis: 218px; }
+  .platform-topbar { align-items: flex-start; flex-direction: column; padding: 16px 20px; }
+  .platform-content { padding: 24px 20px; }
+  .platform-summary-grid { grid-template-columns: 1fr; }
+  .platform-welcome-card { padding: 25px; }
+  .platform-card-art { width: 76px; height: 76px; flex-basis: 76px; font-size: 42px; }
+}
+@media (max-width: 540px) {
+  .platform-sidebar { width: 74px; flex-basis: 74px; }
+  .platform-brand { justify-content: center; padding: 0; }
+  .platform-brand > div:last-child, .platform-identity, .platform-nav-heading, .platform-nav-link:not(.platform-nav-link-active) { display: none; }
+  .platform-navigation { padding: 8px; }
+  .platform-nav-link { justify-content: center; padding: 0; font-size: 0; }
+  .platform-nav-link > span:first-child { font-size: 20px; }
+  .platform-nav-link-active { font-size: 0; }
+  .platform-sidebar-footer { justify-content: center; margin: 8px; padding: 10px 0; }
+  .platform-sidebar-footer > span:last-child { display: none; }
+  .platform-user-copy { display: none; }
+  .platform-logout { margin-left: 0; }
+  .platform-card-art { display: none; }
+  .platform-welcome-card { padding: 23px; }
+}
