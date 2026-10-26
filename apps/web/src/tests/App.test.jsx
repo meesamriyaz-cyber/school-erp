@@ -64,7 +64,7 @@ describe("App", () => {
     render(<App />);
 
     expect(
-      screen.getByText(/Restoring your school session/),
+      screen.getByText(/Restoring your session/),
     ).toBeInTheDocument();
   });
 
