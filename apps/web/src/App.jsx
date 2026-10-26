@@ -5,6 +5,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { useAuth } from "./context/authContext.js";
 import LoginPage from "./components/LoginPage.jsx";
 import StudentDirectory from "./components/StudentDirectory.jsx";
+import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -41,6 +42,10 @@ function DashboardApp() {
 
   if (status !== "authenticated") {
     return <LoginPage />;
+  }
+
+  if (user?.role === "platform_admin") {
+    return <PlatformAdminWorkspace />;
   }
 
   const schoolName = schoolContext?.school?.name || "School workspace";
