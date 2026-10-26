@@ -35,7 +35,7 @@ function DashboardApp() {
     return (
       <main className="auth-loading">
         <div className="auth-brand-mark">S</div>
-        <p>Restoring your school session…</p>
+        <p>Restoring your session…</p>
       </main>
     );
   }
