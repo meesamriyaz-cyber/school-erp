@@ -8,6 +8,7 @@ import studentRoutes from "./studentRoutes.js";
 import academicYearRoutes from "./academicYearRoutes.js";
 import schoolClassRoutes from "./schoolClassRoutes.js";
 import sectionRoutes from "./sectionRoutes.js";
+import enrollmentRoutes from "./enrollmentRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -27,4 +28,5 @@ router.use("/students", studentRoutes);
 router.use("/academic-years", academicYearRoutes);
 router.use("/classes", schoolClassRoutes);
 router.use("/sections", sectionRoutes);
+router.use("/enrollments", enrollmentRoutes);
 export default router;
