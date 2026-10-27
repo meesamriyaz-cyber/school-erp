@@ -14,7 +14,7 @@ const sampleClass = { _id: "class-a", academicYearId: "year-a", name: "Class 1",
 
 describe("ClassesManagement", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     useAuth.mockReturnValue({ accessToken: "test-token", user: { role: "school_admin" } });
   });
 
