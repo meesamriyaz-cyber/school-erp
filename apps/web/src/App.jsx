@@ -352,6 +352,8 @@ function DashboardApp() {
             </>
           ) : activePage === "Students" ? (
   <StudentDirectory />
+) : activePage === "Academic Years" ? (
+  <AcademicYearManagement />
 ) : (
   <section className="content-card placeholder-page">
     <div className="placeholder-icon">▦</div>
