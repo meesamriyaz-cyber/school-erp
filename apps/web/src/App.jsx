@@ -38,7 +38,6 @@ function DashboardApp() {
 
    useEffect(() => {
      if (status !== "authenticated" || !accessToken || user?.role === "platform_admin") {
-       setActiveAcademicYear(null);
        return undefined;
      }
 
