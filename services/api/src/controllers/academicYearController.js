@@ -1,6 +1,7 @@
 
 import mongoose from "mongoose";
 import AcademicYear from "../models/AcademicYear.js";
+import Enrollment from "../models/Enrollment.js";
 
 const CREATE_FIELDS = ["name", "startDate", "endDate", "status"];
 const UPDATE_FIELDS = CREATE_FIELDS;
@@ -233,6 +234,20 @@ export const updateAcademicYear = async (req, res, next) => {
         success: false,
         message: `Cannot change academic year from ${academicYear.status} to ${nextStatus}`,
       });
+    }
+
+    if (academicYear.status === "active" && nextStatus === "closed") {
+      const activeEnrollments = await Enrollment.exists({
+        tenantId: req.tenantId,
+        academicYearId: academicYear._id,
+        status: "active",
+      });
+      if (activeEnrollments) {
+        return res.status(409).json({
+          success: false,
+          message: "Complete, transfer, or withdraw active student enrollments before closing this academic year",
+        });
+      }
     }
 
     academicYear.set(fields);
