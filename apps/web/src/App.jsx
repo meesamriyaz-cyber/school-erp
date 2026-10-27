@@ -1,16 +1,19 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiRequest } from "./lib/api.js";
 import "./App.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { useAuth } from "./context/authContext.js";
 import LoginPage from "./components/LoginPage.jsx";
 import StudentDirectory from "./components/StudentDirectory.jsx";
+import AcademicYearManagement from "./components/AcademicYearManagement.jsx";
 import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
   { label: "Guardians", icon: "♧", section: "MAIN" },
   { label: "Teachers & Staff", icon: "♙", section: "MAIN" },
+  { label: "Academic Years", icon: "▣", section: "ACADEMICS" },
   { label: "Classes & Sections", icon: "▤", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
@@ -28,9 +31,33 @@ const stats = [
 ];
 
 function DashboardApp() {
-   const { status, user, schoolContext, logout } = useAuth();
+   const { status, user, schoolContext, logout, accessToken } = useAuth();
+   const [activeAcademicYear, setActiveAcademicYear] = useState(null);
    const [activePage, setActivePage] = useState("Overview");
    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+   useEffect(() => {
+     if (status !== "authenticated" || !accessToken || user?.role === "platform_admin") {
+       setActiveAcademicYear(null);
+       return undefined;
+     }
+
+     const controller = new AbortController();
+     apiRequest("/academic-years?status=active", {
+       accessToken,
+       signal: controller.signal,
+     }).then((response) => {
+       if (!controller.signal.aborted) {
+         setActiveAcademicYear(Array.isArray(response?.data) ? response.data[0] || null : null);
+       }
+     }).catch((error) => {
+       if (error.name !== "AbortError" && !controller.signal.aborted) {
+         setActiveAcademicYear(null);
+       }
+     });
+
+     return () => controller.abort();
+   }, [accessToken, status, user?.role]);
      if (status === "loading") {
     return (
       <main className="auth-loading">
@@ -153,7 +180,7 @@ function DashboardApp() {
           <div className="topbar-actions">
             <div className="academic-year">
               <span className="year-dot" />
-              Academic year <strong>2026–27</strong>
+              Academic year <strong>{activeAcademicYear?.name || "Not set"}</strong>
             </div>
             <button className="icon-button notification-button" aria-label="Notifications">
               ♧<span className="notification-dot" />
@@ -193,7 +220,7 @@ function DashboardApp() {
             <div className="date-chip">
               <span aria-hidden="true">▦</span>
               <span>Academic session</span>
-              <strong>2026–27</strong>
+              <strong>{activeAcademicYear?.name || "Not set"}</strong>
             </div>
           </div>
 
