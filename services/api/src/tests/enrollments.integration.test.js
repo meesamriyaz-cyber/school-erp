@@ -144,4 +144,64 @@ describe("Student Enrollment API", () => {
     const second = await post("/enrollments", adminA.token, payload);
     expect(second.status).toBe(409);
   });
+
+  it("prevents class or section deactivation while active placements use them", async () => {
+    const suffix = randomUUID().slice(0, 6);
+    const student = await makeStudent(schoolA, `guard-${suffix}`);
+    const unsectionedClass = await SchoolClass.create({
+      tenantId: schoolA._id, academicYearId: yearA._id, name: `Class guard ${suffix}`,
+    });
+    const classEnrollment = await post("/enrollments", adminA.token, {
+      studentId: String(student._id), academicYearId: String(yearA._id), classId: String(unsectionedClass._id),
+    });
+    expect(classEnrollment.status).toBe(201);
+    enrollmentIds.push(classEnrollment.body.data._id);
+    expect((await request(`/classes/${unsectionedClass._id}`, {
+      token: adminA.token, method: "PATCH", body: JSON.stringify({ status: "inactive" }),
+    })).status).toBe(409);
+
+    await request(`/enrollments/${classEnrollment.body.data._id}`, {
+      token: adminA.token, method: "PATCH", body: JSON.stringify({ status: "completed" }),
+    });
+    expect((await request(`/classes/${unsectionedClass._id}`, {
+      token: adminA.token, method: "PATCH", body: JSON.stringify({ status: "inactive" }),
+    })).status).toBe(200);
+
+    const section = await Section.create({ tenantId: schoolA._id, classId: classA._id, name: `Guard ${suffix}` });
+    const sectionStudent = await makeStudent(schoolA, `secguard-${suffix}`);
+    const sectionEnrollment = await post("/enrollments", adminA.token, {
+      studentId: String(sectionStudent._id), academicYearId: String(yearA._id),
+      classId: String(classA._id), sectionId: String(section._id),
+    });
+    expect(sectionEnrollment.status).toBe(201);
+    enrollmentIds.push(sectionEnrollment.body.data._id);
+    expect((await request(`/sections/${section._id}`, {
+      token: adminA.token, method: "PATCH", body: JSON.stringify({ status: "inactive" }),
+    })).status).toBe(409);
+    await request(`/enrollments/${sectionEnrollment.body.data._id}`, {
+      token: adminA.token, method: "PATCH", body: JSON.stringify({ status: "completed" }),
+    });
+    expect((await request(`/sections/${section._id}`, {
+      token: adminA.token, method: "PATCH", body: JSON.stringify({ status: "inactive" }),
+    })).status).toBe(200);
+  });
+
+  it("requires active enrollments to end before an academic year can close", async () => {
+    const student = await makeStudent(schoolB, "year-close");
+    const created = await post("/enrollments", adminB.token, {
+      studentId: String(student._id), academicYearId: String(yearB._id), classId: String(classB._id),
+    });
+    expect(created.status).toBe(201);
+    enrollmentIds.push(created.body.data._id);
+    expect((await request(`/academic-years/${yearB._id}`, {
+      token: adminB.token, method: "PATCH", body: JSON.stringify({ status: "closed" }),
+    })).status).toBe(409);
+    await request(`/enrollments/${created.body.data._id}`, {
+      token: adminB.token, method: "PATCH", body: JSON.stringify({ status: "completed" }),
+    });
+    expect((await request(`/academic-years/${yearB._id}`, {
+      token: adminB.token, method: "PATCH", body: JSON.stringify({ status: "closed" }),
+    })).status).toBe(200);
+  });
+
 });
