@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import SchoolClass from "../models/SchoolClass.js";
 import AcademicYear from "../models/AcademicYear.js";
 import Section from "../models/Section.js";
+import Enrollment from "../models/Enrollment.js";
 
 const CREATE_FIELDS = ["academicYearId", "name", "sortOrder", "status"];
 const UPDATE_FIELDS = ["name", "sortOrder", "status"];
@@ -109,6 +110,8 @@ export const updateClass = async (req, res, next) => {
     if (fields.status === "inactive") {
       const activeSections = await Section.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" });
       if (activeSections) return res.status(409).json({ success: false, message: "Deactivate this class's active sections before deactivating the class" });
+      const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" });
+      if (activeEnrollments) return res.status(409).json({ success: false, message: "End active student enrollments before deactivating this class" });
     }
     schoolClass.set(fields);
     await schoolClass.save();
