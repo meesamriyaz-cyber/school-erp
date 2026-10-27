@@ -445,4 +445,37 @@ it("shows an empty state when a student has no enrollment history", async () => 
 });
 
 
+it("shows terminal enrollment outcomes in history without a current placement", async () => {
+  const studentId = "student-terminal-history";
+  const student = {
+    _id: studentId,
+    firstName: "Ayaan",
+    lastName: "Khan",
+    admissionNumber: "ADM-TERMINAL",
+    status: "active",
+  };
+  const history = [
+    { _id: "enrollment-completed", academicYearId: { name: "2023-2024" }, classId: { name: "Class 1" }, enrollmentDate: "2023-04-01", endedAt: "2024-03-31", status: "completed" },
+    { _id: "enrollment-transferred", academicYearId: { name: "2024-2025" }, classId: { name: "Class 2" }, enrollmentDate: "2024-04-01", endedAt: "2024-10-15", status: "transferred" },
+    { _id: "enrollment-withdrawn", academicYearId: { name: "2025-2026" }, classId: { name: "Class 3" }, enrollmentDate: "2025-04-01", endedAt: "2025-09-10", status: "withdrawn" },
+  ];
+
+  apiRequest.mockImplementation(async (path) => {
+    if (path === `/students/${studentId}`) return { success: true, data: student };
+    if (path === `/enrollments?studentId=${studentId}`) return { success: true, data: history };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId={studentId} onBack={vi.fn()} />);
+
+  expect(await screen.findByText("This student has no active academic placement.")).toBeInTheDocument();
+  expect(screen.getByText("2023-2024 · Class 1")).toBeInTheDocument();
+  expect(screen.getByText("2024-2025 · Class 2")).toBeInTheDocument();
+  expect(screen.getByText("2025-2026 · Class 3")).toBeInTheDocument();
+  expect(screen.getByText("completed")).toBeInTheDocument();
+  expect(screen.getByText("transferred")).toBeInTheDocument();
+  expect(screen.getByText("withdrawn")).toBeInTheDocument();
+  expect(screen.getAllByText(/Ended:/)).toHaveLength(3);
+});
+
 });
