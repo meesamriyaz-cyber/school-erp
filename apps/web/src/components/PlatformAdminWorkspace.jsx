@@ -41,6 +41,23 @@ export default function PlatformAdminWorkspace() {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [schoolsError, setSchoolsError] = useState("");
   const [reloadCount, setReloadCount] = useState(0);
+  const [schoolForm, setSchoolForm] = useState({
+    name: "",
+    slug: "",
+    contactEmail: "",
+    timezone: "Asia/Kolkata",
+    adminFirstName: "",
+    adminLastName: "",
+    adminEmail: "",
+    adminPassword: "",
+  });
+  const [creatingSchool, setCreatingSchool] = useState(false);
+  const [createSchoolError, setCreateSchoolError] = useState("");
+  const [createSchoolSuccess, setCreateSchoolSuccess] = useState("");
+  const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [schoolDetails, setSchoolDetails] = useState(null);
+  const [loadingSchoolDetails, setLoadingSchoolDetails] = useState(false);
+  const [schoolDetailsError, setSchoolDetailsError] = useState("");
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -91,6 +108,103 @@ export default function PlatformAdminWorkspace() {
     void loadSchools();
     return () => controller.abort();
   }, [activePage, accessToken, pagination.page, search, statusFilter, reloadCount]);
+
+
+  useEffect(() => {
+    if (activePage !== "SchoolDetails" || !selectedSchoolId) return undefined;
+    const controller = new AbortController();
+    const loadSchoolDetails = async () => {
+      setLoadingSchoolDetails(true);
+      setSchoolDetailsError("");
+      try {
+        const response = await apiRequest(
+          `/platform/schools/${encodeURIComponent(selectedSchoolId)}`,
+          { accessToken, signal: controller.signal },
+        );
+        setSchoolDetails(response?.data ?? response?.school ?? response ?? null);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setSchoolDetailsError(error.message || "Unable to load school details.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingSchoolDetails(false);
+      }
+    };
+    void loadSchoolDetails();
+    return () => controller.abort();
+  }, [activePage, accessToken, selectedSchoolId, reloadCount]);
+
+  const updateSchoolForm = (event) => {
+    const { name, value } = event.target;
+    setSchoolForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const submitCreateSchool = async (event) => {
+    event.preventDefault();
+    setCreateSchoolError("");
+    setCreateSchoolSuccess("");
+    const name = schoolForm.name.trim();
+    const slug = schoolForm.slug.trim().toLowerCase();
+    const adminEmail = schoolForm.adminEmail.trim().toLowerCase();
+    if (!name || !slug || !schoolForm.adminFirstName.trim() || !adminEmail || !schoolForm.adminPassword) {
+      setCreateSchoolError("Complete all required fields before creating the school.");
+      return;
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      setCreateSchoolError("School ID must use lowercase letters, numbers, and single hyphens only.");
+      return;
+    }
+    if (schoolForm.adminPassword.length < 8) {
+      setCreateSchoolError("The initial administrator password must be at least 8 characters.");
+      return;
+    }
+    setCreatingSchool(true);
+    try {
+      const response = await apiRequest("/platform/schools", {
+        method: "POST",
+        accessToken,
+        body: {
+          school: {
+            name,
+            slug,
+            ...(schoolForm.contactEmail.trim() ? { contactEmail: schoolForm.contactEmail.trim().toLowerCase() } : {}),
+            timezone: schoolForm.timezone.trim() || "Asia/Kolkata",
+          },
+          admin: {
+            firstName: schoolForm.adminFirstName.trim(),
+            ...(schoolForm.adminLastName.trim() ? { lastName: schoolForm.adminLastName.trim() } : {}),
+            email: adminEmail,
+            password: schoolForm.adminPassword,
+          },
+        },
+      });
+      const created = response?.data?.school ?? response?.school ?? response?.data ?? null;
+      setCreateSchoolSuccess(`School "${created?.name || name}" and its initial administrator were created successfully.`);
+      setSchoolForm({
+        name: "", slug: "", contactEmail: "", timezone: "Asia/Kolkata",
+        adminFirstName: "", adminLastName: "", adminEmail: "", adminPassword: "",
+      });
+      setPagination((current) => ({ ...current, page: 1 }));
+      setSearch("");
+      setSearchInput("");
+      setStatusFilter("");
+      setReloadCount((count) => count + 1);
+    } catch (error) {
+      setCreateSchoolError(
+        error.status === 409
+          ? error.message || "A school with this ID or administrator email already exists."
+          : error.message || "Unable to create the school. Please try again.",
+      );
+    } finally {
+      setCreatingSchool(false);
+    }
+  };
+
+  const openSchoolDetails = (school) => {
+    setSelectedSchoolId(school.id || school._id);
+    setSchoolDetails(null);
+    setActivePage("SchoolDetails");
+  };
 
   const submitSearch = (event) => {
     event.preventDefault();
@@ -167,11 +281,15 @@ export default function PlatformAdminWorkspace() {
 
         <div className="platform-content">
           <div className="platform-eyebrow">CENTRAL ADMINISTRATION</div>
-          <h1>{activePage === "Overview" ? "Platform overview" : "School directory"}</h1>
+          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : "School directory"}</h1>
           <p className="platform-page-description">
             {activePage === "Overview"
               ? "Manage schools and their access from one secure workspace."
-              : "Search registered schools, review their status, and move through the directory."}
+              : activePage === "CreateSchool"
+                ? "Register a school and create its first administrator in one secure step."
+                : activePage === "SchoolDetails"
+                  ? "Review school information and its associated administrators."
+                  : "Search registered schools, review their status, and move through the directory."}
           </p>
 
           {activePage === "Overview" ? (
@@ -273,7 +391,7 @@ export default function PlatformAdminWorkspace() {
                       schools.map((school) => (
                         <tr key={school.id || school._id}>
                           <td>
-                            <strong className="platform-school-name">{school.name || "Unnamed school"}</strong>
+                            <button type="button" className="platform-school-name-button" onClick={() => openSchoolDetails(school)}>{school.name || "Unnamed school"}</button>
                           </td>
                           <td><code>{school.slug || "—"}</code></td>
                           <td>{school.contactEmail || "—"}</td>
