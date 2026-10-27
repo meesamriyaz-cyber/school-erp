@@ -141,4 +141,90 @@ describe("PlatformAdminWorkspace school directory", () => {
 
     expect(await screen.findByRole("table", { name: "School directory" })).toBeInTheDocument();
   });
+
+  it("creates a school and its initial administrator", async () => {
+    const user = userEvent.setup();
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Schools/ }));
+    await screen.findByText("Green Valley School");
+    await user.click(screen.getByRole("button", { name: /Create school/ }));
+
+    await user.type(screen.getByLabelText(/School name/), "North School");
+    await user.type(screen.getByLabelText(/School ID \/ slug/), "north-school");
+    await user.type(screen.getByLabelText(/School contact email/), "office@north.example");
+    await user.type(screen.getByLabelText(/First name/), "Amina");
+    await user.type(screen.getByLabelText(/Last name/), "Khan");
+    await user.type(screen.getByLabelText(/Administrator email/), "admin@north.example");
+    await user.type(screen.getByLabelText(/Temporary password/), "SecurePass123");
+
+    apiRequest.mockResolvedValueOnce({
+      success: true,
+      data: { school: { id: "school-2", name: "North School" }, admin: { id: "admin-2" } },
+    });
+    await user.click(screen.getByRole("button", { name: "Create school" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/created successfully/i);
+    expect(apiRequest).toHaveBeenLastCalledWith("/platform/schools", expect.objectContaining({
+      method: "POST",
+      accessToken: "platform-access-token",
+      body: {
+        school: {
+          name: "North School",
+          slug: "north-school",
+          contactEmail: "office@north.example",
+          timezone: "Asia/Kolkata",
+        },
+        admin: {
+          firstName: "Amina",
+          lastName: "Khan",
+          email: "admin@north.example",
+          password: "SecurePass123",
+        },
+      },
+    }));
+  });
+
+  it("shows a helpful error when school creation conflicts", async () => {
+    const user = userEvent.setup();
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Schools/ }));
+    await screen.findByText("Green Valley School");
+    await user.click(screen.getByRole("button", { name: /Create school/ }));
+    await user.type(screen.getByLabelText(/School name/), "North School");
+    await user.type(screen.getByLabelText(/School ID \/ slug/), "north-school");
+    await user.type(screen.getByLabelText(/First name/), "Amina");
+    await user.type(screen.getByLabelText(/Administrator email/), "admin@north.example");
+    await user.type(screen.getByLabelText(/Temporary password/), "SecurePass123");
+    const conflict = Object.assign(new Error("A school with this slug already exists."), { status: 409 });
+    apiRequest.mockRejectedValueOnce(conflict);
+
+    await user.click(screen.getByRole("button", { name: "Create school" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/slug already exists/i);
+  });
+
+  it("opens school details and displays the school administrators", async () => {
+    const user = userEvent.setup();
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Schools/ }));
+    await user.findByText("Green Valley School");
+    apiRequest.mockResolvedValueOnce({
+      success: true,
+      data: {
+        school: {
+          id: "school-1", name: "Green Valley School", slug: "green-valley",
+          contactEmail: "office@greenvalley.example", status: "active",
+          timezone: "Asia/Kolkata", createdAt: "2025-01-15T00:00:00.000Z",
+        },
+        administrators: [{ id: "admin-1", firstName: "Amina", lastName: "Khan", email: "admin@greenvalley.example", status: "active" }],
+      },
+    });
+    await user.click(screen.getByRole("button", { name: "Green Valley School" }));
+
+    expect(await screen.findByText("School administrators")).toBeInTheDocument();
+    expect(await screen.findByText("admin@greenvalley.example")).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenLastCalledWith("/platform/schools/school-1", expect.objectContaining({
+      accessToken: "platform-access-token",
+    }));
+  });
+
 });
