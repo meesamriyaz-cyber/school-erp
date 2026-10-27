@@ -29,6 +29,10 @@ vi.mock("../components/ClassesManagement.jsx", () => ({
   default: () => <h2>Classes management displayed</h2>,
 }));
 
+vi.mock("../components/SectionsManagement.jsx", () => ({
+  default: () => <h2>Sections management displayed</h2>,
+}));
+
 vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
 import { apiRequest } from "../lib/api.js";
 
@@ -462,4 +466,20 @@ it("shows the active academic year and opens its management page", async () => {
     expect(screen.getByRole("heading", { name: "Classes management displayed" })).toBeInTheDocument();
   });
 
+});
+
+
+it("opens Sections management from academic navigation", async () => {
+  const user = userEvent.setup();
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    accessToken: "test-access-token",
+    user: { firstName: "Ayaan", lastName: "Khan", role: "SCHOOL_ADMIN" },
+    schoolContext: { school: { name: "Green Valley School" } },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: /^Sections$/ }));
+  expect(screen.getByRole("heading", { name: "Sections management displayed" })).toBeInTheDocument();
 });
