@@ -316,7 +316,7 @@ export default function PlatformAdminWorkspace() {
                 <article className="platform-summary-card">
                   <span className="platform-summary-icon">＋</span>
                   <span className="platform-summary-label">School onboarding</span>
-                  <strong>Coming next</strong>
+                  <strong>Available</strong>
                   <p>Create a school and its initial administrator.</p>
                 </article>
                 <article className="platform-summary-card">
@@ -327,6 +327,50 @@ export default function PlatformAdminWorkspace() {
                 </article>
               </section>
             </>
+          ) : activePage === "CreateSchool" ? (
+            <section className="platform-form-card" aria-label="Create school form">
+              <div className="platform-form-heading">
+                <div><h2>School information</h2><p>Fields marked required must be completed.</p></div>
+                <button type="button" className="platform-secondary-button" onClick={() => setActivePage("Schools")}>Back to directory</button>
+              </div>
+              {createSchoolSuccess && <div className="platform-form-success" role="status">{createSchoolSuccess}<button type="button" onClick={() => { setCreateSchoolSuccess(""); setActivePage("Schools"); }}>View directory</button></div>}
+              {createSchoolError && <div className="platform-directory-error" role="alert"><p>{createSchoolError}</p></div>}
+              <form className="platform-school-form" onSubmit={submitCreateSchool}>
+                <h3>School details</h3>
+                <label>School name *<input name="name" value={schoolForm.name} onChange={updateSchoolForm} required maxLength={160} autoComplete="organization" /></label>
+                <label>School ID / slug *<input name="slug" value={schoolForm.slug} onChange={(event) => setSchoolForm((current) => ({ ...current, slug: event.target.value.toLowerCase().replace(/\s+/g, "-") }))} required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} aria-describedby="platform-school-slug-help" /><small id="platform-school-slug-help">Use lowercase letters, numbers, and hyphens. This ID is used for school sign-in.</small></label>
+                <label>School contact email<input type="email" name="contactEmail" value={schoolForm.contactEmail} onChange={updateSchoolForm} maxLength={254} autoComplete="email" /></label>
+                <label>Timezone *<input name="timezone" value={schoolForm.timezone} onChange={updateSchoolForm} required maxLength={80} placeholder="Asia/Kolkata" /></label>
+                <h3>Initial school administrator</h3>
+                <label>First name *<input name="adminFirstName" value={schoolForm.adminFirstName} onChange={updateSchoolForm} required maxLength={80} autoComplete="given-name" /></label>
+                <label>Last name<input name="adminLastName" value={schoolForm.adminLastName} onChange={updateSchoolForm} maxLength={80} autoComplete="family-name" /></label>
+                <label>Administrator email *<input type="email" name="adminEmail" value={schoolForm.adminEmail} onChange={updateSchoolForm} required maxLength={254} autoComplete="email" /></label>
+                <label>Temporary password *<input type="password" name="adminPassword" value={schoolForm.adminPassword} onChange={updateSchoolForm} required minLength={8} maxLength={128} autoComplete="new-password" /><small>Use at least 8 characters and share it securely with the administrator.</small></label>
+                <div className="platform-form-actions"><button type="button" className="platform-secondary-button" onClick={() => setActivePage("Schools")} disabled={creatingSchool}>Cancel</button><button type="submit" className="platform-primary-button" disabled={creatingSchool}>{creatingSchool ? "Creating school…" : "Create school"}</button></div>
+              </form>
+            </section>
+          ) : activePage === "SchoolDetails" ? (
+            <section className="platform-form-card" aria-label="School details">
+              <div className="platform-form-heading"><div><h2>{schoolDetails?.school?.name || schoolDetails?.name || "School details"}</h2><p>School profile and administrator accounts</p></div><button type="button" className="platform-secondary-button" onClick={() => setActivePage("Schools")}>Back to directory</button></div>
+              {loadingSchoolDetails && <p role="status">Loading school details…</p>}
+              {schoolDetailsError && <div className="platform-directory-error" role="alert"><p>{schoolDetailsError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
+              {schoolDetails && (() => {
+                const school = schoolDetails.school || schoolDetails;
+                const administrators = schoolDetails.administrators || schoolDetails.admins || schoolDetails.schoolAdmins || [];
+                return <>
+                  <dl className="platform-school-details">
+                    <div><dt>School name</dt><dd>{school.name || "—"}</dd></div>
+                    <div><dt>School ID</dt><dd>{school.slug || "—"}</dd></div>
+                    <div><dt>Contact email</dt><dd>{school.contactEmail || "—"}</dd></div>
+                    <div><dt>Status</dt><dd>{statusLabel(school.status)}</dd></div>
+                    <div><dt>Timezone</dt><dd>{school.timezone || "—"}</dd></div>
+                    <div><dt>Created</dt><dd>{formatDate(school.createdAt)}</dd></div>
+                  </dl>
+                  <h3>School administrators</h3>
+                  {administrators.length ? <div className="platform-admin-list">{administrators.map((admin) => <article key={admin.id || admin._id || admin.email}><strong>{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || "Administrator"}</strong><span>{admin.email || "—"}</span><span>{statusLabel(admin.status)}</span></article>)}</div> : <p>No school administrators were returned for this school.</p>}
+                </>;
+              })()}
+            </section>
           ) : (
             <section className="platform-directory" aria-label="School directory">
               <div className="platform-directory-toolbar">
