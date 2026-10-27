@@ -174,7 +174,7 @@ export default function StudentDetails({ studentId, onBack }) {
           <div className="student-details-grid">
             <DetailItem label="Academic Year" value={currentEnrollment.academicYearId?.name} />
             <DetailItem label="Class" value={currentEnrollment.classId?.name} />
-            <DetailItem label="Section" value={currentEnrollment.sectionId?.name || "Not assigned"} />
+            <DetailItem label="Section" value={currentEnrollment.sectionId?.name ? `Section ${currentEnrollment.sectionId.name}` : "Not assigned"} />
             <DetailItem label="Enrollment Date" value={formatDate(currentEnrollment.enrollmentDate)} />
             <DetailItem label="Placement Status" value={currentEnrollment.status} />
           </div>
