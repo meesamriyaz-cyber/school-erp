@@ -3226,3 +3226,107 @@ body {
   .platform-form-actions { flex-wrap: wrap; }
   .platform-form-success { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Student academic profile and enrollment history */
+.student-academic-profile,
+.student-academic-history {
+  margin-top: 1.25rem;
+}
+
+.student-academic-history-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.student-academic-history-heading p {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted, #64748b);
+  font-size: 0.9rem;
+}
+
+.student-academic-history-heading button {
+  flex-shrink: 0;
+  border: 1px solid var(--border-color, #dbe2ea);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  background: var(--surface, #fff);
+  color: inherit;
+  cursor: pointer;
+}
+
+.student-academic-history-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.student-academic-history-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+.student-academic-history-list li > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.student-academic-history-list li strong {
+  overflow-wrap: anywhere;
+}
+
+.student-academic-history-list li span {
+  color: var(--text-muted, #64748b);
+  font-size: 0.875rem;
+}
+
+.student-history-status {
+  flex-shrink: 0;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155 !important;
+  text-transform: capitalize;
+}
+
+.student-history-status-active {
+  background: #dcfce7;
+  color: #166534 !important;
+}
+
+.student-history-status-completed {
+  background: #dbeafe;
+  color: #1d4ed8 !important;
+}
+
+.student-history-status-transferred {
+  background: #fef3c7;
+  color: #92400e !important;
+}
+
+.student-history-status-withdrawn {
+  background: #fee2e2;
+  color: #991b1b !important;
+}
+
+.student-academic-history-error {
+  color: #b91c1c;
+}
+
+@media (max-width: 600px) {
+  .student-academic-history-heading,
+  .student-academic-history-list li {
+    flex-direction: column;
+  }
+
+  .student-history-status {
+    align-self: flex-start;
+  }
+}
