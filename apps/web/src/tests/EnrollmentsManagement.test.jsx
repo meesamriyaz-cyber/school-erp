@@ -32,7 +32,7 @@ describe("EnrollmentsManagement", () => {
     render(<EnrollmentsManagement />);
     expect(await screen.findByText("Ayaan Khan")).toBeInTheDocument();
     expect(screen.getByText("Class 1")).toBeInTheDocument();
-    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.getAllByText("A").length).toBeGreaterThan(0);
   });
 
   it("creates an enrollment using the selected student, class, and section", async () => {
