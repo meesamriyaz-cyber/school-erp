@@ -145,6 +145,38 @@ describe("Student Enrollment API", () => {
     expect(second.status).toBe(409);
   });
 
+  it("enforces section capacity for new enrollments and capacity reductions", async () => {
+    const suffix = randomUUID().slice(0, 6);
+    const section = await Section.create({
+      tenantId: schoolA._id, classId: classA._id, name: `Capacity ${suffix}`, capacity: 2,
+    });
+    const students = [
+      await makeStudent(schoolA, `capacity-a-${suffix}`),
+      await makeStudent(schoolA, `capacity-b-${suffix}`),
+      await makeStudent(schoolA, `capacity-c-${suffix}`),
+    ];
+    for (const student of students.slice(0, 2)) {
+      const created = await post("/enrollments", adminA.token, {
+        studentId: String(student._id), academicYearId: String(yearA._id),
+        classId: String(classA._id), sectionId: String(section._id),
+      });
+      expect(created.status).toBe(201);
+      enrollmentIds.push(created.body.data._id);
+    }
+    const overCapacity = await post("/enrollments", adminA.token, {
+      studentId: String(students[2]._id), academicYearId: String(yearA._id),
+      classId: String(classA._id), sectionId: String(section._id),
+    });
+    expect(overCapacity.status).toBe(409);
+    expect(overCapacity.body.message).toMatch(/reached its capacity/i);
+
+    const shrink = await request(`/sections/${section._id}`, {
+      token: adminA.token, method: "PATCH", body: JSON.stringify({ capacity: 1 }),
+    });
+    expect(shrink.status).toBe(409);
+    expect(shrink.body.message).toMatch(/cannot be lower than its active enrollment count/i);
+  });
+
   it("prevents class or section deactivation while active placements use them", async () => {
     const suffix = randomUUID().slice(0, 6);
     const student = await makeStudent(schoolA, `guard-${suffix}`);
