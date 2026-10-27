@@ -21,6 +21,13 @@ vi.mock("../components/StudentDirectory.jsx", () => ({
   default: () => <h2>Student directory displayed</h2>,
 }));
 
+vi.mock("../components/AcademicYearManagement.jsx", () => ({
+  default: () => <h2>Academic year management displayed</h2>,
+}));
+
+vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
+import { apiRequest } from "../lib/api.js";
+
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({
   default: () => <h1>Platform Administrator workspace displayed</h1>,
 }));
