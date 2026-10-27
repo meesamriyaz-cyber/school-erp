@@ -446,4 +446,20 @@ it("shows the active academic year and opens its management page", async () => {
   expect(screen.getByRole("heading", { name: "Academic year management displayed" })).toBeInTheDocument();
 });
 
+
+  it("opens Classes management from academic navigation", async () => {
+    const user = userEvent.setup();
+    useAuth.mockReturnValue({
+      status: "authenticated",
+      accessToken: "test-access-token",
+      user: { firstName: "Ayaan", lastName: "Khan", role: "SCHOOL_ADMIN" },
+      schoolContext: { school: { name: "Green Valley School" } },
+      logout: vi.fn(),
+    });
+
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /Classes & Sections/ }));
+    expect(screen.getByRole("heading", { name: "Classes management displayed" })).toBeInTheDocument();
+  });
+
 });
