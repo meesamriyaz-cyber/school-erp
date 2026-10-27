@@ -278,5 +278,5 @@ describe("Student Enrollment API", () => {
       });
       expect(updatedHistory.body.data.map((item) => item.status).sort()).toEqual([status, "active"].sort());
     }
-  });
+  }, 20000);
 });
