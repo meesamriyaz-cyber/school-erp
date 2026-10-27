@@ -35,6 +35,7 @@ vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    apiRequest.mockResolvedValue({ success: true, data: [] });
   });
 
   it("routes platform administrators to the separate platform workspace", () => {
