@@ -73,7 +73,11 @@ export default function AcademicYearManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadYears(controller.signal);
+    // Defer the stateful request out of the synchronous effect body.
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) return loadYears(controller.signal);
+      return undefined;
+    });
     return () => controller.abort();
   }, [loadYears]);
 
