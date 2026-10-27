@@ -25,6 +25,10 @@ vi.mock("../components/AcademicYearManagement.jsx", () => ({
   default: () => <h2>Academic year management displayed</h2>,
 }));
 
+vi.mock("../components/ClassesManagement.jsx", () => ({
+  default: () => <h2>Classes management displayed</h2>,
+}));
+
 vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
 import { apiRequest } from "../lib/api.js";
 
@@ -189,6 +193,22 @@ expect(screen.getAllByText("School workspace").length).toBeGreaterThan(0);
   expect(screen.getByText("School Administrator")).toBeInTheDocument();
   expect(screen.getByText("SA")).toBeInTheDocument();
   expect(screen.getByText("School user")).toBeInTheDocument();
+
+it("opens Classes management from academic navigation", async () => {
+  const user = userEvent.setup();
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    accessToken: "test-access-token",
+    user: { firstName: "Ayaan", lastName: "Khan", role: "SCHOOL_ADMIN" },
+    schoolContext: { school: { name: "Green Valley School" } },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: /Classes & Sections/ }));
+  expect(screen.getByRole("heading", { name: "Classes management displayed" })).toBeInTheDocument();
+});
+
 });
 
 
