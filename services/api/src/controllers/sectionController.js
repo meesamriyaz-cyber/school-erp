@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Section from "../models/Section.js";
 import SchoolClass from "../models/SchoolClass.js";
 import AcademicYear from "../models/AcademicYear.js";
+import Enrollment from "../models/Enrollment.js";
 
 const CREATE_FIELDS = ["classId", "name", "capacity", "status"];
 const UPDATE_FIELDS = ["name", "capacity", "status"];
@@ -105,6 +106,10 @@ export const updateSection = async (req, res, next) => {
       if (!parent) return res.status(409).json({ success: false, message: "A section cannot be activated while its class is inactive" });
       const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").lean();
       if (!academicYear) return res.status(409).json({ success: false, message: "A section cannot be activated for a closed academic year" });
+    }
+    if (fields.status === "inactive") {
+      const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" });
+      if (activeEnrollments) return res.status(409).json({ success: false, message: "End active student enrollments before deactivating this section" });
     }
     section.set(fields);
     await section.save();
