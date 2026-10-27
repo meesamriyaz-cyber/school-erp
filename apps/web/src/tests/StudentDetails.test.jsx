@@ -36,7 +36,8 @@ vi.mock("../components/EditStudentForm.jsx", () => ({
 
 describe("StudentDetails", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    apiRequest.mockResolvedValue({ success: true, data: [] });
   });
 
   it("loads and displays student personal and guardian details", async () => {
@@ -377,5 +378,71 @@ it("displays a student photo with an empty last name", async () => {
     await screen.findByRole("img", { name: "Ayaan" }),
   ).toHaveAttribute("src", "https://example.com/student.jpg");
 });
+
+
+it("shows the current placement and previous academic enrollment history", async () => {
+  const student = {
+    _id: "student-history-1",
+    firstName: "Ayaan",
+    lastName: "Khan",
+    admissionNumber: "ADM-HISTORY-1",
+    status: "active",
+  };
+  const enrollments = [
+    {
+      _id: "enrollment-current",
+      studentId: student,
+      academicYearId: { _id: "year-current", name: "2026-2027" },
+      classId: { _id: "class-current", name: "Class 2" },
+      sectionId: { _id: "section-current", name: "A" },
+      enrollmentDate: "2026-04-01T00:00:00.000Z",
+      status: "active",
+      endedAt: null,
+    },
+    {
+      _id: "enrollment-previous",
+      studentId: student,
+      academicYearId: { _id: "year-previous", name: "2025-2026" },
+      classId: { _id: "class-previous", name: "Class 1" },
+      sectionId: { _id: "section-previous", name: "B" },
+      enrollmentDate: "2025-04-01T00:00:00.000Z",
+      endedAt: "2026-03-31T00:00:00.000Z",
+      status: "completed",
+    },
+  ];
+  apiRequest.mockImplementation(async (path) => {
+    if (path === "/students/student-history-1") return { success: true, data: student };
+    if (path === "/enrollments?studentId=student-history-1") return { success: true, data: enrollments };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId="student-history-1" onBack={vi.fn()} />);
+
+  expect(await screen.findByText("2026-2027")).toBeInTheDocument();
+  expect(screen.getByText("Class 2")).toBeInTheDocument();
+  expect(screen.getByText("Section A")).toBeInTheDocument();
+  expect(screen.getByText("2025-2026 · Class 1 · Section B")).toBeInTheDocument();
+  expect(screen.getByText("completed")).toBeInTheDocument();
+  expect(apiRequest).toHaveBeenCalledWith(
+    "/enrollments?studentId=student-history-1",
+    expect.objectContaining({ accessToken: "test-access-token", signal: expect.any(AbortSignal) }),
+  );
+});
+
+it("shows an empty state when a student has no enrollment history", async () => {
+  apiRequest.mockImplementation(async (path) => {
+    if (path === "/students/student-no-history") {
+      return { success: true, data: { _id: "student-no-history", firstName: "Sara", lastName: "Ahmad", status: "active" } };
+    }
+    if (path === "/enrollments?studentId=student-no-history") return { success: true, data: [] };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId="student-no-history" onBack={vi.fn()} />);
+
+  expect(await screen.findByText("This student has no active academic placement.")).toBeInTheDocument();
+  expect(screen.getByText("No academic history is recorded for this student yet.")).toBeInTheDocument();
+});
+
 
 });
