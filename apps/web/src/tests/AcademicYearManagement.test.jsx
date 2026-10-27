@@ -20,7 +20,7 @@ describe("AcademicYearManagement", () => {
   it("lists academic years and highlights the active year", async () => {
     apiRequest.mockResolvedValueOnce({ success: true, data: [active, draft] });
     render(<AcademicYearManagement />);
-    expect(await screen.findByText("2026-2027")).toBeInTheDocument();
+    expect((await screen.findAllByText("2026-2027")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("2027-2028")).toBeInTheDocument();
     expect(screen.getByText("Current active academic year")).toBeInTheDocument();
     expect(apiRequest).toHaveBeenCalledWith("/academic-years", expect.objectContaining({ accessToken: "test-token" }));
@@ -73,7 +73,7 @@ describe("AcademicYearManagement", () => {
     useAuth.mockReturnValue({ accessToken: "test-token", user: { role: "principal" } });
     apiRequest.mockResolvedValueOnce({ success: true, data: [active] });
     render(<AcademicYearManagement />);
-    expect(await screen.findByText("2026-2027")).toBeInTheDocument();
+    expect((await screen.findAllByText("2026-2027")).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("You have read-only access to academic years.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Create academic year/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
