@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Section from "../models/Section.js";
 import SchoolClass from "../models/SchoolClass.js";
+import AcademicYear from "../models/AcademicYear.js";
 
 const CREATE_FIELDS = ["classId", "name", "capacity", "status"];
 const UPDATE_FIELDS = ["name", "capacity", "status"];
@@ -85,6 +86,8 @@ export const createSection = async (req, res, next) => {
     if (!fields) return;
     const parent = await SchoolClass.findOne({ _id: fields.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").lean();
     if (!parent) return res.status(400).json({ success: false, message: "Class was not found in this school or is inactive" });
+    const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").lean();
+    if (!academicYear) return res.status(400).json({ success: false, message: "Sections cannot be created for a closed academic year" });
     const data = await Section.create({ ...fields, tenantId: req.tenantId });
     return res.status(201).json({ success: true, data });
   } catch (error) { return handleError(error, res, next); }
@@ -98,8 +101,10 @@ export const updateSection = async (req, res, next) => {
     const section = await Section.findOne({ _id: req.params.sectionId, tenantId: req.tenantId });
     if (!section) return res.status(404).json({ success: false, message: "Section not found" });
     if (fields.status === "active") {
-      const parent = await SchoolClass.findOne({ _id: section.classId, tenantId: req.tenantId, status: "active" }).select("_id").lean();
+      const parent = await SchoolClass.findOne({ _id: section.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").lean();
       if (!parent) return res.status(409).json({ success: false, message: "A section cannot be activated while its class is inactive" });
+      const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").lean();
+      if (!academicYear) return res.status(409).json({ success: false, message: "A section cannot be activated for a closed academic year" });
     }
     section.set(fields);
     await section.save();
