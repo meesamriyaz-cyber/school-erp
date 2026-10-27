@@ -15,6 +15,7 @@ vi.mock("../components/StudentDirectory.jsx", () => ({ default: () => <h2>Studen
 vi.mock("../components/AcademicYearManagement.jsx", () => ({ default: () => <h2>Academic year management displayed</h2> }));
 vi.mock("../components/ClassesManagement.jsx", () => ({ default: () => <h2>Classes management displayed</h2> }));
 vi.mock("../components/SectionsManagement.jsx", () => ({ default: () => <h2>Sections management displayed</h2> }));
+vi.mock("../components/EnrollmentsManagement.jsx", () => ({ default: () => <h2>Enrollments management displayed</h2> }));
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>Platform Administrator workspace displayed</h1> }));
 
 const schoolAdmin = (overrides = {}) => ({
