@@ -57,12 +57,11 @@ export default function AcademicYearManagement() {
   const [pendingAction, setPendingAction] = useState(null);
 
   const loadYears = useCallback(async (signal) => {
-    setLoading(true);
-    setError("");
     try {
       const response = await apiRequest("/academic-years", { accessToken, signal });
       if (!response?.success || !Array.isArray(response.data)) throw new Error("Unexpected response from the server.");
       setYears(response.data);
+      setError("");
     } catch (err) {
       if (err.name === "AbortError") return;
       setYears([]);
@@ -126,7 +125,7 @@ export default function AcademicYearManagement() {
     </div>
     {activeYear && <div className="ay-active-callout"><span className="ay-active-dot" /><div><span>Current active academic year</span><strong>{activeYear.name}</strong></div><span>{dateLabel(activeYear.startDate)} – {dateLabel(activeYear.endDate)}</span></div>}
     {notice && <p className="ay-notice" role="status">{notice}</p>}
-    {error && <div className="ay-error-banner" role="alert"><span>{error}</span><button className="ay-button secondary" onClick={() => void loadYears()}>Retry</button></div>}
+    {error && <div className="ay-error-banner" role="alert"><span>{error}</span><button className="ay-button secondary" onClick={() => { setLoading(true); void loadYears(); }}>Retry</button></div>}
     {formOpen && <YearForm key={editingYear?._id || "new"} year={editingYear} saving={saving} error={formError} onCancel={() => { setFormOpen(false); setEditingYear(null); setFormError(""); }} onSubmit={saveYear} />}
     {pendingAction && <div className="ay-confirm" role="alertdialog" aria-labelledby="ay-confirm-title">
       <div><h3 id="ay-confirm-title">{pendingAction.status === "active" ? "Activate academic year?" : "Close academic year?"}</h3><p>{pendingAction.status === "active" ? `“${pendingAction.year.name}” will become the active year for this school.` : `“${pendingAction.year.name}” will be closed and cannot be edited again.`}</p></div>
