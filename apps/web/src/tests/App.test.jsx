@@ -168,4 +168,13 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: /^Sections$/ }));
     expect(screen.getByRole("heading", { name: "Sections management displayed" })).toBeInTheDocument();
   });
+
+  it("opens Enrollments management from academic navigation", async () => {
+    const user = userEvent.setup();
+    useAuth.mockReturnValue(schoolAdmin());
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /^Enrollments$/ }));
+    expect(screen.getByRole("heading", { name: "Enrollments management displayed" })).toBeInTheDocument();
+  });
+
 });
