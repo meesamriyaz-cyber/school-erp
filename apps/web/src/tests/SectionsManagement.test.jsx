@@ -11,7 +11,6 @@ vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
 const activeYear = { _id: "year-a", name: "2026-2027", status: "active" };
 const closedYear = { _id: "year-closed", name: "2025-2026", status: "closed" };
 const activeClass = { _id: "class-a", academicYearId: "year-a", name: "Class 1", status: "active" };
-const inactiveClass = { _id: "class-inactive", academicYearId: "year-a", name: "Class 2", status: "inactive" };
 const sampleSection = { _id: "section-a", classId: "class-a", name: "A", capacity: 35, status: "active" };
 
 describe("SectionsManagement", () => {
