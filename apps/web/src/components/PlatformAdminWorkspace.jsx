@@ -374,6 +374,7 @@ export default function PlatformAdminWorkspace() {
           ) : (
             <section className="platform-directory" aria-label="School directory">
               <div className="platform-directory-toolbar">
+                <button type="button" className="platform-primary-button" onClick={() => { setCreateSchoolError(""); setCreateSchoolSuccess(""); setActivePage("CreateSchool"); }}>＋ Create school</button>
                 <form className="platform-search-form" onSubmit={submitSearch} role="search">
                   <label className="platform-search-field">
                     <span className="platform-search-icon" aria-hidden="true">⌕</span>
