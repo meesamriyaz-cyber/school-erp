@@ -116,8 +116,18 @@ export const createEnrollment = async (req, res, next) => {
         tenantId: req.tenantId,
         classId: schoolClass._id,
         status: "active",
-      }).select("_id").lean();
+      }).select("_id capacity").lean();
       if (!section) return res.status(400).json({ success: false, message: "Active section was not found in the selected class and school" });
+      if (section.capacity !== null) {
+        const activeCount = await Enrollment.countDocuments({
+          tenantId: req.tenantId,
+          sectionId: section._id,
+          status: "active",
+        });
+        if (activeCount >= section.capacity) {
+          return res.status(409).json({ success: false, message: "The selected section has reached its capacity" });
+        }
+      }
     }
 
     const data = await Enrollment.create({
