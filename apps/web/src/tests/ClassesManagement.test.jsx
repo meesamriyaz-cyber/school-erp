@@ -37,8 +37,8 @@ describe("ClassesManagement", () => {
     await screen.findByText("No classes for 2026-2027");
     await user.click(screen.getByRole("button", { name: /Create class/ }));
     await user.type(screen.getByLabelText("Class name"), "Class 1");
-    await user.clear(screen.getByLabelText("Display order"));
-    await user.type(screen.getByLabelText("Display order"), "1");
+    await user.clear(screen.getByLabelText(/Display order/));
+    await user.type(screen.getByLabelText(/Display order/), "1");
     await user.click(screen.getByRole("button", { name: "Create class" }));
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith("/classes", expect.objectContaining({
       method: "POST",
