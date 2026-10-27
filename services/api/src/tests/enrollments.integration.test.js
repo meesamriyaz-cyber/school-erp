@@ -236,4 +236,47 @@ describe("Student Enrollment API", () => {
     })).status).toBe(200);
   });
 
+
+  it("records completed, transferred, and withdrawn transitions without losing history", async () => {
+    for (const status of ["completed", "transferred", "withdrawn"]) {
+      const student = await makeStudent(schoolA, `terminal-${status}`);
+      const created = await post("/enrollments", adminA.token, {
+        studentId: String(student._id),
+        academicYearId: String(yearA._id),
+        classId: String(classA._id),
+      });
+      expect(created.status).toBe(201);
+      enrollmentIds.push(created.body.data._id);
+
+      const ended = await request(`/enrollments/${created.body.data._id}`, {
+        token: adminA.token,
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      expect(ended.status).toBe(200);
+      expect(ended.body.data.status).toBe(status);
+      expect(ended.body.data.endedAt).toBeTruthy();
+
+      const history = await request(`/enrollments?studentId=${student._id}`, {
+        token: adminA.token,
+      });
+      expect(history.status).toBe(200);
+      expect(history.body.data).toHaveLength(1);
+      expect(history.body.data[0].status).toBe(status);
+      expect(history.body.data[0].endedAt).toBeTruthy();
+
+      const newPlacement = await post("/enrollments", adminA.token, {
+        studentId: String(student._id),
+        academicYearId: String(yearA._id),
+        classId: String(classA._id),
+      });
+      expect(newPlacement.status).toBe(201);
+      enrollmentIds.push(newPlacement.body.data._id);
+
+      const updatedHistory = await request(`/enrollments?studentId=${student._id}`, {
+        token: adminA.token,
+      });
+      expect(updatedHistory.body.data.map((item) => item.status).sort()).toEqual([status, "active"].sort());
+    }
+  });
 });
