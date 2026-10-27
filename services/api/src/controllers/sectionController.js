@@ -101,6 +101,16 @@ export const updateSection = async (req, res, next) => {
     if (!fields) return;
     const section = await Section.findOne({ _id: req.params.sectionId, tenantId: req.tenantId });
     if (!section) return res.status(404).json({ success: false, message: "Section not found" });
+    if (Object.hasOwn(fields, "capacity") && fields.capacity !== null) {
+      const activeEnrollments = await Enrollment.countDocuments({
+        tenantId: req.tenantId,
+        sectionId: section._id,
+        status: "active",
+      });
+      if (activeEnrollments > fields.capacity) {
+        return res.status(409).json({ success: false, message: "Section capacity cannot be lower than its active enrollment count" });
+      }
+    }
     if (fields.status === "active") {
       const parent = await SchoolClass.findOne({ _id: section.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").lean();
       if (!parent) return res.status(409).json({ success: false, message: "A section cannot be activated while its class is inactive" });
