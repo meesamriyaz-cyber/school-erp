@@ -9,6 +9,7 @@ import StudentDirectory from "./components/StudentDirectory.jsx";
 import AcademicYearManagement from "./components/AcademicYearManagement.jsx";
 import ClassesManagement from "./components/ClassesManagement.jsx";
 import SectionsManagement from "./components/SectionsManagement.jsx";
+import EnrollmentsManagement from "./components/EnrollmentsManagement.jsx";
 import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
@@ -18,6 +19,7 @@ const navigation = [
   { label: "Academic Years", icon: "▣", section: "ACADEMICS" },
   { label: "Classes & Sections", icon: "▤", section: "ACADEMICS" },
   { label: "Sections", icon: "▧", section: "ACADEMICS" },
+  { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
@@ -360,6 +362,8 @@ function DashboardApp() {
   <ClassesManagement />
 ) : activePage === "Sections" ? (
   <SectionsManagement />
+) : activePage === "Enrollments" ? (
+  <EnrollmentsManagement />
 ) : (
   <section className="content-card placeholder-page">
     <div className="placeholder-icon">▦</div>
