@@ -34,7 +34,7 @@ function YearForm({ year, saving, error, onCancel, onSubmit }) {
     <label>Academic year name<input name="name" value={form.name} maxLength={30} placeholder="e.g. 2027-2028" onChange={(e) => change("name", e.target.value)} required /></label>
     <div className="ay-date-fields">
       <label>Start date<input name="startDate" type="date" value={form.startDate} onChange={(e) => change("startDate", e.target.value)} required /></label>
-      <label>End date<input name="endDate" type="date" min={form.startDate || undefined} value={form.endDate} onChange={(e) => change("endDate", e.target.value)} required /></label>
+      <label>End date<input name="endDate" type="date" value={form.endDate} onChange={(e) => change("endDate", e.target.value)} required /></label>
     </div>
     {(validationError || error) && <p role="alert" className="ay-error">{validationError || error}</p>}
     <div className="ay-form-actions">
