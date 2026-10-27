@@ -5,6 +5,7 @@ import authRoutes from "./authRoutes.js";
 import platformRoutes from "./platformRoutes.js";
 import schoolRoutes from "./schoolRoutes.js";
 import studentRoutes from "./studentRoutes.js";
+import academicYearRoutes from "./academicYearRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -31,4 +32,5 @@ router.use("/auth", authRoutes);
 router.use("/platform", platformRoutes);
 router.use("/school", schoolRoutes);
 router.use("/students", studentRoutes);
+router.use("/academic-years", academicYearRoutes);
 export default router;
