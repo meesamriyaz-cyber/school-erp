@@ -7,6 +7,7 @@ import { useAuth } from "./context/authContext.js";
 import LoginPage from "./components/LoginPage.jsx";
 import StudentDirectory from "./components/StudentDirectory.jsx";
 import AcademicYearManagement from "./components/AcademicYearManagement.jsx";
+import ClassesManagement from "./components/ClassesManagement.jsx";
 import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
@@ -353,6 +354,8 @@ function DashboardApp() {
   <StudentDirectory />
 ) : activePage === "Academic Years" ? (
   <AcademicYearManagement />
+) : activePage === "Classes & Sections" ? (
+  <ClassesManagement />
 ) : (
   <section className="content-card placeholder-page">
     <div className="placeholder-icon">▦</div>
