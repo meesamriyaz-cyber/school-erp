@@ -17,6 +17,7 @@ const navigation = [
   { label: "Teachers & Staff", icon: "♙", section: "MAIN" },
   { label: "Academic Years", icon: "▣", section: "ACADEMICS" },
   { label: "Classes & Sections", icon: "▤", section: "ACADEMICS" },
+  { label: "Sections", icon: "▧", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
