@@ -41,7 +41,7 @@ const post = (path, token, body) => request(path, { token, method: "POST", body:
 describe("Student Enrollment API", () => {
   beforeAll(async () => {
     if (env.nodeEnv !== "test" || !env.mongoUri) throw new Error("Safety stop: configure the test environment.");
-    const match = env.mongoUri.match(/^mongodb(?:\\+srv)?:\\/\\/[^/]+\\/([^?]+)(?:\\?.*)?$/);
+    const match = env.mongoUri.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]+)(?:\?.*)?$/);
     if (!match || decodeURIComponent(match[1]) !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== "school-erp-test") throw new Error("Safety stop: unexpected database.");
