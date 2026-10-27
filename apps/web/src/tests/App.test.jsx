@@ -399,4 +399,31 @@ it("closes mobile navigation using the backdrop and returns to overview", async 
   ).toBeInTheDocument();
 });
 
+
+it("shows the active academic year and opens its management page", async () => {
+  const user = userEvent.setup();
+  apiRequest.mockResolvedValue({
+    success: true,
+    data: [{
+      _id: "year-active",
+      name: "2026-2027",
+      startDate: "2026-04-01T00:00:00.000Z",
+      endDate: "2027-03-31T00:00:00.000Z",
+      status: "active",
+    }],
+  });
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    accessToken: "test-access-token",
+    user: { firstName: "Ayaan", lastName: "Khan", role: "SCHOOL_ADMIN" },
+    schoolContext: { school: { name: "Green Valley School" } },
+    logout: vi.fn(),
+  });
+
+  render(<App />);
+  expect((await screen.findAllByText("2026-2027")).length).toBeGreaterThanOrEqual(1);
+  await user.click(screen.getByRole("button", { name: /Academic Years/ }));
+  expect(screen.getByRole("heading", { name: "Academic year management displayed" })).toBeInTheDocument();
+});
+
 });
