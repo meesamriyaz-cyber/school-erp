@@ -3,7 +3,6 @@ import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./AcademicYearManagement.css";
 
-const blank = { name: "", startDate: "", endDate: "" };
 const dateLabel = (value) => {
   const date = new Date(value);
   return value && !Number.isNaN(date.getTime())
