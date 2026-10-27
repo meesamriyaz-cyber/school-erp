@@ -99,6 +99,7 @@ describe("SectionsManagement", () => {
     apiRequest.mockResolvedValueOnce({ success: true, data: [closedYear, activeYear] });
     apiRequest.mockResolvedValueOnce({ success: true, data: [activeClass] });
     apiRequest.mockResolvedValueOnce({ success: true, data: [] });
+    apiRequest.mockResolvedValueOnce({ success: true, data: [] });
     render(<SectionsManagement />);
     await screen.findByText("No sections for Class 1");
     await user.selectOptions(screen.getByLabelText("Academic year"), "year-closed");
