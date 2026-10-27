@@ -1,6 +1,6 @@
+import "dotenv/config";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import { createSchool } from "../controllers/platformController.js";
@@ -10,7 +10,11 @@ const integrationDescribe = testMongoUri ? describe : describe.skip;
 
 const getDatabaseName = (uri) => {
   try {
-    return decodeURIComponent(new URL(uri).pathname.replace(/^\//, "").split("/")[0] || "");
+    const match = uri.match(
+      /^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]*)/
+    );
+
+    return match ? decodeURIComponent(match[1]) : "";
   } catch {
     return "";
   }

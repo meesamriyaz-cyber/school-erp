@@ -206,7 +206,7 @@ describe("PlatformAdminWorkspace school directory", () => {
     const user = userEvent.setup();
     render(<PlatformAdminWorkspace />);
     await user.click(screen.getByRole("button", { name: /Schools/ }));
-    await user.findByText("Green Valley School");
+    await screen.findByText("Green Valley School");
     apiRequest.mockResolvedValueOnce({
       success: true,
       data: {
