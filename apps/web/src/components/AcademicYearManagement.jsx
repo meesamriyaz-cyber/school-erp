@@ -141,7 +141,7 @@ export default function AcademicYearManagement() {
           <td data-label="Status"><span className={`ay-status status-${year.status || "draft"}`}>{year.status || "draft"}</span></td>
           {canManage && <td data-label="Actions"><div className="ay-row-actions">
             {year.status !== "closed" && <button className="ay-text-button" onClick={() => { setEditingYear(year); setFormError(""); setFormOpen(true); }}>Edit</button>}
-            {year.status === "draft" && <button className="ay-text-button" onClick={() => setPendingAction({ year, status: "active" })}>Activate</button>}
+            {year.status === "draft" && (activeYear ? <span className="ay-action-hint">Close active year first</span> : <button className="ay-text-button" onClick={() => setPendingAction({ year, status: "active" })}>Activate</button>)}
             {year.status !== "closed" && <button className="ay-text-button danger" onClick={() => setPendingAction({ year, status: "closed" })}>Close</button>}
           </div></td>}
         </tr>)}
