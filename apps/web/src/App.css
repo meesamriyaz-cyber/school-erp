@@ -3093,3 +3093,136 @@ body {
   .platform-pagination { align-items: flex-start; flex-direction: column; padding: 14px; }
   .platform-pagination > div { width: 100%; justify-content: space-between; }
 }
+
+
+/* Platform school onboarding and details */
+.platform-form-card {
+  padding: 22px;
+  border: 1px solid #e7ebf2;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 12px #1d31540d;
+}
+.platform-form-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.platform-form-heading h2 { margin: 0 0 7px; font-size: 18px; }
+.platform-form-heading p { margin: 0; color: #8792a5; font-size: 12px; line-height: 1.6; }
+.platform-school-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.platform-school-form h3 {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #edf0f5;
+  font-size: 13px;
+}
+.platform-school-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  color: #46546d;
+  font-size: 12px;
+  font-weight: 700;
+}
+.platform-school-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  padding: 10px 12px;
+  border: 1px solid #dfe5ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #34415a;
+  font-size: 14px;
+}
+.platform-school-form input:focus { border-color: #4263eb; outline: 3px solid #4263eb20; }
+.platform-school-form small { color: #8792a5; font-size: 10px; font-weight: 400; line-height: 1.5; }
+.platform-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0f5;
+}
+.platform-secondary-button {
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 1px solid #e0e6f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #52617a;
+  font-size: 12px;
+  font-weight: 700;
+}
+.platform-secondary-button:disabled, .platform-primary-button:disabled { cursor: not-allowed; opacity: .6; }
+.platform-form-success {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 13px 15px;
+  border: 1px solid #b8e7d0;
+  border-radius: 9px;
+  background: #f0fbf5;
+  color: #18794e;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.platform-form-success button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid #b8e7d0;
+  border-radius: 7px;
+  background: #fff;
+  color: #18794e;
+  font-size: 11px;
+  font-weight: 700;
+}
+.platform-school-name-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #3658d4;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: left;
+}
+.platform-school-name-button:hover { text-decoration: underline; }
+.platform-school-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 28px;
+}
+.platform-school-details > div {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e9edf5;
+  border-radius: 9px;
+  background: #fbfcff;
+}
+.platform-school-details dt { margin-bottom: 7px; color: #8792a5; font-size: 10px; font-weight: 700; }
+.platform-school-details dd { margin: 0; color: #34415a; font-size: 12px; overflow-wrap: anywhere; }
+.platform-form-card > h3 { margin: 0 0 12px; font-size: 14px; }
+.platform-admin-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.platform-admin-list article { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 14px; border: 1px solid #e9edf5; border-radius: 9px; }
+.platform-admin-list article strong { color: #34415a; font-size: 12px; }
+.platform-admin-list article span { color: #7f8aa0; font-size: 11px; overflow-wrap: anywhere; }
+@media (max-width: 650px) {
+  .platform-form-card { padding: 15px; }
+  .platform-form-heading { flex-direction: column; }
+  .platform-school-form, .platform-school-details, .platform-admin-list { grid-template-columns: minmax(0, 1fr); }
+  .platform-form-actions { flex-wrap: wrap; }
+  .platform-form-success { align-items: flex-start; flex-direction: column; }
+}
