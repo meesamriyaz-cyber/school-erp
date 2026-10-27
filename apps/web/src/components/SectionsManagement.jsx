@@ -37,7 +37,7 @@ function SectionForm({ section, saving, error, onCancel, onSubmit }) {
       <input autoFocus name="name" maxLength={50} value={name} onChange={(event) => { setName(event.target.value); setValidationError(""); }} placeholder="e.g. A" required />
     </label>
     <label>Capacity (optional)
-      <input name="capacity" type="number" min="1" max="500" step="1" value={capacity} onChange={(event) => { setCapacity(event.target.value); setValidationError(""); }} placeholder="Leave blank if not set" />
+      <input name="capacity" type="number" step="1" value={capacity} onChange={(event) => { setCapacity(event.target.value); setValidationError(""); }} placeholder="Leave blank if not set" />
       <span className="section-field-hint">Enter a whole number from 1 to 500, or leave blank.</span>
     </label>
     {(validationError || error) && <p className="section-error" role="alert">{validationError || error}</p>}
