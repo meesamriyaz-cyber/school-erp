@@ -216,7 +216,7 @@ export default function EnrollmentsManagement() {
       });
       if (!response?.success) throw new Error("Unable to update enrollment.");
       setPendingEnrollment(null);
-      if (status === "transferred") {
+      if (status === "transferred" && selectedYear?.status === "active") {
         const transferredStudentId = enrollment.studentId?._id || enrollment.studentId;
         if (transferredStudentId) setSelectedStudentId(String(transferredStudentId));
         setFormOpen(true);
