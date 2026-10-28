@@ -191,11 +191,13 @@ export default function StudentDetails({ studentId, onBack }) {
             <h3 id="student-academic-history-title">Academic History</h3>
             <p>Current and previous class placements for this student.</p>
           </div>
-          {historyError && (
-            <button type="button" onClick={() => setHistoryRetry((value) => value + 1)}>
-              Retry history
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setHistoryRetry((value) => value + 1)}
+            disabled={historyLoading}
+          >
+            {historyLoading ? "Refreshing…" : historyError ? "Retry history" : "Refresh history"}
+          </button>
         </div>
         {historyLoading ? (
           <p role="status">Loading academic history…</p>
