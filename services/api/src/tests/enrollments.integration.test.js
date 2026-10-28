@@ -332,6 +332,44 @@ describe("Student Enrollment API", () => {
     })).status).toBe(200);
   }, 20000);
 
+  it("keeps academic-year closure consistent when closure races with enrollment creation", async () => {
+    const student = await makeStudent(schoolB, `year-race-${randomUUID().slice(0, 6)}`);
+
+    const [closure, enrollment] = await Promise.all([
+      request(`/academic-years/${yearB._id}`, {
+        token: adminB.token,
+        method: "PATCH",
+        body: JSON.stringify({ status: "closed" }),
+      }),
+      post("/enrollments", adminB.token, {
+        studentId: String(student._id),
+        academicYearId: String(yearB._id),
+        classId: String(classB._id),
+      }),
+    ]);
+
+    expect(
+      (closure.status === 200 && enrollment.status === 400) ||
+      (closure.status === 409 && enrollment.status === 201)
+    ).toBe(true);
+    if (enrollment.status === 201) enrollmentIds.push(enrollment.body.data._id);
+
+    const [finalYear, activeCount] = await Promise.all([
+      AcademicYear.findOne({ _id: yearB._id, tenantId: schoolB._id }).lean(),
+      Enrollment.countDocuments({
+        tenantId: schoolB._id,
+        academicYearId: yearB._id,
+        status: "active",
+      }),
+    ]);
+    if (finalYear.status === "closed") {
+      expect(activeCount).toBe(0);
+    } else {
+      expect(finalYear.status).toBe("active");
+      expect(activeCount).toBe(1);
+    }
+  }, 20000);
+
   it("requires active enrollments to end before an academic year can close", async () => {
     const student = await makeStudent(schoolB, "year-close");
     const created = await post("/enrollments", adminB.token, {
