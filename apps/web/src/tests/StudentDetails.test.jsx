@@ -478,4 +478,36 @@ it("shows terminal enrollment outcomes in history without a current placement", 
   expect(screen.getAllByText(/Ended:/)).toHaveLength(3);
 });
 
+
+it("refreshes current placement and academic history on request", async () => {
+  const user = userEvent.setup();
+  const studentId = "student-refresh-history";
+  let historyRequestCount = 0;
+  apiRequest.mockImplementation(async (path) => {
+    if (path === `/students/${studentId}`) {
+      return { success: true, data: { _id: studentId, firstName: "Ayaan", lastName: "Khan", status: "active" } };
+    }
+    if (path === `/enrollments?studentId=${studentId}`) {
+      historyRequestCount += 1;
+      return {
+        success: true,
+        data: historyRequestCount === 1
+          ? [{ _id: "enrollment-before", academicYearId: { name: "2026-2027" }, classId: { name: "Class 1" }, status: "active", enrollmentDate: "2026-04-01" }]
+          : [{ _id: "enrollment-after", academicYearId: { name: "2026-2027" }, classId: { name: "Class 2" }, status: "active", enrollmentDate: "2026-04-01" }],
+      };
+    }
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId={studentId} onBack={vi.fn()} />);
+
+  expect(await screen.findByText("Class 1")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Refresh history" }));
+
+  expect(await screen.findByText("Class 2")).toBeInTheDocument();
+  expect(historyRequestCount).toBe(2);
+  expect(screen.queryByText("Class 1")).not.toBeInTheDocument();
+});
+
+
 });
