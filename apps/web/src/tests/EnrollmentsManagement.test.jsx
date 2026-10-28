@@ -120,6 +120,33 @@ describe("EnrollmentsManagement", () => {
   });
 
 
+  it("shows action-specific confirmation copy for completion, transfer, and withdrawal", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation(async (path) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [enrollment] };
+      return { success: true, data: [] };
+    });
+
+    render(<EnrollmentsManagement />);
+    await screen.findByText("Ayaan Khan");
+
+    const cases = [
+      ["Complete", "Mark this enrollment as completed?"],
+      ["Transfer", "Mark this enrollment as transferred?"],
+      ["Withdraw", "Withdraw this student from the enrollment?"],
+    ];
+
+    for (const [action, heading] of cases) {
+      await user.click(screen.getByRole("button", { name: action }));
+      expect(screen.getByRole("alertdialog")).toHaveTextContent(heading);
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+    }
+  });
+
   it("shows a termination API error and leaves the active enrollment available", async () => {
     const user = userEvent.setup();
     apiRequest.mockImplementation(async (path, options = {}) => {
