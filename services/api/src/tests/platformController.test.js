@@ -111,13 +111,13 @@ describe("createSchool controller", () => {
           school: expect.objectContaining({
             name: "Test School",
             slug: "test-school",
-            status: "active",
+            status: "pending",
           }),
           admin: expect.objectContaining({
             firstName: "School",
             email: "admin@example.com",
             role: "school_admin",
-            status: "active",
+            status: "pending",
           }),
         }),
       }),
@@ -125,6 +125,21 @@ describe("createSchool controller", () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(dbSession.endSession).toHaveBeenCalledOnce();
+  });
+
+  it("creates both the school and its administrator as pending until platform-admin activation", async () => {
+    await createSchool(req, res, next);
+
+    expect(Tenant.create.mock.calls[0][0][0].status).toBe("pending");
+    expect(User.create.mock.calls[0][0][0].status).toBe("pending");
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          school: expect.objectContaining({ status: "pending" }),
+          admin: expect.objectContaining({ status: "pending" }),
+        }),
+      }),
+    );
   });
 
   it("normalizes school and administrator fields", async () => {
