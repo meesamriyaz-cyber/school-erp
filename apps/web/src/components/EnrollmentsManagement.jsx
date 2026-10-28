@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./EnrollmentsManagement.css";
@@ -32,6 +32,8 @@ export default function EnrollmentsManagement() {
   const [notice, setNotice] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [pendingEnrollment, setPendingEnrollment] = useState(null);
+  const [endingEnrollment, setEndingEnrollment] = useState(false);
+  const endingEnrollmentRef = useRef(false);
 
   const loadSetup = useCallback(async (signal) => {
     setLoadingSetup(true);
@@ -187,7 +189,9 @@ export default function EnrollmentsManagement() {
   };
 
   const confirmEndEnrollment = async () => {
-    if (!pendingEnrollment) return;
+    if (!pendingEnrollment || endingEnrollmentRef.current) return;
+    endingEnrollmentRef.current = true;
+    setEndingEnrollment(true);
     const { enrollment, status } = pendingEnrollment;
     setError("");
     setNotice("");
@@ -202,6 +206,9 @@ export default function EnrollmentsManagement() {
     } catch (err) {
       setError(err.message || "Unable to update enrollment.");
       setPendingEnrollment(null);
+    } finally {
+      endingEnrollmentRef.current = false;
+      setEndingEnrollment(false);
     }
   };
 
@@ -240,7 +247,7 @@ export default function EnrollmentsManagement() {
 
     {pendingEnrollment && <div className="enrollment-confirm" role="alertdialog" aria-labelledby="enrollment-confirm-title">
       <div><h3 id="enrollment-confirm-title">End this active enrollment?</h3><p>The current placement will remain in the student's history. You can then create a new placement.</p></div>
-      <div className="enrollment-form-actions"><button type="button" className="enrollment-button secondary" onClick={() => setPendingEnrollment(null)}>Cancel</button><button type="button" className="enrollment-button primary" onClick={() => void confirmEndEnrollment()}>Confirm</button></div>
+      <div className="enrollment-form-actions"><button type="button" className="enrollment-button secondary" onClick={() => setPendingEnrollment(null)} disabled={endingEnrollment}>Cancel</button><button type="button" className="enrollment-button primary" onClick={() => void confirmEndEnrollment()} disabled={endingEnrollment}>{endingEnrollment ? "Updating…" : "Confirm"}</button></div>
     </div>}
 
     <div className="enrollments-list">
