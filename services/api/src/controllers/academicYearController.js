@@ -237,17 +237,67 @@ export const updateAcademicYear = async (req, res, next) => {
     }
 
     if (academicYear.status === "active" && nextStatus === "closed") {
-      const activeEnrollments = await Enrollment.exists({
-        tenantId: req.tenantId,
-        academicYearId: academicYear._id,
-        status: "active",
-      });
-      if (activeEnrollments) {
-        return res.status(409).json({
-          success: false,
-          message: "Complete, transfer, or withdraw active student enrollments before closing this academic year",
+      const session = await mongoose.startSession();
+      let updatedAcademicYear;
+      try {
+        await session.withTransaction(async () => {
+          // Enrollment creation increments this same year document in its transaction.
+          // A write conflict forces either operation to recheck the committed state.
+          const lockedYear = await AcademicYear.findOneAndUpdate(
+            { _id: academicYear._id, tenantId: req.tenantId },
+            { $inc: { lifecycleRevision: 1 } },
+            { new: true, session }
+          );
+          if (!lockedYear) {
+            const error = new Error("Academic year not found");
+            error.code = "ACADEMIC_YEAR_NOT_FOUND";
+            throw error;
+          }
+          if (lockedYear.status === "closed") {
+            const error = new Error("A closed academic year cannot be modified");
+            error.code = "ACADEMIC_YEAR_CLOSED";
+            throw error;
+          }
+          if (lockedYear.status !== "active") {
+            const error = new Error(`Cannot change academic year from ${lockedYear.status} to closed`);
+            error.code = "ACADEMIC_YEAR_TRANSITION";
+            throw error;
+          }
+
+          const activeEnrollments = await Enrollment.exists({
+            tenantId: req.tenantId,
+            academicYearId: lockedYear._id,
+            status: "active",
+          }).session(session);
+          if (activeEnrollments) {
+            const error = new Error("Complete, transfer, or withdraw active student enrollments before closing this academic year");
+            error.code = "ACADEMIC_YEAR_HAS_ACTIVE_ENROLLMENTS";
+            throw error;
+          }
+
+          lockedYear.set(fields);
+          await lockedYear.save({ session });
+          updatedAcademicYear = lockedYear;
         });
+      } catch (error) {
+        if (error.code === "ACADEMIC_YEAR_HAS_ACTIVE_ENROLLMENTS") {
+          return res.status(409).json({ success: false, message: error.message });
+        }
+        if (error.code === "ACADEMIC_YEAR_CLOSED") {
+          return res.status(409).json({ success: false, message: error.message });
+        }
+        if (error.code === "ACADEMIC_YEAR_TRANSITION") {
+          return res.status(409).json({ success: false, message: error.message });
+        }
+        if (error.code === "ACADEMIC_YEAR_NOT_FOUND") {
+          return res.status(404).json({ success: false, message: error.message });
+        }
+        throw error;
+      } finally {
+        await session.endSession();
       }
+
+      return res.status(200).json({ success: true, data: updatedAcademicYear });
     }
 
     academicYear.set(fields);
