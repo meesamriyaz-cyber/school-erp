@@ -11,6 +11,21 @@ const formatDate = (value) => {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+const enrollmentEndCopy = {
+  completed: {
+    title: "Mark this enrollment as completed?",
+    description: "The student’s completed placement will remain in their enrollment history.",
+  },
+  transferred: {
+    title: "Mark this enrollment as transferred?",
+    description: "The transfer will remain in the student’s history. You can create a new placement afterward.",
+  },
+  withdrawn: {
+    title: "Withdraw this student from the enrollment?",
+    description: "The withdrawn placement will remain in the student’s enrollment history.",
+  },
+};
+
 export default function EnrollmentsManagement() {
   const { accessToken, user } = useAuth();
   const canManage = canWriteRole(user?.role);
@@ -246,7 +261,7 @@ export default function EnrollmentsManagement() {
     </form>}
 
     {pendingEnrollment && <div className="enrollment-confirm" role="alertdialog" aria-labelledby="enrollment-confirm-title">
-      <div><h3 id="enrollment-confirm-title">End this active enrollment?</h3><p>The current placement will remain in the student's history. You can then create a new placement.</p></div>
+      <div><h3 id="enrollment-confirm-title">{enrollmentEndCopy[pendingEnrollment.status].title}</h3><p>{enrollmentEndCopy[pendingEnrollment.status].description}</p></div>
       <div className="enrollment-form-actions"><button type="button" className="enrollment-button secondary" onClick={() => setPendingEnrollment(null)} disabled={endingEnrollment}>Cancel</button><button type="button" className="enrollment-button primary" onClick={() => void confirmEndEnrollment()} disabled={endingEnrollment}>{endingEnrollment ? "Updating…" : "Confirm"}</button></div>
     </div>}
 
