@@ -274,8 +274,9 @@ describe("Student Enrollment API", () => {
     ]);
 
     expect(
-      [capacityUpdate.status, secondEnrollment.status].sort((a, b) => a - b)
-    ).toEqual([200, 409]);
+      (capacityUpdate.status === 200 && secondEnrollment.status === 409) ||
+      (capacityUpdate.status === 409 && secondEnrollment.status === 201)
+    ).toBe(true);
     if (secondEnrollment.status === 201) enrollmentIds.push(secondEnrollment.body.data._id);
 
     const [finalSection, activeCount] = await Promise.all([
