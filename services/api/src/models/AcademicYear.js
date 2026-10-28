@@ -41,6 +41,13 @@ const academicYearSchema = new mongoose.Schema(
       default: "draft",
       required: true,
     },
+
+    // Incremented transactionally when closing a year or creating an enrollment.
+    lifecycleRevision: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
   },
   {
     timestamps: true,
