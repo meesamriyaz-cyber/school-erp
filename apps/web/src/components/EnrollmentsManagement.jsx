@@ -219,6 +219,8 @@ export default function EnrollmentsManagement() {
       if (status === "transferred" && selectedYear?.status === "active") {
         const transferredStudentId = enrollment.studentId?._id || enrollment.studentId;
         if (transferredStudentId) setSelectedStudentId(String(transferredStudentId));
+        setSelectedClassId("");
+        setSelectedSectionId("");
         setFormOpen(true);
         setNotice("Enrollment marked as transferred. Select the student’s new class and section to complete the transfer.");
       } else {
