@@ -75,4 +75,48 @@ describe("EnrollmentsManagement", () => {
     expect(screen.queryByRole("button", { name: /Enroll student/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Transfer" })).not.toBeInTheDocument();
   });
+
+  it("shows duplicate active enrollment conflicts and keeps the form open", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [] };
+      if (path === "/enrollments" && options.method === "POST") throw new Error("This student already has an active enrollment in this school");
+      return { success: true, data: [] };
+    });
+    render(<EnrollmentsManagement />);
+    await screen.findByText("No enrollments for 2026-2027");
+    await user.click(screen.getByRole("button", { name: /Enroll student/ }));
+    await user.selectOptions(screen.getByLabelText("Class"), "class-a");
+    await user.click(screen.getByRole("button", { name: "Create enrollment" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("This student already has an active enrollment in this school");
+    expect(screen.getByRole("heading", { name: "Enroll a student" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create enrollment" })).toBeInTheDocument();
+  });
+
+  it("shows section capacity conflicts and preserves the selected section", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [] };
+      if (path === "/enrollments" && options.method === "POST") throw new Error("The selected section has reached its capacity");
+      return { success: true, data: [] };
+    });
+    render(<EnrollmentsManagement />);
+    await screen.findByText("No enrollments for 2026-2027");
+    await user.click(screen.getByRole("button", { name: /Enroll student/ }));
+    await user.selectOptions(screen.getByLabelText("Class"), "class-a");
+    await user.selectOptions(screen.getByLabelText("Section (optional)"), "section-a");
+    await user.click(screen.getByRole("button", { name: "Create enrollment" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The selected section has reached its capacity");
+    expect(screen.getByLabelText("Section (optional)")).toHaveValue("section-a");
+    expect(screen.getByRole("button", { name: "Create enrollment" })).toBeInTheDocument();
+  });
+
 });
