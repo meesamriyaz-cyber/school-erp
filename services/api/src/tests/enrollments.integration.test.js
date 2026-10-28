@@ -207,6 +207,37 @@ describe("Student Enrollment API", () => {
     expect(shrink.body.message).toMatch(/cannot be lower than its active enrollment count/i);
   });
 
+  it("does not exceed section capacity when enrollment requests arrive concurrently", async () => {
+    const suffix = randomUUID().slice(0, 6);
+    const section = await Section.create({
+      tenantId: schoolA._id,
+      classId: classA._id,
+      name: `Concurrent ${suffix}`,
+      capacity: 1,
+    });
+    const students = [
+      await makeStudent(schoolA, `concurrent-a-${suffix}`),
+      await makeStudent(schoolA, `concurrent-b-${suffix}`),
+    ];
+
+    const results = await Promise.all(students.map((student) => post("/enrollments", adminA.token, {
+      studentId: String(student._id),
+      academicYearId: String(yearA._id),
+      classId: String(classA._id),
+      sectionId: String(section._id),
+    })));
+
+    expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
+    const activeCount = await Enrollment.countDocuments({
+      tenantId: schoolA._id,
+      sectionId: section._id,
+      status: "active",
+    });
+    expect(activeCount).toBe(1);
+    const created = results.find((result) => result.status === 201);
+    enrollmentIds.push(created.body.data._id);
+  }, 20000);
+
   it("prevents class or section deactivation while active placements use them", async () => {
     const suffix = randomUUID().slice(0, 6);
     const student = await makeStudent(schoolA, `guard-${suffix}`);
