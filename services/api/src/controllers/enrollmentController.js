@@ -7,6 +7,10 @@ import Section from "../models/Section.js";
 
 const TERMINAL_STATUSES = ["completed", "transferred", "withdrawn"];
 const validId = (value) => mongoose.isValidObjectId(value);
+const calendarDay = (value) => {
+  const date = new Date(value);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+};
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const pick = (body, fields) => Object.fromEntries(fields.filter((field) => Object.hasOwn(body, field)).map((field) => [field, body[field]]));
 
@@ -108,6 +112,10 @@ export const createEnrollment = async (req, res, next) => {
     ]);
     if (!student) return res.status(400).json({ success: false, message: "Active student was not found in this school" });
     if (!year) return res.status(400).json({ success: false, message: "Enrollments can only be created for this school's active academic year" });
+    const enrollmentDate = fields.enrollmentDate ? new Date(fields.enrollmentDate) : new Date();
+    if (calendarDay(enrollmentDate) < calendarDay(year.startDate) || calendarDay(enrollmentDate) > calendarDay(year.endDate)) {
+      return res.status(400).json({ success: false, message: "Enrollment date must fall within the selected academic year" });
+    }
     if (!schoolClass) return res.status(400).json({ success: false, message: "Active class was not found in the selected academic year and school" });
 
     if (fields.sectionId) {
