@@ -195,6 +195,9 @@ describe("EnrollmentsManagement", () => {
 
     await waitFor(() => expect(screen.getByText("transferred")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Transfer" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Enroll a student" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Student")).toHaveValue("student-a");
+    expect(screen.getByRole("status")).toHaveTextContent("Select the student’s new class and section to complete the transfer.");
     expect(apiRequest).toHaveBeenCalledWith("/enrollments/enrollment-a", expect.objectContaining({
       method: "PATCH",
       body: { status: "transferred" },
