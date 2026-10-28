@@ -1,4 +1,3 @@
-﻿
 name: School ERP CI
 
 on:
@@ -38,12 +37,26 @@ jobs:
         run: pnpm --filter @school-erp/web build
 
   backend-tests:
-    name: Backend Tests
+    name: Backend Tests and MongoDB Integration
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      MONGO_URI: mongodb://127.0.0.1:27017/school-erp-test?replicaSet=rs0
+      MONGO_TEST_URI: mongodb://127.0.0.1:27017/school-erp-test?replicaSet=rs0
+      JWT_ACCESS_SECRET: ci-test-access-secret-0123456789-abcdef
+      JWT_REFRESH_SECRET: ci-test-refresh-secret-9876543210-fedcba
+      WEB_URL: http://localhost:5173
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Start MongoDB replica set
+        uses: supercharge/mongodb-github-action@1.12.0
+        with:
+          mongodb-version: 7.0
+          mongodb-replica-set: rs0
+          mongodb-port: 27017
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -58,6 +71,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify MongoDB test configuration
+        run: |
+          node --input-type=module -e "const uri = process.env.MONGO_TEST_URI; if (!uri || !uri.includes('/school-erp-test?') || !uri.includes('replicaSet=rs0')) process.exit(1); console.log('MongoDB integration-test URI configured for school-erp-test replica set.')"
 
       - name: Run backend tests
         run: pnpm --filter @school-erp/api test
