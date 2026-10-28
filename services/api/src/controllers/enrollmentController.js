@@ -107,7 +107,7 @@ export const createEnrollment = async (req, res, next) => {
     if (!fields) return;
     const [student, year, schoolClass] = await Promise.all([
       Student.findOne({ _id: fields.studentId, tenantId: req.tenantId, status: "active" }).select("_id").lean(),
-      AcademicYear.findOne({ _id: fields.academicYearId, tenantId: req.tenantId, status: "active" }).select("_id").lean(),
+      AcademicYear.findOne({ _id: fields.academicYearId, tenantId: req.tenantId, status: "active" }).select("_id startDate endDate").lean(),
       SchoolClass.findOne({ _id: fields.classId, tenantId: req.tenantId, academicYearId: fields.academicYearId, status: "active" }).select("_id academicYearId").lean(),
     ]);
     if (!student) return res.status(400).json({ success: false, message: "Active student was not found in this school" });
