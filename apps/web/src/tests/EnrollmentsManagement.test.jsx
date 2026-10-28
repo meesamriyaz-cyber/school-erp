@@ -228,7 +228,7 @@ describe("EnrollmentsManagement", () => {
     expect(apiRequest.mock.calls.filter(([path, options]) => path === "/enrollments/enrollment-a" && options?.method === "PATCH")).toHaveLength(1);
 
     resolveTermination({ success: true, data: { ...enrollment, status: "transferred" } });
-    await screen.findByText("Enrollment marked as transferred.");
+    await screen.findByText("Enrollment marked as transferred. Select the student’s new class and section to complete the transfer.");
   });
 
 });
