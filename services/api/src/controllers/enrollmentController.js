@@ -126,15 +126,58 @@ export const createEnrollment = async (req, res, next) => {
         status: "active",
       }).select("_id capacity").lean();
       if (!section) return res.status(400).json({ success: false, message: "Active section was not found in the selected class and school" });
+
       if (section.capacity !== null) {
-        const activeCount = await Enrollment.countDocuments({
-          tenantId: req.tenantId,
-          sectionId: section._id,
-          status: "active",
-        });
-        if (activeCount >= section.capacity) {
-          return res.status(409).json({ success: false, message: "The selected section has reached its capacity" });
+        const session = await mongoose.startSession();
+        let data;
+        try {
+          await session.withTransaction(async () => {
+            // All capacity-limited placements update this same section document first.
+            // MongoDB retries write-conflicting transactions, so each retry sees the latest count.
+            const lockedSection = await Section.findOneAndUpdate(
+              { _id: section._id, tenantId: req.tenantId, classId: schoolClass._id, status: "active" },
+              { $inc: { capacityRevision: 1 } },
+              { new: true, session }
+            ).select("_id capacity").lean();
+
+            if (!lockedSection) {
+              const error = new Error("Active section was not found in the selected class and school");
+              error.code = "SECTION_NOT_ACTIVE";
+              throw error;
+            }
+
+            const activeCount = await Enrollment.countDocuments({
+              tenantId: req.tenantId,
+              sectionId: lockedSection._id,
+              status: "active",
+            }).session(session);
+
+            if (lockedSection.capacity !== null && activeCount >= lockedSection.capacity) {
+              const error = new Error("The selected section has reached its capacity");
+              error.code = "SECTION_CAPACITY";
+              throw error;
+            }
+
+            const created = await Enrollment.create([{
+              ...fields,
+              tenantId: req.tenantId,
+              sectionId: fields.sectionId,
+              status: "active",
+            }], { session });
+            data = created[0];
+          });
+        } catch (error) {
+          if (error.code === "SECTION_CAPACITY") {
+            return res.status(409).json({ success: false, message: error.message });
+          }
+          if (error.code === "SECTION_NOT_ACTIVE") {
+            return res.status(400).json({ success: false, message: error.message });
+          }
+          throw error;
+        } finally {
+          await session.endSession();
         }
+        return res.status(201).json({ success: true, data });
       }
     }
 
