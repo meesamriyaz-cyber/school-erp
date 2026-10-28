@@ -174,4 +174,31 @@ describe("EnrollmentsManagement", () => {
     }));
   });
 
+
+  it("prevents duplicate termination requests while one is pending", async () => {
+    const user = userEvent.setup();
+    let resolveTermination;
+    const termination = new Promise((resolve) => { resolveTermination = resolve; });
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [enrollment] };
+      if (path === "/enrollments/enrollment-a" && options.method === "PATCH") return termination;
+      return { success: true, data: [] };
+    });
+
+    render(<EnrollmentsManagement />);
+    await screen.findByText("Ayaan Khan");
+    await user.click(screen.getByRole("button", { name: "Transfer" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByRole("button", { name: "Updating…" })).toBeDisabled();
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === "/enrollments/enrollment-a" && options?.method === "PATCH")).toHaveLength(1);
+
+    resolveTermination({ success: true, data: { ...enrollment, status: "transferred" } });
+    await screen.findByText("Enrollment marked as transferred.");
+  });
+
 });
