@@ -119,4 +119,59 @@ describe("EnrollmentsManagement", () => {
     expect(screen.getByRole("button", { name: "Create enrollment" })).toBeInTheDocument();
   });
 
+
+  it("shows a termination API error and leaves the active enrollment available", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [enrollment] };
+      if (path === "/enrollments/enrollment-a" && options.method === "PATCH") {
+        throw new Error("Only active enrollments can be ended");
+      }
+      return { success: true, data: [] };
+    });
+
+    render(<EnrollmentsManagement />);
+    await screen.findByText("Ayaan Khan");
+    await user.click(screen.getByRole("button", { name: "Transfer" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Only active enrollments can be ended");
+    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Transfer" })).toBeInTheDocument();
+  });
+
+  it("refreshes enrollment history after a successful terminal transition", async () => {
+    const user = userEvent.setup();
+    let ended = false;
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [ended ? { ...enrollment, status: "transferred" } : enrollment] };
+      if (path === "/enrollments/enrollment-a" && options.method === "PATCH") {
+        ended = true;
+        return { success: true, data: { ...enrollment, status: "transferred" } };
+      }
+      return { success: true, data: [] };
+    });
+
+    render(<EnrollmentsManagement />);
+    await screen.findByText("Ayaan Khan");
+    await user.click(screen.getByRole("button", { name: "Transfer" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(screen.getByText("transferred")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Transfer" })).not.toBeInTheDocument();
+    expect(apiRequest).toHaveBeenCalledWith("/enrollments/enrollment-a", expect.objectContaining({
+      method: "PATCH",
+      body: { status: "transferred" },
+    }));
+  });
+
 });
