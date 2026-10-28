@@ -220,7 +220,7 @@ export default function EnrollmentsManagement() {
     </div>
 
     {notice && <p className="enrollment-notice" role="status">{notice}</p>}
-    {error && <div className="enrollment-error-banner" role="alert"><span>{error}</span><button type="button" className="enrollment-button secondary" onClick={() => { setError(""); void loadSetup(); void loadClasses(); void loadEnrollments(); }}>Retry</button></div>}
+    {error && <div className="enrollment-error-banner" role="alert"><span>{error}</span><button type="button" className="enrollment-button secondary" onClick={() => { setError(""); void loadSetup(); void loadClasses(); void loadEnrollments(); }}>Refresh data</button></div>}
 
     {formOpen && <form className="enrollment-form" onSubmit={createEnrollment}>
       <div><h3>Enroll a student</h3><p>New enrollments can only be created for the active academic year.</p></div>
