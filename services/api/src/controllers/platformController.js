@@ -368,6 +368,53 @@ export const updateSchoolStatus = async (req, res, next) => {
       );
     }
 
+    // Activating a newly created school must activate its pending school
+    // administrators in the same transaction, so the school cannot become
+    // active while its initial administrator remains unable to sign in.
+    if (school.status === "pending" && status === "active") {
+      let dbSession;
+      let updatedSchool;
+
+      try {
+        dbSession = await mongoose.startSession();
+
+        await dbSession.withTransaction(async () => {
+          updatedSchool = await Tenant.findOneAndUpdate(
+            { _id: school._id, status: "pending" },
+            { $set: { status: "active" } },
+            { new: true, runValidators: true, session: dbSession },
+          )
+            .select("_id name slug status contactEmail timezone createdAt updatedAt")
+            .lean();
+
+          if (updatedSchool) {
+            await User.updateMany(
+              { tenantId: school._id, role: "school_admin", status: "pending" },
+              { $set: { status: "active" } },
+              { session: dbSession },
+            );
+          }
+        });
+      } finally {
+        if (dbSession) {
+          await dbSession.endSession();
+        }
+      }
+
+      if (!updatedSchool) {
+        return res.status(409).json({
+          success: false,
+          message: "School status changed during this request; reload and try again",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "School status updated to active",
+        data: { school: { ...updatedSchool, id: String(updatedSchool._id) } },
+      });
+    }
+
     // Include the current status in the update filter to prevent stale writes.
     const updatedSchool = await Tenant.findOneAndUpdate(
       { _id: school._id, status: school.status },
