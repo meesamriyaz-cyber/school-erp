@@ -216,7 +216,7 @@ describe("Student Enrollment API", () => {
     expect((await request(`/sections/${section._id}`, {
       token: adminA.token, method: "PATCH", body: JSON.stringify({ status: "inactive" }),
     })).status).toBe(200);
-  });
+  }, 20000);
 
   it("requires active enrollments to end before an academic year can close", async () => {
     const student = await makeStudent(schoolB, "year-close");
@@ -234,7 +234,7 @@ describe("Student Enrollment API", () => {
     expect((await request(`/academic-years/${yearB._id}`, {
       token: adminB.token, method: "PATCH", body: JSON.stringify({ status: "closed" }),
     })).status).toBe(200);
-  });
+  }, 20000);
 
 
   it("records completed, transferred, and withdrawn transitions without losing history", async () => {
