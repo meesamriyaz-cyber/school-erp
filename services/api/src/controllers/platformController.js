@@ -158,7 +158,7 @@ export const createSchool = async (req, res, next) => {
             slug,
             contactEmail: contactEmail || null,
             timezone,
-            status: "active",
+            status: "pending",
           },
         ],
         { session: dbSession }
@@ -173,7 +173,7 @@ export const createSchool = async (req, res, next) => {
             email,
             passwordHash,
             role: "school_admin",
-            status: "active",
+            status: "pending",
           },
         ],
         { session: dbSession }
