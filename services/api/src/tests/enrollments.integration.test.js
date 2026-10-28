@@ -238,6 +238,58 @@ describe("Student Enrollment API", () => {
     enrollmentIds.push(created.body.data._id);
   }, 20000);
 
+  it("keeps section capacity valid when a capacity reduction races with enrollment creation", async () => {
+    const suffix = randomUUID().slice(0, 6);
+    const section = await Section.create({
+      tenantId: schoolA._id,
+      classId: classA._id,
+      name: `Capacity race ${suffix}`,
+      capacity: 2,
+    });
+    const students = [
+      await makeStudent(schoolA, `caprace-a-${suffix}`),
+      await makeStudent(schoolA, `caprace-b-${suffix}`),
+    ];
+    const first = await post("/enrollments", adminA.token, {
+      studentId: String(students[0]._id),
+      academicYearId: String(yearA._id),
+      classId: String(classA._id),
+      sectionId: String(section._id),
+    });
+    expect(first.status).toBe(201);
+    enrollmentIds.push(first.body.data._id);
+
+    const [capacityUpdate, secondEnrollment] = await Promise.all([
+      request(`/sections/${section._id}`, {
+        token: adminA.token,
+        method: "PATCH",
+        body: JSON.stringify({ capacity: 1 }),
+      }),
+      post("/enrollments", adminA.token, {
+        studentId: String(students[1]._id),
+        academicYearId: String(yearA._id),
+        classId: String(classA._id),
+        sectionId: String(section._id),
+      }),
+    ]);
+
+    expect(
+      [capacityUpdate.status, secondEnrollment.status].sort((a, b) => a - b)
+    ).toEqual([200, 409]);
+    if (secondEnrollment.status === 201) enrollmentIds.push(secondEnrollment.body.data._id);
+
+    const [finalSection, activeCount] = await Promise.all([
+      Section.findOne({ _id: section._id, tenantId: schoolA._id }).lean(),
+      Enrollment.countDocuments({
+        tenantId: schoolA._id,
+        sectionId: section._id,
+        status: "active",
+      }),
+    ]);
+    expect(finalSection.capacity).not.toBeNull();
+    expect(activeCount).toBeLessThanOrEqual(finalSection.capacity);
+  }, 20000);
+
   it("prevents class or section deactivation while active placements use them", async () => {
     const suffix = randomUUID().slice(0, 6);
     const student = await makeStudent(schoolA, `guard-${suffix}`);
