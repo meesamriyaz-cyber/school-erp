@@ -333,18 +333,32 @@ describe("Student Enrollment API", () => {
   }, 20000);
 
   it("keeps academic-year closure consistent when closure races with enrollment creation", async () => {
-    const student = await makeStudent(schoolB, `year-race-${randomUUID().slice(0, 6)}`);
+    const raceSchool = await makeSchool("year-race");
+    const raceAdmin = await makeUser(raceSchool, "school_admin");
+    const raceYear = await AcademicYear.create({
+      tenantId: raceSchool._id,
+      name: `AY-race-${randomUUID().slice(0, 6)}`,
+      startDate: "2026-04-01",
+      endDate: "2027-03-31",
+      status: "active",
+    });
+    const raceClass = await SchoolClass.create({
+      tenantId: raceSchool._id,
+      academicYearId: raceYear._id,
+      name: "Race Class",
+    });
+    const student = await makeStudent(raceSchool, `year-race-${randomUUID().slice(0, 6)}`);
 
     const [closure, enrollment] = await Promise.all([
-      request(`/academic-years/${yearB._id}`, {
-        token: adminB.token,
+      request(`/academic-years/${raceYear._id}`, {
+        token: raceAdmin.token,
         method: "PATCH",
         body: JSON.stringify({ status: "closed" }),
       }),
-      post("/enrollments", adminB.token, {
+      post("/enrollments", raceAdmin.token, {
         studentId: String(student._id),
-        academicYearId: String(yearB._id),
-        classId: String(classB._id),
+        academicYearId: String(raceYear._id),
+        classId: String(raceClass._id),
       }),
     ]);
 
@@ -355,10 +369,10 @@ describe("Student Enrollment API", () => {
     if (enrollment.status === 201) enrollmentIds.push(enrollment.body.data._id);
 
     const [finalYear, activeCount] = await Promise.all([
-      AcademicYear.findOne({ _id: yearB._id, tenantId: schoolB._id }).lean(),
+      AcademicYear.findOne({ _id: raceYear._id, tenantId: raceSchool._id }).lean(),
       Enrollment.countDocuments({
-        tenantId: schoolB._id,
-        academicYearId: yearB._id,
+        tenantId: raceSchool._id,
+        academicYearId: raceYear._id,
         status: "active",
       }),
     ]);
