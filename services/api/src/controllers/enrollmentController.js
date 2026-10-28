@@ -132,6 +132,19 @@ export const createEnrollment = async (req, res, next) => {
         let data;
         try {
           await session.withTransaction(async () => {
+            // Enrollment creation and year closure both write the academic-year document.
+            const lockedYear = await AcademicYear.findOneAndUpdate(
+              { _id: fields.academicYearId, tenantId: req.tenantId, status: "active" },
+              { $inc: { lifecycleRevision: 1 } },
+              { new: true, session }
+            ).select("_id status").lean();
+
+            if (!lockedYear) {
+              const error = new Error("Enrollments can only be created for this school's active academic year");
+              error.code = "ACADEMIC_YEAR_NOT_ACTIVE";
+              throw error;
+            }
+
             // All capacity-limited placements update this same section document first.
             // MongoDB retries write-conflicting transactions, so each retry sees the latest count.
             const lockedSection = await Section.findOneAndUpdate(
@@ -173,6 +186,9 @@ export const createEnrollment = async (req, res, next) => {
           if (error.code === "SECTION_NOT_ACTIVE") {
             return res.status(400).json({ success: false, message: error.message });
           }
+          if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
+            return res.status(400).json({ success: false, message: error.message });
+          }
           throw error;
         } finally {
           await session.endSession();
@@ -181,12 +197,39 @@ export const createEnrollment = async (req, res, next) => {
       }
     }
 
-    const data = await Enrollment.create({
-      ...fields,
-      tenantId: req.tenantId,
-      sectionId: fields.sectionId || null,
-      status: "active",
-    });
+    const session = await mongoose.startSession();
+    let data;
+    try {
+      await session.withTransaction(async () => {
+        // This write serializes even unsectioned or uncapped enrollments with year closure.
+        const lockedYear = await AcademicYear.findOneAndUpdate(
+          { _id: fields.academicYearId, tenantId: req.tenantId, status: "active" },
+          { $inc: { lifecycleRevision: 1 } },
+          { new: true, session }
+        ).select("_id status").lean();
+
+        if (!lockedYear) {
+          const error = new Error("Enrollments can only be created for this school's active academic year");
+          error.code = "ACADEMIC_YEAR_NOT_ACTIVE";
+          throw error;
+        }
+
+        const created = await Enrollment.create([{
+          ...fields,
+          tenantId: req.tenantId,
+          sectionId: fields.sectionId || null,
+          status: "active",
+        }], { session });
+        data = created[0];
+      });
+    } catch (error) {
+      if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      throw error;
+    } finally {
+      await session.endSession();
+    }
     return res.status(201).json({ success: true, data });
   } catch (error) { return handleError(error, res, next); }
 };
