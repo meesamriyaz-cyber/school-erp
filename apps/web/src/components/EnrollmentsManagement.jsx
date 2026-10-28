@@ -215,8 +215,15 @@ export default function EnrollmentsManagement() {
         method: "PATCH", accessToken, body: { status },
       });
       if (!response?.success) throw new Error("Unable to update enrollment.");
-      setNotice(`Enrollment marked as ${status}.`);
       setPendingEnrollment(null);
+      if (status === "transferred") {
+        const transferredStudentId = enrollment.studentId?._id || enrollment.studentId;
+        if (transferredStudentId) setSelectedStudentId(String(transferredStudentId));
+        setFormOpen(true);
+        setNotice("Enrollment marked as transferred. Select the student’s new class and section to complete the transfer.");
+      } else {
+        setNotice(`Enrollment marked as ${status}.`);
+      }
       await loadEnrollments();
     } catch (err) {
       setError(err.message || "Unable to update enrollment.");
