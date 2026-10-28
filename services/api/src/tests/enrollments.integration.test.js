@@ -97,6 +97,36 @@ describe("Student Enrollment API", () => {
     expect((await request(`/enrollments/${created.body.data._id}`, { token: adminB.token })).status).toBe(404);
   });
 
+  it("rejects enrollment dates outside the selected academic year", async () => {
+    const student = await makeStudent(schoolA, "date-range");
+    const base = {
+      studentId: String(student._id),
+      academicYearId: String(yearA._id),
+      classId: String(classA._id),
+    };
+
+    const beforeYear = await post("/enrollments", adminA.token, {
+      ...base,
+      enrollmentDate: "2026-03-31",
+    });
+    expect(beforeYear.status).toBe(400);
+    expect(beforeYear.body.message).toMatch(/within the selected academic year/i);
+
+    const afterYear = await post("/enrollments", adminA.token, {
+      ...base,
+      enrollmentDate: "2027-04-01",
+    });
+    expect(afterYear.status).toBe(400);
+    expect(afterYear.body.message).toMatch(/within the selected academic year/i);
+
+    const firstDay = await post("/enrollments", adminA.token, {
+      ...base,
+      enrollmentDate: "2026-04-01",
+    });
+    expect(firstDay.status).toBe(201);
+    enrollmentIds.push(firstDay.body.data._id);
+  });
+
   it("rejects invalid parent combinations, forged tenant IDs, and teacher writes", async () => {
     expect((await post("/enrollments", adminA.token, {
       studentId: String(studentA._id), academicYearId: String(yearA._id), classId: String(classB._id),
