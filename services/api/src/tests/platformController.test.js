@@ -5,17 +5,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import { hashPassword } from "../utils/password.js";
-import { createSchool } from "../controllers/platformController.js";
+import { createSchool, updateSchoolStatus } from "../controllers/platformController.js";
 
 vi.mock("../models/Tenant.js", () => ({
   default: {
     create: vi.fn(),
+    findById: vi.fn(),
+    findOneAndUpdate: vi.fn(),
   },
 }));
 
 vi.mock("../models/User.js", () => ({
   default: {
     create: vi.fn(),
+    updateMany: vi.fn(),
   },
 }));
 
@@ -24,6 +27,64 @@ vi.mock("../utils/password.js", () => ({
 }));
 
 
+
+describe("updateSchoolStatus controller", () => {
+  it("activates a pending school and its pending school administrators in one transaction", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const school = {
+      _id: schoolId,
+      name: "Pending School",
+      slug: "pending-school",
+      status: "pending",
+    };
+    const updatedSchool = { ...school, status: "active" };
+    const session = {
+      withTransaction: vi.fn(async (callback) => callback()),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    };
+    const next = vi.fn();
+    const req = {
+      params: { schoolId: String(schoolId) },
+      body: { status: "active" },
+    };
+
+    mongoose.startSession.mockResolvedValue(session);
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(school) }),
+    });
+    Tenant.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updatedSchool) }),
+    });
+    User.updateMany.mockResolvedValue({ modifiedCount: 1 });
+
+    await updateSchoolStatus(req, res, next);
+
+    expect(session.withTransaction).toHaveBeenCalledOnce();
+    expect(Tenant.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: schoolId, status: "pending" },
+      { $set: { status: "active" } },
+      { new: true, runValidators: true, session },
+    );
+    expect(User.updateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId, role: "school_admin", status: "pending" },
+      { $set: { status: "active" } },
+      { session },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        data: { school: expect.objectContaining({ status: "active" }) },
+      }),
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+});
 
 describe("createSchool controller", () => {
   let req;
