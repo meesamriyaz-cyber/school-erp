@@ -101,16 +101,6 @@ export const updateSection = async (req, res, next) => {
     if (!fields) return;
     const section = await Section.findOne({ _id: req.params.sectionId, tenantId: req.tenantId });
     if (!section) return res.status(404).json({ success: false, message: "Section not found" });
-    if (Object.hasOwn(fields, "capacity") && fields.capacity !== null) {
-      const activeEnrollments = await Enrollment.countDocuments({
-        tenantId: req.tenantId,
-        sectionId: section._id,
-        status: "active",
-      });
-      if (activeEnrollments > fields.capacity) {
-        return res.status(409).json({ success: false, message: "Section capacity cannot be lower than its active enrollment count" });
-      }
-    }
     if (fields.status === "active") {
       const parent = await SchoolClass.findOne({ _id: section.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").lean();
       if (!parent) return res.status(409).json({ success: false, message: "A section cannot be activated while its class is inactive" });
@@ -121,6 +111,55 @@ export const updateSection = async (req, res, next) => {
       const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" });
       if (activeEnrollments) return res.status(409).json({ success: false, message: "End active student enrollments before deactivating this section" });
     }
+    if (Object.hasOwn(fields, "capacity")) {
+      const session = await mongoose.startSession();
+      let updatedSection;
+      try {
+        await session.withTransaction(async () => {
+          // Capacity updates share the section write used by capacity-limited enrollments.
+          // A conflicting transaction retries and rechecks the committed enrollment count.
+          const lockedSection = await Section.findOneAndUpdate(
+            { _id: section._id, tenantId: req.tenantId },
+            { $inc: { capacityRevision: 1 } },
+            { new: true, session }
+          );
+          if (!lockedSection) {
+            const error = new Error("Section not found");
+            error.code = "SECTION_NOT_FOUND";
+            throw error;
+          }
+
+          if (fields.capacity !== null) {
+            const activeEnrollments = await Enrollment.countDocuments({
+              tenantId: req.tenantId,
+              sectionId: lockedSection._id,
+              status: "active",
+            }).session(session);
+            if (activeEnrollments > fields.capacity) {
+              const error = new Error("Section capacity cannot be lower than its active enrollment count");
+              error.code = "SECTION_CAPACITY_BELOW_ENROLLMENTS";
+              throw error;
+            }
+          }
+
+          lockedSection.set(fields);
+          await lockedSection.save({ session });
+          updatedSection = lockedSection;
+        });
+      } catch (error) {
+        if (error.code === "SECTION_CAPACITY_BELOW_ENROLLMENTS") {
+          return res.status(409).json({ success: false, message: error.message });
+        }
+        if (error.code === "SECTION_NOT_FOUND") {
+          return res.status(404).json({ success: false, message: error.message });
+        }
+        throw error;
+      } finally {
+        await session.endSession();
+      }
+      return res.status(200).json({ success: true, data: updatedSection });
+    }
+
     section.set(fields);
     await section.save();
     return res.status(200).json({ success: true, data: section });
