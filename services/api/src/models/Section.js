@@ -29,6 +29,12 @@ const sectionSchema = new mongoose.Schema(
       min: 1,
       max: 500,
     },
+    // Incremented inside enrollment-capacity transactions to serialize concurrent placements.
+    capacityRevision: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
 
     status: {
       type: String,
