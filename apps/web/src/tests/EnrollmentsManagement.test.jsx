@@ -141,7 +141,7 @@ describe("EnrollmentsManagement", () => {
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Only active enrollments can be ended");
-    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Ayaan Khan ADM-1 Class 1 A/ })).toHaveTextContent("active");
     expect(screen.getByRole("button", { name: "Transfer" })).toBeInTheDocument();
   });
 
