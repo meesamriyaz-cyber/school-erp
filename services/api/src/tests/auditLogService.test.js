@@ -27,7 +27,13 @@ describe("user audit outbox service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auditLogModel.create.mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
-    outboxModel.create.mockResolvedValue({ _id: outboxId });
+    outboxModel.create.mockImplementation(async ({ event }) => {
+      outboxModel.findOneAndUpdate
+        .mockReset()
+        .mockReturnValueOnce(leanResult({ _id: outboxId, attempts: 1, event }))
+        .mockReturnValue(leanResult(null));
+      return { _id: outboxId };
+    });
     outboxModel.findOneAndUpdate
       .mockReturnValueOnce(leanResult({
         _id: outboxId,
