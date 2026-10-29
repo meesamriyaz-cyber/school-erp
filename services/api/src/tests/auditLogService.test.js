@@ -14,7 +14,7 @@ const { auditLogModel, outboxModel } = vi.hoisted(() => ({
 vi.mock("../models/AuditLog.js", () => ({ default: auditLogModel }));
 vi.mock("../models/AuditOutbox.js", () => ({ default: outboxModel }));
 
-import { processPendingAuditEvents, writeUserAudit } from "../services/auditLogService.js";
+import { processPendingAuditEvents, withAuditTransaction, writeUserAudit } from "../services/auditLogService.js";
 
 const leanResult = (value) => ({ lean: vi.fn().mockResolvedValue(value) });
 
@@ -161,6 +161,38 @@ describe("user audit outbox service", () => {
       );
     } finally {
       logSpy.mockRestore();
+    }
+  });
+  it("runs the mutation callback in a MongoDB transaction and closes the session", async () => {
+    const session = {
+      withTransaction: vi.fn(async (callback) => callback()),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const startSession = vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    try {
+      const result = await withAuditTransaction(async (activeSession) => {
+        expect(activeSession).toBe(session);
+        return "committed";
+      });
+      expect(result).toBe("committed");
+      expect(session.withTransaction).toHaveBeenCalledOnce();
+      expect(session.endSession).toHaveBeenCalledOnce();
+    } finally {
+      startSession.mockRestore();
+    }
+  });
+
+  it("propagates transaction failure so the caller cannot report a committed mutation", async () => {
+    const session = {
+      withTransaction: vi.fn().mockRejectedValue(new Error("transaction aborted")),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const startSession = vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    try {
+      await expect(withAuditTransaction(async () => "must-not-commit")).rejects.toThrow("transaction aborted");
+      expect(session.endSession).toHaveBeenCalledOnce();
+    } finally {
+      startSession.mockRestore();
     }
   });
 });
