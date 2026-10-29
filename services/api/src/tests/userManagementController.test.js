@@ -150,4 +150,58 @@ describe("user management controller", () => {
     const responseUser = res.json.mock.calls[0][0].data[0];
     expect(responseUser).not.toHaveProperty("passwordHash");
   });
+
+  it("rejects school-admin status changes for users outside the authenticated tenant", async () => {
+    const otherTenantId = new mongoose.Types.ObjectId();
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({
+          _id: userId, tenantId: otherTenantId, role: "teacher", status: "active", authVersion: 0,
+        }),
+      }),
+    });
+    req.body = { status: "suspended" };
+
+    await updateUserStatus(req, res, next);
+
+    expect(userModel.findOne).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: tenantId.toString(),
+      role: { $nin: ["platform_admin", "school_admin"] },
+    }));
+    expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(sessionModel.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("prevents an administrator from changing their own status", async () => {
+    req.params.userId = req.auth.userId;
+    req.body = { status: "suspended" };
+
+    await updateUserStatus(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(userModel.findOne).not.toHaveBeenCalled();
+    expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does not allow platform administrators to assign the platform_admin role through school-user management", async () => {
+    req.auth = { userId: new mongoose.Types.ObjectId().toString(), tenantId: null, role: "platform_admin" };
+    req.body = { role: "platform_admin" };
+
+    await updateUserRole(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(userModel.findOne).not.toHaveBeenCalled();
+    expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid pagination instead of issuing an unbounded query", async () => {
+    req.query = { page: "1", limit: "1000" };
+
+    await listUsers(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(userModel.find).not.toHaveBeenCalled();
+    expect(userModel.countDocuments).not.toHaveBeenCalled();
+  });
+
 });
