@@ -122,7 +122,7 @@ describe("user management controller", () => {
     await updateUserStatus(req, res, next);
 
     expect(userModel.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "active", authVersion: 2 }),
+      expect.objectContaining({ status: "active", $or: [{ authVersion: 2 }, { authVersion: { $exists: false } }] }),
       { $set: { status: "suspended" }, $inc: { authVersion: 1 } },
       expect.objectContaining({ new: true, runValidators: true }),
     );
