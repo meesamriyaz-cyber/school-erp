@@ -98,7 +98,7 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
           { _id: outbox._id, status: "processing" },
           {
             $set: {
-              status: "pending",
+              status: attempts >= MAX_ATTEMPTS ? "failed" : "pending",
               nextAttemptAt: new Date(Date.now() + backoff),
               lastError: safeErrorMessage(error),
             },
