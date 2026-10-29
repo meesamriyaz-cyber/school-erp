@@ -25,7 +25,7 @@ vi.mock("../models/Session.js", () => ({ default: sessionModel }));
 vi.mock("../utils/password.js", () => ({ hashPassword }));
 vi.mock("../services/auditLogService.js", () => ({ writeUserAudit: auditWrite }));
 
-import { createUser, listUsers, updateUserStatus, updateUserRole } from "../controllers/userManagementController.js";
+import { createUser, listUsers, updateUser, updateUserStatus, updateUserRole } from "../controllers/userManagementController.js";
 
 const makeResponse = () => ({
   status: vi.fn().mockReturnThis(),
@@ -123,6 +123,28 @@ describe("user management controller", () => {
       role: { $nin: ["platform_admin", "school_admin"] },
     }));
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("records changed profile field names without copying profile values into the audit event", async () => {
+    const existing = { _id: userId, tenantId, firstName: "Sam", lastName: "Teacher", email: "sam@example.com", role: "teacher", status: "active" };
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }),
+    });
+    userModel.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ ...existing, firstName: "Samuel" }) }),
+    });
+    req.body = { firstName: "Samuel" };
+
+    await updateUser(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
+      action: "USER_PROFILE_UPDATED",
+      targetUserId: userId,
+      changedFields: ["firstName"],
+    }));
+    expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("email");
+    expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("passwordHash");
   });
 
   it("increments authVersion and revokes sessions when a user is suspended", async () => {
@@ -307,7 +329,7 @@ describe("user management controller", () => {
 
   it("increments authVersion and revokes sessions when a platform admin changes a user's role", async () => {
     req.auth = { userId: new mongoose.Types.ObjectId().toString(), tenantId: null, role: "platform_admin" };
-    const existing = { _id: userId, tenantId, status: "active", authVersion: 4 };
+    const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 4 };
     userModel.findOne.mockReturnValue({
       select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }),
     });
@@ -333,6 +355,10 @@ describe("user management controller", () => {
       { $set: { revokedAt: expect.any(Date) } },
     );
     expect(res.status).toHaveBeenCalledWith(200);
+    expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
+      action: "USER_ROLE_CHANGED", previousValue: "teacher", newValue: "principal",
+      changedFields: ["role"],
+    }));
   });
 
 });
