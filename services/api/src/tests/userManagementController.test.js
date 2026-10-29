@@ -78,15 +78,18 @@ describe("user management controller", () => {
     req.body.tenantId = tenantId.toString();
     await createUser(req, res, next);
 
-    expect(userModel.create).toHaveBeenCalledWith(expect.objectContaining({
-      tenantId: expect.any(mongoose.Types.ObjectId),
-      firstName: "Sam",
-      email: "sam@example.com",
-      passwordHash: "hashed-password",
-      role: "teacher",
-      status: "pending",
-      authVersion: 0,
-    }));
+    expect(userModel.create).toHaveBeenCalledWith(
+      [expect.objectContaining({
+        tenantId: expect.any(mongoose.Types.ObjectId),
+        firstName: "Sam",
+        email: "sam@example.com",
+        passwordHash: "hashed-password",
+        role: "teacher",
+        status: "pending",
+        authVersion: 0,
+      })],
+      { session: {} },
+    );
     expect(res.status).toHaveBeenCalledWith(201);
     expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
       actorUserId: req.auth.userId,
