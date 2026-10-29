@@ -149,11 +149,29 @@ export async function stopAuditOutboxWorker() {
  * The outbox makes failures after successful enqueue retryable across process restarts.
  * Callers should not pass request bodies, credentials, tokens, or hashes.
  */
-export async function writeUserAudit(input) {
+export async function withAuditTransaction(work) {
+  const session = await mongoose.startSession();
+  let result;
+  try {
+    await session.withTransaction(async () => {
+      result = await work(session);
+    });
+  } finally {
+    await session.endSession();
+  }
+  // Deliver only after commit; the polling worker recovers queued events after restarts.
+  void processPendingAuditEvents();
+  return result;
+}
+
+export async function writeUserAudit(input, { session = null } = {}) {
   let event;
   try {
     event = { eventId: new mongoose.Types.ObjectId(), ...buildSafeEvent(input) };
-    const queued = await AuditOutbox.create({ event });
+    const queued = session
+      ? (await AuditOutbox.create([{ event }], { session }))[0]
+      : await AuditOutbox.create({ event });
+    if (session) return true;
     await processPendingAuditEvents();
     const current = await AuditOutbox.findById(queued._id).select("status").lean();
     return current?.status === "delivered";
