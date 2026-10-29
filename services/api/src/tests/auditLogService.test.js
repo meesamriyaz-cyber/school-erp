@@ -1,25 +1,47 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { auditLogModel } = vi.hoisted(() => ({
+const { auditLogModel, outboxModel } = vi.hoisted(() => ({
   auditLogModel: { create: vi.fn() },
+  outboxModel: {
+    create: vi.fn(),
+    findOneAndUpdate: vi.fn(),
+    updateOne: vi.fn(),
+    findById: vi.fn(),
+  },
 }));
 
 vi.mock("../models/AuditLog.js", () => ({ default: auditLogModel }));
+vi.mock("../models/AuditOutbox.js", () => ({ default: outboxModel }));
 
-import { writeUserAudit } from "../services/auditLogService.js";
+import { processPendingAuditEvents, writeUserAudit } from "../services/auditLogService.js";
 
-describe("user audit log service", () => {
+const leanResult = (value) => ({ lean: vi.fn().mockResolvedValue(value) });
+
+describe("user audit outbox service", () => {
   const actorUserId = new mongoose.Types.ObjectId();
   const targetUserId = new mongoose.Types.ObjectId();
   const tenantId = new mongoose.Types.ObjectId();
+  const outboxId = new mongoose.Types.ObjectId();
 
   beforeEach(() => {
     vi.clearAllMocks();
     auditLogModel.create.mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
+    outboxModel.create.mockResolvedValue({ _id: outboxId });
+    outboxModel.findOneAndUpdate
+      .mockReturnValueOnce(leanResult({
+        _id: outboxId,
+        attempts: 1,
+        event: { eventId: new mongoose.Types.ObjectId(), action: "USER_PROFILE_UPDATED" },
+      }))
+      .mockReturnValue(leanResult(null));
+    outboxModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+    outboxModel.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue(leanResult({ status: "delivered" })),
+    });
   });
 
-  it("persists only allowlisted audit fields and excludes credential data", async () => {
+  it("durably enqueues sanitized events before attempting delivery", async () => {
     const result = await writeUserAudit({
       actorUserId,
       actorRole: "school_admin",
@@ -35,7 +57,10 @@ describe("user audit log service", () => {
     });
 
     expect(result).toBe(true);
-    expect(auditLogModel.create).toHaveBeenCalledWith(expect.objectContaining({
+    expect(outboxModel.create).toHaveBeenCalledOnce();
+    const queued = outboxModel.create.mock.calls[0][0];
+    expect(queued.status).toBeUndefined();
+    expect(queued.event).toMatchObject({
       actorUserId,
       actorRole: "school_admin",
       tenantId,
@@ -43,18 +68,26 @@ describe("user audit log service", () => {
       targetTenantId: tenantId,
       action: "USER_PROFILE_UPDATED",
       changedFields: ["firstName"],
-      previousValue: null,
-      newValue: null,
-    }));
-    const record = auditLogModel.create.mock.calls[0][0];
-    expect(record).not.toHaveProperty("password");
-    expect(record).not.toHaveProperty("passwordHash");
-    expect(record).not.toHaveProperty("accessToken");
-    expect(record).not.toHaveProperty("refreshToken");
+    });
+    expect(queued.event.eventId).toBeInstanceOf(mongoose.Types.ObjectId);
+    expect(queued.event).not.toHaveProperty("password");
+    expect(queued.event).not.toHaveProperty("passwordHash");
+    expect(queued.event).not.toHaveProperty("accessToken");
+    expect(queued.event).not.toHaveProperty("refreshToken");
+    expect(auditLogModel.create).toHaveBeenCalledWith(queued.event);
+    expect(outboxModel.updateOne).toHaveBeenCalledWith(
+      { _id: outboxId, status: "processing" },
+      expect.objectContaining({
+        $set: expect.objectContaining({ status: "delivered" }),
+      }),
+    );
   });
 
-  it("returns false and logs safe context when persistence fails", async () => {
-    auditLogModel.create.mockRejectedValue(new Error("database unavailable"));
+  it("requeues failed deliveries with backoff and logs sanitized context", async () => {
+    auditLogModel.create.mockRejectedValueOnce(new Error("database unavailable\nsecret detail"));
+    outboxModel.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue(leanResult({ status: "pending" })),
+    });
     const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     try {
@@ -69,13 +102,56 @@ describe("user audit log service", () => {
       });
 
       expect(result).toBe(false);
-      expect(logSpy).toHaveBeenCalledWith(
-        "Failed to persist user-management audit event",
+      expect(outboxModel.updateOne).toHaveBeenCalledWith(
+        { _id: outboxId, status: "processing" },
         expect.objectContaining({
-          action: "USER_ROLE_CHANGED",
-          actorUserId: String(actorUserId),
-          targetUserId: String(targetUserId),
+          $set: expect.objectContaining({
+            status: "pending",
+            nextAttemptAt: expect.any(Date),
+            lastError: "database unavailable secret detail",
+          }),
+          $unset: { processingStartedAt: 1 },
         }),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        "Audit outbox delivery failed",
+        expect.objectContaining({ action: "USER_ROLE_CHANGED", attempts: 1 }),
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("marks an event delivered when an earlier attempt inserted it before crashing", async () => {
+    auditLogModel.create.mockRejectedValueOnce(Object.assign(new Error("duplicate"), { code: 11000 }));
+    const result = await processPendingAuditEvents({ batchSize: 1 });
+
+    expect(result.processed).toBe(1);
+    expect(outboxModel.updateOne).toHaveBeenCalledWith(
+      { _id: outboxId, status: "processing" },
+      expect.objectContaining({
+        $set: expect.objectContaining({ status: "delivered" }),
+      }),
+    );
+  });
+
+  it("keeps an outbox enqueue failure visible and does not claim delivery", async () => {
+    outboxModel.create.mockRejectedValueOnce(new Error("outbox unavailable"));
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const result = await writeUserAudit({
+        actorUserId,
+        actorRole: "platform_admin",
+        targetUserId,
+        action: "USER_ROLE_CHANGED",
+        changedFields: ["role"],
+      });
+      expect(result).toBe(false);
+      expect(auditLogModel.create).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        "Failed to enqueue user-management audit event",
+        expect.objectContaining({ action: "USER_ROLE_CHANGED" }),
       );
     } finally {
       logSpy.mockRestore();
