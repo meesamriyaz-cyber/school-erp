@@ -242,6 +242,42 @@ describe("user management controller", () => {
     expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
+  it("keeps a committed role change successful when session cleanup fails", async () => {
+    req.auth = { userId: new mongoose.Types.ObjectId().toString(), tenantId: null, role: "platform_admin" };
+    const existing = { _id: userId, tenantId, status: "active", authVersion: 4 };
+    const updated = {
+      ...existing, firstName: "Sam", lastName: "Teacher", email: "sam@example.com",
+      phone: null, role: "principal",
+    };
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }),
+    });
+    userModel.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updated) }),
+    });
+    sessionModel.updateMany.mockRejectedValue(new Error("session store unavailable"));
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    req.body = { role: "principal" };
+
+    try {
+      await updateUserRole(req, res, next);
+
+      expect(userModel.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.any(Object),
+        { $set: { role: "principal" }, $inc: { authVersion: 1 } },
+        expect.objectContaining({ new: true, runValidators: true }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(next).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        "Failed to revoke sessions after user authorization change",
+        expect.objectContaining({ userId: String(userId) }),
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it("rejects invalid pagination instead of issuing an unbounded query", async () => {
     req.query = { page: "1", limit: "1000" };
 
