@@ -183,6 +183,8 @@ export async function writeUserAudit(input, { session = null } = {}) {
       errorName: error?.name ?? "Error",
       errorMessage: safeErrorMessage(error),
     });
+    // A failed enqueue inside a transaction must abort the user mutation too.
+    if (session) throw error;
     return false;
   }
 }
