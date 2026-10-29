@@ -227,4 +227,79 @@ describe("PlatformAdminWorkspace school directory", () => {
     }));
   });
 
+  it("activates a pending school from its details and refreshes the status", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce(pageOne)
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          school: {
+            id: "school-1", name: "Green Valley School", slug: "green-valley",
+            status: "pending", timezone: "Asia/Kolkata",
+          },
+          administrators: [{ id: "admin-1", firstName: "Saima", lastName: "Yousuf", email: "saima@example.com", status: "pending" }],
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: "School status updated to active",
+        data: { school: { id: "school-1", name: "Green Valley School", status: "active" } },
+      })
+      .mockResolvedValue({
+        success: true,
+        data: {
+          school: {
+            id: "school-1", name: "Green Valley School", slug: "green-valley",
+            status: "active", timezone: "Asia/Kolkata",
+          },
+          administrators: [{ id: "admin-1", firstName: "Saima", lastName: "Yousuf", email: "saima@example.com", status: "active" }],
+        },
+      });
+
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Schools/ }));
+    await screen.findByText("Green Valley School");
+    await user.click(screen.getByRole("button", { name: "Green Valley School" }));
+
+    await user.click(await screen.findByRole("button", { name: "Activate school" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("School status updated to active");
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/platform/schools/school-1/status",
+      expect.objectContaining({
+        method: "PATCH",
+        accessToken: "platform-access-token",
+        body: { status: "active" },
+      }),
+    );
+    expect(await screen.findByRole("button", { name: "Suspend school" })).toBeInTheDocument();
+  });
+
+  it("shows a useful error when a school status update fails", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce(pageOne)
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          school: {
+            id: "school-1", name: "Green Valley School", slug: "green-valley",
+            status: "pending", timezone: "Asia/Kolkata",
+          },
+          administrators: [],
+        },
+      });
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Schools/ }));
+    await screen.findByText("Green Valley School");
+    await user.click(screen.getByRole("button", { name: "Green Valley School" }));
+    apiRequest.mockRejectedValueOnce(new Error("Status update denied"));
+
+    await user.click(await screen.findByRole("button", { name: "Activate school" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Status update denied");
+    expect(screen.getByRole("button", { name: "Activate school" })).toBeEnabled();
+  });
+
 });
