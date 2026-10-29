@@ -159,8 +159,7 @@ export async function withAuditTransaction(work) {
   } finally {
     await session.endSession();
   }
-  // Deliver only after commit; the polling worker recovers queued events after restarts.
-  void processPendingAuditEvents();
+  // The running worker delivers committed outbox rows; polling recovers after restarts.
   return result;
 }
 
