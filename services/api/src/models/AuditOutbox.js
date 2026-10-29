@@ -9,7 +9,7 @@ const auditOutboxSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "processing", "delivered"],
+      enum: ["pending", "processing", "delivered", "failed"],
       default: "pending",
       index: true,
     },
