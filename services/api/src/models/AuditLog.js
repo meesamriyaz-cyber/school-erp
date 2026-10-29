@@ -9,6 +9,12 @@ const AUDIT_ACTIONS = [
 
 const auditLogSchema = new mongoose.Schema(
   {
+    eventId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      unique: true,
+      immutable: true,
+    },
     actorUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
