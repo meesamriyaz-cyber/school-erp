@@ -58,6 +58,9 @@ export default function PlatformAdminWorkspace() {
   const [schoolDetails, setSchoolDetails] = useState(null);
   const [loadingSchoolDetails, setLoadingSchoolDetails] = useState(false);
   const [schoolDetailsError, setSchoolDetailsError] = useState("");
+  const [updatingSchoolStatus, setUpdatingSchoolStatus] = useState(false);
+  const [schoolStatusError, setSchoolStatusError] = useState("");
+  const [schoolStatusSuccess, setSchoolStatusSuccess] = useState("");
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -200,6 +203,35 @@ export default function PlatformAdminWorkspace() {
     }
   };
 
+  const updateSchoolStatus = async (status) => {
+    if (!selectedSchoolId || updatingSchoolStatus) return;
+    setUpdatingSchoolStatus(true);
+    setSchoolStatusError("");
+    setSchoolStatusSuccess("");
+    try {
+      const response = await apiRequest(
+        `/platform/schools/${encodeURIComponent(selectedSchoolId)}/status`,
+        { method: "PATCH", accessToken, body: { status } },
+      );
+      const updatedSchool = response?.data?.school;
+      if (!updatedSchool) {
+        throw new Error("The server did not return the updated school status. Refresh and verify the school before retrying.");
+      }
+      setSchoolDetails((current) => {
+        if (!current) return current;
+        return current.school
+          ? { ...current, school: { ...current.school, ...updatedSchool } }
+          : { ...current, ...updatedSchool };
+      });
+      setSchoolStatusSuccess(response?.message || `School status updated to ${status}.`);
+      setReloadCount((count) => count + 1);
+    } catch (error) {
+      setSchoolStatusError(error.message || "Unable to update the school status. Please retry.");
+    } finally {
+      setUpdatingSchoolStatus(false);
+    }
+  };
+
   const openSchoolDetails = (school) => {
     setSelectedSchoolId(school.id || school._id);
     setSchoolDetails(null);
@@ -298,7 +330,7 @@ export default function PlatformAdminWorkspace() {
                 <div>
                   <span className="platform-card-kicker">SCHOOLS AT A GLANCE</span>
                   <h2>Your platform, centrally managed.</h2>
-                  <p>School discovery, onboarding and lifecycle controls will be brought together here.</p>
+                  <p>Manage school onboarding and lifecycle controls from one secure workspace.</p>
                   <button type="button" onClick={() => setActivePage("Schools")}>
                     Open school directory <span aria-hidden="true">→</span>
                   </button>
@@ -322,7 +354,7 @@ export default function PlatformAdminWorkspace() {
                 <article className="platform-summary-card">
                   <span className="platform-summary-icon">✓</span>
                   <span className="platform-summary-label">Lifecycle controls</span>
-                  <strong>Coming next</strong>
+                  <strong>Available</strong>
                   <p>Activate, suspend and reactivate schools.</p>
                 </article>
               </section>
@@ -366,6 +398,31 @@ export default function PlatformAdminWorkspace() {
                     <div><dt>Timezone</dt><dd>{school.timezone || "—"}</dd></div>
                     <div><dt>Created</dt><dd>{formatDate(school.createdAt)}</dd></div>
                   </dl>
+                  <section className="platform-lifecycle-controls" aria-label="School lifecycle controls">
+                    <div>
+                      <h3>School lifecycle</h3>
+                      <p>Change access for this school and its school administrators.</p>
+                    </div>
+                    <div className="platform-form-actions">
+                      {school.status === "pending" && (
+                        <button type="button" className="platform-primary-button" onClick={() => void updateSchoolStatus("active")} disabled={updatingSchoolStatus}>
+                          {updatingSchoolStatus ? "Updating…" : "Activate school"}
+                        </button>
+                      )}
+                      {school.status === "active" && (
+                        <button type="button" className="platform-secondary-button" onClick={() => void updateSchoolStatus("suspended")} disabled={updatingSchoolStatus}>
+                          {updatingSchoolStatus ? "Updating…" : "Suspend school"}
+                        </button>
+                      )}
+                      {school.status === "suspended" && (
+                        <button type="button" className="platform-primary-button" onClick={() => void updateSchoolStatus("active")} disabled={updatingSchoolStatus}>
+                          {updatingSchoolStatus ? "Updating…" : "Reactivate school"}
+                        </button>
+                      )}
+                    </div>
+                    {schoolStatusSuccess && <p role="status">{schoolStatusSuccess}</p>}
+                    {schoolStatusError && <div className="platform-directory-error" role="alert"><p>{schoolStatusError}</p><button type="button" onClick={() => void updateSchoolStatus(school.status === "pending" || school.status === "suspended" ? "active" : "suspended")} disabled={updatingSchoolStatus}>Retry</button></div>}
+                  </section>
                   <h3>School administrators</h3>
                   {administrators.length ? <div className="platform-admin-list">{administrators.map((admin) => <article key={admin.id || admin._id || admin.email}><strong>{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || "Administrator"}</strong><span>{admin.email || "—"}</span><span>{statusLabel(admin.status)}</span></article>)}</div> : <p>No school administrators were returned for this school.</p>}
                 </>;
