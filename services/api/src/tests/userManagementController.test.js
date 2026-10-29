@@ -171,6 +171,23 @@ describe("user management controller", () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
+  it("returns a conflict and does not revoke sessions when a concurrent status update wins", async () => {
+    const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 2 };
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }),
+    });
+    userModel.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(null) }),
+    });
+    req.body = { status: "suspended" };
+
+    await updateUserStatus(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(sessionModel.updateMany).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it("keeps a committed status change successful when session cleanup fails", async () => {
     const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 2 };
     const updated = { ...existing, status: "suspended", authVersion: 3, firstName: "Sam", lastName: "Teacher", email: "sam@example.com" };
