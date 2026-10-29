@@ -359,9 +359,18 @@ export const updateSchoolStatus = async (req, res, next) => {
       });
     }
 
-    // If an earlier suspension could not revoke every session, retry before
-    // reactivation. A revocation error must leave the school suspended.
+    // Invalidate access tokens issued before suspension before allowing
+    // the school to become active again. Access tokens do not consult the
+    // session store, so revoking refresh sessions alone is not sufficient.
+    // If this fails, the school remains suspended.
     if (school.status === "suspended" && status === "active") {
+      await User.updateMany(
+        { tenantId: school._id },
+        { $inc: { authVersion: 1 } },
+      );
+
+      // Retry revocation in case an earlier suspension could not revoke every
+      // session. A revocation error must leave the school suspended.
       await Session.updateMany(
         { tenantId: school._id, revokedAt: null },
         { $set: { revokedAt: new Date() } },
