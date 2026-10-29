@@ -171,6 +171,38 @@ describe("user management controller", () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
+  it("keeps a committed status change successful when session cleanup fails", async () => {
+    const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 2 };
+    const updated = { ...existing, status: "suspended", authVersion: 3, firstName: "Sam", lastName: "Teacher", email: "sam@example.com" };
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }),
+    });
+    userModel.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updated) }),
+    });
+    sessionModel.updateMany.mockRejectedValue(new Error("session store unavailable"));
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    req.body = { status: "suspended" };
+
+    try {
+      await updateUserStatus(req, res, next);
+
+      expect(userModel.findOneAndUpdate).toHaveBeenCalledWith(
+        expect.any(Object),
+        { $set: { status: "suspended" }, $inc: { authVersion: 1 } },
+        expect.objectContaining({ new: true, runValidators: true }),
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(next).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        "Failed to revoke sessions after user authorization change",
+        expect.objectContaining({ userId: String(userId) }),
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it("prevents an administrator from changing their own status", async () => {
     req.params.userId = req.auth.userId;
     req.body = { status: "suspended" };
