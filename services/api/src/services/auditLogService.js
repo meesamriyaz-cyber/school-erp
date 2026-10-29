@@ -67,21 +67,28 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
     for (let i = 0; i < Math.min(Math.max(batchSize, 1), 100); i += 1) {
       const outbox = await AuditOutbox.findOneAndUpdate(
         {
-          status: "pending",
           attempts: { $lt: MAX_ATTEMPTS },
-          nextAttemptAt: { $lte: new Date() },
+          $or: [
+            { status: "pending", nextAttemptAt: { $lte: new Date() } },
+            { status: "processing", processingStartedAt: { $lte: new Date(Date.now() - 60_000) } },
+          ],
         },
-        { $set: { status: "processing" }, $inc: { attempts: 1 } },
+        { $set: { status: "processing", processingStartedAt: new Date() }, $inc: { attempts: 1 } },
         { new: true, sort: { createdAt: 1 } },
       ).lean();
       if (!outbox) break;
 
       try {
         // The event payload is constructed from allowlisted fields before it enters the outbox.
-        await AuditLog.create(outbox.event);
+        try {
+          await AuditLog.create(outbox.event);
+        } catch (error) {
+          // A prior worker may have inserted the same immutable event and crashed before acking it.
+          if (error?.code !== 11000) throw error;
+        }
         await AuditOutbox.updateOne(
           { _id: outbox._id, status: "processing" },
-          { $set: { status: "delivered", deliveredAt: new Date(), lastError: null } },
+          { $set: { status: "delivered", deliveredAt: new Date(), lastError: null }, $unset: { processingStartedAt: 1 } },
         );
         processed += 1;
       } catch (error) {
@@ -91,10 +98,11 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
           { _id: outbox._id, status: "processing" },
           {
             $set: {
-              status: attempts >= MAX_ATTEMPTS ? "pending" : "pending",
+              status: "pending",
               nextAttemptAt: new Date(Date.now() + backoff),
               lastError: safeErrorMessage(error),
             },
+            $unset: { processingStartedAt: 1 },
           },
         );
         console.error("Audit outbox delivery failed", {
@@ -144,7 +152,7 @@ export async function stopAuditOutboxWorker() {
 export async function writeUserAudit(input) {
   let event;
   try {
-    event = buildSafeEvent(input);
+    event = { eventId: new mongoose.Types.ObjectId(), ...buildSafeEvent(input) };
     const queued = await AuditOutbox.create({ event });
     await processPendingAuditEvents();
     const current = await AuditOutbox.findById(queued._id).select("status").lean();
