@@ -9,6 +9,26 @@ const AUDITABLE_FIELDS = new Set([
   "role",
   "status",
 ]);
+const AUDITABLE_ROLES = new Set([
+  "platform_admin", "school_admin", "principal", "teacher", "accountant",
+  "librarian", "transport_manager", "student", "parent",
+]);
+const AUDITABLE_STATUSES = new Set(["pending", "active", "suspended"]);
+
+function safeAuditValue(action, value, isNewValue) {
+  if (value == null) return null;
+  const normalized = String(value);
+  if (action === "USER_STATUS_CHANGED") {
+    return AUDITABLE_STATUSES.has(normalized) ? normalized : null;
+  }
+  if (action === "USER_ROLE_CHANGED") {
+    return AUDITABLE_ROLES.has(normalized) ? normalized : null;
+  }
+  if (action === "USER_CREATED" && isNewValue && normalized === "pending") {
+    return normalized;
+  }
+  return null;
+}
 
 /**
  * Writes a minimal audit record. Never pass request bodies, credentials, tokens,
@@ -43,8 +63,8 @@ export async function writeUserAudit({
         : null,
       action,
       changedFields: safeFields,
-      previousValue: previousValue == null ? null : String(previousValue),
-      newValue: newValue == null ? null : String(newValue),
+      previousValue: safeAuditValue(action, previousValue, false),
+      newValue: safeAuditValue(action, newValue, true),
     });
     return true;
   } catch (error) {
@@ -52,7 +72,8 @@ export async function writeUserAudit({
       action,
       actorUserId: String(actorUserId),
       targetUserId: String(targetUserId),
-      error,
+      errorName: error?.name ?? "Error",
+      errorMessage: typeof error?.message === "string" ? error.message.slice(0, 200) : "Unknown audit persistence error",
     });
     return false;
   }
