@@ -12,7 +12,6 @@ const auditLogSchema = new mongoose.Schema(
     eventId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
-      unique: true,
       immutable: true,
     },
     actorUserId: {
@@ -92,6 +91,7 @@ auditLogSchema.pre(immutableAuditOperations, function rejectAuditMutation() {
   throw new Error("Audit log records are immutable");
 });
 
+auditLogSchema.index({ eventId: 1 }, { unique: true, partialFilterExpression: { eventId: { $type: "objectId" } } });
 auditLogSchema.index({ targetUserId: 1, createdAt: -1 });
 auditLogSchema.index({ tenantId: 1, createdAt: -1 });
 
