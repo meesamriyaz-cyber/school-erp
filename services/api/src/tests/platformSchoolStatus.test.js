@@ -1,19 +1,23 @@
+import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findById, findOneAndUpdate, updateMany } = vi.hoisted(() => ({
+const { findById, findOneAndUpdate, updateMany, userUpdateMany } = vi.hoisted(() => ({
   findById: vi.fn(),
   findOneAndUpdate: vi.fn(),
   updateMany: vi.fn(),
+  userUpdateMany: vi.fn(),
 }));
 
 vi.mock("../models/Tenant.js", () => ({
   default: { findById, findOneAndUpdate, create: vi.fn() },
 }));
-vi.mock("../models/User.js", () => ({ default: { create: vi.fn() } }));
+vi.mock("../models/User.js", () => ({ default: { create: vi.fn(), updateMany: userUpdateMany } }));
 vi.mock("../models/Session.js", () => ({ default: { updateMany } }));
 vi.mock("../utils/password.js", () => ({ hashPassword: vi.fn() }));
 
 import { updateSchoolStatus } from "../controllers/platformController.js";
+
+vi.spyOn(mongoose, "startSession");
 
 describe("updateSchoolStatus", () => {
   let req;
@@ -21,6 +25,7 @@ describe("updateSchoolStatus", () => {
   let next;
   let schoolQuery;
   let updateQuery;
+  let dbSession;
 
   const schoolId = "507f1f77bcf86cd799439011";
   const activeSchool = {
@@ -32,6 +37,12 @@ describe("updateSchoolStatus", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    dbSession = {
+      withTransaction: vi.fn(async (callback) => callback()),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    mongoose.startSession.mockResolvedValue(dbSession);
+    userUpdateMany.mockResolvedValue({ modifiedCount: 1 });
     req = { params: { schoolId }, body: { status: "suspended" } };
     res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     next = vi.fn();
@@ -122,8 +133,15 @@ describe("updateSchoolStatus", () => {
     expect(findOneAndUpdate).toHaveBeenCalledWith(
       { _id: schoolId, status: "pending" },
       { $set: { status: "active" } },
-      { new: true, runValidators: true },
+      { new: true, runValidators: true, session: dbSession },
     );
+    expect(userUpdateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId, role: "school_admin", status: "pending" },
+      { $set: { status: "active" } },
+      { session: dbSession },
+    );
+    expect(dbSession.withTransaction).toHaveBeenCalledOnce();
+    expect(dbSession.endSession).toHaveBeenCalledOnce();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
