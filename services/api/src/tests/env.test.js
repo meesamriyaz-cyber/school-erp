@@ -166,6 +166,31 @@ describe("environment configuration", () => {
     );
   });
 
+  it("trims whitespace around the selected test URI", async () => {
+    const uri = "mongodb://localhost:27017/school-erp-test";
+    const { default: env } = await importEnv({
+      MONGO_TEST_URI: `  ${uri}  `,
+    });
+
+    expect(env.mongoUri).toBe(uri);
+  });
+
+  it("rejects a test URI with an unsupported scheme", async () => {
+    await expect(
+      importEnv({ MONGO_TEST_URI: "localhost:27017/school-erp-test" }),
+    ).rejects.toThrow(
+      'MONGO_TEST_URI must start with "mongodb://" or "mongodb+srv://"',
+    );
+  });
+
+  it("refuses a test URI that targets a non-test database", async () => {
+    await expect(
+      importEnv({ MONGO_TEST_URI: "mongodb://localhost:27017/school-erp" }),
+    ).rejects.toThrow(
+      "MONGO_TEST_URI must target a database whose name includes 'test' (expected school-erp-test)",
+    );
+  });
+
   it("uses MONGO_URI outside test mode", async () => {
     const { default: env } = await importEnv({
       NODE_ENV: "development",
