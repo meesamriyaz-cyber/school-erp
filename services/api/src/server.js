@@ -1,5 +1,6 @@
 import app from "./app.js";
 import env from "./config/env.js";
+import { startAuditOutboxWorker, stopAuditOutboxWorker } from "./services/auditLogService.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -9,6 +10,7 @@ let server;
 
 const startServer = async () => {
   await connectDatabase();
+  startAuditOutboxWorker();
 
   server = app.listen(env.port, () => {
     console.log(
@@ -30,6 +32,7 @@ const shutdown = async (signal) => {
       });
     }
 
+    await stopAuditOutboxWorker();
     await disconnectDatabase();
     process.exitCode = 0;
   } catch (error) {
@@ -50,6 +53,7 @@ startServer().catch(async (error) => {
   console.error("Failed to start School ERP API:", error.message);
 
   try {
+    await stopAuditOutboxWorker();
     await disconnectDatabase();
   } finally {
     process.exitCode = 1;
