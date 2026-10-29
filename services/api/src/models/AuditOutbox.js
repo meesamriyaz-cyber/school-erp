@@ -23,6 +23,10 @@ const auditOutboxSchema = new mongoose.Schema(
       default: Date.now,
       index: true,
     },
+    processingStartedAt: {
+      type: Date,
+      default: null,
+    },
     lastError: {
       type: String,
       default: null,
