@@ -9,6 +9,7 @@ const { handlers } = vi.hoisted(() => ({
     updateUser: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateUser" })),
     updateUserStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateUserStatus" })),
     updateUserRole: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateUserRole" })),
+    listAuditLogs: vi.fn((_req, res) => res.status(200).json({ endpoint: "listAuditLogs" })),
   },
 }));
 
@@ -23,6 +24,7 @@ vi.mock("../middleware/authenticate.js", () => ({
   },
 }));
 vi.mock("../controllers/userManagementController.js", () => handlers);
+vi.mock("../controllers/auditLogController.js", () => ({ listAuditLogs: handlers.listAuditLogs }));
 
 import platformRoutes from "../routes/platformRoutes.js";
 import schoolRoutes from "../routes/schoolRoutes.js";
@@ -72,6 +74,38 @@ describe("user-management route authorization", () => {
     const response = await fetch(`${baseUrl}/school/users`, { headers: { "x-test-role": "school_admin" } });
     expect(response.status).toBe(200);
     expect(handlers.listUsers).toHaveBeenCalledOnce();
+  });
+
+  it("restricts platform audit logs to platform admins", async () => {
+    const response = await fetch(`${baseUrl}/platform/audit-logs`, {
+      headers: { "x-test-role": "school_admin" },
+    });
+    expect(response.status).toBe(403);
+    expect(handlers.listAuditLogs).not.toHaveBeenCalled();
+  });
+
+  it("allows platform admins to access audit logs", async () => {
+    const response = await fetch(`${baseUrl}/platform/audit-logs`, {
+      headers: { "x-test-role": "platform_admin" },
+    });
+    expect(response.status).toBe(200);
+    expect(handlers.listAuditLogs).toHaveBeenCalledOnce();
+  });
+
+  it("allows school admins to access the school audit-log route", async () => {
+    const response = await fetch(`${baseUrl}/school/audit-logs`, {
+      headers: { "x-test-role": "school_admin" },
+    });
+    expect(response.status).toBe(200);
+    expect(handlers.listAuditLogs).toHaveBeenCalledOnce();
+  });
+
+  it("rejects teachers from the school audit-log route", async () => {
+    const response = await fetch(`${baseUrl}/school/audit-logs`, {
+      headers: { "x-test-role": "teacher" },
+    });
+    expect(response.status).toBe(403);
+    expect(handlers.listAuditLogs).not.toHaveBeenCalled();
   });
 
   it("does not expose a school-level role-change route", async () => {
