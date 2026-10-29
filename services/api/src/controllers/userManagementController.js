@@ -231,21 +231,21 @@ export const updateUser = async (req, res, next) => {
     }
     const result = await findScopedUser(req);
     if (result.error) return sendError(res, result.error.status, result.error.message);
-    const user = await User.findOneAndUpdate(
-      { _id: req.params.userId, ...scopeFor(req) },
-      { $set: update },
-      { new: true, runValidators: true },
-    ).select("_id tenantId firstName lastName email phone role status authVersion lastLoginAt createdAt updatedAt").lean();
-    if (!user) return sendError(res, 404, "User not found");
-    await writeUserAudit({
-      actorUserId: req.auth.userId,
-      actorRole: req.auth.role,
-      tenantId: req.auth.tenantId,
-      targetUserId: user._id,
-      targetTenantId: user.tenantId,
-      action: "USER_PROFILE_UPDATED",
-      changedFields: Object.keys(update),
+    const user = await withAuditTransaction(async (session) => {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: req.params.userId, ...scopeFor(req) },
+        { $set: update },
+        { new: true, runValidators: true, session },
+      ).select("_id tenantId firstName lastName email phone role status authVersion lastLoginAt createdAt updatedAt").lean();
+      if (!updatedUser) return null;
+      await writeUserAudit({
+        actorUserId: req.auth.userId, actorRole: req.auth.role, tenantId: req.auth.tenantId,
+        targetUserId: updatedUser._id, targetTenantId: updatedUser.tenantId,
+        action: "USER_PROFILE_UPDATED", changedFields: Object.keys(update),
+      }, { session });
+      return updatedUser;
     });
+    if (!user) return sendError(res, 404, "User not found");
     return res.status(200).json({ success: true, message: "User profile updated", data: { user: serializeUser(user) } });
   } catch (error) {
     if (error.code === 11000) return sendError(res, 409, "A user with this email already exists in this school");
