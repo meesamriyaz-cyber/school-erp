@@ -270,24 +270,23 @@ export const updateUserStatus = async (req, res, next) => {
     const transitions = { pending: ["active"], active: ["suspended"], suspended: ["active"] };
     if (!transitions[current.status]?.includes(status)) return sendError(res, 400, `Cannot change user status from ${current.status} to ${status}`);
 
-    const updated = await User.findOneAndUpdate(
-      { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
-      { $set: { status }, $inc: { authVersion: 1 } },
-      { new: true, runValidators: true },
-    ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
+    const updated = await withAuditTransaction(async (session) => {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
+        { $set: { status }, $inc: { authVersion: 1 } },
+        { new: true, runValidators: true, session },
+      ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
+      if (!updatedUser) return null;
+      await writeUserAudit({
+        actorUserId: req.auth.userId, actorRole: req.auth.role, tenantId: req.auth.tenantId,
+        targetUserId: updatedUser._id, targetTenantId: updatedUser.tenantId,
+        action: "USER_STATUS_CHANGED", changedFields: ["status"],
+        previousValue: current.status, newValue: updatedUser.status,
+      }, { session });
+      return updatedUser;
+    });
     if (!updated) return sendError(res, 409, "User changed during this request; reload and try again");
     await revokeSessionsAfterAuthChange(updated._id);
-    await writeUserAudit({
-      actorUserId: req.auth.userId,
-      actorRole: req.auth.role,
-      tenantId: req.auth.tenantId,
-      targetUserId: updated._id,
-      targetTenantId: updated.tenantId,
-      action: "USER_STATUS_CHANGED",
-      changedFields: ["status"],
-      previousValue: current.status,
-      newValue: updated.status,
-    });
     return res.status(200).json({ success: true, message: `User status updated to ${status}`, data: { user: serializeUser(updated) } });
   } catch (error) {
     return next(error);
