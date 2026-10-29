@@ -97,7 +97,7 @@ describe("user management controller", () => {
       targetUserId: userId,
       action: "USER_CREATED",
       changedFields: ["firstName", "lastName", "email", "phone", "role", "status"],
-    }));
+    }), { session: {} });
     expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("password");
     expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("passwordHash");
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -149,7 +149,7 @@ describe("user management controller", () => {
       action: "USER_PROFILE_UPDATED",
       targetUserId: userId,
       changedFields: ["firstName"],
-    }));
+    }), { session: {} });
     expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("email");
     expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("passwordHash");
   });
@@ -175,7 +175,7 @@ describe("user management controller", () => {
     expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
       action: "USER_STATUS_CHANGED", previousValue: "active", newValue: "suspended",
       changedFields: ["status"],
-    }));
+    }), { session: {} });
   });
 
   it("prevents school admins from assigning roles through the role endpoint", async () => {
@@ -365,7 +365,7 @@ describe("user management controller", () => {
     expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
       action: "USER_ROLE_CHANGED", previousValue: "teacher", newValue: "principal",
       changedFields: ["role"],
-    }));
+    }), { session: {} });
   });
 
 });
