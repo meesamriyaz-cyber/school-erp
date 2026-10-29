@@ -204,4 +204,35 @@ describe("user management controller", () => {
     expect(userModel.countDocuments).not.toHaveBeenCalled();
   });
 
+
+  it("increments authVersion and revokes sessions when a platform admin changes a user's role", async () => {
+    req.auth = { userId: new mongoose.Types.ObjectId().toString(), tenantId: null, role: "platform_admin" };
+    const existing = { _id: userId, tenantId, status: "active", authVersion: 4 };
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }),
+    });
+    userModel.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({
+          ...existing, firstName: "Sam", lastName: "Teacher", email: "sam@example.com",
+          phone: null, role: "principal", status: "active",
+        }),
+      }),
+    });
+    req.body = { role: "principal" };
+
+    await updateUserRole(req, res, next);
+
+    expect(userModel.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "active", $or: [{ authVersion: 4 }, { authVersion: { $exists: false } }] }),
+      { $set: { role: "principal" }, $inc: { authVersion: 1 } },
+      expect.objectContaining({ new: true, runValidators: true }),
+    );
+    expect(sessionModel.updateMany).toHaveBeenCalledWith(
+      { userId, revokedAt: null },
+      { $set: { revokedAt: expect.any(Date) } },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
 });
