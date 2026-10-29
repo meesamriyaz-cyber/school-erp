@@ -12,6 +12,23 @@ const SCHOOL_ROLES = USER_ROLES.filter(
 const PROFILE_FIELDS = ["firstName", "lastName", "email", "phone"];
 const sendError = (res, status, message) => res.status(status).json({ success: false, message });
 
+// authVersion is incremented atomically with role/status changes, so stale access
+// tokens are invalid immediately. Session revocation is cleanup; if the database
+// cleanup fails, report it to server logs without misreporting the committed change.
+async function revokeSessionsAfterAuthChange(userId) {
+  try {
+    await Session.updateMany(
+      { userId, revokedAt: null },
+      { $set: { revokedAt: new Date() } },
+    );
+  } catch (error) {
+    console.error("Failed to revoke sessions after user authorization change", {
+      userId: String(userId),
+      error,
+    });
+  }
+}
+
 const isPlatformAdmin = (req) => req.auth?.role === "platform_admin";
 const scopeFor = (req) => isPlatformAdmin(req)
   ? { tenantId: { $ne: null }, role: { $ne: "platform_admin" } }
@@ -236,7 +253,7 @@ export const updateUserStatus = async (req, res, next) => {
       { new: true, runValidators: true },
     ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
     if (!updated) return sendError(res, 409, "User changed during this request; reload and try again");
-    await Session.updateMany({ userId: updated._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
+    await revokeSessionsAfterAuthChange(updated._id);
     return res.status(200).json({ success: true, message: `User status updated to ${status}`, data: { user: serializeUser(updated) } });
   } catch (error) {
     return next(error);
@@ -259,7 +276,7 @@ export const updateUserRole = async (req, res, next) => {
       { new: true, runValidators: true },
     ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
     if (!updated) return sendError(res, 409, "User changed during this request; reload and try again");
-    await Session.updateMany({ userId: updated._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
+    await revokeSessionsAfterAuthChange(updated._id);
     return res.status(200).json({ success: true, message: "User role updated", data: { user: serializeUser(updated) } });
   } catch (error) {
     if (error.name === "ValidationError") return sendError(res, 400, "One or more user fields are invalid");
