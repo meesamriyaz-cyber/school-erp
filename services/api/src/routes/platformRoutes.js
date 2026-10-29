@@ -6,8 +6,11 @@ import requireTrustedOrigin from "../middleware/requireTrustedOrigin.js";
 import { authorizeRoles } from "../middleware/authorizeRoles.js";
 import { createSchool, getSchoolDetails, listSchools, updateSchoolStatus } from "../controllers/platformController.js";
 import { createUser, getUserDetails, listUsers, updateUser, updateUserRole, updateUserStatus } from "../controllers/userManagementController.js";
+import { listAuditLogs } from "../controllers/auditLogController.js";
 
 const router = Router();
+
+router.get("/audit-logs", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), listAuditLogs);
 
 router.get("/users", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), listUsers);
 router.post("/users", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), createUser);
