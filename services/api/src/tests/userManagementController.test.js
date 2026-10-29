@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { userModel, tenantModel, sessionModel, hashPassword, auditWrite } = vi.hoisted(() => ({
+const { userModel, tenantModel, sessionModel, hashPassword, auditWrite, auditTransaction } = vi.hoisted(() => ({
   userModel: {
     find: vi.fn(),
     countDocuments: vi.fn(),
@@ -14,6 +14,7 @@ const { userModel, tenantModel, sessionModel, hashPassword, auditWrite } = vi.ho
   sessionModel: { updateMany: vi.fn() },
   hashPassword: vi.fn(),
   auditWrite: vi.fn().mockResolvedValue(true),
+  auditTransaction: vi.fn(async (work) => work({})),
 }));
 
 vi.mock("../models/User.js", () => ({
@@ -23,7 +24,7 @@ vi.mock("../models/User.js", () => ({
 vi.mock("../models/Tenant.js", () => ({ default: tenantModel }));
 vi.mock("../models/Session.js", () => ({ default: sessionModel }));
 vi.mock("../utils/password.js", () => ({ hashPassword }));
-vi.mock("../services/auditLogService.js", () => ({ writeUserAudit: auditWrite }));
+vi.mock("../services/auditLogService.js", () => ({ writeUserAudit: auditWrite, withAuditTransaction: auditTransaction }));
 
 import { createUser, listUsers, updateUser, updateUserStatus, updateUserRole } from "../controllers/userManagementController.js";
 
@@ -65,7 +66,10 @@ describe("user management controller", () => {
     next = vi.fn();
     tenantModel.findById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: tenantId, status: "active" }) }) });
     hashPassword.mockResolvedValue("hashed-password");
-    userModel.create.mockImplementation(async (user) => ({ _id: userId, ...user, createdAt: new Date(), updatedAt: new Date() }));
+    userModel.create.mockImplementation(async (input) => {
+      const makeUser = (user) => ({ _id: userId, ...user, createdAt: new Date(), updatedAt: new Date() });
+      return Array.isArray(input) ? input.map(makeUser) : makeUser(input);
+    });
     sessionModel.updateMany.mockResolvedValue({ modifiedCount: 1 });
   });
 
