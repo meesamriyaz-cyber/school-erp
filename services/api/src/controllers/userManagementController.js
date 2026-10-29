@@ -4,6 +4,7 @@ import Tenant from "../models/Tenant.js";
 import User, { USER_ROLES } from "../models/User.js";
 import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
+import { writeUserAudit } from "../services/auditLogService.js";
 
 const STATUSES = ["pending", "active", "suspended"];
 const SCHOOL_ROLES = USER_ROLES.filter(
@@ -161,6 +162,16 @@ export const createUser = async (req, res, next) => {
       tenantId, firstName, lastName, email, phone: phone || null,
       passwordHash, role, status: "pending", authVersion: 0,
     });
+    await writeUserAudit({
+      actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
+      tenantId: req.auth.tenantId,
+      targetUserId: user._id,
+      targetTenantId: user.tenantId,
+      action: "USER_CREATED",
+      changedFields: ["firstName", "lastName", "email", "phone", "role", "status"],
+      newValue: "pending",
+    });
     return res.status(201).json({
       success: true,
       message: "User created and awaiting activation",
@@ -223,6 +234,15 @@ export const updateUser = async (req, res, next) => {
       { new: true, runValidators: true },
     ).select("_id tenantId firstName lastName email phone role status authVersion lastLoginAt createdAt updatedAt").lean();
     if (!user) return sendError(res, 404, "User not found");
+    await writeUserAudit({
+      actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
+      tenantId: req.auth.tenantId,
+      targetUserId: user._id,
+      targetTenantId: user.tenantId,
+      action: "USER_PROFILE_UPDATED",
+      changedFields: Object.keys(update),
+    });
     return res.status(200).json({ success: true, message: "User profile updated", data: { user: serializeUser(user) } });
   } catch (error) {
     if (error.code === 11000) return sendError(res, 409, "A user with this email already exists in this school");
@@ -254,6 +274,17 @@ export const updateUserStatus = async (req, res, next) => {
     ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
     if (!updated) return sendError(res, 409, "User changed during this request; reload and try again");
     await revokeSessionsAfterAuthChange(updated._id);
+    await writeUserAudit({
+      actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
+      tenantId: req.auth.tenantId,
+      targetUserId: updated._id,
+      targetTenantId: updated.tenantId,
+      action: "USER_STATUS_CHANGED",
+      changedFields: ["status"],
+      previousValue: current.status,
+      newValue: updated.status,
+    });
     return res.status(200).json({ success: true, message: `User status updated to ${status}`, data: { user: serializeUser(updated) } });
   } catch (error) {
     return next(error);
@@ -268,7 +299,7 @@ export const updateUserRole = async (req, res, next) => {
     if (!validId(userId)) return sendError(res, 400, "Invalid user ID");
     if (String(req.auth.userId) === String(userId)) return sendError(res, 403, "You cannot change your own role");
     if (typeof role !== "string" || !allowedRolesFor(req).includes(role)) return sendError(res, 400, "You cannot assign this role");
-    const current = await User.findOne({ _id: userId, ...scopeFor(req) }).select("_id status authVersion").lean();
+    const current = await User.findOne({ _id: userId, ...scopeFor(req) }).select("_id tenantId role status authVersion").lean();
     if (!current) return sendError(res, 404, "User not found");
     const updated = await User.findOneAndUpdate(
       { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
@@ -277,6 +308,17 @@ export const updateUserRole = async (req, res, next) => {
     ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
     if (!updated) return sendError(res, 409, "User changed during this request; reload and try again");
     await revokeSessionsAfterAuthChange(updated._id);
+    await writeUserAudit({
+      actorUserId: req.auth.userId,
+      actorRole: req.auth.role,
+      tenantId: req.auth.tenantId,
+      targetUserId: updated._id,
+      targetTenantId: updated.tenantId,
+      action: "USER_ROLE_CHANGED",
+      changedFields: ["role"],
+      previousValue: current.role,
+      newValue: updated.role,
+    });
     return res.status(200).json({ success: true, message: "User role updated", data: { user: serializeUser(updated) } });
   } catch (error) {
     if (error.name === "ValidationError") return sendError(res, 400, "One or more user fields are invalid");
