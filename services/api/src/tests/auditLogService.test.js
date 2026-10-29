@@ -195,4 +195,34 @@ describe("user audit outbox service", () => {
       startSession.mockRestore();
     }
   });
+  it("enqueues the sanitized event with the active transaction session", async () => {
+    const session = { id: "active-session" };
+    outboxModel.create.mockResolvedValueOnce([{ _id: outboxId }]);
+    const result = await writeUserAudit({
+      actorUserId, actorRole: "school_admin", targetUserId, tenantId,
+      action: "USER_PROFILE_UPDATED", changedFields: ["email"],
+    }, { session });
+
+    expect(result).toBe(true);
+    expect(outboxModel.create).toHaveBeenCalledWith(
+      [expect.objectContaining({ event: expect.objectContaining({ action: "USER_PROFILE_UPDATED" }) })],
+      { session },
+    );
+    expect(auditLogModel.create).not.toHaveBeenCalled();
+  });
+
+  it("throws on transactional outbox failure so the enclosing mutation rolls back", async () => {
+    const session = { id: "active-session" };
+    outboxModel.create.mockRejectedValueOnce(new Error("outbox unavailable"));
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(writeUserAudit({
+        actorUserId, actorRole: "school_admin", targetUserId, tenantId,
+        action: "USER_PROFILE_UPDATED", changedFields: ["email"],
+      }, { session })).rejects.toThrow("outbox unavailable");
+      expect(auditLogModel.create).not.toHaveBeenCalled();
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
 });
