@@ -1,19 +1,20 @@
 import mongoose from "mongoose";
 import AuditLog from "../models/AuditLog.js";
+import AuditOutbox from "../models/AuditOutbox.js";
 
 const AUDITABLE_FIELDS = new Set([
-  "firstName",
-  "lastName",
-  "email",
-  "phone",
-  "role",
-  "status",
+  "firstName", "lastName", "email", "phone", "role", "status",
 ]);
 const AUDITABLE_ROLES = new Set([
   "platform_admin", "school_admin", "principal", "teacher", "accountant",
   "librarian", "transport_manager", "student", "parent",
 ]);
 const AUDITABLE_STATUSES = new Set(["pending", "active", "suspended"]);
+const MAX_ATTEMPTS = 10;
+const MAX_BACKOFF_MS = 60 * 60 * 1000;
+const POLL_INTERVAL_MS = 5000;
+let workerTimer = null;
+let workerRunning = false;
 
 function safeAuditValue(action, value, isNewValue) {
   if (value == null) return null;
@@ -30,50 +31,131 @@ function safeAuditValue(action, value, isNewValue) {
   return null;
 }
 
-/**
- * Writes a minimal audit record. Never pass request bodies, credentials, tokens,
- * hashes, or arbitrary metadata into this function.
- *
- * Audit persistence is best-effort for these user-management handlers: a failure
- * is logged without making a completed user mutation appear to have failed.
- */
-export async function writeUserAudit({
-  actorUserId,
-  actorRole,
-  tenantId = null,
-  targetUserId,
-  targetTenantId = null,
-  action,
-  changedFields = [],
-  previousValue = null,
-  newValue = null,
+function buildSafeEvent({
+  actorUserId, actorRole, tenantId = null, targetUserId, targetTenantId = null,
+  action, changedFields = [], previousValue = null, newValue = null,
 }) {
-  try {
-    const safeFields = [...new Set(changedFields)].filter((field) =>
-      AUDITABLE_FIELDS.has(field)
-    );
+  const safeFields = [...new Set(changedFields)].filter((field) =>
+    AUDITABLE_FIELDS.has(field)
+  );
+  return {
+    actorUserId: new mongoose.Types.ObjectId(String(actorUserId)),
+    actorRole,
+    tenantId: tenantId ? new mongoose.Types.ObjectId(String(tenantId)) : null,
+    targetUserId: new mongoose.Types.ObjectId(String(targetUserId)),
+    targetTenantId: targetTenantId
+      ? new mongoose.Types.ObjectId(String(targetTenantId))
+      : null,
+    action,
+    changedFields: safeFields,
+    previousValue: safeAuditValue(action, previousValue, false),
+    newValue: safeAuditValue(action, newValue, true),
+  };
+}
 
-    await AuditLog.create({
-      actorUserId: new mongoose.Types.ObjectId(String(actorUserId)),
-      actorRole,
-      tenantId: tenantId ? new mongoose.Types.ObjectId(String(tenantId)) : null,
-      targetUserId: new mongoose.Types.ObjectId(String(targetUserId)),
-      targetTenantId: targetTenantId
-        ? new mongoose.Types.ObjectId(String(targetTenantId))
-        : null,
-      action,
-      changedFields: safeFields,
-      previousValue: safeAuditValue(action, previousValue, false),
-      newValue: safeAuditValue(action, newValue, true),
-    });
-    return true;
+function safeErrorMessage(error) {
+  return typeof error?.message === "string"
+    ? error.message.replace(/[\r\n\t]/g, " ").slice(0, 200)
+    : "Unknown audit delivery error";
+}
+
+export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
+  if (workerRunning) return { processed: 0, skipped: true };
+  workerRunning = true;
+  let processed = 0;
+  try {
+    for (let i = 0; i < Math.min(Math.max(batchSize, 1), 100); i += 1) {
+      const outbox = await AuditOutbox.findOneAndUpdate(
+        {
+          status: "pending",
+          attempts: { $lt: MAX_ATTEMPTS },
+          nextAttemptAt: { $lte: new Date() },
+        },
+        { $set: { status: "processing" }, $inc: { attempts: 1 } },
+        { new: true, sort: { createdAt: 1 } },
+      ).lean();
+      if (!outbox) break;
+
+      try {
+        // The event payload is constructed from allowlisted fields before it enters the outbox.
+        await AuditLog.create(outbox.event);
+        await AuditOutbox.updateOne(
+          { _id: outbox._id, status: "processing" },
+          { $set: { status: "delivered", deliveredAt: new Date(), lastError: null } },
+        );
+        processed += 1;
+      } catch (error) {
+        const attempts = outbox.attempts;
+        const backoff = Math.min(1000 * (2 ** Math.max(attempts - 1, 0)), MAX_BACKOFF_MS);
+        await AuditOutbox.updateOne(
+          { _id: outbox._id, status: "processing" },
+          {
+            $set: {
+              status: attempts >= MAX_ATTEMPTS ? "pending" : "pending",
+              nextAttemptAt: new Date(Date.now() + backoff),
+              lastError: safeErrorMessage(error),
+            },
+          },
+        );
+        console.error("Audit outbox delivery failed", {
+          outboxId: String(outbox._id),
+          action: outbox.event?.action,
+          attempts,
+          errorName: error?.name ?? "Error",
+          errorMessage: safeErrorMessage(error),
+        });
+      }
+    }
+    return { processed, skipped: false };
   } catch (error) {
-    console.error("Failed to persist user-management audit event", {
-      action,
-      actorUserId: String(actorUserId),
-      targetUserId: String(targetUserId),
+    console.error("Audit outbox polling failed", {
       errorName: error?.name ?? "Error",
-      errorMessage: typeof error?.message === "string" ? error.message.slice(0, 200) : "Unknown audit persistence error",
+      errorMessage: safeErrorMessage(error),
+    });
+    return { processed, skipped: false, failed: true };
+  } finally {
+    workerRunning = false;
+  }
+}
+
+export function startAuditOutboxWorker() {
+  if (workerTimer) return;
+  void processPendingAuditEvents();
+  workerTimer = setInterval(() => {
+    void processPendingAuditEvents();
+  }, POLL_INTERVAL_MS);
+  workerTimer.unref?.();
+}
+
+export async function stopAuditOutboxWorker() {
+  if (workerTimer) clearInterval(workerTimer);
+  workerTimer = null;
+  // Give an active delivery cycle a chance to finish before DB shutdown.
+  while (workerRunning) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+/**
+ * Persist the sanitized event to a MongoDB outbox, then attempt immediate delivery.
+ * The outbox makes failures after successful enqueue retryable across process restarts.
+ * Callers should not pass request bodies, credentials, tokens, or hashes.
+ */
+export async function writeUserAudit(input) {
+  let event;
+  try {
+    event = buildSafeEvent(input);
+    const queued = await AuditOutbox.create({ event });
+    await processPendingAuditEvents();
+    const current = await AuditOutbox.findById(queued._id).select("status").lean();
+    return current?.status === "delivered";
+  } catch (error) {
+    console.error("Failed to enqueue user-management audit event", {
+      action: input?.action,
+      actorUserId: input?.actorUserId == null ? null : String(input.actorUserId),
+      targetUserId: input?.targetUserId == null ? null : String(input.targetUserId),
+      errorName: error?.name ?? "Error",
+      errorMessage: safeErrorMessage(error),
     });
     return false;
   }
