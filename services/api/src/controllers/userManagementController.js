@@ -303,24 +303,23 @@ export const updateUserRole = async (req, res, next) => {
     if (typeof role !== "string" || !allowedRolesFor(req).includes(role)) return sendError(res, 400, "You cannot assign this role");
     const current = await User.findOne({ _id: userId, ...scopeFor(req) }).select("_id tenantId role status authVersion").lean();
     if (!current) return sendError(res, 404, "User not found");
-    const updated = await User.findOneAndUpdate(
-      { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
-      { $set: { role }, $inc: { authVersion: 1 } },
-      { new: true, runValidators: true },
-    ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
+    const updated = await withAuditTransaction(async (session) => {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
+        { $set: { role }, $inc: { authVersion: 1 } },
+        { new: true, runValidators: true, session },
+      ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
+      if (!updatedUser) return null;
+      await writeUserAudit({
+        actorUserId: req.auth.userId, actorRole: req.auth.role, tenantId: req.auth.tenantId,
+        targetUserId: updatedUser._id, targetTenantId: updatedUser.tenantId,
+        action: "USER_ROLE_CHANGED", changedFields: ["role"],
+        previousValue: current.role, newValue: updatedUser.role,
+      }, { session });
+      return updatedUser;
+    });
     if (!updated) return sendError(res, 409, "User changed during this request; reload and try again");
     await revokeSessionsAfterAuthChange(updated._id);
-    await writeUserAudit({
-      actorUserId: req.auth.userId,
-      actorRole: req.auth.role,
-      tenantId: req.auth.tenantId,
-      targetUserId: updated._id,
-      targetTenantId: updated.tenantId,
-      action: "USER_ROLE_CHANGED",
-      changedFields: ["role"],
-      previousValue: current.role,
-      newValue: updated.role,
-    });
     return res.status(200).json({ success: true, message: "User role updated", data: { user: serializeUser(updated) } });
   } catch (error) {
     if (error.name === "ValidationError") return sendError(res, 400, "One or more user fields are invalid");
