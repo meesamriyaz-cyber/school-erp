@@ -4,7 +4,7 @@ import Tenant from "../models/Tenant.js";
 import User, { USER_ROLES } from "../models/User.js";
 import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
-import { writeUserAudit } from "../services/auditLogService.js";
+import { writeUserAudit, withAuditTransaction } from "../services/auditLogService.js";
 
 const STATUSES = ["pending", "active", "suspended"];
 const SCHOOL_ROLES = USER_ROLES.filter(
@@ -158,19 +158,22 @@ export const createUser = async (req, res, next) => {
     if (tenant.status !== "active") return sendError(res, 409, "Users can only be created for an active school");
 
     const passwordHash = await hashPassword(password);
-    const user = await User.create({
-      tenantId, firstName, lastName, email, phone: phone || null,
-      passwordHash, role, status: "pending", authVersion: 0,
-    });
-    await writeUserAudit({
-      actorUserId: req.auth.userId,
-      actorRole: req.auth.role,
-      tenantId: req.auth.tenantId,
-      targetUserId: user._id,
-      targetTenantId: user.tenantId,
-      action: "USER_CREATED",
-      changedFields: ["firstName", "lastName", "email", "phone", "role", "status"],
-      newValue: "pending",
+    const user = await withAuditTransaction(async (session) => {
+      const [createdUser] = await User.create([{
+        tenantId, firstName, lastName, email, phone: phone || null,
+        passwordHash, role, status: "pending", authVersion: 0,
+      }], { session });
+      await writeUserAudit({
+        actorUserId: req.auth.userId,
+        actorRole: req.auth.role,
+        tenantId: req.auth.tenantId,
+        targetUserId: createdUser._id,
+        targetTenantId: createdUser.tenantId,
+        action: "USER_CREATED",
+        changedFields: ["firstName", "lastName", "email", "phone", "role", "status"],
+        newValue: "pending",
+      }, { session });
+      return createdUser;
     });
     return res.status(201).json({
       success: true,
