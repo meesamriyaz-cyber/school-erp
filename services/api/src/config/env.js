@@ -82,38 +82,58 @@ if (
   throw new Error("WEB_URL must use HTTPS in production");
 }
 
+const testMongoUri =
+  typeof process.env.MONGO_TEST_URI === "string"
+    ? process.env.MONGO_TEST_URI.trim()
+    : "";
+
+if (nodeEnv === "test" && !testMongoUri) {
+  throw new Error(
+    "MONGO_TEST_URI is required when NODE_ENV=test"
+  );
+}
+
+const selectedMongoUri = (
+  nodeEnv === "test" ? testMongoUri : process.env.MONGO_URI
+)?.trim();
+
+if (!/^mongodb(?:\+srv)?:\/\//.test(selectedMongoUri ?? "")) {
+  throw new Error(
+    `${nodeEnv === "test" ? "MONGO_TEST_URI" : "MONGO_URI"} must start with "mongodb://" or "mongodb+srv://"`
+  );
+}
+
+if (nodeEnv === "test") {
+  const databaseMatch = selectedMongoUri.match(
+    /^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]*)/
+  );
+  const databaseName = databaseMatch?.[1]
+    ? decodeURIComponent(databaseMatch[1])
+    : "";
+
+  if (!databaseName || !/test/i.test(databaseName)) {
+    throw new Error(
+      "MONGO_TEST_URI must target a database whose name includes 'test' (expected school-erp-test)"
+    );
+  }
+}
+
 console.log("Environment diagnostic:", {
   nodeEnv,
-  testUriConfigured: Boolean(process.env.MONGO_TEST_URI),
-  selectedUriConfigured: Boolean(
-    nodeEnv === "test"
-      ? process.env.MONGO_TEST_URI
-      : process.env.MONGO_URI
-  ),
+  testUriConfigured: Boolean(testMongoUri),
+  selectedUriConfigured: Boolean(selectedMongoUri),
   selectedUriScheme:
-    (nodeEnv === "test"
-      ? process.env.MONGO_TEST_URI
-      : process.env.MONGO_URI
-    )?.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)?.[0] ?? "unrecognized",
+    selectedMongoUri.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)?.[0] ?? "unrecognized",
 });
 
 const env = Object.freeze({
   nodeEnv,
   port,
-  mongoUri:
-    nodeEnv === "test"
-      ? process.env.MONGO_TEST_URI
-      : process.env.MONGO_URI,
+  mongoUri: selectedMongoUri,
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   webUrl: parsedWebUrl.origin,
 });
-
-if (nodeEnv === "test" && !process.env.MONGO_TEST_URI) {
-  throw new Error(
-    "MONGO_TEST_URI is required when NODE_ENV=test"
-  );
-}
 
 
 export default env;
