@@ -153,12 +153,10 @@ describe("user management controller", () => {
 
   it("rejects school-admin status changes for users outside the authenticated tenant", async () => {
     const otherTenantId = new mongoose.Types.ObjectId();
+    // A properly scoped Mongo query cannot return this other-tenant user.
+    // Model that behavior by returning no matching user.
     userModel.findOne.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          _id: userId, tenantId: otherTenantId, role: "teacher", status: "active", authVersion: 0,
-        }),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(null) }),
     });
     req.body = { status: "suspended" };
 
@@ -170,6 +168,7 @@ describe("user management controller", () => {
     }));
     expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
     expect(sessionModel.updateMany).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
   it("prevents an administrator from changing their own status", async () => {
