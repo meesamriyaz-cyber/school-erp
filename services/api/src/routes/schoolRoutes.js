@@ -6,8 +6,11 @@ import requireActiveTenant from "../middleware/requireActiveTenant.js";
 import requireTrustedOrigin from "../middleware/requireTrustedOrigin.js";
 import { authorizeRoles } from "../middleware/authorizeRoles.js";
 import { createUser, getUserDetails, listUsers, updateUser, updateUserStatus } from "../controllers/userManagementController.js";
+import { listAuditLogs } from "../controllers/auditLogController.js";
 
 const router = Router();
+
+router.get("/audit-logs", requireTrustedOrigin, authenticate, requireActiveTenant, authorizeRoles("school_admin"), listAuditLogs);
 
 router.get("/users", requireTrustedOrigin, authenticate, requireActiveTenant, authorizeRoles("school_admin"), listUsers);
 router.post("/users", requireTrustedOrigin, authenticate, requireActiveTenant, authorizeRoles("school_admin"), createUser);
