@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { userModel, tenantModel, sessionModel, hashPassword } = vi.hoisted(() => ({
+const { userModel, tenantModel, sessionModel, hashPassword, auditWrite } = vi.hoisted(() => ({
   userModel: {
     find: vi.fn(),
     countDocuments: vi.fn(),
@@ -13,6 +13,7 @@ const { userModel, tenantModel, sessionModel, hashPassword } = vi.hoisted(() => 
   tenantModel: { findById: vi.fn() },
   sessionModel: { updateMany: vi.fn() },
   hashPassword: vi.fn(),
+  auditWrite: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../models/User.js", () => ({
@@ -22,6 +23,7 @@ vi.mock("../models/User.js", () => ({
 vi.mock("../models/Tenant.js", () => ({ default: tenantModel }));
 vi.mock("../models/Session.js", () => ({ default: sessionModel }));
 vi.mock("../utils/password.js", () => ({ hashPassword }));
+vi.mock("../services/auditLogService.js", () => ({ writeUserAudit: auditWrite }));
 
 import { createUser, listUsers, updateUserStatus, updateUserRole } from "../controllers/userManagementController.js";
 
@@ -46,6 +48,7 @@ describe("user management controller", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    auditWrite.mockResolvedValue(true);
     req = {
       auth: { userId: new mongoose.Types.ObjectId().toString(), tenantId: tenantId.toString(), role: "school_admin" },
       params: { userId: userId.toString() },
@@ -81,6 +84,15 @@ describe("user management controller", () => {
       authVersion: 0,
     }));
     expect(res.status).toHaveBeenCalledWith(201);
+    expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
+      actorUserId: req.auth.userId,
+      actorRole: "school_admin",
+      targetUserId: userId,
+      action: "USER_CREATED",
+      changedFields: ["firstName", "lastName", "email", "phone", "role", "status"],
+    }));
+    expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("password");
+    expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("passwordHash");
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       data: { user: expect.objectContaining({ status: "pending", role: "teacher" }) },
     }));
@@ -131,6 +143,10 @@ describe("user management controller", () => {
       { $set: { revokedAt: expect.any(Date) } },
     );
     expect(res.status).toHaveBeenCalledWith(200);
+    expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
+      action: "USER_STATUS_CHANGED", previousValue: "active", newValue: "suspended",
+      changedFields: ["status"],
+    }));
   });
 
   it("prevents school admins from assigning roles through the role endpoint", async () => {
@@ -244,7 +260,7 @@ describe("user management controller", () => {
 
   it("keeps a committed role change successful when session cleanup fails", async () => {
     req.auth = { userId: new mongoose.Types.ObjectId().toString(), tenantId: null, role: "platform_admin" };
-    const existing = { _id: userId, tenantId, status: "active", authVersion: 4 };
+    const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 4 };
     const updated = {
       ...existing, firstName: "Sam", lastName: "Teacher", email: "sam@example.com",
       phone: null, role: "principal",
