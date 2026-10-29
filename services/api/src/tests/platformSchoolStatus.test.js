@@ -92,22 +92,46 @@ describe("updateSchoolStatus", () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it("revokes any lingering sessions before reactivating a suspended school", async () => {
+  it("invalidates old access tokens and revokes sessions before reactivating a suspended school", async () => {
     req.body.status = "active";
     schoolQuery.lean.mockResolvedValue({ ...activeSchool, status: "suspended" });
     updateQuery.lean.mockResolvedValue({ ...activeSchool, status: "active" });
 
     await updateSchoolStatus(req, res, next);
 
+    expect(userUpdateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId },
+      { $inc: { authVersion: 1 } },
+    );
     expect(updateMany).toHaveBeenCalledWith(
       { tenantId: schoolId, revokedAt: null },
       { $set: { revokedAt: expect.any(Date) } },
+    );
+    expect(userUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      updateMany.mock.invocationCallOrder[0],
     );
     expect(updateMany.mock.invocationCallOrder[0]).toBeLessThan(
       findOneAndUpdate.mock.invocationCallOrder[0],
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it("does not reactivate a suspended school if access-token invalidation fails", async () => {
+    const error = new Error("User store unavailable");
+    req.body.status = "active";
+    schoolQuery.lean.mockResolvedValue({ ...activeSchool, status: "suspended" });
+    userUpdateMany.mockRejectedValue(error);
+
+    await updateSchoolStatus(req, res, next);
+
+    expect(userUpdateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId },
+      { $inc: { authVersion: 1 } },
+    );
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(findOneAndUpdate).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(error);
   });
 
   it("keeps a suspended school suspended if session revocation fails during reactivation", async () => {
