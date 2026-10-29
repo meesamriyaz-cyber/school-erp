@@ -78,6 +78,20 @@ const auditLogSchema = new mongoose.Schema(
   },
 );
 
+// Audit records are append-only through Mongoose; corrections should be new events.
+const immutableAuditOperations = [
+  "updateOne",
+  "updateMany",
+  "findOneAndUpdate",
+  "replaceOne",
+  "deleteOne",
+  "deleteMany",
+  "findOneAndDelete",
+];
+auditLogSchema.pre(immutableAuditOperations, function rejectAuditMutation() {
+  throw new Error("Audit log records are immutable");
+});
+
 auditLogSchema.index({ targetUserId: 1, createdAt: -1 });
 auditLogSchema.index({ tenantId: 1, createdAt: -1 });
 
