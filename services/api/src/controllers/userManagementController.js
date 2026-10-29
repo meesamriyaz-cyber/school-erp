@@ -10,7 +10,6 @@ const SCHOOL_ROLES = USER_ROLES.filter(
   (role) => role !== "platform_admin" && role !== "school_admin",
 );
 const PROFILE_FIELDS = ["firstName", "lastName", "email", "phone"];
-const createHttpError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
 const sendError = (res, status, message) => res.status(status).json({ success: false, message });
 
 const isPlatformAdmin = (req) => req.auth?.role === "platform_admin";
@@ -224,7 +223,7 @@ export const updateUserStatus = async (req, res, next) => {
     if (String(req.auth.userId) === String(userId)) return sendError(res, 403, "You cannot change your own account status");
 
     const current = await User.findOne({ _id: userId, ...scopeFor(req) })
-      .select("_id tenantId role status authVersion")
+      .select("_id tenantId firstName lastName email phone role status authVersion lastLoginAt createdAt updatedAt")
       .lean();
     if (!current) return sendError(res, 404, "User not found");
     if (current.status === status) return res.status(200).json({ success: true, message: "User already has the requested status", data: { user: serializeUser(current) } });
@@ -232,7 +231,7 @@ export const updateUserStatus = async (req, res, next) => {
     if (!transitions[current.status]?.includes(status)) return sendError(res, 400, `Cannot change user status from ${current.status} to ${status}`);
 
     const updated = await User.findOneAndUpdate(
-      { _id: userId, ...scopeFor(req), status: current.status, authVersion: current.authVersion ?? 0 },
+      { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
       { $set: { status }, $inc: { authVersion: 1 } },
       { new: true, runValidators: true },
     ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
@@ -255,7 +254,7 @@ export const updateUserRole = async (req, res, next) => {
     const current = await User.findOne({ _id: userId, ...scopeFor(req) }).select("_id status authVersion").lean();
     if (!current) return sendError(res, 404, "User not found");
     const updated = await User.findOneAndUpdate(
-      { _id: userId, ...scopeFor(req), status: current.status, authVersion: current.authVersion ?? 0 },
+      { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
       { $set: { role }, $inc: { authVersion: 1 } },
       { new: true, runValidators: true },
     ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
