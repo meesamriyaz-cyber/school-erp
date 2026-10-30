@@ -143,6 +143,31 @@ describe("user audit outbox service", () => {
     );
   });
 
+  it("marks an event failed after the tenth unsuccessful delivery attempt", async () => {
+    const event = { eventId: new mongoose.Types.ObjectId(), action: "USER_PROFILE_UPDATED" };
+    outboxModel.findOneAndUpdate.mockReset().mockReturnValueOnce(leanResult({
+      _id: outboxId, attempts: 10, event,
+    }));
+    auditLogModel.create.mockRejectedValueOnce(new Error("persistent database failure"));
+    const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await processPendingAuditEvents({ batchSize: 1 });
+      expect(result.processed).toBe(0);
+      expect(outboxModel.updateOne).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: outboxId, status: "processing", processingToken: expect.any(String) }),
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            status: "failed",
+            nextAttemptAt: expect.any(Date),
+            lastError: "persistent database failure",
+          }),
+          $unset: { processingStartedAt: 1, processingToken: 1 },
+        }),
+      );
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
   it("keeps an outbox enqueue failure visible and does not claim delivery", async () => {
     outboxModel.create.mockRejectedValueOnce(new Error("outbox unavailable"));
     const logSpy = vi.spyOn(console, "error").mockImplementation(() => {});
