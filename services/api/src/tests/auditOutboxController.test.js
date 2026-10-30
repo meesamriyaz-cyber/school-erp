@@ -78,6 +78,7 @@ describe("audit outbox operations controller", () => {
           lastManualRetryAt: expect.any(Date), lastManualRetryBy: adminId,
         }),
         $inc: { manualRetryCount: 1 },
+        $unset: { processingStartedAt: 1, processingToken: 1 },
       }),
       { new: true },
     );
