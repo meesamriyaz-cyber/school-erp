@@ -27,6 +27,11 @@ const auditOutboxSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    processingToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
     lastError: {
       type: String,
       default: null,
