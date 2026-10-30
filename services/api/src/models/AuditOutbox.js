@@ -36,6 +36,20 @@ const auditOutboxSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    manualRetryCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lastManualRetryAt: {
+      type: Date,
+      default: null,
+    },
+    lastManualRetryBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: true,
