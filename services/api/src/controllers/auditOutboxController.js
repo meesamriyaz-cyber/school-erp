@@ -6,7 +6,7 @@ const sendError = (res, status, message) =>
   res.status(status).json({ success: false, message });
 
 const validId = (id) => mongoose.isObjectIdOrHexString(id);
-const STALE_AFTER_MS = 60_000;
+const STALE_AFTER_MS = 5 * 60_000;
 
 export const getAuditOutboxStatus = async (_req, res, next) => {
   try {
