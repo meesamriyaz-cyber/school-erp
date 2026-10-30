@@ -70,6 +70,7 @@ auditOutboxSchema.path("event").validate((event) =>
 );
 
 auditOutboxSchema.index({ status: 1, nextAttemptAt: 1, createdAt: 1 });
+auditOutboxSchema.index({ status: 1, processingStartedAt: 1, createdAt: 1 });
 
 const AuditOutbox = mongoose.model("AuditOutbox", auditOutboxSchema);
 
