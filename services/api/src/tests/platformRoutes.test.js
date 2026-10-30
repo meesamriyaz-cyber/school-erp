@@ -1,11 +1,14 @@
 import express from "express";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool } = vi.hoisted(() => ({
+const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAuditLogs, getAuditOutboxStatus, retryFailedAuditEvent } = vi.hoisted(() => ({
   listSchools: vi.fn((_req, res) => res.status(200).json({ endpoint: "listSchools" })),
   getSchoolDetails: vi.fn((_req, res) => res.status(200).json({ endpoint: "getSchoolDetails" })),
   updateSchoolStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateSchoolStatus" })),
   createSchool: vi.fn((_req, res) => res.status(201).json({ endpoint: "createSchool" })),
+  listAuditLogs: vi.fn((_req, res) => res.status(200).json({ endpoint: "listAuditLogs" })),
+  getAuditOutboxStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "getAuditOutboxStatus" })),
+  retryFailedAuditEvent: vi.fn((_req, res) => res.status(200).json({ endpoint: "retryFailedAuditEvent" })),
 }));
 
 vi.mock("../middleware/requireTrustedOrigin.js", () => ({
@@ -22,6 +25,9 @@ vi.mock("../middleware/authenticate.js", () => ({
     return next();
   },
 }));
+
+vi.mock("../controllers/auditLogController.js", () => ({ listAuditLogs }));
+vi.mock("../controllers/auditOutboxController.js", () => ({ getAuditOutboxStatus, retryFailedAuditEvent }));
 
 vi.mock("../controllers/platformController.js", () => ({
   listSchools,
@@ -61,6 +67,9 @@ describe("platform school-management route authorization", () => {
   });
 
   const protectedRequests = [
+    ["GET", "/audit-outbox", undefined, getAuditOutboxStatus],
+    ["POST", "/audit-outbox/507f1f77bcf86cd799439011/retry", {}, retryFailedAuditEvent],
+    ["GET", "/audit-logs", undefined, listAuditLogs],
     ["GET", "/schools", undefined, listSchools],
     ["GET", "/schools/507f1f77bcf86cd799439011", undefined, getSchoolDetails],
     ["PATCH", "/schools/507f1f77bcf86cd799439011/status", { status: "suspended" }, updateSchoolStatus],
