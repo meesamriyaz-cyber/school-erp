@@ -13,7 +13,7 @@ User-management audit events are first written to `AuditOutbox`. For mutations u
 - Processing lease: 5 minutes. A processing event older than this can be reclaimed.
 - Each claim receives a unique processing token. A worker can acknowledge or reschedule an event only while it still owns that token.
 - `eventId` provides idempotency when a worker inserts an audit log but crashes before acknowledging the outbox record.
-- Failed records are retained for platform-admin inspection and manual retry.
+- Failed records are retained for platform-admin inspection and manual retry. Manual retry clears any stale processing lease/token before returning the event to pending.
 
 ## Monitoring
 
@@ -49,7 +49,7 @@ Do not repeatedly retry an event without investigating its `lastError`. Manual r
 - Configure `MONGO_TEST_URI` only for a dedicated test database whose name includes `test`; run the transaction and concurrency integration tests before release.
 - MongoDB must be a replica set or sharded cluster for transactional user mutation plus outbox enqueue.
 - Start the worker only after the database connection is established.
-- During graceful shutdown, stop scheduling new polls, allow the active delivery cycle to finish, then disconnect MongoDB.
+- During graceful shutdown, stop accepting new HTTP requests and wait for in-flight handlers to finish; then stop scheduling worker polls, allow the active delivery cycle to finish, and disconnect MongoDB.
 - On restart, pending events are picked up by polling; expired processing leases can be reclaimed.
 - Validate shutdown and restart behaviour in the target hosting environment because process termination deadlines and signal delivery vary by platform.
 
@@ -61,3 +61,12 @@ pnpm --filter @school-erp/api exec vitest run src/tests/auditTransaction.integra
 ```
 
 Keep integration tests pointed at the dedicated test database. Never point them at production data.
+
+
+## Integrity and security boundaries
+
+- Audit event construction is allowlisted in the service; request bodies and credential fields must never be passed as event payloads.
+- Audit-log read and outbox-operation routes are restricted to platform administrators, while school audit-log reads are restricted to the authenticated school administrator and target school.
+- Mongoose middleware rejects supported document mutation paths, including query updates/deletes and model-level bulk writes. This is application-level protection, not a database-level immutable-storage guarantee: direct MongoDB collection writes or privileged database credentials can bypass Mongoose middleware.
+- For stronger tamper resistance, restrict production database credentials to the minimum required collections and operations, monitor privileged database access, and consider exporting audit records to a separately controlled append-only/WORM destination according to the organisation's retention requirements.
+- Never expose the outbox event payload through operational endpoints; inspect only the approved metadata fields.
