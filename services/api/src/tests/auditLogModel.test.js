@@ -14,16 +14,21 @@ describe("AuditLog model integrity", () => {
 
   it("registers append-only middleware for update and delete operations", () => {
     const operations = [
+      "update",
       "updateOne",
       "updateMany",
+      "findOneAndReplace",
       "findOneAndUpdate",
+      "findOneAndRemove",
+      "findOneAndDelete",
       "replaceOne",
+      "remove",
       "deleteOne",
       "deleteMany",
-      "findOneAndDelete",
     ];
     for (const operation of operations) {
       expect(AuditLog.schema.s.hooks._pres.has(operation)).toBe(true);
     }
+    expect(AuditLog.schema.s.hooks._pres.has("bulkWrite")).toBe(true);
   });
 });
