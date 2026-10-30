@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { randomUUID } from "node:crypto";
 import AuditLog from "../models/AuditLog.js";
 import AuditOutbox from "../models/AuditOutbox.js";
 
@@ -13,6 +14,7 @@ const AUDITABLE_STATUSES = new Set(["pending", "active", "suspended"]);
 const MAX_ATTEMPTS = 10;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
+const PROCESSING_LEASE_MS = 5 * 60 * 1000;
 let workerTimer = null;
 let workerRunning = false;
 
@@ -65,15 +67,17 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
   let processed = 0;
   try {
     for (let i = 0; i < Math.min(Math.max(batchSize, 1), 100); i += 1) {
+      const processingToken = randomUUID();
+      const claimedAt = new Date();
       const outbox = await AuditOutbox.findOneAndUpdate(
         {
           attempts: { $lt: MAX_ATTEMPTS },
           $or: [
-            { status: "pending", nextAttemptAt: { $lte: new Date() } },
-            { status: "processing", processingStartedAt: { $lte: new Date(Date.now() - 60_000) } },
+            { status: "pending", nextAttemptAt: { $lte: claimedAt } },
+            { status: "processing", processingStartedAt: { $lte: new Date(claimedAt.getTime() - PROCESSING_LEASE_MS) } },
           ],
         },
-        { $set: { status: "processing", processingStartedAt: new Date() }, $inc: { attempts: 1 } },
+        { $set: { status: "processing", processingStartedAt: claimedAt, processingToken }, $inc: { attempts: 1 } },
         { new: true, sort: { createdAt: 1 } },
       ).lean();
       if (!outbox) break;
@@ -85,24 +89,26 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
         } catch (error) {
           // A prior worker may have inserted the same immutable event and crashed before acking it.
           if (error?.code !== 11000) throw error;
+          const existingEvent = await AuditLog.findOne({ eventId: outbox.event?.eventId }).select("_id").lean();
+          if (!existingEvent) throw error;
         }
         await AuditOutbox.updateOne(
-          { _id: outbox._id, status: "processing" },
-          { $set: { status: "delivered", deliveredAt: new Date(), lastError: null }, $unset: { processingStartedAt: 1 } },
+          { _id: outbox._id, status: "processing", processingToken },
+          { $set: { status: "delivered", deliveredAt: new Date(), lastError: null }, $unset: { processingStartedAt: 1, processingToken: 1 } },
         );
         processed += 1;
       } catch (error) {
         const attempts = outbox.attempts;
         const backoff = Math.min(1000 * (2 ** Math.max(attempts - 1, 0)), MAX_BACKOFF_MS);
         await AuditOutbox.updateOne(
-          { _id: outbox._id, status: "processing" },
+          { _id: outbox._id, status: "processing", processingToken },
           {
             $set: {
               status: attempts >= MAX_ATTEMPTS ? "failed" : "pending",
               nextAttemptAt: new Date(Date.now() + backoff),
               lastError: safeErrorMessage(error),
             },
-            $unset: { processingStartedAt: 1 },
+            $unset: { processingStartedAt: 1, processingToken: 1 },
           },
         );
         console.error("Audit outbox delivery failed", {
