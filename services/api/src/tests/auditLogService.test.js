@@ -42,7 +42,7 @@ describe("user audit outbox service", () => {
         event: { eventId: new mongoose.Types.ObjectId(), action: "USER_PROFILE_UPDATED" },
       }))
       .mockReturnValue(leanResult(null));
-    outboxModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+    outboxModel.updateOne.mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
     outboxModel.findById.mockReturnValue({
       select: vi.fn().mockReturnValue(leanResult({ status: "delivered" })),
     });
