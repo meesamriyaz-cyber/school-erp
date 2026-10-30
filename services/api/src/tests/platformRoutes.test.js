@@ -107,7 +107,7 @@ describe("platform school-management route authorization", () => {
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
 
-      expect(response.status).toBe(method === "POST" ? 201 : 200);
+      expect(response.status).toBe(controller === createSchool ? 201 : 200);
       expect(controller).toHaveBeenCalledOnce();
     },
   );
