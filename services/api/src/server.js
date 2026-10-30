@@ -23,6 +23,9 @@ const shutdown = async (signal) => {
   console.log(`${signal} received. Shutting down...`);
 
   try {
+    // Stop scheduling new outbox polls immediately, then drain the active delivery cycle.
+    await stopAuditOutboxWorker();
+
     if (server) {
       await new Promise((resolve, reject) => {
         server.close((error) => {
@@ -32,7 +35,6 @@ const shutdown = async (signal) => {
       });
     }
 
-    await stopAuditOutboxWorker();
     await disconnectDatabase();
     process.exitCode = 0;
   } catch (error) {
