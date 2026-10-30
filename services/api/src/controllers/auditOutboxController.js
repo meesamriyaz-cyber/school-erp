@@ -62,7 +62,7 @@ export const retryFailedAuditEvent = async (req, res, next) => {
           lastManualRetryBy: new mongoose.Types.ObjectId(String(req.auth.userId)),
         },
         $inc: { manualRetryCount: 1 },
-        $unset: { processingStartedAt: 1 },
+        $unset: { processingStartedAt: 1, processingToken: 1 },
       },
       { new: true },
     ).select("_id status attempts manualRetryCount");
