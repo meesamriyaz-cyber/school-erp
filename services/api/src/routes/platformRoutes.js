@@ -7,10 +7,13 @@ import { authorizeRoles } from "../middleware/authorizeRoles.js";
 import { createSchool, getSchoolDetails, listSchools, updateSchoolStatus } from "../controllers/platformController.js";
 import { createUser, getUserDetails, listUsers, updateUser, updateUserRole, updateUserStatus } from "../controllers/userManagementController.js";
 import { listAuditLogs } from "../controllers/auditLogController.js";
+import { getAuditOutboxStatus, retryFailedAuditEvent } from "../controllers/auditOutboxController.js";
 
 const router = Router();
 
 router.get("/audit-logs", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), listAuditLogs);
+router.get("/audit-outbox", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), getAuditOutboxStatus);
+router.post("/audit-outbox/:outboxId/retry", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), retryFailedAuditEvent);
 
 router.get("/users", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), listUsers);
 router.post("/users", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), createUser);
