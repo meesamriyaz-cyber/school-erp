@@ -1,6 +1,6 @@
 import "dotenv/config";
 import mongoose from "mongoose";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import User from "../models/User.js";
 import AuditLog from "../models/AuditLog.js";
 import AuditOutbox from "../models/AuditOutbox.js";
@@ -82,23 +82,29 @@ integrationDescribe("audit transaction MongoDB integration", () => {
     const userId = new mongoose.Types.ObjectId();
     const outboxId = new mongoose.Types.ObjectId();
 
-    await expect(withAuditTransaction(async (session) => {
-      await User.create([{
-        _id: userId, tenantId: new mongoose.Types.ObjectId(), firstName: "Rollback",
-        lastName: "Audit", email: `audit-rollback-${suffix}@example.test`,
-        passwordHash: "integration-test-hash", role: "teacher", status: "pending",
-      }], { session });
-      await AuditOutbox.create([{
-        _id: outboxId,
-        event: {
-          eventId: new mongoose.Types.ObjectId(), actorUserId: new mongoose.Types.ObjectId(),
-          actorRole: "platform_admin", tenantId: null, targetUserId: userId,
-          targetTenantId: null, action: "USER_CREATED", changedFields: ["status"],
-          previousValue: null, newValue: "pending",
-        },
-      }], { session });
-      throw new Error("intentional transaction rollback");
-    })).rejects.toThrow("intentional transaction rollback");
+    const enqueueSpy = vi.spyOn(AuditOutbox, "create").mockRejectedValueOnce(
+      new Error("audit enqueue unavailable"),
+    );
+    try {
+      await expect(withAuditTransaction(async (session) => {
+        await User.create([{
+          _id: userId, tenantId: new mongoose.Types.ObjectId(), firstName: "Rollback",
+          lastName: "Audit", email: `audit-rollback-${suffix}@example.test`,
+          passwordHash: "integration-test-hash", role: "teacher", status: "pending",
+        }], { session });
+        await AuditOutbox.create([{
+          _id: outboxId,
+          event: {
+            eventId: new mongoose.Types.ObjectId(), actorUserId: new mongoose.Types.ObjectId(),
+            actorRole: "platform_admin", tenantId: null, targetUserId: userId,
+            targetTenantId: null, action: "USER_CREATED", changedFields: ["status"],
+            previousValue: null, newValue: "pending",
+          },
+        }], { session });
+      })).rejects.toThrow("audit enqueue unavailable");
+    } finally {
+      enqueueSpy.mockRestore();
+    }
 
     expect(await User.findById(userId).lean()).toBeNull();
     expect(await AuditOutbox.findById(outboxId).lean()).toBeNull();
