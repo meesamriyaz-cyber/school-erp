@@ -81,13 +81,24 @@ const auditLogSchema = new mongoose.Schema(
 const immutableAuditOperations = [
   "updateOne",
   "updateMany",
+  "findOneAndReplace",
   "findOneAndUpdate",
+  "findOneAndRemove",
+  "findOneAndDelete",
   "replaceOne",
+  "update",
+  "updateOne",
+  "updateMany",
+  "remove",
   "deleteOne",
   "deleteMany",
-  "findOneAndDelete",
 ];
 auditLogSchema.pre(immutableAuditOperations, function rejectAuditMutation() {
+  throw new Error("Audit log records are immutable");
+});
+
+// Model-level bulk writes bypass query middleware, so reject them separately.
+auditLogSchema.pre("bulkWrite", function rejectAuditBulkWrite() {
   throw new Error("Audit log records are immutable");
 });
 
