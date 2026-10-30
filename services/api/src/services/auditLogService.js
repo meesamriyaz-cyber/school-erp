@@ -92,11 +92,11 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
           const existingEvent = await AuditLog.findOne({ eventId: outbox.event?.eventId }).select("_id").lean();
           if (!existingEvent) throw error;
         }
-        await AuditOutbox.updateOne(
+        const acknowledgement = await AuditOutbox.updateOne(
           { _id: outbox._id, status: "processing", processingToken },
           { $set: { status: "delivered", deliveredAt: new Date(), lastError: null }, $unset: { processingStartedAt: 1, processingToken: 1 } },
         );
-        processed += 1;
+        if (acknowledgement.matchedCount > 0) processed += 1;
       } catch (error) {
         const attempts = outbox.attempts;
         const backoff = Math.min(1000 * (2 ** Math.max(attempts - 1, 0)), MAX_BACKOFF_MS);
