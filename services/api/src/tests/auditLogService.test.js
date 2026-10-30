@@ -110,14 +110,14 @@ describe("user audit outbox service", () => {
 
       expect(result).toBe(false);
       expect(outboxModel.updateOne).toHaveBeenCalledWith(
-        { _id: outboxId, status: "processing" },
+        expect.objectContaining({ _id: outboxId, status: "processing", processingToken: expect.any(String) }),
         expect.objectContaining({
           $set: expect.objectContaining({
             status: "pending",
             nextAttemptAt: expect.any(Date),
             lastError: "database unavailable secret detail",
           }),
-          $unset: { processingStartedAt: 1 },
+          $unset: { processingStartedAt: 1, processingToken: 1 },
         }),
       );
       expect(logSpy).toHaveBeenCalledWith(
@@ -136,7 +136,7 @@ describe("user audit outbox service", () => {
 
     expect(result.processed).toBe(1);
     expect(outboxModel.updateOne).toHaveBeenCalledWith(
-      { _id: outboxId, status: "processing" },
+      expect.objectContaining({ _id: outboxId, status: "processing", processingToken: expect.any(String) }),
       expect.objectContaining({
         $set: expect.objectContaining({ status: "delivered" }),
       }),
