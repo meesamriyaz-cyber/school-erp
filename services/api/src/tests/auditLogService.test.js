@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { auditLogModel, outboxModel } = vi.hoisted(() => ({
-  auditLogModel: { create: vi.fn() },
+  auditLogModel: { create: vi.fn(), findOne: vi.fn() },
   outboxModel: {
     create: vi.fn(),
     findOneAndUpdate: vi.fn(),
@@ -27,6 +27,7 @@ describe("user audit outbox service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auditLogModel.create.mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
+    auditLogModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue(leanResult({ _id: new mongoose.Types.ObjectId() })) });
     outboxModel.create.mockImplementation(async ({ event }) => {
       outboxModel.findOneAndUpdate
         .mockReset()
@@ -82,7 +83,7 @@ describe("user audit outbox service", () => {
     expect(queued.event).not.toHaveProperty("refreshToken");
     expect(auditLogModel.create).toHaveBeenCalledWith(queued.event);
     expect(outboxModel.updateOne).toHaveBeenCalledWith(
-      { _id: outboxId, status: "processing" },
+      expect.objectContaining({ _id: outboxId, status: "processing", processingToken: expect.any(String) }),
       expect.objectContaining({
         $set: expect.objectContaining({ status: "delivered" }),
       }),
@@ -130,6 +131,7 @@ describe("user audit outbox service", () => {
 
   it("marks an event delivered when an earlier attempt inserted it before crashing", async () => {
     auditLogModel.create.mockRejectedValueOnce(Object.assign(new Error("duplicate"), { code: 11000 }));
+    auditLogModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue(leanResult({ _id: new mongoose.Types.ObjectId() })) });
     const result = await processPendingAuditEvents({ batchSize: 1 });
 
     expect(result.processed).toBe(1);
