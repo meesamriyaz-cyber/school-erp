@@ -7,7 +7,7 @@ const testMongoUri = process.env.MONGO_TEST_URI;
 const integrationDescribe = testMongoUri ? describe : describe.skip;
 
 function getDatabaseName(uri) {
-  const match = uri.match(/^mongodb(?:\\+srv)?:\\/\\/[^/]+\\/([^?]*)/);
+  const match = uri.match(/^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]*)/);
   return match ? decodeURIComponent(match[1]) : "";
 }
 
