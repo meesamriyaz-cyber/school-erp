@@ -64,7 +64,7 @@ export const retryFailedAuditEvent = async (req, res, next) => {
         $inc: { manualRetryCount: 1 },
         $unset: { processingStartedAt: 1, processingToken: 1 },
       },
-      { new: true },
+      { returnDocument: "after" },
     ).select("_id status attempts manualRetryCount");
 
     if (!retried) return sendError(res, 409, "Audit event is not failed or has already been retried");

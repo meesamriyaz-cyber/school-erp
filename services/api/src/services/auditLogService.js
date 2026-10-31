@@ -78,10 +78,17 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
           ],
         },
         { $set: { status: "processing", processingStartedAt: claimedAt, processingToken }, $inc: { attempts: 1 } },
-        { new: true, sort: { createdAt: 1 } },
+        {
+          returnDocument: "after",
+          sort: { createdAt: 1 },
+        },
       ).lean();
       if (!outbox) break;
+       // TEMPORARY B3.9 crash-recovery test instrumentation.
+      // TEMPORARY B3.9 crash-recovery test instrumentation.
+if (process.env.NODE_ENV === "test") {
 
+}
       try {
         // The event payload is constructed from allowlisted fields before it enters the outbox.
         try {
