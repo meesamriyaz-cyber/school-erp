@@ -72,6 +72,14 @@ export default function PlatformAdminWorkspace() {
   const [updatingSchoolStatus, setUpdatingSchoolStatus] = useState(false);
   const [schoolStatusError, setSchoolStatusError] = useState("");
   const [schoolStatusSuccess, setSchoolStatusSuccess] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [userDetails, setUserDetails] = useState(null);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
+  const [userDetailsError, setUserDetailsError] = useState("");
+  const [userProfileForm, setUserProfileForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [savingUserProfile, setSavingUserProfile] = useState(false);
+  const [userProfileError, setUserProfileError] = useState("");
+  const [userProfileSuccess, setUserProfileSuccess] = useState("");
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -193,6 +201,101 @@ export default function PlatformAdminWorkspace() {
     void loadSchoolDetails();
     return () => controller.abort();
   }, [activePage, accessToken, selectedSchoolId, reloadCount]);
+
+  useEffect(() => {
+    if (activePage !== "UserDetails" || !selectedUserId) return undefined;
+    const controller = new AbortController();
+    const loadUserDetails = async () => {
+      setLoadingUserDetails(true);
+      setUserDetailsError("");
+      setUserProfileError("");
+      setUserProfileSuccess("");
+      try {
+        const response = await apiRequest(
+          `/platform/users/${encodeURIComponent(selectedUserId)}`,
+          { accessToken, signal: controller.signal },
+        );
+        if (controller.signal.aborted) return;
+        const details = response?.data?.user ?? response?.user ?? response?.data ?? null;
+        if (!details) throw new Error("The server returned no user details.");
+        setUserDetails(details);
+        setUserProfileForm({
+          firstName: details.firstName || "",
+          lastName: details.lastName || "",
+          email: details.email || "",
+          phone: details.phone || "",
+        });
+      } catch (error) {
+        if (error.name !== "AbortError" && !controller.signal.aborted) {
+          setUserDetailsError(error.message || "Unable to load user details.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingUserDetails(false);
+      }
+    };
+    void loadUserDetails();
+    return () => controller.abort();
+  }, [activePage, accessToken, selectedUserId, reloadCount]);
+
+  const openUserDetails = (listedUser) => {
+    setSelectedUserId(listedUser.id || listedUser._id);
+    setUserDetails(null);
+    setUserDetailsError("");
+    setUserProfileError("");
+    setUserProfileSuccess("");
+    setActivePage("UserDetails");
+  };
+
+  const updateUserProfileForm = (event) => {
+    const { name, value } = event.target;
+    setUserProfileForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const submitUserProfile = async (event) => {
+    event.preventDefault();
+    if (!selectedUserId || savingUserProfile) return;
+    setUserProfileError("");
+    setUserProfileSuccess("");
+    const payload = {
+      firstName: userProfileForm.firstName.trim(),
+      lastName: userProfileForm.lastName.trim(),
+      email: userProfileForm.email.trim().toLowerCase(),
+      phone: userProfileForm.phone.trim(),
+    };
+    if (!payload.firstName || payload.firstName.length > 80) {
+      setUserProfileError("First name is required and must be 80 characters or fewer.");
+      return;
+    }
+    if (payload.lastName.length > 80 || !payload.email || payload.email.length > 254 ||
+        !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.email) || payload.phone.length > 20) {
+      setUserProfileError("Enter a valid email address. Names and phone number must be within their length limits.");
+      return;
+    }
+    setSavingUserProfile(true);
+    try {
+      const response = await apiRequest(
+        `/platform/users/${encodeURIComponent(selectedUserId)}`,
+        { method: "PATCH", accessToken, body: payload },
+      );
+      const updated = response?.data?.user ?? response?.user ?? response?.data;
+      if (!updated) throw new Error("The server did not return the updated user profile.");
+      setUserDetails(updated);
+      setUserProfileForm({
+        firstName: updated.firstName || "",
+        lastName: updated.lastName || "",
+        email: updated.email || "",
+        phone: updated.phone || "",
+      });
+      setUsers((current) => current.map((item) =>
+        (item.id || item._id) === selectedUserId ? { ...item, ...updated } : item
+      ));
+      setUserProfileSuccess(response?.message || "User profile updated successfully.");
+    } catch (error) {
+      setUserProfileError(error.message || "Unable to update the user profile.");
+    } finally {
+      setSavingUserProfile(false);
+    }
+  };
 
   const updateSchoolForm = (event) => {
     const { name, value } = event.target;
@@ -384,7 +487,7 @@ export default function PlatformAdminWorkspace() {
 
         <div className="platform-content">
           <div className="platform-eyebrow">CENTRAL ADMINISTRATION</div>
-          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : activePage === "Users" ? "User directory" : "School directory"}</h1>
+          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : activePage === "Users" ? "User directory" : activePage === "UserDetails" ? "User details" : "School directory"}</h1>
           <p className="platform-page-description">
             {activePage === "Overview"
               ? "Manage schools and their access from one secure workspace."
@@ -394,7 +497,9 @@ export default function PlatformAdminWorkspace() {
                   ? "Review school information and its associated administrators."
                   : activePage === "Users"
                     ? "Search and manage accounts across all registered schools."
-                    : "Search registered schools, review their status, and move through the directory."}
+                    : activePage === "UserDetails"
+                      ? "Review and update an account profile."
+                      : "Search registered schools, review their status, and move through the directory."}
           </p>
 
           {activePage === "Overview" ? (
@@ -501,6 +606,43 @@ export default function PlatformAdminWorkspace() {
                 </>;
               })()}
             </section>
+          ) : activePage === "UserDetails" ? (
+            <section className="platform-form-card" aria-label="User details">
+              <div className="platform-form-heading">
+                <div>
+                  <h2>{userDetails ? [userDetails.firstName, userDetails.lastName].filter(Boolean).join(" ") || "User details" : "User details"}</h2>
+                  <p>Account information and editable profile fields</p>
+                </div>
+                <button type="button" className="platform-secondary-button" onClick={() => setActivePage("Users")}>Back to directory</button>
+              </div>
+              {loadingUserDetails && <p role="status">Loading user details…</p>}
+              {userDetailsError && <div className="platform-directory-error" role="alert"><p>{userDetailsError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
+              {userDetails && (
+                <>
+                  <dl className="platform-school-details">
+                    <div><dt>School</dt><dd>{userSchools.find((item) => (item.id || item._id) === userDetails.tenantId)?.name || "—"}</dd></div>
+                    <div><dt>Role</dt><dd>{statusLabel(userDetails.role?.replaceAll("_", " "))}</dd></div>
+                    <div><dt>Status</dt><dd>{statusLabel(userDetails.status)}</dd></div>
+                    <div><dt>Last login</dt><dd>{userDetails.lastLoginAt ? formatDate(userDetails.lastLoginAt) : "Never"}</dd></div>
+                    <div><dt>Account created</dt><dd>{formatDate(userDetails.createdAt)}</dd></div>
+                    <div><dt>Last updated</dt><dd>{formatDate(userDetails.updatedAt)}</dd></div>
+                  </dl>
+                  <form className="platform-school-form" onSubmit={submitUserProfile}>
+                    <h3>Edit profile</h3>
+                    <label>First name *<input name="firstName" value={userProfileForm.firstName} onChange={updateUserProfileForm} required maxLength={80} autoComplete="given-name" /></label>
+                    <label>Last name<input name="lastName" value={userProfileForm.lastName} onChange={updateUserProfileForm} maxLength={80} autoComplete="family-name" /></label>
+                    <label>Email address *<input type="email" name="email" value={userProfileForm.email} onChange={updateUserProfileForm} required maxLength={254} autoComplete="email" /></label>
+                    <label>Phone<input type="tel" name="phone" value={userProfileForm.phone} onChange={updateUserProfileForm} maxLength={20} autoComplete="tel" /></label>
+                    {userProfileError && <div className="platform-directory-error" role="alert"><p>{userProfileError}</p></div>}
+                    {userProfileSuccess && <p className="platform-form-success" role="status">{userProfileSuccess}</p>}
+                    <div className="platform-form-actions">
+                      <button type="button" className="platform-secondary-button" onClick={() => setActivePage("Users")} disabled={savingUserProfile}>Back</button>
+                      <button type="submit" className="platform-primary-button" disabled={savingUserProfile || loadingUserDetails}>{savingUserProfile ? "Saving…" : "Save profile"}</button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </section>
           ) : activePage === "Users" ? (
             <section className="platform-directory" aria-label="User directory">
               <div className="platform-directory-toolbar platform-user-toolbar">
@@ -560,7 +702,7 @@ export default function PlatformAdminWorkspace() {
                     ) : users.length ? users.map((listedUser) => {
                       const school = userSchools.find((item) => (item.id || item._id) === listedUser.tenantId);
                       return <tr key={listedUser.id || listedUser._id}>
-                        <td><strong className="platform-school-name">{[listedUser.firstName, listedUser.lastName].filter(Boolean).join(" ") || "Unnamed user"}</strong></td>
+                        <td><button type="button" className="platform-school-name-button" onClick={() => openUserDetails(listedUser)}>{[listedUser.firstName, listedUser.lastName].filter(Boolean).join(" ") || "Unnamed user"}</button></td>
                         <td>{listedUser.email || "—"}</td>
                         <td>{school?.name || "—"}</td>
                         <td>{statusLabel(listedUser.role?.replaceAll("_", " "))}</td>
