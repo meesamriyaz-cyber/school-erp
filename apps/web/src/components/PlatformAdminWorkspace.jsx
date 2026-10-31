@@ -5,6 +5,7 @@ import { apiRequest } from "../lib/api.js";
 const navigation = [
   { label: "Overview", icon: "▦" },
   { label: "Schools", icon: "⌂" },
+  { label: "Users", icon: "♙" },
 ];
 
 const PAGE_SIZE = 20;
@@ -38,6 +39,16 @@ export default function PlatformAdminWorkspace() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [users, setUsers] = useState([]);
+  const [userPagination, setUserPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
+  const [userSearchInput, setUserSearchInput] = useState("");
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [userStatusFilter, setUserStatusFilter] = useState("");
+  const [userSchoolFilter, setUserSchoolFilter] = useState("");
+  const [userSchools, setUserSchools] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState("");
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [schoolsError, setSchoolsError] = useState("");
   const [reloadCount, setReloadCount] = useState(0);
@@ -112,6 +123,52 @@ export default function PlatformAdminWorkspace() {
     return () => controller.abort();
   }, [activePage, accessToken, pagination.page, search, statusFilter, reloadCount]);
 
+
+  useEffect(() => {
+    if (activePage !== "Users") return undefined;
+
+    const controller = new AbortController();
+    const loadUsers = async () => {
+      setLoadingUsers(true);
+      setUsersError("");
+      const params = new URLSearchParams({
+        page: String(userPagination.page),
+        limit: String(PAGE_SIZE),
+      });
+      if (userRoleFilter) params.set("role", userRoleFilter);
+      if (userStatusFilter) params.set("status", userStatusFilter);
+      if (userSchoolFilter) params.set("tenantId", userSchoolFilter);
+      if (userSearch) params.set("search", userSearch);
+
+      try {
+        const response = await apiRequest(
+          `/platform/users?${params.toString()}`,
+          { accessToken, signal: controller.signal },
+        );
+        if (controller.signal.aborted) return;
+        setUsers(Array.isArray(response?.data) ? response.data : []);
+        setUserPagination((current) => ({ ...current, ...(response?.pagination ?? {}) }));
+
+        const schoolsResponse = await apiRequest(
+          "/platform/schools?page=1&limit=100",
+          { accessToken, signal: controller.signal },
+        );
+        if (!controller.signal.aborted) {
+          setUserSchools(Array.isArray(schoolsResponse?.data) ? schoolsResponse.data : []);
+        }
+      } catch (error) {
+        if (error.name !== "AbortError" && !controller.signal.aborted) {
+          setUsersError(error.message || "Unable to load the user directory.");
+          setUsers([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingUsers(false);
+      }
+    };
+
+    void loadUsers();
+    return () => controller.abort();
+  }, [activePage, accessToken, userPagination.page, userRoleFilter, userStatusFilter, userSchoolFilter, userSearch, reloadCount]);
 
   useEffect(() => {
     if (activePage !== "SchoolDetails" || !selectedSchoolId) return undefined;
@@ -249,6 +306,20 @@ export default function PlatformAdminWorkspace() {
     setStatusFilter(value);
   };
 
+  const submitUserSearch = (event) => {
+    event.preventDefault();
+    setUserPagination((current) => ({ ...current, page: 1 }));
+    setUserSearch(userSearchInput.trim());
+  };
+
+  const changeUserFilter = (setter) => (value) => {
+    setUserPagination((current) => ({ ...current, page: 1 }));
+    setter(value);
+  };
+
+  const userTotalPages = userPagination.totalPages || 0;
+  const userStartItem = userPagination.total === 0 ? 0 : (userPagination.page - 1) * PAGE_SIZE + 1;
+  const userEndItem = Math.min(userPagination.page * PAGE_SIZE, userPagination.total);
   const totalPages = pagination.totalPages || 0;
   const startItem = pagination.total === 0 ? 0 : (pagination.page - 1) * PAGE_SIZE + 1;
   const endItem = Math.min(pagination.page * PAGE_SIZE, pagination.total);
@@ -313,7 +384,7 @@ export default function PlatformAdminWorkspace() {
 
         <div className="platform-content">
           <div className="platform-eyebrow">CENTRAL ADMINISTRATION</div>
-          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : "School directory"}</h1>
+          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : activePage === "Users" ? "User directory" : "School directory"}</h1>
           <p className="platform-page-description">
             {activePage === "Overview"
               ? "Manage schools and their access from one secure workspace."
@@ -321,7 +392,9 @@ export default function PlatformAdminWorkspace() {
                 ? "Register a school and create its first administrator in one secure step."
                 : activePage === "SchoolDetails"
                   ? "Review school information and its associated administrators."
-                  : "Search registered schools, review their status, and move through the directory."}
+                  : activePage === "Users"
+                    ? "Search and manage accounts across all registered schools."
+                    : "Search registered schools, review their status, and move through the directory."}
           </p>
 
           {activePage === "Overview" ? (
@@ -427,6 +500,88 @@ export default function PlatformAdminWorkspace() {
                   {administrators.length ? <div className="platform-admin-list">{administrators.map((admin) => <article key={admin.id || admin._id || admin.email}><strong>{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || "Administrator"}</strong><span>{admin.email || "—"}</span><span>{statusLabel(admin.status)}</span></article>)}</div> : <p>No school administrators were returned for this school.</p>}
                 </>;
               })()}
+            </section>
+          ) : activePage === "Users" ? (
+            <section className="platform-directory" aria-label="User directory">
+              <div className="platform-directory-toolbar platform-user-toolbar">
+                <form className="platform-search-form" onSubmit={submitUserSearch} role="search">
+                  <label className="platform-search-field">
+                    <span className="platform-search-icon" aria-hidden="true">⌕</span>
+                    <span className="sr-only">Search users</span>
+                    <input type="search" value={userSearchInput} onChange={(event) => setUserSearchInput(event.target.value)} placeholder="Search by name or email" maxLength={100} />
+                  </label>
+                  <button type="submit" className="platform-primary-button">Search</button>
+                </form>
+                <label className="platform-status-filter">
+                  <span>Role</span>
+                  <select aria-label="Filter users by role" value={userRoleFilter} onChange={(event) => changeUserFilter(setUserRoleFilter)(event.target.value)}>
+                    <option value="">All roles</option>
+                    <option value="school_admin">School admin</option>
+                    <option value="principal">Principal</option>
+                    <option value="teacher">Teacher</option>
+                    <option value="accountant">Accountant</option>
+                    <option value="librarian">Librarian</option>
+                    <option value="transport_manager">Transport manager</option>
+                    <option value="student">Student</option>
+                    <option value="parent">Parent</option>
+                  </select>
+                </label>
+                <label className="platform-status-filter">
+                  <span>Status</span>
+                  <select aria-label="Filter users by status" value={userStatusFilter} onChange={(event) => changeUserFilter(setUserStatusFilter)(event.target.value)}>
+                    <option value="">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </label>
+                <label className="platform-status-filter">
+                  <span>School</span>
+                  <select aria-label="Filter users by school" value={userSchoolFilter} onChange={(event) => changeUserFilter(setUserSchoolFilter)(event.target.value)}>
+                    <option value="">All schools</option>
+                    {userSchools.map((school) => <option key={school.id || school._id} value={school.id || school._id}>{school.name}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              <div className="platform-directory-meta">
+                <strong>{userPagination.total} {userPagination.total === 1 ? "user" : "users"}</strong>
+                <span>{loadingUsers ? "Refreshing directory…" : userSearch || userRoleFilter || userStatusFilter || userSchoolFilter ? "Filtered results" : "All school users"}</span>
+              </div>
+
+              {usersError && <div className="platform-directory-error" role="alert"><p>{usersError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
+
+              <div className="platform-table-wrap">
+                <table className="platform-school-table" aria-label="User directory">
+                  <thead><tr><th scope="col">User</th><th scope="col">Email</th><th scope="col">School</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Created</th></tr></thead>
+                  <tbody>
+                    {loadingUsers && users.length === 0 ? (
+                      <tr><td colSpan="6" className="platform-table-message" role="status">Loading users…</td></tr>
+                    ) : users.length ? users.map((listedUser) => {
+                      const school = userSchools.find((item) => (item.id || item._id) === listedUser.tenantId);
+                      return <tr key={listedUser.id || listedUser._id}>
+                        <td><strong className="platform-school-name">{[listedUser.firstName, listedUser.lastName].filter(Boolean).join(" ") || "Unnamed user"}</strong></td>
+                        <td>{listedUser.email || "—"}</td>
+                        <td>{school?.name || "—"}</td>
+                        <td>{statusLabel(listedUser.role?.replaceAll("_", " "))}</td>
+                        <td><span className={`platform-status-pill platform-status-${listedUser.status || "unknown"}`}>{statusLabel(listedUser.status)}</span></td>
+                        <td>{formatDate(listedUser.createdAt)}</td>
+                      </tr>;
+                    }) : (
+                      <tr><td colSpan="6" className="platform-table-message">{usersError ? "User records could not be loaded." : "No users match these filters."}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="platform-pagination">
+                <span>{userPagination.total === 0 ? "No results" : `Showing ${userStartItem}–${userEndItem} of ${userPagination.total}`}</span>
+                <div>
+                  <button type="button" className="platform-page-button" disabled={loadingUsers || userPagination.page <= 1} onClick={() => setUserPagination((current) => ({ ...current, page: current.page - 1 }))}>Previous</button>
+                  <span className="platform-page-count">Page {userPagination.page}{userTotalPages > 0 ? ` of ${userTotalPages}` : ""}</span>
+                  <button type="button" className="platform-page-button" disabled={loadingUsers || userTotalPages === 0 || userPagination.page >= userTotalPages} onClick={() => setUserPagination((current) => ({ ...current, page: current.page + 1 }))}>Next</button>
+                </div>
+              </div>
             </section>
           ) : (
             <section className="platform-directory" aria-label="School directory">
