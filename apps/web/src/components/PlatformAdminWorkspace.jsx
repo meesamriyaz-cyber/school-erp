@@ -320,11 +320,18 @@ export default function PlatformAdminWorkspace() {
       setUserProfileError("First name is required and must be 80 characters or fewer.");
       return;
     }
-    if (payload.lastName.length > 80 || !payload.email || payload.email.length > 254 ||
-        !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.email) || payload.phone.length > 20) {
-      setUserProfileError("Enter a valid email address. Names and phone number must be within their length limits.");
-      return;
-    }
+  if (
+  payload.lastName.length > 80 ||
+  !payload.email ||
+  payload.email.length > 254 ||
+  !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email) ||
+  payload.phone.length > 20
+) {
+  setUserProfileError(
+    "Enter a valid email address. Names and phone number must be within their length limits."
+  );
+  return;
+}
     setSavingUserProfile(true);
     try {
       const response = await apiRequest(
