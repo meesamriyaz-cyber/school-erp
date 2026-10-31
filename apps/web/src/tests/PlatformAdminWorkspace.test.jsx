@@ -398,4 +398,102 @@ describe("PlatformAdminWorkspace school directory", () => {
     ).toBeInTheDocument();
   });
 
+
+  it("opens a user profile and displays account details", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce({
+        success: true,
+        data: [{
+          id: "user-1", tenantId: "school-1", firstName: "Amina", lastName: "Khan",
+          email: "amina@example.com", role: "teacher", status: "active",
+          createdAt: "2026-01-10T00:00:00.000Z",
+        }],
+        pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: [{ id: "school-1", name: "Green Valley School" }],
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { user: {
+          id: "user-1", tenantId: "school-1", firstName: "Amina", lastName: "Khan",
+          email: "amina@example.com", phone: "9876543210", role: "teacher",
+          status: "active", lastLoginAt: "2026-02-01T00:00:00.000Z",
+          createdAt: "2026-01-10T00:00:00.000Z", updatedAt: "2026-01-15T00:00:00.000Z",
+        } },
+      });
+
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Users/ }));
+    await user.click(await screen.findByRole("button", { name: "Amina Khan" }));
+
+    expect(await screen.findByRole("heading", { name: "Amina Khan" })).toBeInTheDocument();
+    expect(screen.getByText("Green Valley School")).toBeInTheDocument();
+    expect(screen.getByText("Last login")).toBeInTheDocument();
+    expect(screen.getByLabelText("Phone")).toHaveValue("9876543210");
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/platform/users/user-1",
+      expect.objectContaining({ accessToken: "platform-access-token" }),
+    );
+  });
+
+  it("saves an edited user profile", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce({
+        success: true,
+        data: [{
+          id: "user-1", tenantId: "school-1", firstName: "Amina", lastName: "Khan",
+          email: "amina@example.com", role: "teacher", status: "active",
+        }],
+        pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: [{ id: "school-1", name: "Green Valley School" }],
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { user: {
+          id: "user-1", tenantId: "school-1", firstName: "Amina", lastName: "Khan",
+          email: "amina@example.com", phone: "", role: "teacher", status: "active",
+        } },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: "Profile saved",
+        data: { user: {
+          id: "user-1", tenantId: "school-1", firstName: "Amina", lastName: "Khan",
+          email: "amina.new@example.com", phone: "9900112233", role: "teacher", status: "active",
+        } },
+      });
+
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Users/ }));
+    await user.click(await screen.findByRole("button", { name: "Amina Khan" }));
+    await screen.findByLabelText("Email address *");
+
+    await user.clear(screen.getByLabelText("Email address *"));
+    await user.type(screen.getByLabelText("Email address *"), "amina.new@example.com");
+    await user.type(screen.getByLabelText("Phone"), "9900112233");
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Profile saved");
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/platform/users/user-1",
+      expect.objectContaining({
+        method: "PATCH",
+        accessToken: "platform-access-token",
+        body: {
+          firstName: "Amina",
+          lastName: "Khan",
+          email: "amina.new@example.com",
+          phone: "9900112233",
+        },
+      }),
+    );
+  });
+
 });
