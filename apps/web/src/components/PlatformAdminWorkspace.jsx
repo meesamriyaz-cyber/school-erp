@@ -80,6 +80,10 @@ export default function PlatformAdminWorkspace() {
   const [savingUserProfile, setSavingUserProfile] = useState(false);
   const [userProfileError, setUserProfileError] = useState("");
   const [userProfileSuccess, setUserProfileSuccess] = useState("");
+  const [userForm, setUserForm] = useState({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createUserError, setCreateUserError] = useState("");
+  const [createUserSuccess, setCreateUserSuccess] = useState("");
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -236,6 +240,56 @@ export default function PlatformAdminWorkspace() {
     void loadUserDetails();
     return () => controller.abort();
   }, [activePage, accessToken, selectedUserId, reloadCount]);
+
+  const openCreateUser = () => {
+    setUserForm({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
+    setCreateUserError("");
+    setCreateUserSuccess("");
+    setActivePage("CreateUser");
+  };
+
+  const updateUserForm = (event) => {
+    const { name, value } = event.target;
+    setUserForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const submitCreateUser = async (event) => {
+    event.preventDefault();
+    if (creatingUser) return;
+    setCreateUserError("");
+    setCreateUserSuccess("");
+    const payload = {
+      tenantId: userForm.tenantId,
+      firstName: userForm.firstName.trim(),
+      lastName: userForm.lastName.trim(),
+      email: userForm.email.trim().toLowerCase(),
+      phone: userForm.phone.trim(),
+      role: userForm.role,
+      password: userForm.password,
+    };
+    if (!payload.tenantId || !payload.firstName || payload.firstName.length > 80 ||
+        payload.lastName.length > 80 || !payload.email || payload.email.length > 254 ||
+        !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.email) ||
+        payload.phone.length > 20 || payload.password.length < 8 ||
+        new TextEncoder().encode(payload.password).length > 72) {
+      setCreateUserError("Check the required fields. Password must be 8–72 UTF-8 bytes; names, email and phone must meet their length limits.");
+      return;
+    }
+    setCreatingUser(true);
+    try {
+      const response = await apiRequest("/platform/users", { method: "POST", accessToken, body: payload });
+      const created = response?.data?.user ?? response?.user ?? response?.data;
+      if (!created?.id) throw new Error("The server did not return the created user. Refresh the directory to verify the result.");
+      setUsers((current) => [created, ...current.filter((item) => (item.id || item._id) !== created.id)].slice(0, PAGE_SIZE));
+      setUserPagination((current) => ({ ...current, total: current.total + 1 }));
+      setCreateUserSuccess(response?.message || "User created and awaiting activation.");
+      setUserForm({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
+    } catch (error) {
+      setCreateUserError(error.message || "Unable to create the user.");
+    } finally {
+      setCreatingUser(false);
+    }
+  };
 
   const openUserDetails = (listedUser) => {
     setSelectedUserId(listedUser.id || listedUser._id);
@@ -487,7 +541,7 @@ export default function PlatformAdminWorkspace() {
 
         <div className="platform-content">
           <div className="platform-eyebrow">CENTRAL ADMINISTRATION</div>
-          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : activePage === "Users" ? "User directory" : activePage === "UserDetails" ? "User details" : "School directory"}</h1>
+          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : activePage === "Users" ? "User directory" : activePage === "UserDetails" ? "User details" : activePage === "CreateUser" ? "Create user" : "School directory"}</h1>
           <p className="platform-page-description">
             {activePage === "Overview"
               ? "Manage schools and their access from one secure workspace."
@@ -643,9 +697,38 @@ export default function PlatformAdminWorkspace() {
                 </>
               )}
             </section>
+          ) : activePage === "CreateUser" ? (
+            <section className="platform-form-card" aria-label="Create user form">
+              <div className="platform-form-heading">
+                <div><h2>New school user</h2><p>New accounts are created with pending status and must be activated separately.</p></div>
+                <button type="button" className="platform-secondary-button" onClick={() => setActivePage("Users")}>Back to directory</button>
+              </div>
+              {createUserSuccess && <div className="platform-form-success" role="status">{createUserSuccess}<button type="button" onClick={() => setActivePage("Users")}>View directory</button></div>}
+              {createUserError && <div className="platform-directory-error" role="alert"><p>{createUserError}</p></div>}
+              <form className="platform-school-form" onSubmit={submitCreateUser}>
+                <h3>School and account details</h3>
+                <label>School *<select name="tenantId" value={userForm.tenantId} onChange={updateUserForm} required>
+                  <option value="">Select an active school</option>
+                  {userSchools.filter((school) => school.status === "active").map((school) => <option key={school.id || school._id} value={school.id || school._id}>{school.name}</option>)}
+                </select></label>
+                <label>First name *<input name="firstName" value={userForm.firstName} onChange={updateUserForm} required maxLength={80} autoComplete="given-name" /></label>
+                <label>Last name<input name="lastName" value={userForm.lastName} onChange={updateUserForm} maxLength={80} autoComplete="family-name" /></label>
+                <label>Email address *<input type="email" name="email" value={userForm.email} onChange={updateUserForm} required maxLength={254} autoComplete="email" /></label>
+                <label>Phone<input type="tel" name="phone" value={userForm.phone} onChange={updateUserForm} maxLength={20} autoComplete="tel" /></label>
+                <label>Role *<select name="role" value={userForm.role} onChange={updateUserForm} required>
+                  <option value="school_admin">School admin</option><option value="principal">Principal</option><option value="teacher">Teacher</option><option value="accountant">Accountant</option><option value="librarian">Librarian</option><option value="transport_manager">Transport manager</option><option value="student">Student</option><option value="parent">Parent</option>
+                </select></label>
+                <label>Initial password *<input type="password" name="password" value={userForm.password} onChange={updateUserForm} required minLength={8} maxLength={72} autoComplete="new-password" /><small>At least 8 characters and no more than 72 UTF-8 bytes.</small></label>
+                <div className="platform-form-actions">
+                  <button type="button" className="platform-secondary-button" onClick={() => setActivePage("Users")} disabled={creatingUser}>Cancel</button>
+                  <button type="submit" className="platform-primary-button" disabled={creatingUser || !userSchools.some((school) => school.status === "active")}>{creatingUser ? "Creating user…" : "Create user"}</button>
+                </div>
+              </form>
+            </section>
           ) : activePage === "Users" ? (
             <section className="platform-directory" aria-label="User directory">
               <div className="platform-directory-toolbar platform-user-toolbar">
+                <button type="button" className="platform-primary-button" onClick={openCreateUser}>＋ Create user</button>
                 <form className="platform-search-form" onSubmit={submitUserSearch} role="search">
                   <label className="platform-search-field">
                     <span className="platform-search-icon" aria-hidden="true">⌕</span>
