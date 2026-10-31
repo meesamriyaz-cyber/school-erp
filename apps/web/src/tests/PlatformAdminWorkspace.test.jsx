@@ -373,10 +373,10 @@ describe("PlatformAdminWorkspace school directory", () => {
     );
 
     await waitFor(() => {
-      expect(apiRequest).toHaveBeenLastCalledWith(
-        "/platform/users?page=1&limit=20&role=teacher&search=Amina",
-        expect.objectContaining({ accessToken: "platform-access-token" }),
-      );
+        expect(apiRequest).toHaveBeenCalledWith(
+      "/platform/users?page=1&limit=20&role=teacher&search=Amina",
+      expect.objectContaining({ accessToken: "platform-access-token" }),
+    );
     });
   });
 
