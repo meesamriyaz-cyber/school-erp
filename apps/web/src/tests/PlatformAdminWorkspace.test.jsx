@@ -302,4 +302,100 @@ describe("PlatformAdminWorkspace school directory", () => {
     expect(screen.getByRole("button", { name: "Activate school" })).toBeEnabled();
   });
 
+  
+  it("opens the Users page and loads platform users", async () => {
+    const user = userEvent.setup();
+
+    apiRequest
+      .mockResolvedValueOnce({
+        success: true,
+        data: [{
+          id: "user-1",
+          tenantId: "school-1",
+          firstName: "Amina",
+          lastName: "Khan",
+          email: "amina@example.com",
+          role: "teacher",
+          status: "active",
+          createdAt: "2026-01-10T00:00:00.000Z",
+        }],
+        pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: [{
+          id: "school-1",
+          name: "Green Valley School",
+          slug: "green-valley",
+          status: "active",
+        }],
+        pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+      });
+
+    render(<PlatformAdminWorkspace />);
+
+    await user.click(screen.getByRole("button", { name: /Users/ }));
+
+    expect(await screen.findByText("amina@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Amina Khan")).toBeInTheDocument();
+
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/platform/users?page=1&limit=20",
+      expect.objectContaining({ accessToken: "platform-access-token" }),
+    );
+  });
+
+  it("applies user search and role filters", async () => {
+    const user = userEvent.setup();
+
+    apiRequest.mockResolvedValue({
+      success: true,
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
+
+    render(<PlatformAdminWorkspace />);
+
+    await user.click(screen.getByRole("button", { name: /Users/ }));
+
+    await screen.findByRole("searchbox", { name: "Search users" });
+
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search users" }),
+      "Amina",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Search" }));
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Filter users by role" }),
+      "teacher",
+    );
+
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenLastCalledWith(
+        "/platform/users?page=1&limit=20&role=teacher&search=Amina",
+        expect.objectContaining({ accessToken: "platform-access-token" }),
+      );
+    });
+  });
+
+  it("shows an empty state when no users match the filters", async () => {
+    const user = userEvent.setup();
+
+    apiRequest.mockResolvedValue({
+      success: true,
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
+
+    render(<PlatformAdminWorkspace />);
+
+    await user.click(screen.getByRole("button", { name: /Users/ }));
+
+    expect(
+      await screen.findByText("No users match these filters."),
+    ).toBeInTheDocument();
+  });
+
 });
