@@ -80,7 +80,7 @@ describe("audit outbox operations controller", () => {
         $inc: { manualRetryCount: 1 },
         $unset: { processingStartedAt: 1, processingToken: 1 },
       }),
-      { new: true },
+      { returnDocument: "after" },
     );
     expect(processPendingAuditEvents).toHaveBeenCalledWith({ batchSize: 1 });
     expect(res.status).toHaveBeenCalledWith(200);
