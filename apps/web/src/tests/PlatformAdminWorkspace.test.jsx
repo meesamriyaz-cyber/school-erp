@@ -397,6 +397,101 @@ describe("PlatformAdminWorkspace school directory", () => {
       await screen.findByText("No users match these filters."),
     ).toBeInTheDocument();
   });
+ 
+  it("creates a user for an active school", async () => {
+  const user = userEvent.setup();
+
+  // Initial Users directory response.
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [{
+      id: "user-1",
+      tenantId: "school-1",
+      firstName: "Amina",
+      lastName: "Khan",
+      email: "amina@example.com",
+      role: "teacher",
+      status: "active",
+    }],
+    pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  });
+
+  // Active schools response for the School dropdown.
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [{
+      id: "school-1",
+      name: "Green Valley School",
+      status: "active",
+    }],
+    pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+  });
+
+  render(<PlatformAdminWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: /Users/ }));
+
+  expect(
+    await screen.findByRole("option", { name: "Green Valley School" }),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: /Create user/ }));
+
+  await user.selectOptions(
+    screen.getByLabelText("School *"),
+    "school-1",
+  );
+  await user.type(screen.getByLabelText("First name *"), "Amina");
+  await user.type(screen.getByLabelText("Last name"), "Khan");
+  await user.type(screen.getByLabelText("Email address *"), "amina@example.com");
+  await user.selectOptions(
+    screen.getByLabelText("Role *"),
+    "teacher",
+  );
+  await user.type(
+    screen.getByLabelText(/Initial password/),
+    "SecurePass123",
+  );
+
+  // Exactly one response for the POST request.
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    message: "User created successfully.",
+    data: {
+      user: {
+        id: "user-2",
+        tenantId: "school-1",
+        firstName: "Amina",
+        lastName: "Khan",
+        email: "amina@example.com",
+        role: "teacher",
+        status: "pending",
+      },
+    },
+  });
+
+  await user.click(screen.getByRole("button", { name: "Create user" }));
+
+  expect(await screen.findByRole("status"))
+    .toHaveTextContent("User created successfully.");
+
+  expect(apiRequest).toHaveBeenLastCalledWith(
+    "/platform/users",
+    expect.objectContaining({
+      method: "POST",
+      accessToken: "platform-access-token",
+      body: {
+        tenantId: "school-1",
+        firstName: "Amina",
+        lastName: "Khan",
+        email: "amina@example.com",
+        phone: "",
+        role: "teacher",
+        password: "SecurePass123",
+      },
+    }),
+  );
+});
 
 
   it("opens a user profile and displays account details", async () => {

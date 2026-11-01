@@ -269,7 +269,7 @@ export default function PlatformAdminWorkspace() {
     };
     if (!payload.tenantId || !payload.firstName || payload.firstName.length > 80 ||
         payload.lastName.length > 80 || !payload.email || payload.email.length > 254 ||
-        !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(payload.email) ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email) ||
         payload.phone.length > 20 || payload.password.length < 8 ||
         new TextEncoder().encode(payload.password).length > 72) {
       setCreateUserError("Check the required fields. Password must be 8–72 UTF-8 bytes; names, email and phone must meet their length limits.");
