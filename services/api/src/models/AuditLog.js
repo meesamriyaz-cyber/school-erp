@@ -93,6 +93,21 @@ const immutableAuditOperations = [
   "deleteOne",
   "deleteMany",
 ];
+// Prevent modifications to an existing audit record through document.save().
+auditLogSchema.pre("save", function rejectAuditDocumentSave() {
+  if (!this.isNew && this.isModified()) {
+    throw new Error("Audit log records are immutable");
+  }
+});
+
+// Prevent document.deleteOne() as well as the existing query-level delete protection.
+auditLogSchema.pre(
+  "deleteOne",
+  { document: true, query: false },
+  function rejectAuditDocumentDelete() {
+    throw new Error("Audit log records are immutable");
+  },
+);
 auditLogSchema.pre(immutableAuditOperations, function rejectAuditMutation() {
   throw new Error("Audit log records are immutable");
 });

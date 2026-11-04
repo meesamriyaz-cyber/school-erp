@@ -533,7 +533,240 @@ describe("PlatformAdminWorkspace school directory", () => {
       expect.objectContaining({ accessToken: "platform-access-token" }),
     );
   });
+ it("suspends an active user and updates the profile status", async () => {
+  const user = userEvent.setup();
 
+  apiRequest
+    .mockResolvedValueOnce({
+      success: true,
+      data: [{
+        id: "user-1",
+        tenantId: "school-1",
+        firstName: "Amina",
+        lastName: "Khan",
+        email: "amina@example.com",
+        role: "teacher",
+        status: "active",
+      }],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: [{ id: "school-1", name: "Green Valley School" }],
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: { user: {
+        id: "user-1",
+        tenantId: "school-1",
+        firstName: "Amina",
+        lastName: "Khan",
+        email: "amina@example.com",
+        phone: "",
+        role: "teacher",
+        status: "active",
+      } },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      message: "User status updated to suspended",
+      data: { user: {
+        id: "user-1",
+        tenantId: "school-1",
+        firstName: "Amina",
+        lastName: "Khan",
+        email: "amina@example.com",
+        phone: "",
+        role: "teacher",
+        status: "suspended",
+      } },
+    });
+
+  render(<PlatformAdminWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: /Users/ }));
+  await user.click(await screen.findByRole("button", { name: "Amina Khan" }));
+
+  await user.click(await screen.findByRole("button", { name: "Suspend user" }));
+
+  expect(await screen.findByRole("status"))
+    .toHaveTextContent("User status updated to suspended");
+
+  expect(screen.getByRole("button", { name: "Reactivate user" }))
+    .toBeInTheDocument();
+
+  expect(screen.queryByRole("button", { name: "Suspend user" }))
+    .not.toBeInTheDocument();
+
+  expect(apiRequest).toHaveBeenCalledWith(
+    "/platform/users/user-1/status",
+    expect.objectContaining({
+      method: "PATCH",
+      accessToken: "platform-access-token",
+      body: { status: "suspended" },
+    }),
+  );
+});
+it("activates a pending user and updates the profile status", async () => {
+  const user = userEvent.setup();
+
+  apiRequest
+    .mockResolvedValueOnce({
+      success: true,
+      data: [{
+        id: "user-1",
+        tenantId: "school-1",
+        firstName: "Amina",
+        lastName: "Khan",
+        email: "amina@example.com",
+        role: "teacher",
+        status: "pending",
+      }],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: [{ id: "school-1", name: "Green Valley School" }],
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: {
+        user: {
+          id: "user-1",
+          tenantId: "school-1",
+          firstName: "Amina",
+          lastName: "Khan",
+          email: "amina@example.com",
+          phone: "",
+          role: "teacher",
+          status: "pending",
+        },
+      },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      message: "User status updated to active",
+      data: {
+        user: {
+          id: "user-1",
+          tenantId: "school-1",
+          firstName: "Amina",
+          lastName: "Khan",
+          email: "amina@example.com",
+          phone: "",
+          role: "teacher",
+          status: "active",
+        },
+      },
+    });
+
+  render(<PlatformAdminWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: /Users/ }));
+  await user.click(await screen.findByRole("button", { name: "Amina Khan" }));
+
+  await user.click(await screen.findByRole("button", { name: "Activate user" }));
+
+  expect(await screen.findByRole("status"))
+    .toHaveTextContent("User status updated to active");
+
+  expect(screen.getByRole("button", { name: "Suspend user" }))
+    .toBeInTheDocument();
+
+  expect(screen.queryByRole("button", { name: "Activate user" }))
+    .not.toBeInTheDocument();
+
+  expect(apiRequest).toHaveBeenCalledWith(
+    "/platform/users/user-1/status",
+    expect.objectContaining({
+      method: "PATCH",
+      accessToken: "platform-access-token",
+      body: { status: "active" },
+    }),
+  );
+});
+it("changes a user's role and updates the profile", async () => {
+  const user = userEvent.setup();
+
+  apiRequest
+    .mockResolvedValueOnce({
+      success: true,
+      data: [{
+        id: "user-1",
+        tenantId: "school-1",
+        firstName: "Amina",
+        lastName: "Khan",
+        email: "amina@example.com",
+        role: "teacher",
+        status: "active",
+      }],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: [{ id: "school-1", name: "Green Valley School" }],
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      data: {
+        user: {
+          id: "user-1",
+          tenantId: "school-1",
+          firstName: "Amina",
+          lastName: "Khan",
+          email: "amina@example.com",
+          phone: "",
+          role: "teacher",
+          status: "active",
+        },
+      },
+    })
+    .mockResolvedValueOnce({
+      success: true,
+      message: "User role updated",
+      data: {
+        user: {
+          id: "user-1",
+          tenantId: "school-1",
+          firstName: "Amina",
+          lastName: "Khan",
+          email: "amina@example.com",
+          phone: "",
+          role: "principal",
+          status: "active",
+        },
+      },
+    });
+
+  render(<PlatformAdminWorkspace />);
+
+  await user.click(screen.getByRole("button", { name: /Users/ }));
+  await user.click(await screen.findByRole("button", { name: "Amina Khan" }));
+
+  const roleSelect = await screen.findByRole("combobox", {
+    name: "User role",
+  });
+
+  expect(roleSelect).toHaveValue("teacher");
+
+  await user.selectOptions(roleSelect, "principal");
+
+  await user.click(screen.getByRole("button", { name: "Save role" }));
+
+  expect(await screen.findByRole("status"))
+    .toHaveTextContent("User role updated");
+
+  expect(roleSelect).toHaveValue("principal");
+
+  expect(apiRequest).toHaveBeenCalledWith(
+    "/platform/users/user-1/role",
+    expect.objectContaining({
+      method: "PATCH",
+      accessToken: "platform-access-token",
+      body: { role: "principal" },
+    }),
+  );
+});
   it("saves an edited user profile", async () => {
     const user = userEvent.setup();
     apiRequest

@@ -52,6 +52,9 @@ export default function PlatformAdminWorkspace() {
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [schoolsError, setSchoolsError] = useState("");
   const [reloadCount, setReloadCount] = useState(0);
+  const [updatingUserStatus, setUpdatingUserStatus] = useState(false);
+  const [userStatusError, setUserStatusError] = useState("");
+    const [userStatusSuccess, setUserStatusSuccess] = useState("");
   const [schoolForm, setSchoolForm] = useState({
     name: "",
     slug: "",
@@ -80,6 +83,10 @@ export default function PlatformAdminWorkspace() {
   const [savingUserProfile, setSavingUserProfile] = useState(false);
   const [userProfileError, setUserProfileError] = useState("");
   const [userProfileSuccess, setUserProfileSuccess] = useState("");
+  const [updatingUserRole, setUpdatingUserRole] = useState(false);
+  const [userRoleError, setUserRoleError] = useState("");
+  const [userRoleSuccess, setUserRoleSuccess] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
   const [userForm, setUserForm] = useState({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
   const [creatingUser, setCreatingUser] = useState(false);
   const [createUserError, setCreateUserError] = useState("");
@@ -223,6 +230,9 @@ export default function PlatformAdminWorkspace() {
         const details = response?.data?.user ?? response?.user ?? response?.data ?? null;
         if (!details) throw new Error("The server returned no user details.");
         setUserDetails(details);
+        setSelectedRole(details.role || "");
+        setUserRoleError("");
+        setUserRoleSuccess("");
         setUserProfileForm({
           firstName: details.firstName || "",
           lastName: details.lastName || "",
@@ -357,7 +367,100 @@ export default function PlatformAdminWorkspace() {
       setSavingUserProfile(false);
     }
   };
+  const updateUserStatus = async (status) => {
+  if (!selectedUserId || updatingUserStatus) return;
 
+  setUpdatingUserStatus(true);
+  setUserStatusError("");
+  setUserStatusSuccess("");
+
+  try {
+    const response = await apiRequest(
+      `/platform/users/${encodeURIComponent(selectedUserId)}/status`,
+      { method: "PATCH", accessToken, body: { status } },
+    );
+
+    const updatedUser = response?.data?.user ?? response?.user;
+
+    if (!updatedUser) {
+      throw new Error(
+        "The server did not return the updated user status. Refresh and verify the user before retrying.",
+      );
+    }
+
+    setUserDetails((current) => current ? { ...current, ...updatedUser } : current);
+
+    setUsers((current) =>
+      current.map((item) =>
+        (item.id || item._id) === selectedUserId
+          ? { ...item, ...updatedUser }
+          : item
+      )
+    );
+
+    setUserStatusSuccess(
+      response?.message || `User status updated to ${status}.`,
+    );
+  } catch (error) {
+    setUserStatusError(
+      error.message || "Unable to update the user status. Please retry.",
+    );
+  } finally {
+    setUpdatingUserStatus(false);
+  }
+};
+  const updateUserRole = async () => {
+  if (!selectedUserId || !selectedRole || updatingUserRole) return;
+
+  if (selectedRole === userDetails?.role) return;
+
+  setUpdatingUserRole(true);
+  setUserRoleError("");
+  setUserRoleSuccess("");
+
+  try {
+    const response = await apiRequest(
+      `/platform/users/${encodeURIComponent(selectedUserId)}/role`,
+      {
+        method: "PATCH",
+        accessToken,
+        body: { role: selectedRole },
+      },
+    );
+
+    const updatedUser = response?.data?.user ?? response?.user;
+
+    if (!updatedUser) {
+      throw new Error(
+        "The server did not return the updated user role. Refresh and verify the user before retrying.",
+      );
+    }
+
+    setUserDetails((current) =>
+      current ? { ...current, ...updatedUser } : current,
+    );
+
+    setSelectedRole(updatedUser.role || "");
+
+    setUsers((current) =>
+      current.map((item) =>
+        (item.id || item._id) === selectedUserId
+          ? { ...item, ...updatedUser }
+          : item,
+      ),
+    );
+
+    setUserRoleSuccess(
+      response?.message || "User role updated successfully.",
+    );
+  } catch (error) {
+    setUserRoleError(
+      error.message || "Unable to update the user role. Please retry.",
+    );
+  } finally {
+    setUpdatingUserRole(false);
+  }
+};
   const updateSchoolForm = (event) => {
     const { name, value } = event.target;
     setSchoolForm((current) => ({ ...current, [name]: value }));
@@ -637,6 +740,7 @@ export default function PlatformAdminWorkspace() {
                     <div><dt>Timezone</dt><dd>{school.timezone || "—"}</dd></div>
                     <div><dt>Created</dt><dd>{formatDate(school.createdAt)}</dd></div>
                   </dl>
+                
                   <section className="platform-lifecycle-controls" aria-label="School lifecycle controls">
                     <div>
                       <h3>School lifecycle</h3>
@@ -688,6 +792,121 @@ export default function PlatformAdminWorkspace() {
                     <div><dt>Account created</dt><dd>{formatDate(userDetails.createdAt)}</dd></div>
                     <div><dt>Last updated</dt><dd>{formatDate(userDetails.updatedAt)}</dd></div>
                   </dl>
+                    <section
+  className="platform-lifecycle-controls"
+  aria-label="User role management"
+>
+  <div>
+    <h3>Role management</h3>
+    <p>Change this user's role and permissions.</p>
+  </div>
+
+  <label>
+    <span>User role</span>
+    <select
+      aria-label="User role"
+      value={selectedRole}
+      onChange={(event) => {
+        setSelectedRole(event.target.value);
+        setUserRoleError("");
+        setUserRoleSuccess("");
+      }}
+      disabled={updatingUserRole}
+    >
+      <option value="school_admin">School admin</option>
+      <option value="principal">Principal</option>
+      <option value="teacher">Teacher</option>
+      <option value="accountant">Accountant</option>
+      <option value="librarian">Librarian</option>
+      <option value="transport_manager">Transport manager</option>
+      <option value="student">Student</option>
+      <option value="parent">Parent</option>
+    </select>
+  </label>
+
+  <div className="platform-form-actions">
+    <button
+      type="button"
+      className="platform-primary-button"
+      onClick={() => void updateUserRole()}
+      disabled={
+        updatingUserRole ||
+        !selectedRole ||
+        selectedRole === userDetails.role
+      }
+    >
+      {updatingUserRole ? "Updating…" : "Save role"}
+    </button>
+  </div>
+
+  {userRoleSuccess && (
+    <p role="status">{userRoleSuccess}</p>
+  )}
+
+  {userRoleError && (
+    <p className="platform-directory-error" role="alert">
+      {userRoleError}
+    </p>
+  )}
+</section>
+                  <section className="platform-lifecycle-controls" aria-label="User lifecycle controls">
+  <div>
+    <h3>User account lifecycle</h3>
+    <p>Manage this user's access to the school ERP.</p>
+  </div>
+
+  <div className="platform-form-actions">
+    {userDetails.status === "pending" && (
+      <button
+        type="button"
+        className="platform-primary-button"
+        onClick={() => void updateUserStatus("active")}
+        disabled={updatingUserStatus}
+      >
+        {updatingUserStatus ? "Updating…" : "Activate user"}
+      </button>
+    )}
+
+    {userDetails.status === "active" && (
+      <button
+        type="button"
+        className="platform-secondary-button"
+        onClick={() => void updateUserStatus("suspended")}
+        disabled={updatingUserStatus}
+      >
+        {updatingUserStatus ? "Updating…" : "Suspend user"}
+      </button>
+    )}
+
+    {userDetails.status === "suspended" && (
+      <button
+        type="button"
+        className="platform-primary-button"
+        onClick={() => void updateUserStatus("active")}
+        disabled={updatingUserStatus}
+      >
+        {updatingUserStatus ? "Updating…" : "Reactivate user"}
+      </button>
+    )}
+  </div>
+
+  {userStatusSuccess && (
+    <p role="status">{userStatusSuccess}</p>
+  )}
+
+  {userStatusError && (
+    <div className="platform-directory-error" role="alert">
+      <p>{userStatusError}</p>
+      <button
+        type="button"
+        onClick={() => void updateUserStatus(userDetails.status === "active" ? "suspended" : "active")}
+        disabled={updatingUserStatus}
+      >
+        Retry
+      </button>
+    </div>
+  )}
+</section>
                   <form className="platform-school-form" onSubmit={submitUserProfile}>
                     <h3>Edit profile</h3>
                     <label>First name *<input name="firstName" value={userProfileForm.firstName} onChange={updateUserProfileForm} required maxLength={80} autoComplete="given-name" /></label>

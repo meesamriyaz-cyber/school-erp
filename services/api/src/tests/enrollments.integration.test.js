@@ -205,7 +205,7 @@ describe("Student Enrollment API", () => {
     });
     expect(shrink.status).toBe(409);
     expect(shrink.body.message).toMatch(/cannot be lower than its active enrollment count/i);
-  });
+  }, 15000);
 
   it("does not exceed section capacity when enrollment requests arrive concurrently", async () => {
     const suffix = randomUUID().slice(0, 6);

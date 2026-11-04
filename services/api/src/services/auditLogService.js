@@ -61,7 +61,10 @@ function safeErrorMessage(error) {
     : "Unknown audit delivery error";
 }
 
-export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
+export async function processPendingAuditEvents({
+  batchSize = 25,
+  outboxId = null,
+} = {}) {
   if (workerRunning) return { processed: 0, skipped: true };
   workerRunning = true;
   let processed = 0;
@@ -70,13 +73,19 @@ export async function processPendingAuditEvents({ batchSize = 25 } = {}) {
       const processingToken = randomUUID();
       const claimedAt = new Date();
       const outbox = await AuditOutbox.findOneAndUpdate(
-        {
-          attempts: { $lt: MAX_ATTEMPTS },
-          $or: [
-            { status: "pending", nextAttemptAt: { $lte: claimedAt } },
-            { status: "processing", processingStartedAt: { $lte: new Date(claimedAt.getTime() - PROCESSING_LEASE_MS) } },
-          ],
-        },
+       {
+  ...(outboxId ? { _id: outboxId } : {}),
+  attempts: { $lt: MAX_ATTEMPTS },
+  $or: [
+    { status: "pending", nextAttemptAt: { $lte: claimedAt } },
+    {
+      status: "processing",
+      processingStartedAt: {
+        $lte: new Date(claimedAt.getTime() - PROCESSING_LEASE_MS),
+      },
+    },
+  ],
+},
         { $set: { status: "processing", processingStartedAt: claimedAt, processingToken }, $inc: { attempts: 1 } },
         {
           returnDocument: "after",

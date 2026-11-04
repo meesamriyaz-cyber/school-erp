@@ -31,4 +31,24 @@ describe("AuditLog model integrity", () => {
     }
     expect(AuditLog.schema.s.hooks._pres.has("bulkWrite")).toBe(true);
   });
+  it("registers document-level protection against modifying existing audit records", () => {
+  const saveHooks = AuditLog.schema.s.hooks._pres.get("save") ?? [];
+
+  expect(
+    saveHooks.some(({ fn }) => fn.name === "rejectAuditDocumentSave"),
+  ).toBe(true);
+});
+
+it("registers document-level protection against deleting audit records", () => {
+  const deleteHooks = AuditLog.schema.s.hooks._pres.get("deleteOne") ?? [];
+
+  expect(
+    deleteHooks.some(
+      ({ fn, document, query }) =>
+        fn.name === "rejectAuditDocumentDelete" &&
+        document === true &&
+        query === false,
+    ),
+  ).toBe(true);
+});
 });

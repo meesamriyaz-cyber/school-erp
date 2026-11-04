@@ -69,14 +69,19 @@ export const retryFailedAuditEvent = async (req, res, next) => {
 
     if (!retried) return sendError(res, 409, "Audit event is not failed or has already been retried");
 
-    await processPendingAuditEvents({ batchSize: 1 });
+   const processingResult = await processPendingAuditEvents({
+  batchSize: 1,
+  outboxId: retried._id,
+});
     const current = await AuditOutbox.findById(retried._id)
       .select("_id status attempts manualRetryCount lastError")
       .lean();
 
     return res.status(200).json({
       success: true,
-      message: "Audit event retry submitted",
+      message: processingResult?.skipped
+  ? "Audit event retry queued for background processing"
+  : "Audit event retry processing attempted",
       data: current ? {
         id: String(current._id),
         status: current.status,

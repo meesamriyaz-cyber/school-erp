@@ -82,7 +82,10 @@ describe("audit outbox operations controller", () => {
       }),
       { returnDocument: "after" },
     );
-    expect(processPendingAuditEvents).toHaveBeenCalledWith({ batchSize: 1 });
+   expect(processPendingAuditEvents).toHaveBeenCalledWith({
+  batchSize: 1,
+  outboxId,
+});
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -92,4 +95,26 @@ describe("audit outbox operations controller", () => {
     expect(res.status).toHaveBeenCalledWith(409);
     expect(processPendingAuditEvents).not.toHaveBeenCalled();
   });
+  it("reports a queued retry when the audit worker is already running", async () => {
+  processPendingAuditEvents.mockResolvedValueOnce({
+    processed: 0,
+    skipped: true,
+  });
+
+  outboxModel.findById.mockReturnValue(chain({
+    _id: outboxId,
+    status: "pending",
+    attempts: 0,
+    manualRetryCount: 1,
+    lastError: null,
+  }));
+
+  await retryFailedAuditEvent(req, res, next);
+
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json.mock.calls[0][0].message).toBe(
+    "Audit event retry queued for background processing",
+  );
+  expect(res.json.mock.calls[0][0].data.status).toBe("pending");
+});
 });
