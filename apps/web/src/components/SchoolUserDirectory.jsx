@@ -63,6 +63,7 @@ export default function SchoolUserDirectory() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 350);
@@ -112,7 +113,47 @@ export default function SchoolUserDirectory() {
     };
   }, [loadUsers, refreshKey]);
 
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const statusActionLabel = (status) => {
+    if (status === "pending") return "Activate";
+    if (status === "active") return "Suspend";
+    if (status === "suspended") return "Reactivate";
+    return null;
+  };
+
+  const changeUserStatus = async (user) => {
+    const nextStatus = user.status === "pending" || user.status === "suspended"
+      ? "active"
+      : user.status === "active" ? "suspended" : null;
+    if (!nextStatus) return;
+
+    const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "this user";
+    const message = nextStatus === "active"
+      ? `Activate ${fullName}? The user will be able to sign in.`
+      : `Suspend ${fullName}? Their existing sessions will be revoked.`;
+    if (!window.confirm(message)) return;
+
+    setUpdatingUserId(user.id);
+    setError("");
+    try {
+      const result = await apiRequest(`/school/users/${user.id}/status`, {
+        method: "PATCH",
+        accessToken,
+        body: { status: nextStatus },
+      });
+      if (!result?.success || !result.data?.user) {
+        throw new Error(result?.message || "Unable to update this user's status.");
+      }
+      setRefreshKey((current) => current + 1);
+    } catch (requestError) {
+      setError(requestError.message || "Unable to update this user's status.");
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
 
   const updateFilter = (setter) => (event) => {
     setter(event.target.value);
@@ -207,11 +248,12 @@ export default function SchoolUserDirectory() {
               <th scope="col">Status</th>
               <th scope="col">Last login</th>
               <th scope="col">Created</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="school-user-message">Loading school users…</td></tr>
+              <tr><td colSpan={6} className="school-user-message">Loading school users…</td></tr>
             ) : error ? (
               <tr><td colSpan={5} className="school-user-message">School users could not be loaded.</td></tr>
             ) : users.length === 0 ? (
@@ -228,6 +270,19 @@ export default function SchoolUserDirectory() {
                 <td><UserStatus status={user.status} /></td>
                 <td>{formatDate(user.lastLoginAt)}</td>
                 <td>{formatDate(user.createdAt)}</td>
+                <td>
+                  {statusActionLabel(user.status) && (
+                    <button
+                      type="button"
+                      className="school-user-status-action"
+                      aria-label={statusActionLabel(user.status) + " " + ([user.firstName, user.lastName].filter(Boolean).join(" ") || "user")}
+                      disabled={updatingUserId === user.id}
+                      onClick={() => changeUserStatus(user)}
+                    >
+                      {updatingUserId === user.id ? "Updating…" : statusActionLabel(user.status)}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -251,6 +306,17 @@ export default function SchoolUserDirectory() {
                     <span>Role: {formatRole(user.role)}</span>
                     <span>Last login: {formatDate(user.lastLoginAt)}</span>
                   </div>
+                  {statusActionLabel(user.status) && (
+                    <button
+                      type="button"
+                      className="school-user-status-action"
+                      aria-label={statusActionLabel(user.status) + " " + ([user.firstName, user.lastName].filter(Boolean).join(" ") || "user")}
+                      disabled={updatingUserId === user.id}
+                      onClick={() => changeUserStatus(user)}
+                    >
+                      {updatingUserId === user.id ? "Updating…" : statusActionLabel(user.status)}
+                    </button>
+                  )}
                 </article>
               ))}
       </div>
