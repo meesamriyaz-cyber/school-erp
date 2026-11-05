@@ -297,7 +297,9 @@ export const updateUserRole = async (req, res, next) => {
   try {
     const { userId } = req.params ?? {};
     const { role } = req.body ?? {};
-    if (!isPlatformAdmin(req)) return sendError(res, 403, "Only platform administrators may change user roles");
+    if (!isPlatformAdmin(req) && req.auth?.role !== "school_admin") {
+      return sendError(res, 403, "Only platform or school administrators may change user roles");
+    }
     if (!validId(userId)) return sendError(res, 400, "Invalid user ID");
     if (String(req.auth.userId) === String(userId)) return sendError(res, 403, "You cannot change your own role");
     if (typeof role !== "string" || !allowedRolesFor(req).includes(role)) return sendError(res, 400, "You cannot assign this role");
