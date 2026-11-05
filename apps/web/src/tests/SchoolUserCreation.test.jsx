@@ -32,11 +32,11 @@ describe("SchoolUserCreation", () => {
 
     render(<SchoolUserCreation onCreated={vi.fn()} onCancel={vi.fn()} />);
 
-    await user.type(screen.getByLabelText("First name"), "Sara");
+    await user.type(screen.getByLabelText(/First name/i), "Sara");
     await user.type(screen.getByLabelText("Last name"), "Ahmad");
     await user.type(screen.getByLabelText("Email"), "Sara@Example.com");
     await user.type(screen.getByLabelText("Phone"), "9876543210");
-    await user.selectOptions(screen.getByLabelText("Role"), "teacher");
+    await user.selectOptions(screen.getByLabelText(/Role/i), "teacher");
     await user.type(screen.getByLabelText("Initial password"), "SecurePass123");
     await user.click(screen.getByRole("button", { name: "Create user" }));
 
@@ -69,9 +69,9 @@ describe("SchoolUserCreation", () => {
     const user = userEvent.setup();
     render(<SchoolUserCreation onCreated={vi.fn()} onCancel={vi.fn()} />);
 
-    await user.type(screen.getByLabelText("First name"), "Sara");
+    await user.type(screen.getByLabelText(/First name/i), "Sara");
     await user.type(screen.getByLabelText("Email"), "sara@example.com");
-    await user.selectOptions(screen.getByLabelText("Role"), "teacher");
+    await user.selectOptions(screen.getByLabelText(/Role/i), "teacher");
     await user.type(screen.getByLabelText("Initial password"), "short");
     await user.click(screen.getByRole("button", { name: "Create user" }));
 
@@ -84,9 +84,9 @@ describe("SchoolUserCreation", () => {
     apiRequest.mockRejectedValueOnce(new Error("A user with this email already exists in this school"));
     render(<SchoolUserCreation onCreated={vi.fn()} onCancel={vi.fn()} />);
 
-    await user.type(screen.getByLabelText("First name"), "Sara");
+    await user.type(screen.getByLabelText(/First name/i), "Sara");
     await user.type(screen.getByLabelText("Email"), "sara@example.com");
-    await user.selectOptions(screen.getByLabelText("Role"), "teacher");
+    await user.selectOptions(screen.getByLabelText(/Role/i), "teacher");
     await user.type(screen.getByLabelText("Initial password"), "SecurePass123");
     await user.click(screen.getByRole("button", { name: "Create user" }));
 
@@ -96,7 +96,7 @@ describe("SchoolUserCreation", () => {
 
   it("does not offer platform-admin or school-admin roles", () => {
     render(<SchoolUserCreation onCreated={vi.fn()} onCancel={vi.fn()} />);
-    const roleSelect = screen.getByLabelText("Role");
+    const roleSelect = screen.getByLabelText(/Role/i);
     expect(roleSelect).not.toHaveDisplayValue("Platform administrator");
     expect(screen.queryByRole("option", { name: /platform admin/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /school admin/i })).not.toBeInTheDocument();
