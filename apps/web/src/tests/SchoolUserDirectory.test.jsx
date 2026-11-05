@@ -15,7 +15,7 @@ const response = (data, total = data.length) => ({
 });
 
 describe("SchoolUserDirectory", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => vi.resetAllMocks());
 
   it("loads and displays school users without exposing internal fields", async () => {
     apiRequest.mockResolvedValueOnce(response([{
@@ -34,7 +34,7 @@ describe("SchoolUserDirectory", () => {
     render(<SchoolUserDirectory />);
 
     expect(await screen.findAllByText("Ayaan Khan")).not.toHaveLength(0);
-    expect(screen.getByText("ayaan@example.com")).toBeInTheDocument();
+    expect(screen.getAllByText("ayaan@example.com")).not.toHaveLength(0);
     expect(screen.getAllByText("Teacher")).not.toHaveLength(0);
     expect(screen.getAllByText("active")).not.toHaveLength(0);
     expect(screen.getByText("Showing 1–1 of 1")).toBeInTheDocument();
@@ -120,8 +120,8 @@ describe("SchoolUserDirectory", () => {
   it("shows an empty state when no users match", async () => {
     apiRequest.mockResolvedValueOnce(response([]));
     render(<SchoolUserDirectory />);
+    expect(await screen.findAllByText("No users found. Try changing your search or filters.")).not.toHaveLength(0);
     expect(screen.getAllByText("No records")).not.toHaveLength(0);
-    expect(screen.getAllByText("No users found. Try changing your search or filters.")).not.toHaveLength(0);
   });
 
   it("shows an error and retries after a failed request", async () => {
