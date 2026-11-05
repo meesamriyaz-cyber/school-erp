@@ -11,6 +11,7 @@ import ClassesManagement from "./components/ClassesManagement.jsx";
 import SectionsManagement from "./components/SectionsManagement.jsx";
 import EnrollmentsManagement from "./components/EnrollmentsManagement.jsx";
 import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
+import SchoolUserDirectory from "./components/SchoolUserDirectory.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -25,6 +26,7 @@ const navigation = [
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
   { label: "Fees & Payments", icon: "₹", section: "FINANCE" },
   { label: "Reports", icon: "▥", section: "FINANCE" },
+  { label: "User Management", icon: "♙", section: "SYSTEM" },
   { label: "Settings", icon: "⚙", section: "SYSTEM" },
 ];
 
@@ -389,6 +391,8 @@ function DashboardApp() {
   <SectionsManagement />
 ) : activePage === "Enrollments" ? (
   <EnrollmentsManagement />
+) : activePage === "User Management" ? (
+  <SchoolUserDirectory />
 ) : (
   <section className="content-card placeholder-page">
     <div className="placeholder-icon">▦</div>
