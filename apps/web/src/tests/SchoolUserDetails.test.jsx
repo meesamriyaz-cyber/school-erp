@@ -34,8 +34,8 @@ describe("SchoolUserDetails", () => {
     expect(await screen.findByRole("heading", { name: "Ayaan Khan" })).toBeInTheDocument();
     expect(screen.getAllByText("ayaan@example.com")).toHaveLength(2);
     expect(screen.getByText("9876543210")).toBeInTheDocument();
-    expect(screen.getByText("Teacher")).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getAllByText("Teacher")).toHaveLength(2);
+    expect(screen.getAllByText("active")).toHaveLength(2);
     expect(apiRequest).toHaveBeenCalledWith(
       "/school/users/user-101",
       expect.objectContaining({ accessToken: "school-admin-token", signal: expect.any(AbortSignal) }),
