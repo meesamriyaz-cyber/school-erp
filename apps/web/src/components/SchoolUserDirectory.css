@@ -150,3 +150,21 @@
 }
 .school-user-name-link:hover { color: #3157d5; text-decoration: underline; }
 .school-user-name-link:focus-visible { outline: 2px solid #4263eb; outline-offset: 3px; border-radius: 2px; }
+
+.school-user-create-button {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #3157d5;
+  border-radius: 8px;
+  background: #3157d5;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.school-user-create-button:hover { background: #2648bd; }
+.school-user-create-button:focus-visible { outline: 3px solid #4263eb40; outline-offset: 2px; }
+@media (max-width: 480px) {
+  .school-user-toolbar { align-items: flex-start; flex-wrap: wrap; }
+  .school-user-create-button { width: 100%; }
+}
