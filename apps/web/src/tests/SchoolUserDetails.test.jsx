@@ -135,4 +135,41 @@ describe("SchoolUserDetails", () => {
     expect(screen.queryByText("17")).not.toBeInTheDocument();
     expect(screen.queryByText("secret-hash")).not.toBeInTheDocument();
   });
+  it("allows a school admin to change a user's role to another school-level role", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce({ success: true, data: { user: userRecord } })
+      .mockResolvedValueOnce({
+        success: true,
+        message: "User role updated",
+        data: { user: { ...userRecord, role: "principal" } },
+      });
+
+    render(<SchoolUserDetails userId="user-101" onBack={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Ayaan Khan" });
+    await user.selectOptions(screen.getByLabelText("New role"), "principal");
+    await user.click(screen.getByRole("button", { name: "Save role" }));
+
+    expect(await screen.findByText("Principal")).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenLastCalledWith(
+      "/school/users/user-101/role",
+      { method: "PATCH", accessToken: "school-admin-token", body: { role: "principal" } },
+    );
+  });
+
+  it("keeps the selected role and shows an error when role update fails", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce({ success: true, data: { user: userRecord } })
+      .mockRejectedValueOnce(new Error("Role update forbidden"));
+
+    render(<SchoolUserDetails userId="user-101" onBack={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Ayaan Khan" });
+    await user.selectOptions(screen.getByLabelText("New role"), "principal");
+    await user.click(screen.getByRole("button", { name: "Save role" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Role update forbidden");
+    expect(screen.getByLabelText("New role")).toHaveValue("principal");
+  });
+
 });
