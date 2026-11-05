@@ -60,6 +60,7 @@ export default function SchoolUserDirectory() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -73,6 +74,7 @@ export default function SchoolUserDirectory() {
   const loadUsers = useCallback(async (signal) => {
     setLoading(true);
     setError("");
+    setLoadError("");
 
     try {
       const params = new URLSearchParams({
@@ -94,10 +96,12 @@ export default function SchoolUserDirectory() {
 
       setUsers(response.data);
       setTotal(response.pagination?.total ?? response.data.length);
+      setLoadError("");
     } catch (requestError) {
       if (requestError.name === "AbortError") return;
       setUsers([]);
       setTotal(0);
+      setLoadError(requestError.message || "Unable to load school users.");
       setError(requestError.message || "Unable to load school users.");
     } finally {
       if (!signal.aborted) setLoading(false);
@@ -254,8 +258,8 @@ export default function SchoolUserDirectory() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="school-user-message">Loading school users…</td></tr>
-            ) : error ? (
-              <tr><td colSpan={5} className="school-user-message">School users could not be loaded.</td></tr>
+            ) : loadError ? (
+              <tr><td colSpan={6} className="school-user-message">School users could not be loaded.</td></tr>
             ) : users.length === 0 ? (
               <tr><td colSpan={5} className="school-user-message">No users found. Try changing your search or filters.</td></tr>
             ) : users.map((user) => (
@@ -291,7 +295,7 @@ export default function SchoolUserDirectory() {
 
       <div className="school-user-mobile-list" aria-live="polite">
         {loading ? <p>Loading school users…</p>
-          : error ? <p>School users could not be loaded.</p>
+          : loadError ? <p>School users could not be loaded.</p>
             : users.length === 0 ? <p>No users found. Try changing your search or filters.</p>
               : users.map((user) => (
                 <article className="school-user-mobile-card" key={user.id}>
