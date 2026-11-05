@@ -151,4 +151,68 @@ describe("SchoolUserDirectory", () => {
     await waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
+
+  it.each([
+    ["pending", "Activate", "active"],
+    ["active", "Suspend", "suspended"],
+    ["suspended", "Reactivate", "active"],
+  ])("allows a school admin to %s users through the status API", async (currentStatus, action, nextStatus) => {
+    const user = {
+      id: "user-status-1",
+      firstName: "Ayaan",
+      lastName: "Khan",
+      email: "ayaan@example.com",
+      role: "teacher",
+      status: currentStatus,
+    };
+    apiRequest.mockResolvedValueOnce(response([user], 1));
+    apiRequest.mockResolvedValueOnce({
+      success: true,
+      message: `User status updated to ${nextStatus}`,
+      data: { user: { ...user, status: nextStatus } },
+    });
+    apiRequest.mockResolvedValueOnce(response([{ ...user, status: nextStatus }], 1));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<SchoolUserDirectory />);
+
+    const actionButton = await screen.findByRole("button", {
+      name: new RegExp(`${action}.*Ayaan Khan`, "i"),
+    });
+    fireEvent.click(actionButton);
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(
+      "/school/users/user-status-1/status",
+      expect.objectContaining({
+        method: "PATCH",
+        accessToken: "school-admin-token",
+        body: { status: nextStatus },
+      }),
+    ));
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(3));
+    expect(await screen.findAllByText(nextStatus)).not.toHaveLength(0);
+  });
+
+  it("keeps the user directory available and reports a status update failure", async () => {
+    apiRequest.mockResolvedValueOnce(response([{
+      id: "user-status-2",
+      firstName: "Sara",
+      lastName: "Ahmad",
+      email: "sara@example.com",
+      role: "teacher",
+      status: "pending",
+    }], 1));
+    apiRequest.mockRejectedValueOnce(new Error("You cannot change this account status"));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<SchoolUserDirectory />);
+    fireEvent.click(await screen.findByRole("button", {
+      name: /Activate.*Sara Ahmad/i,
+    }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "You cannot change this account status",
+    );
+    expect(screen.getAllByText("pending")).not.toHaveLength(0);
+  });
 });
