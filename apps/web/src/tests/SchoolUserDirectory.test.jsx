@@ -110,7 +110,7 @@ describe("SchoolUserDirectory", () => {
 
     expect(await screen.findByText("Page 2 of 2")).toBeInTheDocument();
     expect(screen.getByText("Showing 11–11 of 11")).toBeInTheDocument();
-    expect(screen.getAllByText("User11")).not.toHaveLength(0);
+    expect(await screen.findAllByText("User11")).not.toHaveLength(0);
     expect(apiRequest).toHaveBeenLastCalledWith(
       "/school/users?page=2&limit=10",
       expect.objectContaining({ accessToken: "school-admin-token" }),
