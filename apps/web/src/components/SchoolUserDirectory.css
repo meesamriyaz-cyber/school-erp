@@ -135,3 +135,18 @@
   .school-user-pagination { align-items: flex-start; flex-direction: column; padding: 14px; }
   .school-user-pagination > div { width: 100%; justify-content: space-between; }
 }
+
+.school-user-name-link {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #34415a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.school-user-name-link:hover { color: #3157d5; text-decoration: underline; }
+.school-user-name-link:focus-visible { outline: 2px solid #4263eb; outline-offset: 3px; border-radius: 2px; }
