@@ -79,6 +79,13 @@
 }
 .school-user-edit-form { padding: 22px; }
 .school-user-edit-form h3 { margin: 0 0 18px; color: #34415a; font-size: 15px; }
+.school-user-role-form { border-top: 1px solid #edf0f5; }
+.school-user-role-form > p { margin: -8px 0 16px; color: #8490a4; font-size: 12px; }
+.school-user-role-form label { display: grid; max-width: 360px; gap: 7px; }
+.school-user-role-form label span { color: #8490a4; font-size: 10px; font-weight: 700; letter-spacing: .25px; text-transform: uppercase; }
+.school-user-role-form select { width: 100%; min-height: 42px; box-sizing: border-box; padding: 9px 11px; border: 1px solid #e2e7f0; border-radius: 8px; background: #fff; color: #34415a; font: inherit; font-size: 12px; }
+.school-user-role-form select:focus { border-color: #4263eb; outline: 3px solid #4263eb20; }
+.school-user-details-success { margin: 14px 0 0; color: #18794e; font-size: 12px; }
 .school-user-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .school-user-edit-grid label { display: grid; min-width: 0; gap: 7px; }
 .school-user-edit-grid input {
