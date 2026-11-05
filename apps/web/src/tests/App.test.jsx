@@ -17,6 +17,7 @@ vi.mock("../components/ClassesManagement.jsx", () => ({ default: () => <h2>Class
 vi.mock("../components/SectionsManagement.jsx", () => ({ default: () => <h2>Sections management displayed</h2> }));
 vi.mock("../components/EnrollmentsManagement.jsx", () => ({ default: () => <h2>Enrollments management displayed</h2> }));
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>Platform Administrator workspace displayed</h1> }));
+vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));
 
 const schoolAdmin = (overrides = {}) => ({
   status: "authenticated",
@@ -216,5 +217,17 @@ it("does not expose the school administration dashboard to students", () => {
   expect(
     screen.queryByRole("button", { name: "Students" }),
   ).not.toBeInTheDocument();
+});
+
+it("opens the school user directory from the administration navigation", async () => {
+  useAuth.mockReturnValue(schoolAdmin());
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.click(screen.getByRole("button", { name: "User Management" }));
+
+  expect(
+    screen.getByRole("heading", { name: "School user directory displayed" }),
+  ).toBeInTheDocument();
 });
 });
