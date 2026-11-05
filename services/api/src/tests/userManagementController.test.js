@@ -178,7 +178,65 @@ describe("user management controller", () => {
     }), { session: {} });
   });
 
-  it("prevents school admins from assigning roles through the role endpoint", async () => {
+  it("allows school admins to change roles within their own school and revokes sessions", async () => {
+    const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 2 };
+    const updated = {
+      ...existing, firstName: "Sam", lastName: "Teacher", email: "sam@example.com",
+      phone: null, role: "principal",
+    };
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }),
+    });
+    userModel.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updated) }),
+    });
+    req.body = { role: "principal" };
+
+    await updateUserRole(req, res, next);
+
+    expect(userModel.findOne).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: tenantId.toString(),
+      role: { $nin: ["platform_admin", "school_admin"] },
+    }));
+    expect(userModel.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: tenantId.toString(), status: "active" }),
+      { $set: { role: "principal" }, $inc: { authVersion: 1 } },
+      expect.objectContaining({ new: true, runValidators: true }),
+    );
+    expect(auditWrite).toHaveBeenCalledWith(expect.objectContaining({
+      action: "USER_ROLE_CHANGED", previousValue: "teacher", newValue: "principal",
+      changedFields: ["role"], actorRole: "school_admin",
+    }), { session: {} });
+    expect(sessionModel.updateMany).toHaveBeenCalledWith(
+      { userId, revokedAt: null },
+      { $set: { revokedAt: expect.any(Date) } },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it.each(["platform_admin", "school_admin"])("does not let school admins assign the %s role", async (role) => {
+    req.body = { role };
+    await updateUserRole(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(userModel.findOne).not.toHaveBeenCalled();
+  });
+
+  it("does not let school admins change a user in another school", async () => {
+    userModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(null) }),
+    });
+    req.body = { role: "principal" };
+    await updateUserRole(req, res, next);
+    expect(userModel.findOne).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: tenantId.toString(),
+      role: { $nin: ["platform_admin", "school_admin"] },
+    }));
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it("prevents school admins from changing their own role", async () => {
+    req.params.userId = req.auth.userId;
     req.body = { role: "principal" };
     await updateUserRole(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
