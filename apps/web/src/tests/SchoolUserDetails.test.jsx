@@ -32,7 +32,7 @@ describe("SchoolUserDetails", () => {
     render(<SchoolUserDetails userId="user-101" onBack={vi.fn()} />);
 
     expect(await screen.findByRole("heading", { name: "Ayaan Khan" })).toBeInTheDocument();
-    expect(screen.getByText("ayaan@example.com")).toBeInTheDocument();
+    expect(screen.getAllByText("ayaan@example.com")).toHaveLength(2);
     expect(screen.getByText("9876543210")).toBeInTheDocument();
     expect(screen.getByText("Teacher")).toBeInTheDocument();
     expect(screen.getByText("active")).toBeInTheDocument();
