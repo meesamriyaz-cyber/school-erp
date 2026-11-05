@@ -34,7 +34,7 @@ describe("SchoolUserDetails", () => {
     expect(await screen.findByRole("heading", { name: "Ayaan Khan" })).toBeInTheDocument();
     expect(screen.getAllByText("ayaan@example.com")).toHaveLength(2);
     expect(screen.getByText("9876543210")).toBeInTheDocument();
-    expect(screen.getAllByText("Teacher")).toHaveLength(2);
+    expect(screen.getAllByText("Teacher")).toHaveLength(3);
     expect(screen.getAllByText("active")).toHaveLength(2);
     expect(apiRequest).toHaveBeenCalledWith(
       "/school/users/user-101",
@@ -150,7 +150,7 @@ describe("SchoolUserDetails", () => {
     await user.selectOptions(screen.getByLabelText("New role"), "principal");
     await user.click(screen.getByRole("button", { name: "Save role" }));
 
-    expect(await screen.findByText("Principal")).toBeInTheDocument();
+    expect(await screen.findAllByText("Principal")).toHaveLength(3);
     expect(apiRequest).toHaveBeenLastCalledWith(
       "/school/users/user-101/role",
       { method: "PATCH", accessToken: "school-admin-token", body: { role: "principal" } },
