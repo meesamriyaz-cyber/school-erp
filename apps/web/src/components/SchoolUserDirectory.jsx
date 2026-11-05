@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import SchoolUserDetails from "./SchoolUserDetails.jsx";
+import SchoolUserCreation from "./SchoolUserCreation.jsx";
 import { useAuth } from "../context/authContext.js";
 import { apiRequest } from "../lib/api.js";
 import "./SchoolUserDirectory.css";
@@ -61,6 +62,7 @@ export default function SchoolUserDirectory() {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 350);
