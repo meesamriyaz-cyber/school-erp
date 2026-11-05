@@ -33,11 +33,11 @@ describe("SchoolUserCreation", () => {
     render(<SchoolUserCreation onCreated={vi.fn()} onCancel={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/First name/i), "Sara");
-    await user.type(screen.getByLabelText("Last name"), "Ahmad");
-    await user.type(screen.getByLabelText("Email"), "Sara@Example.com");
-    await user.type(screen.getByLabelText("Phone"), "9876543210");
+    await user.type(screen.getByLabelText(/^Last name/i), "Ahmad");
+    await user.type(screen.getByLabelText(/^Email/i), "Sara@Example.com");
+    await user.type(screen.getByLabelText(/^Phone/i), "9876543210");
     await user.selectOptions(screen.getByLabelText(/Role/i), "teacher");
-    await user.type(screen.getByLabelText("Initial password"), "SecurePass123");
+    await user.type(screen.getByLabelText(/^Initial password/i), "SecurePass123");
     await user.click(screen.getByRole("button", { name: "Create user" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent(/pending|awaiting activation/i);
@@ -70,9 +70,9 @@ describe("SchoolUserCreation", () => {
     render(<SchoolUserCreation onCreated={vi.fn()} onCancel={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/First name/i), "Sara");
-    await user.type(screen.getByLabelText("Email"), "sara@example.com");
+    await user.type(screen.getByLabelText(/^Email/i), "sara@example.com");
     await user.selectOptions(screen.getByLabelText(/Role/i), "teacher");
-    await user.type(screen.getByLabelText("Initial password"), "short");
+    await user.type(screen.getByLabelText(/^Initial password/i), "short");
     await user.click(screen.getByRole("button", { name: "Create user" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/8 characters/i);
@@ -85,9 +85,9 @@ describe("SchoolUserCreation", () => {
     render(<SchoolUserCreation onCreated={vi.fn()} onCancel={vi.fn()} />);
 
     await user.type(screen.getByLabelText(/First name/i), "Sara");
-    await user.type(screen.getByLabelText("Email"), "sara@example.com");
+    await user.type(screen.getByLabelText(/^Email/i), "sara@example.com");
     await user.selectOptions(screen.getByLabelText(/Role/i), "teacher");
-    await user.type(screen.getByLabelText("Initial password"), "SecurePass123");
+    await user.type(screen.getByLabelText(/^Initial password/i), "SecurePass123");
     await user.click(screen.getByRole("button", { name: "Create user" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/already exists/i);
