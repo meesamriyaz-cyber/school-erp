@@ -123,6 +123,23 @@ export default function SchoolUserDirectory() {
     return <SchoolUserDetails userId={selectedUserId} onBack={() => setSelectedUserId(null)} />;
   }
 
+  if (showCreateForm) {
+    return (
+      <SchoolUserCreation
+        onCancel={() => setShowCreateForm(false)}
+        onCreated={() => {
+          setShowCreateForm(false);
+          setPage(1);
+          setSearchInput("");
+          setSearch("");
+          setRoleFilter("");
+          setStatusFilter("");
+          setRefreshKey((current) => current + 1);
+        }}
+      />
+    );
+  }
+
   return (
     <section className="school-user-directory" aria-labelledby="school-user-heading">
       <div className="school-user-toolbar">
@@ -130,9 +147,14 @@ export default function SchoolUserDirectory() {
           <h2 id="school-user-heading">School user directory</h2>
           <p>View the accounts belonging to your school.</p>
         </div>
-        <div className="school-user-total" aria-live="polite">
-          <strong>{total}</strong>
-          <span>users found</span>
+        <div className="school-user-toolbar-actions">
+          <button type="button" className="school-user-create-button" onClick={() => setShowCreateForm(true)}>
+            Create user
+          </button>
+          <div className="school-user-total" aria-live="polite">
+            <strong>{total}</strong>
+            <span>users found</span>
+          </div>
         </div>
       </div>
 
