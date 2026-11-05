@@ -36,11 +36,6 @@ export default function SchoolUserDetails({ userId, onBack }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
-    setRecord(null);
-    setEditing(false);
-
     apiRequest(`/school/users/${encodeURIComponent(userId)}`, {
       accessToken,
       signal: controller.signal,
