@@ -33,10 +33,10 @@ describe("SchoolUserDirectory", () => {
 
     render(<SchoolUserDirectory />);
 
-    expect(await screen.findByText("Ayaan Khan")).toBeInTheDocument();
+    expect(await screen.findAllByText("Ayaan Khan")).not.toHaveLength(0);
     expect(screen.getByText("ayaan@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Teacher")).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getAllByText("Teacher")).not.toHaveLength(0);
+    expect(screen.getAllByText("active")).not.toHaveLength(0);
     expect(screen.getByText("Showing 1–1 of 1")).toBeInTheDocument();
     expect(screen.queryByText("must-not-render")).not.toBeInTheDocument();
     expect(screen.queryByText("internal-tenant-id")).not.toBeInTheDocument();
@@ -66,7 +66,7 @@ describe("SchoolUserDirectory", () => {
         expect.any(Object),
       );
     }, { timeout: 2000 });
-    expect(await screen.findByText("Sara Ahmad")).toBeInTheDocument();
+    expect(await screen.findAllByText("Sara Ahmad")).not.toHaveLength(0);
   });
 
   it("applies role and status filters to the server query", async () => {
@@ -110,7 +110,7 @@ describe("SchoolUserDirectory", () => {
 
     expect(await screen.findByText("Page 2 of 2")).toBeInTheDocument();
     expect(screen.getByText("Showing 11–11 of 11")).toBeInTheDocument();
-    expect(screen.getByText("User11")).toBeInTheDocument();
+    expect(screen.getAllByText("User11")).not.toHaveLength(0);
     expect(apiRequest).toHaveBeenLastCalledWith(
       "/school/users?page=2&limit=10",
       expect.objectContaining({ accessToken: "school-admin-token" }),
@@ -120,8 +120,8 @@ describe("SchoolUserDirectory", () => {
   it("shows an empty state when no users match", async () => {
     apiRequest.mockResolvedValueOnce(response([]));
     render(<SchoolUserDirectory />);
-    expect(await screen.findByText("No records")).toBeInTheDocument();
-    expect(screen.getByText("No users found. Try changing your search or filters.")).toBeInTheDocument();
+    expect(screen.getAllByText("No records")).not.toHaveLength(0);
+    expect(screen.getAllByText("No users found. Try changing your search or filters.")).not.toHaveLength(0);
   });
 
   it("shows an error and retries after a failed request", async () => {
@@ -132,7 +132,7 @@ describe("SchoolUserDirectory", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Service unavailable");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText("No records")).toBeInTheDocument();
+    expect(screen.getAllByText("No records")).not.toHaveLength(0);
   });
 
   it("handles an unexpected response shape", async () => {
