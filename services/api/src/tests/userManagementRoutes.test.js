@@ -108,13 +108,23 @@ describe("user-management route authorization", () => {
     expect(handlers.listAuditLogs).not.toHaveBeenCalled();
   });
 
-  it("does not expose a school-level role-change route", async () => {
+  it("allows school admins to reach the school-scoped role-change route", async () => {
     const response = await fetch(`${baseUrl}/school/users/507f1f77bcf86cd799439011/role`, {
       method: "PATCH",
       headers: { "x-test-role": "school_admin", "content-type": "application/json" },
       body: JSON.stringify({ role: "principal" }),
     });
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(200);
+    expect(handlers.updateUserRole).toHaveBeenCalledOnce();
+  });
+
+  it("restricts the school role-change route to school admins", async () => {
+    const response = await fetch(`${baseUrl}/school/users/507f1f77bcf86cd799439011/role`, {
+      method: "PATCH",
+      headers: { "x-test-role": "teacher", "content-type": "application/json" },
+      body: JSON.stringify({ role: "principal" }),
+    });
+    expect(response.status).toBe(403);
     expect(handlers.updateUserRole).not.toHaveBeenCalled();
   });
 });
