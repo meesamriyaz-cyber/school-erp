@@ -42,9 +42,13 @@ function DashboardApp() {
    const [sidebarOpen, setSidebarOpen] = useState(false);
 
    useEffect(() => {
-     if (status !== "authenticated" || !accessToken || user?.role === "platform_admin") {
-       return undefined;
-     }
+        if (
+      status !== "authenticated" ||
+      !accessToken ||
+      user?.role !== "school_admin"
+    ) {
+      return undefined;
+    }
 
      const controller = new AbortController();
      apiRequest("/academic-years?status=active", {
@@ -78,6 +82,27 @@ function DashboardApp() {
   if (user?.role === "platform_admin") {
     return <PlatformAdminWorkspace />;
   }
+  if (user?.role !== "school_admin") {
+  return (
+    <main className="auth-loading">
+      <div className="auth-brand-mark">S</div>
+      <h1>Workspace unavailable</h1>
+      <p>
+        Your account does not currently have access to the
+        school administration workspace.
+      </p>
+      <button
+        className="logout-button"
+        type="button"
+        onClick={() => {
+          void logout();
+        }}
+      >
+        Sign out
+      </button>
+    </main>
+  );
+}
 
   const schoolName = schoolContext?.school?.name || "School workspace";
   const fullName = [user?.firstName, user?.lastName]

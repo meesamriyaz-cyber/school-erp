@@ -21,7 +21,7 @@ vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>
 const schoolAdmin = (overrides = {}) => ({
   status: "authenticated",
   accessToken: "test-access-token",
-  user: { firstName: "Ayaan", lastName: "Khan", role: "SCHOOL_ADMIN" },
+  user: { firstName: "Ayaan", lastName: "Khan", role: "school_admin" },
   schoolContext: { school: { name: "Green Valley School" } },
   logout: vi.fn(),
   ...overrides,
@@ -61,7 +61,7 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Good day, Administrator" })).toBeInTheDocument();
     expect(screen.getByText("Green Valley School")).toBeInTheDocument();
     expect(screen.getByText("Ayaan Khan")).toBeInTheDocument();
-    expect(screen.getByText("SCHOOL ADMIN")).toBeInTheDocument();
+    expect(screen.getByText("school admin")).toBeInTheDocument();
   });
 
   it("opens the student directory from dashboard navigation", async () => {
@@ -91,14 +91,24 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Back to overview" })).toBeInTheDocument();
   });
 
-  it("uses fallback values when user and school details are missing", () => {
-    useAuth.mockReturnValue({ status: "authenticated", user: {}, schoolContext: null, logout: vi.fn() });
-    render(<App />);
-    expect(screen.getAllByText("School workspace").length).toBeGreaterThan(0);
-    expect(screen.getByText("School Administrator")).toBeInTheDocument();
-    expect(screen.getByText("SA")).toBeInTheDocument();
-    expect(screen.getByText("School user")).toBeInTheDocument();
+ it("shows an unavailable message when the authenticated user has no role", () => {
+  useAuth.mockReturnValue({
+    status: "authenticated",
+    user: {},
+    schoolContext: null,
+    logout: vi.fn(),
   });
+
+  render(<App />);
+
+  expect(
+    screen.getByRole("heading", { name: "Workspace unavailable" }),
+  ).toBeInTheDocument();
+
+  expect(
+    screen.queryByRole("button", { name: "Students" }),
+  ).not.toBeInTheDocument();
+});
 
   it("opens mobile navigation and closes it after selecting a page", async () => {
     const user = userEvent.setup();
@@ -176,5 +186,35 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: /^Enrollments$/ }));
     expect(screen.getByRole("heading", { name: "Enrollments management displayed" })).toBeInTheDocument();
   });
+ it("does not expose the school administration dashboard to teachers", () => {
+  useAuth.mockReturnValue(schoolAdmin({
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "teacher",
+    },
+  }));
 
+  render(<App />);
+
+  expect(
+    screen.queryByRole("button", { name: "Students" }),
+  ).not.toBeInTheDocument();
+});
+
+it("does not expose the school administration dashboard to students", () => {
+  useAuth.mockReturnValue(schoolAdmin({
+    user: {
+      firstName: "Ayaan",
+      lastName: "Khan",
+      role: "student",
+    },
+  }));
+
+  render(<App />);
+
+  expect(
+    screen.queryByRole("button", { name: "Students" }),
+  ).not.toBeInTheDocument();
+});
 });
