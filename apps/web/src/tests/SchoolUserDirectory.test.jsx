@@ -176,10 +176,10 @@ describe("SchoolUserDirectory", () => {
 
     render(<SchoolUserDirectory />);
 
-    const actionButton = await screen.findByRole("button", {
+    const actionButtons = await screen.findAllByRole("button", {
       name: new RegExp(`${action}.*Ayaan Khan`, "i"),
     });
-    fireEvent.click(actionButton);
+    fireEvent.click(actionButtons[0]);
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(
       "/school/users/user-status-1/status",
@@ -206,9 +206,10 @@ describe("SchoolUserDirectory", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(<SchoolUserDirectory />);
-    fireEvent.click(await screen.findByRole("button", {
+    const activateButtons = await screen.findAllByRole("button", {
       name: /Activate.*Sara Ahmad/i,
-    }));
+    });
+    fireEvent.click(activateButtons[0]);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "You cannot change this account status",
