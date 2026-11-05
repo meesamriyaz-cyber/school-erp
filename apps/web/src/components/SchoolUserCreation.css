@@ -1,0 +1,43 @@
+.school-user-creation {
+  overflow: hidden;
+  border: 1px solid var(--border, #e7ebf2);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow-card, 0 3px 12px rgba(29, 49, 84, .05));
+}
+.school-user-creation-header { padding: 20px; border-bottom: 1px solid #edf0f5; }
+.school-user-creation-header h2 { margin: 0 0 6px; color: #28364d; font-size: 16px; }
+.school-user-creation-header p { margin: 0; color: #929caf; font-size: 11px; }
+.school-user-creation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+.school-user-creation-grid label { display: grid; min-width: 0; gap: 7px; color: #68768c; font-size: 11px; font-weight: 700; }
+.school-user-creation-grid input, .school-user-creation-grid select {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid #e2e7f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #34415a;
+  font: inherit;
+  font-size: 12px;
+}
+.school-user-creation-grid input:focus, .school-user-creation-grid select:focus { border-color: #4263eb; outline: 3px solid #4263eb20; }
+.school-user-creation-hint { color: #929caf; font-size: 10px; font-weight: 400; }
+.school-user-creation-error, .school-user-creation-success { margin: 0 20px 16px; padding: 12px 14px; border: 1px solid; border-radius: 8px; font-size: 12px; }
+.school-user-creation-error { border-color: #f2c8c5; background: #fff7f6; color: #a52820; }
+.school-user-creation-success { border-color: #b8e5d1; background: #f1fbf6; color: #16835b; }
+.school-user-creation-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 20px; border-top: 1px solid #edf0f5; }
+.school-user-creation-actions button { min-height: 38px; padding: 8px 13px; border: 1px solid #e2e7f0; border-radius: 8px; background: #fff; color: #52617a; font-size: 12px; font-weight: 700; cursor: pointer; }
+.school-user-creation-actions .school-user-creation-submit { border-color: #3157d5; background: #3157d5; color: #fff; }
+.school-user-creation-actions button:disabled { cursor: not-allowed; opacity: .55; }
+@media (max-width: 600px) {
+  .school-user-creation-grid { grid-template-columns: 1fr; padding: 16px; }
+  .school-user-creation-header { padding: 16px; }
+  .school-user-creation-actions { padding: 14px 16px; }
+}
