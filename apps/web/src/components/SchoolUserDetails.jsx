@@ -163,7 +163,6 @@ export default function SchoolUserDetails({ userId, onBack }) {
       ) : error && !record ? (
         <div className="school-user-details-error" role="alert">
           <p>{error}</p>
-          <button type="button" onClick={onBack}>Back to users</button>
         </div>
       ) : record ? (
         <>
