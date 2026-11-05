@@ -169,3 +169,30 @@
   .school-user-toolbar { align-items: flex-start; flex-wrap: wrap; }
   .school-user-create-button { width: 100%; }
 }
+
+.school-user-status-action {
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid #d7deeb;
+  border-radius: 7px;
+  background: #fff;
+  color: #40516d;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.school-user-status-action:hover:not(:disabled) {
+  border-color: #3157d5;
+  color: #3157d5;
+}
+.school-user-status-action:focus-visible {
+  outline: 3px solid #4263eb40;
+  outline-offset: 2px;
+}
+.school-user-status-action:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+.school-user-mobile-card > .school-user-status-action {
+  margin-top: 12px;
+}
