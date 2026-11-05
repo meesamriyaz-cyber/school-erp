@@ -5,7 +5,7 @@ import authenticate from "../middleware/authenticate.js";
 import requireActiveTenant from "../middleware/requireActiveTenant.js";
 import requireTrustedOrigin from "../middleware/requireTrustedOrigin.js";
 import { authorizeRoles } from "../middleware/authorizeRoles.js";
-import { createUser, getUserDetails, listUsers, updateUser, updateUserStatus } from "../controllers/userManagementController.js";
+import { createUser, getUserDetails, listUsers, updateUser, updateUserRole, updateUserStatus } from "../controllers/userManagementController.js";
 import { listAuditLogs } from "../controllers/auditLogController.js";
 
 const router = Router();
@@ -17,6 +17,7 @@ router.post("/users", requireTrustedOrigin, authenticate, requireActiveTenant, a
 router.get("/users/:userId", requireTrustedOrigin, authenticate, requireActiveTenant, authorizeRoles("school_admin"), getUserDetails);
 router.patch("/users/:userId", requireTrustedOrigin, authenticate, requireActiveTenant, authorizeRoles("school_admin"), updateUser);
 router.patch("/users/:userId/status", requireTrustedOrigin, authenticate, requireActiveTenant, authorizeRoles("school_admin"), updateUserStatus);
+router.patch("/users/:userId/role", requireTrustedOrigin, authenticate, requireActiveTenant, authorizeRoles("school_admin"), updateUserRole);
 
 router.get(
   "/context",
