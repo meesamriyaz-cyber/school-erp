@@ -25,6 +25,16 @@ function roleLabel(role) {
   return role ? role.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Unknown";
 }
 
+const SCHOOL_ROLE_OPTIONS = [
+  ["principal", "Principal"],
+  ["teacher", "Teacher"],
+  ["accountant", "Accountant"],
+  ["librarian", "Librarian"],
+  ["transport_manager", "Transport manager"],
+  ["student", "Student"],
+  ["parent", "Parent"],
+];
+
 export default function SchoolUserDetails({ userId, onBack }) {
   const { accessToken } = useAuth();
   const [record, setRecord] = useState(null);
@@ -33,6 +43,10 @@ export default function SchoolUserDetails({ userId, onBack }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [selectedRole, setSelectedRole] = useState("");
+  const [savingRole, setSavingRole] = useState(false);
+  const [roleError, setRoleError] = useState("");
+  const [roleMessage, setRoleMessage] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,6 +60,7 @@ export default function SchoolUserDetails({ userId, onBack }) {
       if (controller.signal.aborted) return;
       const nextUser = response.data.user;
       setRecord(nextUser);
+      setSelectedRole(nextUser.role || "");
       setForm({
         firstName: nextUser.firstName || "",
         lastName: nextUser.lastName || "",
@@ -83,6 +98,39 @@ export default function SchoolUserDetails({ userId, onBack }) {
     });
     setError("");
     setEditing(false);
+  };
+
+  const handleRoleSubmit = async (event) => {
+    event.preventDefault();
+    if (!record || !SCHOOL_ROLE_OPTIONS.some(([value]) => value === selectedRole)) {
+      setRoleError("Select a valid school-level role.");
+      return;
+    }
+    if (selectedRole === record.role) {
+      setRoleError("Select a different role before saving.");
+      return;
+    }
+
+    setSavingRole(true);
+    setRoleError("");
+    setRoleMessage("");
+    try {
+      const response = await apiRequest(`/school/users/${encodeURIComponent(userId)}/role`, {
+        method: "PATCH",
+        accessToken,
+        body: { role: selectedRole },
+      });
+      if (!response?.success || !response.data?.user) {
+        throw new Error(response?.message || "Unable to update this user's role.");
+      }
+      setRecord(response.data.user);
+      setSelectedRole(response.data.user.role);
+      setRoleMessage("Role updated. The user's existing sessions have been revoked.");
+    } catch (requestError) {
+      setRoleError(requestError.message || "Unable to update this user's role.");
+    } finally {
+      setSavingRole(false);
+    }
   };
 
   const handleChange = (event) => {
@@ -176,6 +224,30 @@ export default function SchoolUserDetails({ userId, onBack }) {
           </header>
 
           {error && <p className="school-user-details-inline-error" role="alert">{error}</p>}
+
+          <form className="school-user-edit-form school-user-role-form" onSubmit={handleRoleSubmit}>
+            <h3>Change user role</h3>
+            <p>Only roles within this school can be assigned. Changing a role revokes the user's existing sessions.</p>
+            <label>
+              <span>New role</span>
+              <select value={selectedRole} onChange={(event) => {
+                setSelectedRole(event.target.value);
+                setRoleError("");
+                setRoleMessage("");
+              }}>
+                {SCHOOL_ROLE_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            {roleError && <p className="school-user-details-inline-error" role="alert">{roleError}</p>}
+            {roleMessage && <p className="school-user-details-success" role="status">{roleMessage}</p>}
+            <div className="school-user-form-actions">
+              <button type="submit" className="school-user-save" disabled={savingRole || selectedRole === record.role}>
+                {savingRole ? "Saving role…" : "Save role"}
+              </button>
+            </div>
+          </form>
 
           {editing ? (
             <form className="school-user-edit-form" onSubmit={handleSubmit} noValidate>
