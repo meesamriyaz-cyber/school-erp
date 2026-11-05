@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import SchoolUserDetails from "./SchoolUserDetails.jsx";
 import { useAuth } from "../context/authContext.js";
 import { apiRequest } from "../lib/api.js";
 import "./SchoolUserDirectory.css";
@@ -59,6 +60,7 @@ export default function SchoolUserDirectory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 350);
@@ -114,6 +116,10 @@ export default function SchoolUserDirectory() {
     setter(event.target.value);
     setPage(1);
   };
+
+  if (selectedUserId) {
+    return <SchoolUserDetails userId={selectedUserId} onBack={() => setSelectedUserId(null)} />;
+  }
 
   return (
     <section className="school-user-directory" aria-labelledby="school-user-heading">
@@ -212,7 +218,7 @@ export default function SchoolUserDirectory() {
                 <article className="school-user-mobile-card" key={user.id}>
                   <div className="school-user-mobile-heading">
                     <div>
-                      <strong>{[user.firstName, user.lastName].filter(Boolean).join(" ") || "Unnamed user"}</strong>
+                      <button type="button" className="school-user-name school-user-name-link" aria-label={`View details for ${[user.firstName, user.lastName].filter(Boolean).join(" ") || "Unnamed user"}`} onClick={() => setSelectedUserId(user.id)}>{[user.firstName, user.lastName].filter(Boolean).join(" ") || "Unnamed user"}</button>
                       <span>{user.email || "—"}</span>
                     </div>
                     <UserStatus status={user.status} />
