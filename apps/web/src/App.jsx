@@ -14,6 +14,7 @@ import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 import SchoolUserDirectory from "./components/SchoolUserDirectory.jsx";
 import GuardianDirectory from "./components/GuardianDirectory.jsx";
 import AttendanceManagement from "./components/AttendanceManagement.jsx";
+import SubjectManagement from "./components/SubjectManagement.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -24,6 +25,7 @@ const navigation = [
   { label: "Sections", icon: "▧", section: "ACADEMICS" },
   { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
+  { label: "Subjects", icon: "▤", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
   { label: "Fees & Payments", icon: "₹", section: "FINANCE" },
@@ -397,6 +399,8 @@ function DashboardApp() {
   <EnrollmentsManagement />
 ) : activePage === "Attendance" ? (
   <AttendanceManagement />
+) : activePage === "Subjects" ? (
+  <SubjectManagement />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
 ) : (
