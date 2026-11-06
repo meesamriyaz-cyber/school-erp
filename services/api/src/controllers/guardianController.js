@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Guardian from "../models/Guardian.js";
+import StudentGuardian from "../models/StudentGuardian.js";
 
 const CREATE_FIELDS = ["firstName", "lastName", "phone", "email"];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
@@ -89,7 +90,35 @@ export const getGuardian = async (req, res, next) => {
     if (!guardian) {
       return res.status(404).json({ success: false, message: "Guardian not found" });
     }
-    return res.status(200).json({ success: true, data: guardian });
+    const relationships = await StudentGuardian.find({
+      tenantId: req.tenantId,
+      guardianId: guardian._id,
+    })
+      .sort({ status: 1, createdAt: 1, _id: 1 })
+      .populate({
+        path: "studentId",
+        select: "firstName lastName admissionNumber status",
+        match: { tenantId: req.tenantId },
+      })
+      .lean();
+
+    const linkedStudents = relationships
+      .filter((relationship) => relationship.studentId)
+      .map((relationship) => ({
+        _id: relationship._id,
+        relationship: relationship.relationship,
+        isPrimary: relationship.isPrimary,
+        isEmergencyContact: relationship.isEmergencyContact,
+        canPickup: relationship.canPickup,
+        receivesCommunication: relationship.receivesCommunication,
+        status: relationship.status,
+        student: relationship.studentId,
+      }));
+
+    return res.status(200).json({
+      success: true,
+      data: { ...guardian, linkedStudents },
+    });
   } catch (error) {
     return next(error);
   }
