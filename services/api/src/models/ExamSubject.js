@@ -35,6 +35,12 @@ const examSubjectSchema = new mongoose.Schema(
       trim: true,
       default: "",
       match: [/^$|^([01][0-9]|2[0-3]):[0-5][0-9]$/, "End time must use HH:mm format"],
+      validate: {
+        validator(value) {
+          return !value || !this.startTime || value > this.startTime;
+        },
+        message: "End time must be later than start time",
+      },
     },
     maxMarks: {
       type: Number,
