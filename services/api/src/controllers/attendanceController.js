@@ -93,7 +93,7 @@ export const saveAttendance = async (req, res, next) => {
         filter: { tenantId: req.tenantId, studentId: record.studentId, date: day },
         update: { $set: {
           enrollmentId: enrollment._id, academicYearId, classId, sectionId: enrollment.sectionId || null,
-          status: record.status, remarks: record.remarks?.trim() || "", markedBy: req.user._id,
+          status: record.status, remarks: record.remarks?.trim() || "", markedBy: req.auth.userId,
         }},
         upsert: true,
       }};
