@@ -722,4 +722,163 @@ describe("Guardian API integration tests", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("allows an administrator to update a student-guardian relationship", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linked = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(guardian._id),
+        relationship: "father",
+      }),
+    });
+    expect(linked.status).toBe(201);
+
+    const response = await request(
+      `/students/${student._id}/guardians/${linked.body.data._id}`,
+      {
+        method: "PATCH",
+        token: adminA.token,
+        body: JSON.stringify({
+          relationship: "legal_guardian",
+          canPickup: true,
+          isEmergencyContact: true,
+          receivesCommunication: false,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.relationship).toBe("legal_guardian");
+    expect(response.body.data.canPickup).toBe(true);
+    expect(response.body.data.isEmergencyContact).toBe(true);
+    expect(response.body.data.receivesCommunication).toBe(false);
+  });
+
+  it("prevents a teacher from updating a student-guardian relationship", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linked = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(guardian._id),
+        relationship: "father",
+      }),
+    });
+    expect(linked.status).toBe(201);
+
+    const response = await request(
+      `/students/${student._id}/guardians/${linked.body.data._id}`,
+      {
+        method: "PATCH",
+        token: teacherA.token,
+        body: JSON.stringify({ canPickup: true }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("deactivates a student-guardian link without deleting its history", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linked = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(guardian._id),
+        relationship: "mother",
+        isPrimary: true,
+      }),
+    });
+    expect(linked.status).toBe(201);
+
+    const response = await request(
+      `/students/${student._id}/guardians/${linked.body.data._id}`,
+      {
+        method: "PATCH",
+        token: adminA.token,
+        body: JSON.stringify({ status: "inactive" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe("inactive");
+
+    const list = await request(`/students/${student._id}/guardians`, {
+      token: adminA.token,
+    });
+    expect(list.status).toBe(200);
+    expect(list.body.data).toHaveLength(1);
+    expect(String(list.body.data[0]._id)).toBe(String(linked.body.data._id));
+    expect(list.body.data[0].status).toBe("inactive");
+  });
+
+  it("allows a new primary guardian after the previous primary link is deactivated", async () => {
+    const student = await createStudent(adminA.token);
+    const firstGuardian = await createGuardian(adminA.token);
+    const secondGuardian = await createGuardian(adminA.token);
+    const firstLink = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(firstGuardian._id),
+        relationship: "father",
+        isPrimary: true,
+      }),
+    });
+    expect(firstLink.status).toBe(201);
+
+    const deactivated = await request(
+      `/students/${student._id}/guardians/${firstLink.body.data._id}`,
+      {
+        method: "PATCH",
+        token: adminA.token,
+        body: JSON.stringify({ status: "inactive" }),
+      },
+    );
+    expect(deactivated.status).toBe(200);
+
+    const secondLink = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(secondGuardian._id),
+        relationship: "mother",
+        isPrimary: true,
+      }),
+    });
+
+    expect(secondLink.status).toBe(201);
+    expect(secondLink.body.data.isPrimary).toBe(true);
+  });
+
+  it("rejects unsupported student-guardian update fields", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linked = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(guardian._id),
+        relationship: "father",
+      }),
+    });
+    expect(linked.status).toBe(201);
+
+    const response = await request(
+      `/students/${student._id}/guardians/${linked.body.data._id}`,
+      {
+        method: "PATCH",
+        token: adminA.token,
+        body: JSON.stringify({ tenantId: String(schoolB._id) }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
 });
