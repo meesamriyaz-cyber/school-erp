@@ -136,6 +136,13 @@ describe("Timetable API integration", () => {
       body: JSON.stringify({ assignmentId: String(assignmentOtherClass._id) }),
     });
     expect(invalidAssignment.status).toBe(400);
+
+    // Restore the original fixture so later collision tests remain independent.
+    const restored = await request(`/timetable/${entry._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ dayOfWeek: 1, periodNumber: 1, startTime: "09:00", endTime: "09:45", room: "" }),
+    });
+    expect(restored.status).toBe(200);
   });
 
   it("rejects an edited timetable period that overlaps the teacher's other class", async () => {
