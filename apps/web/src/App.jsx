@@ -18,6 +18,7 @@ import SubjectManagement from "./components/SubjectManagement.jsx";
 import TeacherAssignments from "./components/TeacherAssignments.jsx";
 import TimetableManagement from "./components/TimetableManagement.jsx";
 import ExaminationManagement from "./components/ExaminationManagement.jsx";
+import StudentResultsPortal from "./components/StudentResultsPortal.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -89,7 +90,7 @@ function DashboardApp() {
     return <LoginPage />;
   }
 
-  if (user?.role === "platform_admin") {
+  if (user?.role === "student" || user?.role === "parent") {\n    return <StudentResultsPortal />;\n  }\n\n  if (user?.role === "platform_admin") {
     return <PlatformAdminWorkspace />;
   }
   if (user?.role !== "school_admin") {
