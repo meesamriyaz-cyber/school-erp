@@ -16,7 +16,7 @@ import timetableRoutes from "./timetableRoutes.js";
 import examRoutes from "./examRoutes.js";
 import examMarkRoutes from "./examMarkRoutes.js";
 import guardianRoutes from "./guardianRoutes.js";
-import studentGuardianRoutes from "./studentGuardianRoutes.js";
+import studentGuardianRoutes from "./studentGuardianRoutes.js";\nimport portalRoutes from "./portalRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -44,5 +44,5 @@ router.use("/subjects", subjectRoutes);
 router.use("/teacher-assignments", teacherAssignmentRoutes);
 router.use("/timetable", timetableRoutes);
 router.use("/examinations", examRoutes);
-router.use("/examinations", examMarkRoutes);
+router.use("/examinations", examMarkRoutes);\nrouter.use("/portal", portalRoutes);
 export default router;
