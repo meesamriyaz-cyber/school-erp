@@ -90,7 +90,11 @@ function DashboardApp() {
     return <LoginPage />;
   }
 
-  if (user?.role === "student" || user?.role === "parent") {\n    return <StudentResultsPortal />;\n  }\n\n  if (user?.role === "platform_admin") {
+  if (user?.role === "student" || user?.role === "parent") {
+    return <StudentResultsPortal />;
+  }
+
+  if (user?.role === "platform_admin") {
     return <PlatformAdminWorkspace />;
   }
   if (user?.role !== "school_admin") {
