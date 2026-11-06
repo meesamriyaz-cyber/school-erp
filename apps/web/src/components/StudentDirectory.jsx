@@ -45,7 +45,7 @@ function StudentStatus({ status }) {
   );
 }
 
-function StudentMobileCard({ student, onView }) {
+function StudentMobileCard({ student, onView, onLinked }) {
   return (
     <article className="student-mobile-card">
       <div className="student-mobile-card-header">
@@ -88,6 +88,8 @@ function StudentMobileCard({ student, onView }) {
           )}
         </div>
       </div>
+
+      <PortalAccountLink record={student} recordType="student" onLinked={onLinked} />
 
       <div className="student-mobile-card-actions">
         <button
@@ -390,6 +392,12 @@ export default function StudentDirectory() {
               key={student._id}
               student={student}
               onView={handleViewStudent}
+              onLinked={(updated) => {
+                setStudents((current) => current.map((item) => (
+                  item._id === updated._id ? { ...item, ...updated } : item
+                )));
+                setNotice("Student portal account linked successfully.");
+              }}
             />
           ))
         )}
