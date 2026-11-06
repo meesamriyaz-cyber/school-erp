@@ -32,6 +32,9 @@ export default function GuardianDirectory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedGuardian, setSelectedGuardian] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -82,6 +85,28 @@ export default function GuardianDirectory() {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
+
+  const openGuardian = async (guardian) => {
+    setSelectedGuardian(null);
+    setDetailError("");
+    setDetailLoading(true);
+    try {
+      const response = await apiRequest(`/guardians/${guardian._id}`, { accessToken });
+      if (!response?.success || !response.data) {
+        throw new Error("Unable to load guardian details.");
+      }
+      setSelectedGuardian(response.data);
+    } catch (requestError) {
+      setDetailError(requestError.message || "Unable to load guardian details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeGuardian = () => {
+    setSelectedGuardian(null);
+    setDetailError("");
+  };
 
   const updateSearch = (value) => {
     setSearchInput(value);
@@ -160,7 +185,11 @@ export default function GuardianDirectory() {
               <tr><td colSpan={4} className="guardian-directory-message">No guardians found. Try changing your search or filters.</td></tr>
             ) : visibleGuardians.map((guardian) => (
               <tr key={guardian._id}>
-                <td><strong>{fullName(guardian)}</strong></td>
+                <td>
+                  <button type="button" className="guardian-directory-name" onClick={() => openGuardian(guardian)}>
+                    {fullName(guardian)}
+                  </button>
+                </td>
                 <td>{guardian.phone || "—"}</td>
                 <td>{guardian.email || "—"}</td>
                 <td><GuardianStatus status={guardian.status} /></td>
@@ -177,7 +206,9 @@ export default function GuardianDirectory() {
               : visibleGuardians.map((guardian) => (
                 <article className="guardian-directory-mobile-card" key={guardian._id}>
                   <div className="guardian-directory-mobile-heading">
-                    <strong>{fullName(guardian)}</strong>
+                    <button type="button" className="guardian-directory-name" onClick={() => openGuardian(guardian)}>
+                      {fullName(guardian)}
+                    </button>
                     <GuardianStatus status={guardian.status} />
                   </div>
                   <span>Phone: {guardian.phone || "—"}</span>
@@ -185,6 +216,54 @@ export default function GuardianDirectory() {
                 </article>
               ))}
       </div>
+
+      {(detailLoading || detailError || selectedGuardian) && (
+        <section className="guardian-directory-detail" aria-labelledby="guardian-detail-heading">
+          <div className="guardian-directory-detail-header">
+            <div>
+              <h3 id="guardian-detail-heading">Guardian details</h3>
+              {selectedGuardian && <p>{fullName(selectedGuardian)}</p>}
+            </div>
+            <button type="button" onClick={closeGuardian}>Close</button>
+          </div>
+          {detailLoading ? <p role="status">Loading guardian details…</p>
+            : detailError ? <p role="alert">{detailError}</p>
+              : (
+                <>
+                  <div className="guardian-directory-contact">
+                    <span><strong>Phone:</strong> {selectedGuardian.phone || "—"}</span>
+                    <span><strong>Email:</strong> {selectedGuardian.email || "—"}</span>
+                    <span><strong>Status:</strong> <GuardianStatus status={selectedGuardian.status} /></span>
+                  </div>
+                  <h4>Linked students ({selectedGuardian.linkedStudents?.length || 0})</h4>
+                  {!selectedGuardian.linkedStudents?.length ? (
+                    <p>No students are currently linked to this guardian.</p>
+                  ) : (
+                    <div className="guardian-directory-linked-students">
+                      {selectedGuardian.linkedStudents.map((link) => (
+                        <article key={link._id} className="guardian-directory-linked-student">
+                          <div>
+                            <strong>{fullName(link.student)}</strong>
+                            <span>Admission no.: {link.student?.admissionNumber || "—"}</span>
+                          </div>
+                          <div>
+                            <span>Relationship: {String(link.relationship || "other").replaceAll("_", " ")}</span>
+                            <GuardianStatus status={link.status} />
+                          </div>
+                          <div className="guardian-directory-flags">
+                            {link.isPrimary && <span>Primary guardian</span>}
+                            {link.isEmergencyContact && <span>Emergency contact</span>}
+                            {link.canPickup && <span>Can pick up</span>}
+                            {link.receivesCommunication && <span>Receives communication</span>}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+        </section>
+      )}
 
       <div className="guardian-directory-pagination">
         <span>
