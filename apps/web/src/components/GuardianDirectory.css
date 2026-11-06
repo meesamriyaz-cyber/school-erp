@@ -1,0 +1,210 @@
+.guardian-directory {
+  display: grid;
+  gap: 18px;
+}
+
+.guardian-directory-toolbar,
+.guardian-directory-mobile-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.guardian-directory-toolbar h2 {
+  margin: 0 0 6px;
+}
+
+.guardian-directory-toolbar p {
+  margin: 0;
+  color: var(--text-secondary, #64748b);
+}
+
+.guardian-directory-total {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+}
+
+.guardian-directory-total strong {
+  color: var(--text-primary, #202c42);
+  font-size: 1.5rem;
+}
+
+.guardian-directory-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.guardian-directory-search {
+  flex: 1 1 260px;
+}
+
+.guardian-directory-search input,
+.guardian-directory-status-filter select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--border, #d9dfeb);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+}
+
+.guardian-directory-status-filter {
+  flex: 0 1 180px;
+}
+
+.guardian-directory-refresh,
+.guardian-directory-error button,
+.guardian-directory-pagination button {
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid var(--border, #d9dfeb);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-primary, #202c42);
+  font-weight: 600;
+}
+
+.guardian-directory-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border, #e9edf4);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.guardian-directory-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.guardian-directory-table th,
+.guardian-directory-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border, #edf0f5);
+  vertical-align: middle;
+}
+
+.guardian-directory-table th {
+  background: #f8f9fc;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.guardian-directory-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.guardian-directory-message {
+  padding: 28px !important;
+  color: var(--text-secondary, #64748b);
+  text-align: center;
+}
+
+.guardian-directory-status {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #e8f7ee;
+  color: #237443;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.guardian-directory-status-inactive {
+  background: #f1f2f5;
+  color: #626b7a;
+}
+
+.guardian-directory-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #f1c7c3;
+  border-radius: 8px;
+  color: #b42318;
+}
+
+.guardian-directory-error p {
+  margin: 0;
+}
+
+.guardian-directory-mobile-list {
+  display: none;
+}
+
+.guardian-directory-mobile-card {
+  display: grid;
+  gap: 9px;
+  padding: 15px;
+  border: 1px solid var(--border, #e9edf4);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.88rem;
+}
+
+.guardian-directory-mobile-heading strong {
+  color: var(--text-primary, #202c42);
+}
+
+.guardian-directory-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.86rem;
+}
+
+.guardian-directory-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.guardian-directory-pagination button:disabled,
+.guardian-directory-refresh:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 700px) {
+  .guardian-directory-table-wrap {
+    display: none;
+  }
+
+  .guardian-directory-mobile-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .guardian-directory-toolbar {
+    align-items: flex-start;
+  }
+
+  .guardian-directory-status-filter {
+    flex: 1 1 160px;
+  }
+
+  .guardian-directory-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .guardian-directory-pagination > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
