@@ -201,11 +201,12 @@ describe("Examination API integration", () => {
       Section.create({ tenantId: schoolA._id, classId: classA._id, name: "Section A" }),
       Section.create({ tenantId: schoolA._id, classId: classA._id, name: "Section B" }),
     ]);
-    const studentB = await Student.create({
-      tenantId: schoolA._id, admissionNumber: `EX-${randomUUID().slice(0, 8)}`, firstName: "Section B Student",
-    });
+    const [studentSectionA, studentB] = await Promise.all([
+      Student.create({ tenantId: schoolA._id, admissionNumber: `EX-${randomUUID().slice(0, 8)}`, firstName: "Section A Student" }),
+      Student.create({ tenantId: schoolA._id, admissionNumber: `EX-${randomUUID().slice(0, 8)}`, firstName: "Section B Student" }),
+    ]);
     const [enrollmentInA, enrollmentInB] = await Promise.all([
-      Enrollment.create({ tenantId: schoolA._id, studentId: studentA._id, academicYearId: yearA._id, classId: classA._id, sectionId: sectionA._id, status: "active" }),
+      Enrollment.create({ tenantId: schoolA._id, studentId: studentSectionA._id, academicYearId: yearA._id, classId: classA._id, sectionId: sectionA._id, status: "active" }),
       Enrollment.create({ tenantId: schoolA._id, studentId: studentB._id, academicYearId: yearA._id, classId: classA._id, sectionId: sectionB._id, status: "active" }),
     ]);
     await TeacherAssignment.create({
