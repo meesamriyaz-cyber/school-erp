@@ -16,6 +16,7 @@ import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
 import Enrollment from "../models/Enrollment.js";
 import Student from "../models/Student.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 const EXPECTED_TEST_DATABASE = "school-erp-test";
@@ -59,7 +60,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -80,6 +81,7 @@ describe("Examination API integration", () => {
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
         await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
+        await TeacherAssignment.deleteMany({ tenantId: { $in: tenantIds } });
         await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
         await Student.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamSubject.deleteMany({ tenantId: { $in: tenantIds } });
@@ -194,4 +196,60 @@ describe("Examination API integration", () => {
     expect(published.status).toBe(409);
     expect(published.body.incompleteCount).toBe(1);
   });
+  it("limits teachers to their assigned section in class-wide exams for both reading and mark entry", async () => {
+    const [sectionA, sectionB] = await Promise.all([
+      Section.create({ tenantId: schoolA._id, classId: classA._id, name: "Section A" }),
+      Section.create({ tenantId: schoolA._id, classId: classA._id, name: "Section B" }),
+    ]);
+    const studentB = await Student.create({
+      tenantId: schoolA._id, admissionNumber: `EX-${randomUUID().slice(0, 8)}`, firstName: "Section B Student",
+    });
+    const [enrollmentInA, enrollmentInB] = await Promise.all([
+      Enrollment.create({ tenantId: schoolA._id, studentId: studentA._id, academicYearId: yearA._id, classId: classA._id, sectionId: sectionA._id, status: "active" }),
+      Enrollment.create({ tenantId: schoolA._id, studentId: studentB._id, academicYearId: yearA._id, classId: classA._id, sectionId: sectionB._id, status: "active" }),
+    ]);
+    await TeacherAssignment.create({
+      tenantId: schoolA._id, teacherId: teacherA.user._id, subjectId: subjectA._id,
+      academicYearId: yearA._id, classId: classA._id, sectionId: sectionA._id,
+      assignedBy: adminA.user._id, status: "active",
+    });
+    const created = await request("/examinations", {
+      method: "POST", token: adminA.token, body: JSON.stringify(createPayload()),
+    });
+    const examId = created.body.data._id;
+    const subject = await request(`/examinations/${examId}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(subjectA._id), examDate: "2026-09-03", maxMarks: 100, passMarks: 35 }),
+    });
+    expect(subject.status).toBe(201);
+    await request(`/examinations/${examId}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "scheduled" }) });
+    await request(`/examinations/${examId}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "in_progress" }) });
+
+    const adminSave = await request(`/examinations/${examId}/marks`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ marks: [
+        { examSubjectId: subject.body.data._id, enrollmentId: String(enrollmentInA._id), marksObtained: 76 },
+        { examSubjectId: subject.body.data._id, enrollmentId: String(enrollmentInB._id), marksObtained: 88 },
+      ] }),
+    });
+    expect(adminSave.status).toBe(200);
+
+    const teacherRead = await request(`/examinations/${examId}/marks`, { token: teacherA.token });
+    expect(teacherRead.status).toBe(200);
+    expect(teacherRead.body.data).toHaveLength(1);
+    expect(String(teacherRead.body.data[0].enrollmentId)).toBe(String(enrollmentInA._id));
+
+    const forbiddenWrite = await request(`/examinations/${examId}/marks`, {
+      method: "POST", token: teacherA.token,
+      body: JSON.stringify({ marks: [{ examSubjectId: subject.body.data._id, enrollmentId: String(enrollmentInB._id), marksObtained: 90 }] }),
+    });
+    expect(forbiddenWrite.status).toBe(403);
+
+    const allowedWrite = await request(`/examinations/${examId}/marks`, {
+      method: "POST", token: teacherA.token,
+      body: JSON.stringify({ marks: [{ examSubjectId: subject.body.data._id, enrollmentId: String(enrollmentInA._id), marksObtained: 79 }] }),
+    });
+    expect(allowedWrite.status).toBe(200);
+  });
+
 });
