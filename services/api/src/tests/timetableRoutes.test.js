@@ -119,6 +119,33 @@ describe("Timetable API integration", () => {
     expect(response.body.data.dayOfWeek).toBe(1);
   });
 
+  it("allows administrators to edit a timetable period without bypassing assignment scope", async () => {
+    const listed = await request("/timetable", { token: adminA.token });
+    const entry = listed.body.data.find((item) => String(item.assignmentId._id) === String(assignmentA._id));
+    const updated = await request(`/timetable/${entry._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ dayOfWeek: 3, periodNumber: 2, startTime: "11:00", endTime: "11:45", room: "Lab 1" }),
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.dayOfWeek).toBe(3);
+    expect(updated.body.data.periodNumber).toBe(2);
+    expect(updated.body.data.room).toBe("Lab 1");
+
+    const invalidAssignment = await request(`/timetable/${entry._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ assignmentId: String(assignmentOtherClass._id) }),
+    });
+    expect(invalidAssignment.status).toBe(400);
+  });
+
+  it("rejects an edited timetable period that overlaps the teacher's other class", async () => {
+    const created = await request("/timetable", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ ...entryPayload(assignmentOtherClass._id, classB._id, 3), dayOfWeek: 3, startTime: "11:15", endTime: "12:00" }),
+    });
+    expect(created.status).toBe(409);
+  });
+
   it("limits teacher timetable reads to their own active assignments", async () => {
     const secondEntry = {
       ...entryPayload(assignmentB._id, classA._id, 1),
