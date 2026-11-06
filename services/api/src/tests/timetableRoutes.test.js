@@ -56,8 +56,8 @@ const entryPayload = (assignmentId, classId = classA._id, periodNumber = 1) => (
 describe("Timetable API integration", () => {
   beforeAll(async () => {
     if (env.nodeEnv !== "test") throw new Error("Safety stop: run tests with NODE_ENV=test");
-    const match = typeof env.mongoUri === "string" ? env.mongoUri.match(/^mongodb(?:\\+srv)?:\\/\\/[^/]+\\/([^?]+)(?:\\?.*)?$/) : null;
-    if (!match || decodeURIComponent(match[1]) !== EXPECTED_TEST_DATABASE) throw new Error(`Safety stop: expected ${EXPECTED_TEST_DATABASE}`);
+    const databaseName = typeof env.mongoUri === "string" ? env.mongoUri.split("/").at(-1)?.split("?")[0] : null;
+    if (decodeURIComponent(databaseName || "") !== EXPECTED_TEST_DATABASE) throw new Error(`Safety stop: expected ${EXPECTED_TEST_DATABASE}`);
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== EXPECTED_TEST_DATABASE) {
       await mongoose.disconnect();
