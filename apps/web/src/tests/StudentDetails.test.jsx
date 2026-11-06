@@ -509,5 +509,77 @@ it("refreshes current placement and academic history on request", async () => {
   expect(screen.queryByText("Class 1")).not.toBeInTheDocument();
 });
 
+it("loads and displays linked guardian details for the student", async () => {
+  const studentId = "student-with-guardians";
+  const student = {
+    _id: studentId,
+    firstName: "Ayaan",
+    lastName: "Khan",
+    admissionNumber: "ADM-GUARDIAN-1",
+    status: "active",
+  };
+  const guardianLinks = [
+    {
+      _id: "student-guardian-1",
+      guardianId: {
+        _id: "guardian-1",
+        firstName: "Imran",
+        lastName: "Khan",
+        phone: "9999999999",
+        email: "imran@example.com",
+      },
+      relationship: "father",
+      isPrimary: true,
+      isEmergencyContact: true,
+      canPickup: true,
+      receivesCommunication: true,
+      status: "active",
+    },
+    {
+      _id: "student-guardian-2",
+      guardianId: {
+        _id: "guardian-2",
+        firstName: "Sara",
+        lastName: "Khan",
+        phone: "8888888888",
+        email: "sara@example.com",
+      },
+      relationship: "mother",
+      isPrimary: false,
+      isEmergencyContact: false,
+      canPickup: false,
+      receivesCommunication: true,
+      status: "active",
+    },
+  ];
+
+  apiRequest.mockImplementation(async (path) => {
+    if (path === `/students/${studentId}`) return { success: true, data: student };
+    if (path === `/enrollments?studentId=${studentId}`) return { success: true, data: [] };
+    if (path === `/students/${studentId}/guardians`) return { success: true, data: guardianLinks };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId={studentId} onBack={vi.fn()} />);
+
+  expect(await screen.findByRole("heading", { name: /Ayaan Khan/ })).toBeInTheDocument();
+  expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
+  expect(screen.getByText("Sara Khan")).toBeInTheDocument();
+  expect(screen.getByText("9999999999")).toBeInTheDocument();
+  expect(screen.getByText("8888888888")).toBeInTheDocument();
+  expect(screen.getByText("imran@example.com")).toBeInTheDocument();
+  expect(screen.getByText("sara@example.com")).toBeInTheDocument();
+  expect(screen.getByText("father")).toBeInTheDocument();
+  expect(screen.getByText("mother")).toBeInTheDocument();
+  expect(apiRequest).toHaveBeenCalledWith(
+    `/students/${studentId}/guardians`,
+    expect.objectContaining({
+      accessToken: "test-access-token",
+      signal: expect.any(AbortSignal),
+    }),
+  );
+});
+
+
 
 });
