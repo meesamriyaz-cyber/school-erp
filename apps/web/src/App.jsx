@@ -16,6 +16,7 @@ import GuardianDirectory from "./components/GuardianDirectory.jsx";
 import AttendanceManagement from "./components/AttendanceManagement.jsx";
 import SubjectManagement from "./components/SubjectManagement.jsx";
 import TeacherAssignments from "./components/TeacherAssignments.jsx";
+import TimetableManagement from "./components/TimetableManagement.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -405,6 +406,8 @@ function DashboardApp() {
   <SubjectManagement />
 ) : activePage === "Teacher Assignments" ? (
   <TeacherAssignments />
+) : activePage === "Timetable" ? (
+  <TimetableManagement />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
 ) : (
