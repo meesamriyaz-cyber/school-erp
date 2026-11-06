@@ -18,6 +18,7 @@ export default function TimetableManagement() {
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState("");
+  const [scheduleView, setScheduleView] = useState("week");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -119,6 +120,7 @@ export default function TimetableManagement() {
   };
 
   const dayLabel = (day) => weekdays.find((item) => item.value === day)?.label || "—";
+  const entriesByDay = useMemo(() => weekdays.map((day) => ({ ...day, entries: entries.filter((entry) => entry.dayOfWeek === day.value).sort((a, b) => a.startTime.localeCompare(b.startTime) || a.periodNumber - b.periodNumber) })), [entries]);
 
   return <section className="timetable-management" aria-labelledby="timetable-title">
     <div className="timetable-heading"><div><p className="timetable-eyebrow">ACADEMIC OPERATIONS</p><h2 id="timetable-title">Timetable Management</h2><p>Build the weekly class schedule using approved teacher–subject assignments.</p></div>
@@ -147,13 +149,29 @@ export default function TimetableManagement() {
       <label>Class<select value={filter.classId} onChange={(e) => setFilter((v) => ({ ...v, classId: e.target.value, sectionId: "" }))}><option value="">All classes</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Section<select value={filter.sectionId} onChange={(e) => setFilter((v) => ({ ...v, sectionId: e.target.value }))}><option value="">All sections</option>{sections.map((section) => <option key={section._id} value={section._id}>{section.name}</option>)}</select></label>
     </div></div>
-    <div className="timetable-table-wrap"><table className="timetable-table"><thead><tr><th>Day</th><th>Period</th><th>Time</th><th>Class / Section</th><th>Subject</th><th>Teacher</th><th>Room</th><th>Status</th><th>Action</th></tr></thead><tbody>
+    <div className="timetable-view-toggle" role="group" aria-label="Timetable display">
+      <button type="button" className={scheduleView === "week" ? "active" : ""} aria-pressed={scheduleView === "week"} onClick={() => setScheduleView("week")}>Weekly view</button>
+      <button type="button" className={scheduleView === "list" ? "active" : ""} aria-pressed={scheduleView === "list"} onClick={() => setScheduleView("list")}>List view</button>
+    </div>
+    {scheduleView === "week" ? <div className="timetable-week-grid">
+      {entriesByDay.map((day) => <section className="timetable-week-day" key={day.value} aria-label={day.label}>
+        <h4>{day.label}<span>{day.entries.length} {day.entries.length === 1 ? "period" : "periods"}</span></h4>
+        {day.entries.length ? <div className="timetable-week-periods">{day.entries.map((entry) => <article className={`timetable-week-period status-${entry.status}`} key={entry._id}>
+          <div className="timetable-week-period-time">P{entry.periodNumber} · {entry.startTime}–{entry.endTime}</div>
+          <strong>{entry.assignmentId?.subjectId?.name || "—"}</strong>
+          <span>{entry.classId?.name || "—"}{entry.sectionId?.name ? ` · ${entry.sectionId.name}` : ""}</span>
+          <span>{teacherName(entry.assignmentId)}</span>
+          {entry.room && <small>{entry.room}</small>}
+          <div className="timetable-week-actions"><button type="button" className="timetable-action" onClick={() => editEntry(entry)}>Edit</button><button type="button" className="timetable-action" onClick={() => void toggleStatus(entry)}>{entry.status === "active" ? "Deactivate" : "Activate"}</button></div>
+        </article>)}</div> : <p className="timetable-week-empty">No periods</p>}
+      </section>)}
+    </div> : <div className="timetable-table-wrap"><table className="timetable-table"><thead><tr><th>Day</th><th>Period</th><th>Time</th><th>Class / Section</th><th>Subject</th><th>Teacher</th><th>Room</th><th>Status</th><th>Action</th></tr></thead><tbody>
       {loading ? <tr><td colSpan="9">Loading timetable…</td></tr> : entries.length ? entries.map((entry) => <tr key={entry._id}>
         <td>{dayLabel(entry.dayOfWeek)}</td><td>{entry.periodNumber}</td><td>{entry.startTime}–{entry.endTime}</td><td>{entry.classId?.name || "—"}{entry.sectionId?.name ? <small>Section {entry.sectionId.name}</small> : <small>Class-wide</small>}</td>
         <td>{entry.assignmentId?.subjectId?.name || "—"}</td><td>{teacherName(entry.assignmentId)}</td><td>{entry.room || "—"}</td><td><span className={`timetable-status status-${entry.status}`}>{entry.status}</span></td>
         <td><div className="timetable-row-actions"><button type="button" className="timetable-action" onClick={() => editEntry(entry)}>Edit</button><button type="button" className="timetable-action" onClick={() => void toggleStatus(entry)}>{entry.status === "active" ? "Deactivate" : "Activate"}</button></div></td>
       </tr>) : <tr><td colSpan="9">No timetable periods found for these filters.</td></tr>}
-    </tbody></table></div>
+    </tbody></table></div>}
     <p className="timetable-help">Inactive periods are hidden from the active schedule. Reactivating a period is blocked if its linked teacher assignment is inactive.</p>
   </section>;
 }
