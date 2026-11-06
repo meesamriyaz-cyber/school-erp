@@ -92,7 +92,7 @@ describe("App", () => {
     const user = userEvent.setup();
     useAuth.mockReturnValue(schoolAdmin());
     render(<App />);
-    await user.click(screen.getByRole("button", { name: /Attendance/ }));
+    await user.click(screen.getByRole("button", { name: /^Attendance$/ }));
     expect(screen.getByRole("heading", { name: "Attendance management displayed" })).toBeInTheDocument();
   });
 
@@ -158,7 +158,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Open navigation" }));
     await user.click(screen.getByRole("button", { name: "Close navigation" }));
     expect(screen.queryByRole("button", { name: "Close navigation" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Attendance/ }));
+    await user.click(screen.getByRole("button", { name: /^Attendance$/ }));
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(screen.getByRole("heading", { name: "Good day, Administrator" })).toBeInTheDocument();
   });
