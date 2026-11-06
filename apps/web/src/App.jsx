@@ -14,6 +14,7 @@ import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 import SchoolUserDirectory from "./components/SchoolUserDirectory.jsx";
 import GuardianDirectory from "./components/GuardianDirectory.jsx";
 import AttendanceManagement from "./components/AttendanceManagement.jsx";
+import AttendanceReports from "./components/AttendanceReports.jsx";
 import SubjectManagement from "./components/SubjectManagement.jsx";
 import TeacherAssignments from "./components/TeacherAssignments.jsx";
 import TimetableManagement from "./components/TimetableManagement.jsx";
@@ -30,6 +31,7 @@ const navigation = [
   { label: "Sections", icon: "▧", section: "ACADEMICS" },
   { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
+  { label: "Attendance Reports", icon: "▥", section: "ACADEMICS" },
   { label: "Subjects", icon: "▤", section: "ACADEMICS" },
   { label: "Teacher Assignments", icon: "♙", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
@@ -57,7 +59,7 @@ function DashboardApp() {
         if (
       status !== "authenticated" ||
       !accessToken ||
-      user?.role !== "school_admin"
+      !["school_admin", "principal"].includes(user?.role)
     ) {
       return undefined;
     }
@@ -102,7 +104,7 @@ function DashboardApp() {
   if (user?.role === "platform_admin") {
     return <PlatformAdminWorkspace />;
   }
-  if (user?.role !== "school_admin") {
+  if (!["school_admin", "principal"].includes(user?.role)) {
   return (
     <main className="auth-loading">
       <div className="auth-brand-mark">S</div>
@@ -413,6 +415,8 @@ function DashboardApp() {
   <EnrollmentsManagement />
 ) : activePage === "Attendance" ? (
   <AttendanceManagement />
+) : activePage === "Attendance Reports" ? (
+  <AttendanceReports />
 ) : activePage === "Subjects" ? (
   <SubjectManagement />
 ) : activePage === "Teacher Assignments" ? (
