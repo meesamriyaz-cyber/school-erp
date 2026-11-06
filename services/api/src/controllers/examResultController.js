@@ -7,7 +7,7 @@ import Enrollment from "../models/Enrollment.js";
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
 
-export const loadResultContext = async (tenantId, exam) => {
+export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrollments = false } = {}) => {
   const [subjects, enrollments] = await Promise.all([
     ExamSubject.find({ tenantId, examinationId: exam._id })
       .populate("subjectId", "name code")
@@ -17,7 +17,7 @@ export const loadResultContext = async (tenantId, exam) => {
       tenantId,
       academicYearId: exam.academicYearId,
       classId: exam.classId,
-      status: "active",
+      ...(includeHistoricalEnrollments ? { status: { $in: ["active", "completed", "transferred"] } } : { status: "active" }),
       ...(exam.sectionId ? { sectionId: exam.sectionId } : {}),
     })
       .populate("studentId", "admissionNumber firstName lastName")
