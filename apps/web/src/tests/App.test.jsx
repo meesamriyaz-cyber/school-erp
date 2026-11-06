@@ -12,6 +12,7 @@ vi.mock("../context/authContext.js", () => ({ useAuth: vi.fn() }));
 vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
 vi.mock("../components/LoginPage.jsx", () => ({ default: () => <h1>Login page displayed</h1> }));
 vi.mock("../components/StudentDirectory.jsx", () => ({ default: () => <h2>Student directory displayed</h2> }));
+vi.mock("../components/GuardianDirectory.jsx", () => ({ default: () => <h2>Guardian directory displayed</h2> }));
 vi.mock("../components/AcademicYearManagement.jsx", () => ({ default: () => <h2>Academic year management displayed</h2> }));
 vi.mock("../components/ClassesManagement.jsx", () => ({ default: () => <h2>Classes management displayed</h2> }));
 vi.mock("../components/SectionsManagement.jsx", () => ({ default: () => <h2>Sections management displayed</h2> }));
@@ -119,7 +120,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Close navigation" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Guardians" }));
     expect(screen.queryByRole("button", { name: "Close navigation" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back to overview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Guardian directory displayed" })).toBeInTheDocument();
   });
 
   it("closes mobile navigation using the close menu button", async () => {
@@ -129,6 +130,14 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Open navigation" }));
     await user.click(screen.getByRole("button", { name: "Close menu" }));
     expect(screen.queryByRole("button", { name: "Close navigation" })).not.toBeInTheDocument();
+  });
+
+  it("opens the school-wide guardian directory from navigation", async () => {
+    const user = userEvent.setup();
+    useAuth.mockReturnValue(schoolAdmin());
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Guardians" }));
+    expect(screen.getByRole("heading", { name: "Guardian directory displayed" })).toBeInTheDocument();
   });
 
   it("opens the student directory from Student management", async () => {
