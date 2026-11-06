@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
+import Student from "../models/Student.js";
 
 const CREATE_FIELDS = ["firstName", "lastName", "phone", "email"];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
@@ -145,11 +146,62 @@ export const updateGuardian = async (req, res, next) => {
         return invalid(res, `${field} must be a string`);
       }
     }
-    const guardian = await Guardian.findOneAndUpdate(
-      { _id: guardianId, tenantId: req.tenantId },
-      { $set: updates },
-      { new: true, runValidators: true },
-    ).lean();
+    const session = await mongoose.startSession();
+    let guardian;
+
+    try {
+      await session.withTransaction(async () => {
+        guardian = await Guardian.findOneAndUpdate(
+          { _id: guardianId, tenantId: req.tenantId },
+          { $set: updates },
+          { new: true, runValidators: true, session },
+        ).lean();
+
+        if (!guardian) return;
+
+        const contactFieldsChanged = [
+          "firstName",
+          "lastName",
+          "phone",
+          "email",
+        ].some((field) => Object.hasOwn(updates, field));
+
+        if (contactFieldsChanged) {
+          const legacyLinks = await StudentGuardian.find({
+            tenantId: req.tenantId,
+            guardianId: guardian._id,
+            source: "legacy_student",
+          })
+            .select("studentId")
+            .session(session)
+            .lean();
+
+          if (legacyLinks.length) {
+            const guardianName = [guardian.firstName, guardian.lastName]
+              .filter(Boolean)
+              .join(" ");
+
+            await Student.updateMany(
+              {
+                tenantId: req.tenantId,
+                _id: { $in: legacyLinks.map((link) => link.studentId) },
+              },
+              {
+                $set: {
+                  guardianName,
+                  guardianPhone: guardian.phone || null,
+                  guardianEmail: guardian.email || null,
+                },
+              },
+              { session },
+            );
+          }
+        }
+      });
+    } finally {
+      await session.endSession();
+    }
+
     if (!guardian) {
       return res.status(404).json({ success: false, message: "Guardian not found" });
     }
