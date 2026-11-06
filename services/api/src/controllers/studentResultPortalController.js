@@ -60,7 +60,7 @@ export const getMyPublishedResults = async (req, res, next) => {
   try {
     let students = [];
     if (req.auth.role === "student") {
-      const student = await Student.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" })
+      const student = await Student.findOne({ tenantId: req.tenantId, userId: req.auth.userId })
         .select("_id admissionNumber firstName lastName").lean();
       if (!student) return res.status(409).json({ success: false, message: "Your student account has not been linked by the school" });
       if (req.query.studentId && String(req.query.studentId) !== String(student._id)) {
@@ -78,19 +78,22 @@ export const getMyPublishedResults = async (req, res, next) => {
       if (req.query.studentId && !studentIds.some((id) => String(id) === String(req.query.studentId))) {
         return res.status(403).json({ success: false, message: "This student is not linked to your parent account" });
       }
-      const filter = { tenantId: req.tenantId, status: "active", _id: { $in: studentIds } };
+      const filter = { tenantId: req.tenantId, _id: { $in: studentIds } };
       if (req.query.studentId) filter._id = req.query.studentId;
       students = await Student.find(filter).select("_id admissionNumber firstName lastName").sort({ firstName: 1, lastName: 1 }).lean();
     }
 
     if (!students.length) return res.status(200).json({ success: true, data: [] });
     const enrollments = await Enrollment.find({
-      tenantId: req.tenantId, studentId: { $in: students.map((student) => student._id) }, status: "active",
+      tenantId: req.tenantId,
+      studentId: { $in: students.map((student) => student._id) },
+      status: { $in: ["active", "completed", "transferred"] },
     }).select("_id studentId academicYearId classId sectionId").lean();
     if (!enrollments.length) return res.status(200).json({ success: true, data: [] });
 
     const exams = await Examination.find({
-      tenantId: req.tenantId, status: "published",
+      tenantId: req.tenantId,
+      status: "published",
       $or: enrollments.map((enrollment) => ({
         academicYearId: enrollment.academicYearId,
         classId: enrollment.classId,
@@ -98,20 +101,19 @@ export const getMyPublishedResults = async (req, res, next) => {
       })),
     }).sort({ endDate: -1, _id: -1 }).lean();
 
-    const studentById = new Map(students.map((student) => [String(student._id), student]));
-    const enrollmentByStudent = new Map(enrollments.map((enrollment) => [String(enrollment.studentId), enrollment]));
     const data = [];
     for (const exam of exams) {
-      const context = await loadResultContext(req.tenantId, exam);
-      for (const student of students) {
-        const enrollment = enrollmentByStudent.get(String(student._id));
-        if (!enrollment || String(enrollment.academicYearId) !== String(exam.academicYearId) ||
+      const context = await loadResultContext(req.tenantId, exam, { includeHistoricalEnrollments: true });
+      for (const enrollment of enrollments) {
+        if (String(enrollment.academicYearId) !== String(exam.academicYearId) ||
             String(enrollment.classId) !== String(exam.classId) ||
             (exam.sectionId && String(enrollment.sectionId) !== String(exam.sectionId))) continue;
-        const result = context.results.find((item) => String(item.student?._id) === String(student._id));
-        if (result) data.push({
+        const result = context.results.find((item) => String(item.enrollmentId) === String(enrollment._id));
+        if (!result) continue;
+        const student = students.find((item) => String(item._id) === String(enrollment.studentId));
+        data.push({
           examination: { _id: exam._id, name: exam.name, startDate: exam.startDate, endDate: exam.endDate },
-          student: studentById.get(String(student._id)),
+          student,
           result,
         });
       }
