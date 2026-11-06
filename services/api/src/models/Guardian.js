@@ -9,7 +9,7 @@ const guardianSchema = new mongoose.Schema(
       immutable: true,
     },
     // Explicitly linked by a school administrator to a parent login account.
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, immutable: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     firstName: { type: String, required: true, trim: true, maxlength: 80 },
     lastName: { type: String, default: "", trim: true, maxlength: 80 },
     phone: { type: String, default: null, trim: true, maxlength: 20 },
