@@ -35,6 +35,14 @@ export default function GuardianDirectory() {
   const [selectedGuardian, setSelectedGuardian] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const { user } = useAuth();
+  const canManage = ["school_admin", "principal"].includes(user?.role);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [mutationError, setMutationError] = useState("");
+  const [mutationNotice, setMutationNotice] = useState("");
+  const [confirmStatusChange, setConfirmStatusChange] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,6 +114,109 @@ export default function GuardianDirectory() {
   const closeGuardian = () => {
     setSelectedGuardian(null);
     setDetailError("");
+    setEditing(false);
+    setEditForm(null);
+    setMutationError("");
+    setMutationNotice("");
+    setConfirmStatusChange(false);
+  };
+
+  const beginEdit = () => {
+    if (!selectedGuardian || !canManage) return;
+    setEditForm({
+      firstName: selectedGuardian.firstName || "",
+      lastName: selectedGuardian.lastName || "",
+      phone: selectedGuardian.phone || "",
+      email: selectedGuardian.email || "",
+    });
+    setMutationError("");
+    setMutationNotice("");
+    setEditing(true);
+  };
+
+  const saveGuardian = async (event) => {
+    event.preventDefault();
+    if (!selectedGuardian || !editForm) return;
+    const payload = {
+      firstName: editForm.firstName.trim(),
+      lastName: editForm.lastName.trim(),
+      phone: editForm.phone.trim() || null,
+      email: editForm.email.trim() || null,
+    };
+    if (!payload.firstName) {
+      setMutationError("Guardian first name is required.");
+      return;
+    }
+    if (payload.firstName.length > 80 || payload.lastName.length > 80) {
+      setMutationError("Names must not exceed 80 characters.");
+      return;
+    }
+    if ((payload.phone || "").length > 20) {
+      setMutationError("Phone must not exceed 20 characters.");
+      return;
+    }
+    if ((payload.email || "").length > 254 ||
+        (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email))) {
+      setMutationError("Enter a valid email address (maximum 254 characters).");
+      return;
+    }
+
+    setSaving(true);
+    setMutationError("");
+    setMutationNotice("");
+    try {
+      const response = await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}`, {
+        method: "PATCH",
+        accessToken,
+        body: payload,
+      });
+      if (!response?.success || !response.data) {
+        throw new Error(response?.message || "Guardian details could not be updated.");
+      }
+      const updated = { ...selectedGuardian, ...response.data };
+      setSelectedGuardian(updated);
+      setGuardians((current) => current.map((item) => (
+        item._id === updated._id ? { ...item, ...updated } : item
+      )));
+      setEditForm(null);
+      setEditing(false);
+      setMutationNotice("Guardian details updated successfully.");
+    } catch (saveError) {
+      setMutationError(saveError.message || "Unable to update guardian details.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changeGuardianStatus = async () => {
+    if (!selectedGuardian || !canManage) return;
+    const nextStatus = selectedGuardian.status === "active" ? "inactive" : "active";
+    setSaving(true);
+    setMutationError("");
+    setMutationNotice("");
+    try {
+      const response = await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}`, {
+        method: "PATCH",
+        accessToken,
+        body: { status: nextStatus },
+      });
+      if (!response?.success || !response.data) {
+        throw new Error(response?.message || "Guardian status could not be updated.");
+      }
+      const updated = { ...selectedGuardian, ...response.data };
+      setSelectedGuardian(updated);
+      setGuardians((current) => current.map((item) => (
+        item._id === updated._id ? { ...item, ...updated } : item
+      )));
+      setConfirmStatusChange(false);
+      setMutationNotice(nextStatus === "inactive"
+        ? "Guardian record deactivated. Linked student history has been retained."
+        : "Guardian record reactivated.");
+    } catch (statusError) {
+      setMutationError(statusError.message || "Unable to update guardian status.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateSearch = (value) => {
@@ -224,17 +335,78 @@ export default function GuardianDirectory() {
               <h3 id="guardian-detail-heading">Guardian details</h3>
               {selectedGuardian && <p>{fullName(selectedGuardian)}</p>}
             </div>
-            <button type="button" onClick={closeGuardian}>Close</button>
+            <div className="guardian-directory-detail-actions">
+              {canManage && selectedGuardian && !editing && (
+                <>
+                  <button type="button" onClick={beginEdit}>Edit guardian</button>
+                  <button
+                    type="button"
+                    className={selectedGuardian.status === "active" ? "guardian-directory-danger" : ""}
+                    onClick={() => {
+                      setConfirmStatusChange(true);
+                      setMutationError("");
+                      setMutationNotice("");
+                    }}
+                    disabled={saving}
+                  >
+                    {selectedGuardian.status === "active" ? "Deactivate" : "Reactivate"}
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={closeGuardian}>Close</button>
+            </div>
           </div>
           {detailLoading ? <p role="status">Loading guardian details…</p>
             : detailError ? <p role="alert">{detailError}</p>
               : (
                 <>
-                  <div className="guardian-directory-contact">
+                  {mutationError && <p className="guardian-directory-mutation-error" role="alert">{mutationError}</p>}
+                  {mutationNotice && <p className="guardian-directory-mutation-notice" role="status">{mutationNotice}</p>}
+                  {confirmStatusChange && canManage && (
+                    <div className="guardian-directory-confirm-status">
+                      <p>
+                        {selectedGuardian.status === "active"
+                          ? "Deactivate this guardian record? Existing student links and history will be retained."
+                          : "Reactivate this guardian record?"}
+                      </p>
+                      <button type="button" onClick={changeGuardianStatus} disabled={saving}>
+                        {saving ? "Saving…" : "Confirm"}
+                      </button>
+                      <button type="button" onClick={() => setConfirmStatusChange(false)} disabled={saving}>Cancel</button>
+                    </div>
+                  )}
+                  {editing && canManage ? (
+                    <form className="guardian-directory-edit-form" onSubmit={saveGuardian}>
+                      <h4>Edit guardian contact information</h4>
+                      <div className="guardian-directory-edit-grid">
+                        <label>
+                          First name *
+                          <input value={editForm.firstName} onChange={(event) => setEditForm((current) => ({ ...current, firstName: event.target.value }))} maxLength={80} required />
+                        </label>
+                        <label>
+                          Last name
+                          <input value={editForm.lastName} onChange={(event) => setEditForm((current) => ({ ...current, lastName: event.target.value }))} maxLength={80} />
+                        </label>
+                        <label>
+                          Phone
+                          <input type="tel" value={editForm.phone} onChange={(event) => setEditForm((current) => ({ ...current, phone: event.target.value }))} maxLength={20} />
+                        </label>
+                        <label>
+                          Email
+                          <input type="email" value={editForm.email} onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))} maxLength={254} />
+                        </label>
+                      </div>
+                      <div className="guardian-directory-edit-actions">
+                        <button type="button" onClick={() => { setEditing(false); setEditForm(null); setMutationError(""); }} disabled={saving}>Cancel</button>
+                        <button type="submit" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button>
+                      </div>
+                    </form>
+                  ) : null}
+                  {!editing && <div className="guardian-directory-contact">
                     <span><strong>Phone:</strong> {selectedGuardian.phone || "—"}</span>
                     <span><strong>Email:</strong> {selectedGuardian.email || "—"}</span>
                     <span><strong>Status:</strong> <GuardianStatus status={selectedGuardian.status} /></span>
-                  </div>
+                  </div>}
                   <h4>Linked students ({selectedGuardian.linkedStudents?.length || 0})</h4>
                   {!selectedGuardian.linkedStudents?.length ? (
                     <p>No students are currently linked to this guardian.</p>
