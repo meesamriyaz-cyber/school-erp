@@ -20,6 +20,7 @@ vi.mock("../components/EnrollmentsManagement.jsx", () => ({ default: () => <h2>E
 vi.mock("../components/AttendanceManagement.jsx", () => ({ default: () => <h2>Attendance management displayed</h2> }));
 vi.mock("../components/SubjectManagement.jsx", () => ({ default: () => <h2>Subject management displayed</h2> }));
 vi.mock("../components/TeacherAssignments.jsx", () => ({ default: () => <h2>Teacher assignments displayed</h2> }));
+vi.mock("../components/TimetableManagement.jsx", () => ({ default: () => <h2>Timetable management displayed</h2> }));
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>Platform Administrator workspace displayed</h1> }));
 vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));
 
@@ -205,6 +206,14 @@ describe("App", () => {
     render(<App />);
     await user.click(screen.getByRole("button", { name: /^Teacher Assignments$/ }));
     expect(screen.getByRole("heading", { name: "Teacher assignments displayed" })).toBeInTheDocument();
+  });
+
+  it("opens Timetable management from academic navigation", async () => {
+    const user = userEvent.setup();
+    useAuth.mockReturnValue(schoolAdmin());
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /^Timetable$/ }));
+    expect(screen.getByRole("heading", { name: "Timetable management displayed" })).toBeInTheDocument();
   });
 
   it("opens Enrollments management from academic navigation", async () => {
