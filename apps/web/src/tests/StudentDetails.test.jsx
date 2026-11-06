@@ -72,8 +72,8 @@ describe("StudentDetails", () => {
 
     expect(screen.getByText("Admission No.: ADM-101")).toBeInTheDocument();
     expect(screen.getByText("Imran Khan")).toBeInTheDocument();
-    expect(screen.getByText("Phone: 9999999999")).toBeInTheDocument();
-    expect(screen.getByText("Email: imran@example.com")).toBeInTheDocument();
+    expect(screen.getByText("9999999999")).toBeInTheDocument();
+    expect(screen.getByText("imran@example.com")).toBeInTheDocument();
     expect(screen.getByText("active")).toBeInTheDocument();
 
     expect(apiRequest).toHaveBeenCalledWith(
@@ -565,9 +565,9 @@ it("loads and displays linked guardian details for the student", async () => {
   expect(await screen.findByRole("heading", { name: /Ayaan Khan/ })).toBeInTheDocument();
   expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
   expect(screen.getByText("Sara Khan")).toBeInTheDocument();
-  expect(screen.getByText("9999999999")).toBeInTheDocument();
+  expect(screen.getByText("Phone: 9999999999")).toBeInTheDocument();
   expect(screen.getByText("Phone: 8888888888")).toBeInTheDocument();
-  expect(screen.getByText("imran@example.com")).toBeInTheDocument();
+  expect(screen.getByText("Email: imran@example.com")).toBeInTheDocument();
   expect(screen.getByText("Email: sara@example.com")).toBeInTheDocument();
   expect(screen.getByText("Father")).toBeInTheDocument();
   expect(screen.getByText("Mother")).toBeInTheDocument();
