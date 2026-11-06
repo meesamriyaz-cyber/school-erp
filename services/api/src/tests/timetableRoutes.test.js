@@ -148,7 +148,7 @@ describe("Timetable API integration", () => {
   it("rejects an edited timetable period that overlaps the teacher's other class", async () => {
     const created = await request("/timetable", {
       method: "POST", token: adminA.token,
-      body: JSON.stringify({ ...entryPayload(assignmentOtherClass._id, classB._id, 3), dayOfWeek: 3, startTime: "11:15", endTime: "12:00" }),
+      body: JSON.stringify({ ...entryPayload(assignmentOtherClass._id, classB._id, 3), dayOfWeek: 1, startTime: "09:15", endTime: "10:00" }),
     });
     expect(created.status).toBe(409);
   });
