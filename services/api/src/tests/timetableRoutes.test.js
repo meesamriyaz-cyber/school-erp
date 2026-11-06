@@ -131,6 +131,19 @@ describe("Timetable API integration", () => {
     expect(updated.body.data.periodNumber).toBe(2);
     expect(updated.body.data.room).toBe("Lab 1");
 
+    const reassigned = await request(`/timetable/${entry._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ assignmentId: String(assignmentB._id) }),
+    });
+    expect(reassigned.status).toBe(200);
+    expect(String(reassigned.body.data.assignmentId._id)).toBe(String(assignmentB._id));
+
+    const restoredAssignment = await request(`/timetable/${entry._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ assignmentId: String(assignmentA._id) }),
+    });
+    expect(restoredAssignment.status).toBe(200);
+
     const invalidAssignment = await request(`/timetable/${entry._id}`, {
       method: "PATCH", token: adminA.token,
       body: JSON.stringify({ assignmentId: String(assignmentOtherClass._id) }),
