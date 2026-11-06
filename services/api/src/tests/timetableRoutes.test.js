@@ -119,6 +119,30 @@ describe("Timetable API integration", () => {
     expect(response.body.data.dayOfWeek).toBe(1);
   });
 
+  it("limits teacher timetable reads to their own active assignments", async () => {
+    const secondEntry = {
+      ...entryPayload(assignmentB._id, classA._id, 1),
+      dayOfWeek: 2,
+      startTime: "10:00",
+      endTime: "10:45",
+    };
+    const created = await request("/timetable", {
+      method: "POST", token: adminA.token, body: JSON.stringify(secondEntry),
+    });
+    expect(created.status).toBe(201);
+
+    const [teacherAView, teacherBView, adminView] = await Promise.all([
+      request("/timetable", { token: teacherA.token }),
+      request("/timetable", { token: teacherB.token }),
+      request("/timetable", { token: adminA.token }),
+    ]);
+    expect(teacherAView.body.data).toHaveLength(1);
+    expect(String(teacherAView.body.data[0].assignmentId._id)).toBe(String(assignmentA._id));
+    expect(teacherBView.body.data).toHaveLength(1);
+    expect(String(teacherBView.body.data[0].assignmentId._id)).toBe(String(assignmentB._id));
+    expect(adminView.body.data).toHaveLength(2);
+  });
+
   it("rejects a class period collision even when another teacher is assigned", async () => {
     const response = await request("/timetable", { method: "POST", token: adminA.token, body: JSON.stringify(entryPayload(assignmentB._id)) });
     expect(response.status).toBe(409);
