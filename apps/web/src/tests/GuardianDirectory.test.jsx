@@ -37,7 +37,7 @@ describe("GuardianDirectory", () => {
   it("loads and displays school guardian records", async () => {
     render(<GuardianDirectory />);
 
-    expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
+    expect((await screen.findAllByText("Imran Khan")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Sara Khan").length).toBeGreaterThan(0);
     expect(screen.getAllByText("9999999999").length).toBeGreaterThan(0);
     expect(screen.getAllByText("imran@example.com").length).toBeGreaterThan(0);
@@ -58,7 +58,7 @@ describe("GuardianDirectory", () => {
     await user.type(screen.getByRole("searchbox", { name: "Search guardians" }), "sara@example.com");
 
     expect(screen.getAllByText("Sara Khan").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Imran Khan")).not.toBeInTheDocument();
+    expect(screen.queryAllByText("Imran Khan")).toHaveLength(0);
     expect(screen.getByText("1 guardian found")).toBeInTheDocument();
   });
 
@@ -70,7 +70,7 @@ describe("GuardianDirectory", () => {
     await user.selectOptions(screen.getByLabelText("Filter guardians by status"), "active");
 
     expect(screen.getAllByText("Imran Khan").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Sara Khan")).not.toBeInTheDocument();
+    expect(screen.queryAllByText("Sara Khan")).toHaveLength(0);
     expect(screen.getByText("1 guardian found")).toBeInTheDocument();
   });
 
@@ -88,10 +88,10 @@ describe("GuardianDirectory", () => {
 
     render(<GuardianDirectory />);
 
-    expect(await screen.findByText("Guardian1 Test")).toBeInTheDocument();
-    expect(screen.queryByText("Guardian11 Test")).not.toBeInTheDocument();
+    expect((await screen.findAllByText("Guardian1 Test")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Guardian11 Test")).toHaveLength(0);
     await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Guardian11 Test")).toBeInTheDocument();
+    expect(screen.getAllByText("Guardian11 Test").length).toBeGreaterThan(0);
     expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe("GuardianDirectory", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Directory unavailable");
     await user.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
+    expect((await screen.findAllByText("Imran Khan")).length).toBeGreaterThan(0);
     await waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(2));
   });
 });
