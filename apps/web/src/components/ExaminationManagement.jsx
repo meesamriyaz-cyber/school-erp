@@ -85,12 +85,22 @@ export default function ExaminationManagement() {
     setSelectedExam(response.data);
     const roster = await apiRequest(`/enrollments?academicYearId=${response.data.academicYearId?._id || response.data.academicYearId}&classId=${response.data.classId?._id || response.data.classId}${response.data.sectionId ? `&sectionId=${response.data.sectionId._id || response.data.sectionId}` : ""}&status=active`, { accessToken });
     setEnrollments(roster.data || []);
-    setMarks({});
-    setResults(null);
-    if (["completed", "published"].includes(response.data.status)) {
-      const resultResponse = await apiRequest(`/examinations/${id}/results`, { accessToken });
-      setResults(resultResponse.data || []);
+    const [markResponse, resultResponse] = await Promise.all([
+      apiRequest(`/examinations/${id}/marks`, { accessToken }),
+      ["completed", "published"].includes(response.data.status)
+        ? apiRequest(`/examinations/${id}/results`, { accessToken })
+        : Promise.resolve(null),
+    ]);
+    const savedMarks = {};
+    for (const mark of markResponse.data || []) {
+      const subjectId = mark.examSubjectId?._id || mark.examSubjectId;
+      savedMarks[`${mark.enrollmentId}:${subjectId}`] = {
+        score: mark.absent ? "" : String(mark.marksObtained ?? ""),
+        absent: Boolean(mark.absent),
+      };
     }
+    setMarks(savedMarks);
+    setResults(resultResponse?.data || null);
   }, [accessToken]);
 
   useEffect(() => {
@@ -168,7 +178,8 @@ export default function ExaminationManagement() {
   };
 
   const nextStatus = useMemo(() => ({ draft: "scheduled", scheduled: "in_progress", in_progress: "completed" }[selectedExam?.status] || null), [selectedExam?.status]);
-  const canEdit = selectedExam && !["completed", "published"].includes(selectedExam.status);
+  const canConfigure = selectedExam && !["completed", "published"].includes(selectedExam.status);
+  const canEnterMarks = selectedExam && selectedExam.status !== "published";
 
   return <section className="examinations-page" aria-labelledby="examinations-title">
     <div className="examinations-intro"><div><p className="examinations-eyebrow">ACADEMIC OPERATIONS</p><h2 id="examinations-title">Examinations & results</h2><p>Create examinations, configure subjects, enter marks and publish consolidated results.</p></div><span className="examinations-count">{exams.length} examinations</span></div>
@@ -199,10 +210,10 @@ export default function ExaminationManagement() {
           </article>
           <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Exam subjects</h3><p>{selectedExam.subjects?.length || 0} configured</p></div></div>
             {selectedExam.subjects?.map((item) => <div className="exam-subject-row" key={item._id}><strong>{item.subjectId?.name || "Subject"}</strong><span>{item.maxMarks} marks · Pass {item.passMarks}</span></div>)}
-            {canEdit && <form className="examinations-form compact" onSubmit={addSubject}><label>Subject<select required value={subjectForm.subjectId} onChange={(e) => setSubjectForm((v) => ({ ...v, subjectId: e.target.value }))}><option value="">Select subject</option>{subjects.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label><label>Exam date<input type="date" required min={selectedExam.startDate?.slice(0,10)} max={selectedExam.endDate?.slice(0,10)} value={subjectForm.examDate} onChange={(e) => setSubjectForm((v) => ({ ...v, examDate: e.target.value }))} /></label><label>Maximum marks<input type="number" min="1" required value={subjectForm.maxMarks} onChange={(e) => setSubjectForm((v) => ({ ...v, maxMarks: e.target.value }))} /></label><label>Passing marks<input type="number" min="0" required value={subjectForm.passMarks} onChange={(e) => setSubjectForm((v) => ({ ...v, passMarks: e.target.value }))} /></label><button className="examination-secondary" disabled={saving || !subjectForm.subjectId}>Add subject</button></form>}
+            {canConfigure && <form className="examinations-form compact" onSubmit={addSubject}><label>Subject<select required value={subjectForm.subjectId} onChange={(e) => setSubjectForm((v) => ({ ...v, subjectId: e.target.value }))}><option value="">Select subject</option>{subjects.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label><label>Exam date<input type="date" required min={selectedExam.startDate?.slice(0,10)} max={selectedExam.endDate?.slice(0,10)} value={subjectForm.examDate} onChange={(e) => setSubjectForm((v) => ({ ...v, examDate: e.target.value }))} /></label><label>Maximum marks<input type="number" min="1" required value={subjectForm.maxMarks} onChange={(e) => setSubjectForm((v) => ({ ...v, maxMarks: e.target.value }))} /></label><label>Passing marks<input type="number" min="0" required value={subjectForm.passMarks} onChange={(e) => setSubjectForm((v) => ({ ...v, passMarks: e.target.value }))} /></label><button className="examination-secondary" disabled={saving || !subjectForm.subjectId}>Add subject</button></form>}
           </article>
           {selectedExam.subjects?.length > 0 && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Marks entry</h3><p>{enrollments.length} active students in this examination scope</p></div></div>
-            {canEdit && enrollments.length ? <><div className="marks-table-wrap"><table className="marks-table"><thead><tr><th>Student</th>{selectedExam.subjects.map((subject) => <th key={subject._id}>{subject.subjectId?.name || "Subject"}<small> / {subject.maxMarks}</small></th>)}</tr></thead><tbody>{enrollments.map((enrollment) => <tr key={enrollment._id}><td><strong>{enrollment.studentId?.firstName} {enrollment.studentId?.lastName}</strong><small>{enrollment.studentId?.admissionNumber}</small></td>{selectedExam.subjects.map((subject) => { const key = `${enrollment._id}:${subject._id}`; const entry = marks[key] || { score: "", absent: false }; return <td key={subject._id}><input aria-label={`Marks for ${enrollment.studentId?.firstName} in ${subject.subjectId?.name}`} type="number" min="0" max={subject.maxMarks} disabled={entry.absent} value={entry.score} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, score: e.target.value } }))} /><label className="mark-absent"><input type="checkbox" checked={entry.absent} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, absent: e.target.checked, score: "" } }))} /> Absent</label></td>; })}</tr>)}</tbody></table></div><button className="examination-primary" disabled={saving || !enrollments.length} onClick={() => void saveMarks()}>Save marks</button></> : <p className="examinations-empty">{canEdit ? "No active enrollments found in this class scope." : "Marks are locked after completion."}</p>}
+            {canEnterMarks && enrollments.length ? <><div className="marks-table-wrap"><table className="marks-table"><thead><tr><th>Student</th>{selectedExam.subjects.map((subject) => <th key={subject._id}>{subject.subjectId?.name || "Subject"}<small> / {subject.maxMarks}</small></th>)}</tr></thead><tbody>{enrollments.map((enrollment) => <tr key={enrollment._id}><td><strong>{enrollment.studentId?.firstName} {enrollment.studentId?.lastName}</strong><small>{enrollment.studentId?.admissionNumber}</small></td>{selectedExam.subjects.map((subject) => { const key = `${enrollment._id}:${subject._id}`; const entry = marks[key] || { score: "", absent: false }; return <td key={subject._id}><input aria-label={`Marks for ${enrollment.studentId?.firstName} in ${subject.subjectId?.name}`} type="number" min="0" max={subject.maxMarks} disabled={entry.absent} value={entry.score} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, score: e.target.value } }))} /><label className="mark-absent"><input type="checkbox" checked={entry.absent} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, absent: e.target.checked, score: "" } }))} /> Absent</label></td>; })}</tr>)}</tbody></table></div><button className="examination-primary" disabled={saving || !enrollments.length} onClick={() => void saveMarks()}>Save marks</button></> : <p className="examinations-empty">{canEnterMarks ? "No active enrollments found in this class scope." : "Marks are locked after publication."}</p>}
           </article>}
           {results && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Consolidated results</h3><p>{results.length} students · result percentage and status</p></div></div><div className="results-list">{results.map((result) => <div className="result-row" key={result.enrollmentId}><span><strong>{result.student?.firstName} {result.student?.lastName}</strong><small>{result.student?.admissionNumber}</small></span><strong>{result.totalObtained} / {result.totalMaximum} ({result.percentage}%)</strong><em>{result.status}</em></div>)}</div></article>}
         </>}
