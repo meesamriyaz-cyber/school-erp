@@ -8,15 +8,28 @@ import TeacherAssignment from "../models/TeacherAssignment.js";
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
 
-const assertTeacherAssignment = async (req, exam, examSubject) => {
+const teacherAssignmentFilter = (req, exam, examSubject, enrollment = null) => {
+  const filter = {
+    tenantId: req.tenantId,
+    teacherId: req.auth.userId,
+    subjectId: examSubject.subjectId,
+    academicYearId: exam.academicYearId,
+    classId: exam.classId,
+    status: "active",
+  };
+  if (exam.sectionId) {
+    filter.$or = [{ sectionId: null }, { sectionId: exam.sectionId }];
+  } else if (enrollment) {
+    filter.$or = [{ sectionId: null }, { sectionId: enrollment.sectionId || null }];
+  }
+  return filter;
+};
+
+const assertTeacherAssignment = async (req, exam, examSubject, enrollment) => {
   if (req.auth.role !== "teacher") return true;
-  return Boolean(await TeacherAssignment.exists({
-    tenantId: req.tenantId, teacherId: req.auth.userId, subjectId: examSubject.subjectId,
-    academicYearId: exam.academicYearId, classId: exam.classId, status: "active",
-    ...(exam.sectionId
-      ? { $or: [{ sectionId: exam.sectionId }, { sectionId: null }] }
-      : { sectionId: null }),
-  }));
+  return Boolean(await TeacherAssignment.exists(
+    teacherAssignmentFilter(req, exam, examSubject, enrollment)
+  ));
 };
 
 export const listExaminationMarks = async (req, res, next) => {
@@ -34,16 +47,27 @@ export const listExaminationMarks = async (req, res, next) => {
       filter.enrollmentId = req.query.enrollmentId;
     }
     if (req.auth.role === "teacher") {
-      const subjectConfigs = await ExamSubject.find({ tenantId: req.tenantId, examinationId: exam._id }).select("subjectId").lean();
+      const subjectConfigs = await ExamSubject.find({ tenantId: req.tenantId, examinationId: exam._id }).lean();
       const assigned = await TeacherAssignment.find({
         tenantId: req.tenantId, teacherId: req.auth.userId, status: "active",
         academicYearId: exam.academicYearId, classId: exam.classId,
         subjectId: { $in: subjectConfigs.map((item) => item.subjectId) },
-        ...(exam.sectionId ? { $or: [{ sectionId: exam.sectionId }, { sectionId: null }] } : { sectionId: null }),
-      }).distinct("subjectId");
-      const allowedConfigs = await ExamSubject.find({ tenantId: req.tenantId, examinationId: exam._id, subjectId: { $in: assigned } }).distinct("_id");
+        ...(exam.sectionId ? { $or: [{ sectionId: exam.sectionId }, { sectionId: null }] } : {}),
+      }).lean();
+      const allowedSubjectIds = [...new Set(assigned.map((item) => String(item.subjectId)))];
+      const allowedConfigs = subjectConfigs
+        .filter((item) => allowedSubjectIds.includes(String(item.subjectId)))
+        .map((item) => item._id);
       if (!allowedConfigs.length) return res.status(403).json({ success: false, message: "You are not assigned to this examination" });
       filter.examSubjectId = { $in: allowedConfigs };
+      if (!exam.sectionId && !assigned.some((item) => !item.sectionId)) {
+        const sectionIds = [...new Set(assigned.map((item) => String(item.sectionId)))];
+        const scopedEnrollments = await Enrollment.find({
+          tenantId: req.tenantId, academicYearId: exam.academicYearId,
+          classId: exam.classId, status: "active", sectionId: { $in: sectionIds },
+        }).distinct("_id");
+        filter.enrollmentId = { $in: scopedEnrollments };
+      }
     }
     const data = await ExamMark.find(filter)
       .populate("studentId", "admissionNumber firstName lastName")
@@ -74,7 +98,7 @@ export const saveExaminationMarks = async (req, res, next) => {
         tenantId: req.tenantId, _id: { $in: enrollmentIds }, status: "active",
         academicYearId: exam.academicYearId, classId: exam.classId,
         ...(exam.sectionId ? { sectionId: exam.sectionId } : {}),
-      }).select("_id studentId").lean(),
+      }).select("_id studentId sectionId").lean(),
     ]);
     if (subjects.length !== subjectIds.length) return invalid(res, "One or more subjects do not belong to this examination");
     if (enrollments.length !== enrollmentIds.length) return invalid(res, "One or more students are not actively enrolled in this examination class scope");
@@ -101,7 +125,7 @@ export const saveExaminationMarks = async (req, res, next) => {
         if (item.marksObtained === "" || item.marksObtained === null || !Number.isFinite(score) || score < 0 || score > subject.maxMarks) return invalid(res, `Marks must be between zero and ${subject.maxMarks}`);
       }
       if (item.remarks !== undefined && (typeof item.remarks !== "string" || item.remarks.trim().length > 300)) return invalid(res, "Remarks must be 300 characters or fewer");
-      if (!await assertTeacherAssignment(req, exam, subject)) return res.status(403).json({ success: false, message: "You are not assigned to this subject and class" });
+      if (!await assertTeacherAssignment(req, exam, subject, enrollment)) return res.status(403).json({ success: false, message: "You are not assigned to this subject and class" });
       operations.push({
         updateOne: {
           filter: { tenantId: req.tenantId, examinationId: exam._id, examSubjectId: subject._id, enrollmentId: enrollment._id },
