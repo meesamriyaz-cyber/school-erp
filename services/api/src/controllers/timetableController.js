@@ -24,6 +24,17 @@ const populateEntry = (query) => query
 export const listTimetableEntries = async (req, res, next) => {
   try {
     const filter = { tenantId: req.tenantId };
+    if (req.auth.role === "teacher") {
+      const ownAssignments = await TeacherAssignment.find({
+        tenantId: req.tenantId,
+        teacherId: req.auth.userId,
+        status: "active",
+      }).distinct("_id");
+      if (!ownAssignments.length) {
+        return res.status(200).json({ success: true, data: [] });
+      }
+      filter.assignmentId = { $in: ownAssignments };
+    }
     for (const field of ["academicYearId", "classId", "assignmentId"]) {
       if (req.query[field] !== undefined) {
         if (!validId(req.query[field])) return invalid(res, `Invalid ${field}`);
