@@ -289,7 +289,7 @@ export default function StudentDirectory() {
               <th>Admission date</th>
               <th>Status</th>
               <th>Actions</th>
-              {canLinkPortal && <th>Portal account</th>}
+              {canLinkPortal && {canLinkPortal && <th>Portal account</th>}}
             </tr>
           </thead>
 
@@ -355,7 +355,7 @@ export default function StudentDirectory() {
                       View
                     </button>
                   </td>
-                  <td>
+                  {canLinkPortal && <td>
                     <PortalAccountLink
                       record={student}
                       recordType="student"
@@ -366,7 +366,7 @@ export default function StudentDirectory() {
                         setNotice("Student portal account linked successfully.");
                       }}
                     />
-                  </td>
+                  </td>}
                 </tr>
               ))
             )}
