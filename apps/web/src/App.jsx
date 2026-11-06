@@ -13,6 +13,7 @@ import EnrollmentsManagement from "./components/EnrollmentsManagement.jsx";
 import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 import SchoolUserDirectory from "./components/SchoolUserDirectory.jsx";
 import GuardianDirectory from "./components/GuardianDirectory.jsx";
+import AttendanceManagement from "./components/AttendanceManagement.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
