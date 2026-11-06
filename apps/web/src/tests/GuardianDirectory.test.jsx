@@ -114,7 +114,7 @@ describe("GuardianDirectory", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText("Guardian details updated successfully.")).toBeInTheDocument();
-    expect(screen.getByText("Nadia Khan")).toBeInTheDocument();
+    expect(screen.getByText("Nadia Khan", { selector: "p" })).toBeInTheDocument();
     expect(apiRequest).toHaveBeenLastCalledWith("/guardians/guardian-1", {
       method: "PATCH",
       accessToken: "test-access-token",
