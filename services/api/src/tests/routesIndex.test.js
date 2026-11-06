@@ -15,6 +15,7 @@ vi.mock("../routes/schoolRoutes.js", () => ({ default: express.Router() }));
 vi.mock("../routes/studentRoutes.js", () => ({ default: express.Router() }));
 vi.mock("../routes/attendanceRoutes.js", () => ({ default: express.Router() }));
 vi.mock("../routes/subjectRoutes.js", () => ({ default: express.Router() }));
+vi.mock("../routes/teacherAssignmentRoutes.js", () => ({ default: express.Router() }));
 
 import router from "../routes/index.js";
 
@@ -67,7 +68,7 @@ describe("API route index", () => {
     },
   );
 
-  it.each(["/auth", "/platform", "/school", "/students", "/attendance", "/subjects"])(
+  it.each(["/auth", "/platform", "/school", "/students", "/attendance", "/subjects", "/teacher-assignments"])(
     "mounts the %s route group",
     async (path) => {
       const response = await fetch(`${baseUrl}${path}`);
