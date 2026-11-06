@@ -111,7 +111,6 @@ export const saveExaminationMarks = async (req, res, next) => {
       });
     }
     await ExamMark.bulkWrite(operations, { ordered: true });
-    const data = await ExamMark.find({ tenantId: req.tenantId, examinationId: exam._id, _id: { $in: operations.map((op) => op.updateOne.filter) } }).lean();
     return res.status(200).json({ success: true, message: "Examination marks saved", count: operations.length });
   } catch (error) {
     if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more mark records are invalid");
