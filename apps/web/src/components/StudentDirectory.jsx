@@ -4,6 +4,7 @@ import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import StudentForm from "./StudentForm.jsx";
 import StudentDetails from "./StudentDetails.jsx";
+import PortalAccountLink from "./PortalAccountLink.jsx";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -285,13 +286,14 @@ export default function StudentDirectory() {
               <th>Admission date</th>
               <th>Status</th>
               <th>Actions</th>
+              <th>Portal account</th>
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="student-empty">
+                <td colSpan={7} className="student-empty">
                   Loading student records…
                 </td>
               </tr>
@@ -349,6 +351,18 @@ export default function StudentDirectory() {
                     >
                       View
                     </button>
+                  </td>
+                  <td>
+                    <PortalAccountLink
+                      record={student}
+                      recordType="student"
+                      onLinked={(updated) => {
+                        setStudents((current) => current.map((item) => (
+                          item._id === updated._id ? { ...item, ...updated } : item
+                        )));
+                        setNotice("Student portal account linked successfully.");
+                      }}
+                    />
                   </td>
                 </tr>
               ))
