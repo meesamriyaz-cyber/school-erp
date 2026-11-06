@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./TeacherTimetablePortal.css";
+import TeacherAttendancePortal from "./TeacherAttendancePortal.jsx";
 
 const DAYS = [
   { value: 1, label: "Monday" },
@@ -17,6 +18,7 @@ export default function TeacherTimetablePortal() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeView, setActiveView] = useState("timetable");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,6 +48,11 @@ export default function TeacherTimetablePortal() {
         <button type="button" onClick={() => void logout()}>Sign out</button>
       </header>
       <p className="teacher-timetable-welcome">Welcome, {name}</p>
+      <nav className="teacher-workspace-tabs" aria-label="Teacher workspace">
+        <button type="button" className={activeView === "timetable" ? "active" : ""} onClick={() => setActiveView("timetable")}>My timetable</button>
+        <button type="button" className={activeView === "attendance" ? "active" : ""} onClick={() => setActiveView("attendance")}>Mark attendance</button>
+      </nav>
+      {activeView === "attendance" ? <TeacherAttendancePortal /> : <>
       {error && <p className="teacher-timetable-error" role="alert">{error}</p>}
       {loading ? <p className="teacher-timetable-empty">Loading your timetable…</p> : entries.length === 0 ? (
         <p className="teacher-timetable-empty">No active timetable periods are assigned to you yet. Please contact your school administrator.</p>
@@ -67,6 +74,7 @@ export default function TeacherTimetablePortal() {
           })}
         </div>
       )}
+      </>}
     </main>
   );
 }
