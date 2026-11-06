@@ -13,10 +13,13 @@ import Section from "../models/Section.js";
 import Subject from "../models/Subject.js";
 import Examination from "../models/Examination.js";
 import ExamSubject from "../models/ExamSubject.js";
+import ExamMark from "../models/ExamMark.js";
+import Enrollment from "../models/Enrollment.js";
+import Student from "../models/Student.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 const EXPECTED_TEST_DATABASE = "school-erp-test";
-let server, baseUrl, schoolA, schoolB, adminA, teacherA, adminB, yearA, classA, subjectA;
+let server, baseUrl, schoolA, schoolB, adminA, teacherA, adminB, yearA, classA, subjectA, studentA, enrollmentA;
 const tenantIds = [], userIds = [];
 
 const request = async (path, { token, ...options } = {}) => {
@@ -56,7 +59,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Examination.init(), ExamSubject.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -65,6 +68,8 @@ describe("Examination API integration", () => {
     yearA = await AcademicYear.create({ tenantId: schoolA._id, name: `2026-27-${randomUUID().slice(0, 5)}`, startDate: "2026-04-01", endDate: "2027-03-31", status: "active" });
     classA = await SchoolClass.create({ tenantId: schoolA._id, academicYearId: yearA._id, name: "Class 5" });
     subjectA = await Subject.create({ tenantId: schoolA._id, name: `Mathematics ${randomUUID().slice(0, 5)}` });
+    studentA = await Student.create({ tenantId: schoolA._id, admissionNumber: `EX-${randomUUID().slice(0, 8)}`, firstName: "Test Student" });
+    enrollmentA = await Enrollment.create({ tenantId: schoolA._id, studentId: studentA._id, academicYearId: yearA._id, classId: classA._id, status: "active" });
     server = app.listen(0, "127.0.0.1");
     await new Promise((resolve, reject) => { server.once("listening", resolve); server.once("error", reject); });
     baseUrl = `http://127.0.0.1:${server.address().port}/api/v1`;
@@ -74,6 +79,9 @@ describe("Examination API integration", () => {
     if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
+        await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
+        await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
+        await Student.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamSubject.deleteMany({ tenantId: { $in: tenantIds } });
         await Examination.deleteMany({ tenantId: { $in: tenantIds } });
         await Subject.deleteMany({ tenantId: { $in: tenantIds } });
