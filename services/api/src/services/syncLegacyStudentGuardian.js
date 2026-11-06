@@ -79,7 +79,6 @@ export const syncLegacyStudentGuardian = async (student) => {
     guardianId: guardian._id,
   });
   if (existingPair) {
-    existingPair.relationship = "other";
     existingPair.status = "active";
     await existingPair.save();
     return { guardian, relationship: existingPair };
