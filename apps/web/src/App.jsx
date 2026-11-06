@@ -17,6 +17,7 @@ import AttendanceManagement from "./components/AttendanceManagement.jsx";
 import SubjectManagement from "./components/SubjectManagement.jsx";
 import TeacherAssignments from "./components/TeacherAssignments.jsx";
 import TimetableManagement from "./components/TimetableManagement.jsx";
+import ExaminationManagement from "./components/ExaminationManagement.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -408,6 +409,8 @@ function DashboardApp() {
   <TeacherAssignments />
 ) : activePage === "Timetable" ? (
   <TimetableManagement />
+) : activePage === "Examinations" ? (
+  <ExaminationManagement />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
 ) : (
