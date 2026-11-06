@@ -354,6 +354,51 @@ describe("Guardian API integration tests", () => {
     );
   });
 
+  it("returns a guardian with all linked students and relationship details", async () => {
+    const guardian = await createGuardian(adminA.token);
+    const studentOne = await createStudent(adminA.token);
+    const studentTwo = await createStudent(adminA.token);
+
+    const firstLink = await request(`/students/${studentOne._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(guardian._id),
+        relationship: "father",
+        isPrimary: true,
+      }),
+    });
+    const secondLink = await request(`/students/${studentTwo._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(guardian._id),
+        relationship: "father",
+        isEmergencyContact: true,
+      }),
+    });
+
+    expect(firstLink.status).toBe(201);
+    expect(secondLink.status).toBe(201);
+
+    const response = await request(`/guardians/${guardian._id}`, {
+      token: adminA.token,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.firstName).toBe(guardian.firstName);
+    expect(response.body.data.linkedStudents).toHaveLength(2);
+    expect(response.body.data.linkedStudents.map((item) => item.relationship))
+      .toEqual(["father", "father"]);
+    expect(response.body.data.linkedStudents.map((item) => item.student._id))
+      .toContain(String(studentOne._id));
+    expect(response.body.data.linkedStudents.map((item) => item.student._id))
+      .toContain(String(studentTwo._id));
+    expect(response.body.data.linkedStudents.find(
+      (item) => item.student._id === String(studentTwo._id),
+    ).isEmergencyContact).toBe(true);
+  });
+
   it("prevents cross-school guardian retrieval", async () => {
     const guardian = await createGuardian(adminA.token);
 
