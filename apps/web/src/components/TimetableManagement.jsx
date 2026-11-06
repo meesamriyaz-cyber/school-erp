@@ -17,6 +17,7 @@ export default function TimetableManagement() {
   const [filter, setFilter] = useState({ academicYearId: "", classId: "", sectionId: "" });
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -78,13 +79,35 @@ export default function TimetableManagement() {
     try {
       const payload = { ...form, dayOfWeek: Number(form.dayOfWeek), periodNumber: Number(form.periodNumber) };
       if (!payload.sectionId) delete payload.sectionId;
-      const response = await apiRequest("/timetable", { method: "POST", accessToken, body: payload });
+      const requestBody = editingEntryId
+        ? { assignmentId: payload.assignmentId, dayOfWeek: payload.dayOfWeek, periodNumber: payload.periodNumber, startTime: payload.startTime, endTime: payload.endTime, room: payload.room }
+        : payload;
+      const response = await apiRequest(editingEntryId ? `/timetable/${editingEntryId}` : "/timetable", {
+        method: editingEntryId ? "PATCH" : "POST", accessToken, body: requestBody,
+      });
       if (!response?.success) throw new Error(response?.message || "Unable to save timetable entry.");
-      setNotice("Timetable period added successfully."); setForm(emptyForm); setShowForm(false);
+      setNotice(editingEntryId ? "Timetable period updated successfully." : "Timetable period added successfully.");
+      setForm(emptyForm); setEditingEntryId(""); setShowForm(false);
       await loadEntries();
     } catch (err) { setError(err.message || "Unable to save timetable entry."); }
     finally { setSaving(false); }
   };
+
+  const editEntry = (entry) => {
+    setError(""); setNotice("");
+    setEditingEntryId(entry._id);
+    setForm({
+      academicYearId: entry.academicYearId?._id || entry.academicYearId,
+      classId: entry.classId?._id || entry.classId,
+      sectionId: entry.sectionId?._id || entry.sectionId || "",
+      assignmentId: entry.assignmentId?._id || entry.assignmentId,
+      dayOfWeek: String(entry.dayOfWeek), periodNumber: String(entry.periodNumber),
+      startTime: entry.startTime, endTime: entry.endTime, room: entry.room || "",
+    });
+    setShowForm(true);
+  };
+
+  const cancelForm = () => { setShowForm(false); setEditingEntryId(""); setForm(emptyForm); };
 
   const toggleStatus = async (entry) => {
     setError(""); setNotice("");
@@ -99,16 +122,16 @@ export default function TimetableManagement() {
 
   return <section className="timetable-management" aria-labelledby="timetable-title">
     <div className="timetable-heading"><div><p className="timetable-eyebrow">ACADEMIC OPERATIONS</p><h2 id="timetable-title">Timetable Management</h2><p>Build the weekly class schedule using approved teacher–subject assignments.</p></div>
-      <button type="button" className="timetable-primary" onClick={() => setShowForm((value) => !value)}>{showForm ? "Cancel" : "+ Add period"}</button>
+      <button type="button" className="timetable-primary" onClick={() => showForm ? cancelForm() : setShowForm(true)}>{showForm ? "Cancel" : "+ Add period"}</button>
     </div>
     {notice && <p className="timetable-notice" role="status">{notice}</p>}
     {error && <p className="timetable-error" role="alert">{error}</p>}
     {showForm && <form className="timetable-form" onSubmit={submit}>
-      <h3>New timetable period</h3>
+      <h3>{editingEntryId ? "Edit timetable period" : "New timetable period"}</h3>
       <div className="timetable-form-grid">
-        <label>Academic year<select required value={form.academicYearId} onChange={(e) => setForm((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "", assignmentId: "" }))}><option value="">Select year</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}</select></label>
-        <label>Class<select required value={form.classId} onChange={(e) => setForm((v) => ({ ...v, classId: e.target.value, sectionId: "", assignmentId: "" }))}><option value="">Select class</option>{formClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
-        <label>Section<select value={form.sectionId} onChange={(e) => setForm((v) => ({ ...v, sectionId: e.target.value, assignmentId: "" }))}><option value="">Class-wide / no section</option>{sections.map((section) => <option key={section._id} value={section._id}>{section.name}</option>)}</select></label>
+        <label>Academic year<select disabled={Boolean(editingEntryId)} required value={form.academicYearId} onChange={(e) => setForm((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "", assignmentId: "" }))}><option value="">Select year</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}</select></label>
+        <label>Class<select disabled={Boolean(editingEntryId)} required value={form.classId} onChange={(e) => setForm((v) => ({ ...v, classId: e.target.value, sectionId: "", assignmentId: "" }))}><option value="">Select class</option>{formClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+        <label>Section<select disabled={Boolean(editingEntryId)} value={form.sectionId} onChange={(e) => setForm((v) => ({ ...v, sectionId: e.target.value, assignmentId: "" }))}><option value="">Class-wide / no section</option>{sections.map((section) => <option key={section._id} value={section._id}>{section.name}</option>)}</select></label>
         <label>Teacher & subject assignment<select required value={form.assignmentId} onChange={(e) => setForm((v) => ({ ...v, assignmentId: e.target.value }))}><option value="">Select assignment</option>{availableAssignments.map((item) => <option key={item._id} value={item._id}>{teacherName(item)} — {item.subjectId?.name || "Subject"}{item.sectionId ? " (Section-specific)" : ""}</option>)}</select></label>
         <label>Weekday<select value={form.dayOfWeek} onChange={(e) => setForm((v) => ({ ...v, dayOfWeek: e.target.value }))}>{weekdays.map((day) => <option key={day.value} value={day.value}>{day.label}</option>)}</select></label>
         <label>Period number<input type="number" min="1" max="20" required value={form.periodNumber} onChange={(e) => setForm((v) => ({ ...v, periodNumber: e.target.value }))} /></label>
@@ -116,7 +139,7 @@ export default function TimetableManagement() {
         <label>End time<input type="time" required value={form.endTime} onChange={(e) => setForm((v) => ({ ...v, endTime: e.target.value }))} /></label>
         <label>Room / classroom (optional)<input maxLength="50" value={form.room} onChange={(e) => setForm((v) => ({ ...v, room: e.target.value }))} placeholder="e.g. Room 12" /></label>
       </div>
-      <div className="timetable-form-actions"><button type="submit" className="timetable-primary" disabled={saving || !form.academicYearId || !form.classId || !form.assignmentId}>{saving ? "Saving…" : "Save period"}</button></div>
+      <div className="timetable-form-actions"><button type="submit" className="timetable-primary" disabled={saving || !form.academicYearId || !form.classId || !form.assignmentId}>{saving ? "Saving…" : editingEntryId ? "Update period" : "Save period"}</button></div>
       <p className="timetable-help">Monday–Saturday schedule. Class/section and teacher time conflicts are checked before saving.</p>
     </form>}
     <div className="timetable-toolbar"><h3>Weekly schedule</h3><div>
@@ -128,7 +151,7 @@ export default function TimetableManagement() {
       {loading ? <tr><td colSpan="9">Loading timetable…</td></tr> : entries.length ? entries.map((entry) => <tr key={entry._id}>
         <td>{dayLabel(entry.dayOfWeek)}</td><td>{entry.periodNumber}</td><td>{entry.startTime}–{entry.endTime}</td><td>{entry.classId?.name || "—"}{entry.sectionId?.name ? <small>Section {entry.sectionId.name}</small> : <small>Class-wide</small>}</td>
         <td>{entry.assignmentId?.subjectId?.name || "—"}</td><td>{teacherName(entry.assignmentId)}</td><td>{entry.room || "—"}</td><td><span className={`timetable-status status-${entry.status}`}>{entry.status}</span></td>
-        <td><button type="button" className="timetable-action" onClick={() => void toggleStatus(entry)}>{entry.status === "active" ? "Deactivate" : "Activate"}</button></td>
+        <td><div className="timetable-row-actions"><button type="button" className="timetable-action" onClick={() => editEntry(entry)}>Edit</button><button type="button" className="timetable-action" onClick={() => void toggleStatus(entry)}>{entry.status === "active" ? "Deactivate" : "Activate"}</button></div></td>
       </tr>) : <tr><td colSpan="9">No timetable periods found for these filters.</td></tr>}
     </tbody></table></div>
     <p className="timetable-help">Inactive periods are hidden from the active schedule. Reactivating a period is blocked if its linked teacher assignment is inactive.</p>
