@@ -88,6 +88,7 @@ export default function AttendanceManagement() {
         studentId: item.student._id,
         enrollmentId: item.enrollmentId,
         student: item.student,
+        section: item.section,
         status: item.attendance?.status || "",
         remarks: item.attendance?.remarks || "",
       })));
@@ -127,7 +128,7 @@ export default function AttendanceManagement() {
     try {
       const response = await apiRequest("/attendance", {
         method: "PUT", accessToken,
-        body: { date, academicYearId: yearId, classId, sectionId: sectionId || null,
+        body: { date, academicYearId: yearId, classId, ...(sectionId ? { sectionId } : {}),
           records: roster.map(({ studentId, status, remarks }) => ({ studentId, status, remarks })) },
       });
       if (!response?.success) throw new Error("Attendance could not be saved.");
@@ -167,7 +168,7 @@ export default function AttendanceManagement() {
     <div className="attendance-table-wrap">
       <table className="attendance-table"><thead><tr><th>Admission no.</th><th>Student</th><th>Section</th><th>Attendance</th><th>Remarks</th></tr></thead>
         <tbody>{loadingRoster ? <tr><td colSpan="5">Loading attendance register…</td></tr> : roster.length ? roster.map((item) => <tr key={item.studentId}>
-          <td>{item.student.admissionNumber}</td><td>{[item.student.firstName, item.student.lastName].filter(Boolean).join(" ")}</td><td>{sections.find((section) => section._id === (item.section?._id || item.sectionId))?.name || "—"}</td>
+          <td>{item.student.admissionNumber}</td><td>{[item.student.firstName, item.student.lastName].filter(Boolean).join(" ")}</td><td>{item.section?.name || "—"}</td>
           <td><select aria-label={`Attendance for ${item.student.firstName}`} value={item.status} onChange={(e) => updateRecord(item.studentId, { status: e.target.value })}><option value="">Unmarked</option>{STATUSES.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select></td>
           <td><input aria-label={`Remarks for ${item.student.firstName}`} maxLength="300" value={item.remarks} onChange={(e) => updateRecord(item.studentId, { remarks: e.target.value })} placeholder="Optional note" /></td>
         </tr>) : <tr><td colSpan="5">{error ? "Attendance roster unavailable." : "No active enrolled students found for this selection."}</td></tr>}</tbody>
