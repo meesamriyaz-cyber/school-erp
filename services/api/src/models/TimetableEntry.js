@@ -5,7 +5,7 @@ const timetableEntrySchema = new mongoose.Schema({
   academicYearId: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicYear", required: true, immutable: true },
   classId: { type: mongoose.Schema.Types.ObjectId, ref: "SchoolClass", required: true, immutable: true },
   sectionId: { type: mongoose.Schema.Types.ObjectId, ref: "Section", default: null, immutable: true },
-  assignmentId: { type: mongoose.Schema.Types.ObjectId, ref: "TeacherAssignment", required: true, immutable: true },
+  assignmentId: { type: mongoose.Schema.Types.ObjectId, ref: "TeacherAssignment", required: true },
   dayOfWeek: { type: Number, required: true, min: 1, max: 6 },
   periodNumber: { type: Number, required: true, min: 1, max: 20 },
   startTime: { type: String, required: true, match: /^([01][0-9]|2[0-3]):[0-5][0-9]$/ },
