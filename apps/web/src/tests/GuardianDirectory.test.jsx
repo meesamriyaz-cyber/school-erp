@@ -54,7 +54,7 @@ describe("GuardianDirectory", () => {
     const user = userEvent.setup();
     render(<GuardianDirectory />);
 
-    await screen.findByText("Imran Khan");
+    await screen.findAllByText("Imran Khan");
     await user.type(screen.getByRole("searchbox", { name: "Search guardians" }), "sara@example.com");
 
     expect(screen.getAllByText("Sara Khan").length).toBeGreaterThan(0);
@@ -66,7 +66,7 @@ describe("GuardianDirectory", () => {
     const user = userEvent.setup();
     render(<GuardianDirectory />);
 
-    await screen.findByText("Imran Khan");
+    await screen.findAllByText("Imran Khan");
     await user.selectOptions(screen.getByLabelText("Filter guardians by status"), "active");
 
     expect(screen.getAllByText("Imran Khan").length).toBeGreaterThan(0);
