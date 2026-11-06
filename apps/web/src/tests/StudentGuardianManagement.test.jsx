@@ -108,7 +108,7 @@ describe("StudentGuardianManagement", () => {
     let currentLink = { ...link };
 
     apiRequest.mockImplementation(async (path, options = {}) => {
-      if (path === "/students/student-1/guardians" && options.method === "PATCH") {
+      if (path === "/students/student-1/guardians/student-guardian-1" && options.method === "PATCH") {
         currentLink = { ...currentLink, ...options.body };
         return { success: true, data: currentLink };
       }
