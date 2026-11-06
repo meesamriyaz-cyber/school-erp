@@ -431,6 +431,61 @@ describe("Guardian API integration tests", () => {
     expect(response.body.data.phone).toBe("8888888888");
   });
 
+  it("synchronizes legacy student guardian contact fields when a guardian is edited", async () => {
+    const studentResponse = await request("/students", {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        admissionNumber: `GUARD-SYNC-${randomUUID()}`,
+        firstName: "Linked",
+        lastName: "Student",
+        admissionDate: "2026-04-01",
+        guardianName: "Original Guardian",
+        guardianPhone: "9111111111",
+        guardianEmail: "original@example.test",
+      }),
+    });
+
+    expect(studentResponse.status).toBe(201);
+    const studentId = studentResponse.body.data._id;
+
+    const directory = await request("/guardians", { token: adminA.token });
+    const guardian = directory.body.data.find(
+      (item) => item.phone === "9111111111",
+    );
+    expect(guardian).toBeTruthy();
+
+    const updated = await request(`/guardians/${guardian._id}`, {
+      method: "PATCH",
+      token: adminA.token,
+      body: JSON.stringify({
+        firstName: "Updated",
+        lastName: "Guardian",
+        phone: "9222222222",
+        email: "updated@example.test",
+      }),
+    });
+
+    expect(updated.status).toBe(200);
+
+    const student = await request(`/students/${studentId}`, {
+      token: adminA.token,
+    });
+    expect(student.status).toBe(200);
+    expect(student.body.data.guardianName).toBe("Updated Guardian");
+    expect(student.body.data.guardianPhone).toBe("9222222222");
+    expect(student.body.data.guardianEmail).toBe("updated@example.test");
+
+    const details = await request(`/guardians/${guardian._id}`, {
+      token: adminA.token,
+    });
+    expect(details.status).toBe(200);
+    expect(details.body.data.linkedStudents).toHaveLength(1);
+    expect(String(details.body.data.linkedStudents[0].student._id)).toBe(
+      String(studentId),
+    );
+  });
+
   it("prevents a teacher from updating a guardian", async () => {
     const guardian = await createGuardian(adminA.token);
 
