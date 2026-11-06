@@ -78,7 +78,7 @@ describe("GuardianDirectory", () => {
       });
 
     render(<GuardianDirectory />);
-    await user.click(await screen.findByRole("button", { name: "Imran Khan" }));
+    await user.click((await screen.findAllByRole("button", { name: "Imran Khan" }))[0]);
 
     expect(await screen.findByRole("heading", { name: "Guardian details" })).toBeInTheDocument();
     expect(screen.getByText("Linked students (2)")).toBeInTheDocument();
@@ -96,11 +96,11 @@ describe("GuardianDirectory", () => {
     const user = userEvent.setup();
     render(<GuardianDirectory />);
 
-    await screen.findAllByText("Imran Khan");
+    await screen.findAllByRole("button", { name: "Imran Khan" });
     await user.type(screen.getByRole("searchbox", { name: "Search guardians" }), "sara@example.com");
 
     expect(screen.getAllByText("Sara Khan").length).toBeGreaterThan(0);
-    expect(screen.queryAllByText("Imran Khan")).toHaveLength(0);
+    expect(screen.queryAllByRole("button", { name: "Imran Khan" })).toHaveLength(0);
     expect(screen.getByText("1", { selector: "strong" })).toBeInTheDocument();
   });
 
@@ -111,7 +111,7 @@ describe("GuardianDirectory", () => {
     await screen.findAllByText("Imran Khan");
     await user.selectOptions(screen.getByLabelText("Filter guardians by status"), "active");
 
-    expect(screen.getAllByText("Imran Khan").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "Imran Khan" }).length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Sara Khan")).toHaveLength(0);
     expect(screen.getByText("1", { selector: "strong" })).toBeInTheDocument();
   });
