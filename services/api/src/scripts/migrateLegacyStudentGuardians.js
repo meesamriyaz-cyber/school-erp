@@ -17,9 +17,9 @@ const run = async () => {
   try {
     const students = await Student.find({
       $or: [
-        { guardianName: { $nin: ["", null] } },
-        { guardianPhone: { $nin: ["", null] } },
-        { guardianEmail: { $nin: ["", null] } },
+        { guardianName: { $exists: true, $nin: ["", null] } },
+        { guardianPhone: { $exists: true, $nin: ["", null] } },
+        { guardianEmail: { $exists: true, $nin: ["", null] } },
       ],
     }).lean();
 
