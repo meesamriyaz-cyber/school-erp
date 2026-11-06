@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 
 import Student from "../models/Student.js";
+import { syncLegacyStudentGuardian } from "../services/syncLegacyStudentGuardian.js";
 
 const CREATE_FIELDS = [
   "admissionNumber",
@@ -163,6 +164,8 @@ export const createStudent = async (req, res, next) => {
       tenantId: req.tenantId,
     });
 
+    await syncLegacyStudentGuardian(student);
+
     return res.status(201).json({
       success: true,
       data: student,
@@ -233,7 +236,7 @@ export const updateStudent = async (req, res, next) => {
       },
       { $set: updates },
       { returnDocument: "after", runValidators: true }
-    ).lean();
+    );
 
     if (!student) {
       return res.status(404).json({
@@ -242,9 +245,11 @@ export const updateStudent = async (req, res, next) => {
       });
     }
 
+    await syncLegacyStudentGuardian(student);
+
     return res.status(200).json({
       success: true,
-      data: student,
+      data: student.toObject ? student.toObject() : student,
     });
   } catch (error) {
     return handleStudentError(error, res, next);
