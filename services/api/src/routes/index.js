@@ -17,7 +17,7 @@ import examRoutes from "./examRoutes.js";
 import examMarkRoutes from "./examMarkRoutes.js";
 import guardianRoutes from "./guardianRoutes.js";
 import studentGuardianRoutes from "./studentGuardianRoutes.js";
-import portalRoutes from "./portalRoutes.js";import portalRoutes from "./portalRoutes.js";
+import portalRoutes from "./portalRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
