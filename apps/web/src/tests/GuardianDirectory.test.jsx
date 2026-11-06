@@ -30,7 +30,7 @@ const guardians = [
 describe("GuardianDirectory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuth.mockReturnValue({ accessToken: "test-access-token" });
+    useAuth.mockReturnValue({ accessToken: "test-access-token", user: { role: "school_admin" } });
     apiRequest.mockResolvedValue({ success: true, data: guardians });
   });
 
@@ -90,6 +90,66 @@ describe("GuardianDirectory", () => {
       "/guardians/guardian-1",
       { accessToken: "test-access-token" },
     );
+  });
+
+  it("allows an administrator to edit guardian contact details", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce({ success: true, data: guardians })
+      .mockResolvedValueOnce({ success: true, data: { ...guardians[0], linkedStudents: [] } })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { ...guardians[0], firstName: "Nadia", phone: "7777777777", email: "nadia@example.com" },
+      });
+
+    render(<GuardianDirectory />);
+    await user.click((await screen.findAllByRole("button", { name: "Imran Khan" }))[0]);
+    await user.click(await screen.findByRole("button", { name: "Edit guardian" }));
+    await user.clear(screen.getByLabelText("First name *"));
+    await user.type(screen.getByLabelText("First name *"), "Nadia");
+    await user.clear(screen.getByLabelText("Phone"));
+    await user.type(screen.getByLabelText("Phone"), "7777777777");
+    await user.clear(screen.getByLabelText("Email"));
+    await user.type(screen.getByLabelText("Email"), "nadia@example.com");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByText("Guardian details updated successfully.")).toBeInTheDocument();
+    expect(screen.getByText("Nadia", { selector: "p" })).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenLastCalledWith("/guardians/guardian-1", {
+      method: "PATCH",
+      accessToken: "test-access-token",
+      body: {
+        firstName: "Nadia",
+        lastName: "Khan",
+        phone: "7777777777",
+        email: "nadia@example.com",
+      },
+    });
+  });
+
+  it("requires confirmation before deactivating a guardian record", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce({ success: true, data: guardians })
+      .mockResolvedValueOnce({ success: true, data: { ...guardians[0], linkedStudents: [] } })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { ...guardians[0], status: "inactive" },
+      });
+
+    render(<GuardianDirectory />);
+    await user.click((await screen.findAllByRole("button", { name: "Imran Khan" }))[0]);
+    await user.click(await screen.findByRole("button", { name: "Deactivate" }));
+    expect(screen.getByText(/Existing student links and history will be retained/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByText("Guardian record deactivated. Linked student history has been retained.")).toBeInTheDocument();
+    expect(screen.getByText("inactive")).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenLastCalledWith("/guardians/guardian-1", {
+      method: "PATCH",
+      accessToken: "test-access-token",
+      body: { status: "inactive" },
+    });
   });
 
   it("filters guardian records by name, phone and email", async () => {
