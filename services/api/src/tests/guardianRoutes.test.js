@@ -932,4 +932,42 @@ describe("Guardian API integration tests", () => {
     expect(response.status).toBe(400);
   });
 
+
+  it("creates a normalized guardian and student link from legacy student guardian fields", async () => {
+    const studentResponse = await request("/students", {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        admissionNumber: `LEGACY-${randomUUID()}`,
+        firstName: "Test",
+        lastName: "Student",
+        admissionDate: "2026-04-01",
+        guardianName: "Shahnawaz Chachoo",
+        guardianPhone: "919149410572",
+        guardianEmail: "shahnawaz@example.test",
+      }),
+    });
+
+    expect(studentResponse.status).toBe(201);
+    const student = studentResponse.body.data;
+
+    const directory = await request("/guardians", { token: adminA.token });
+    const guardian = directory.body.data.find(
+      (item) => item.phone === "919149410572",
+    );
+    expect(guardian).toBeTruthy();
+    expect(guardian.firstName).toBe("Shahnawaz");
+    expect(guardian.lastName).toBe("Chachoo");
+
+    const details = await request(`/guardians/${guardian._id}`, {
+      token: adminA.token,
+    });
+    expect(details.status).toBe(200);
+    expect(details.body.data.linkedStudents).toHaveLength(1);
+    expect(String(details.body.data.linkedStudents[0].student._id)).toBe(
+      String(student._id),
+    );
+    expect(details.body.data.linkedStudents[0].relationship).toBe("other");
+  });
+
 });
