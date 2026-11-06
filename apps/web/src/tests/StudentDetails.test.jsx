@@ -569,8 +569,8 @@ it("loads and displays linked guardian details for the student", async () => {
   expect(screen.getByText("8888888888")).toBeInTheDocument();
   expect(screen.getByText("imran@example.com")).toBeInTheDocument();
   expect(screen.getByText("sara@example.com")).toBeInTheDocument();
-  expect(screen.getByText("father")).toBeInTheDocument();
-  expect(screen.getByText("mother")).toBeInTheDocument();
+  expect(screen.getByText("Father")).toBeInTheDocument();
+  expect(screen.getByText("Mother")).toBeInTheDocument();
   expect(apiRequest).toHaveBeenCalledWith(
     `/students/${studentId}/guardians`,
     expect.objectContaining({
