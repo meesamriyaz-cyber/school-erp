@@ -1,0 +1,111 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import GuardianDirectory from "../components/GuardianDirectory.jsx";
+import { useAuth } from "../context/authContext.js";
+import { apiRequest } from "../lib/api.js";
+
+vi.mock("../context/authContext.js", () => ({ useAuth: vi.fn() }));
+vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
+
+const guardians = [
+  {
+    _id: "guardian-1",
+    firstName: "Imran",
+    lastName: "Khan",
+    phone: "9999999999",
+    email: "imran@example.com",
+    status: "active",
+  },
+  {
+    _id: "guardian-2",
+    firstName: "Sara",
+    lastName: "Khan",
+    phone: "8888888888",
+    email: "sara@example.com",
+    status: "inactive",
+  },
+];
+
+describe("GuardianDirectory", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuth.mockReturnValue({ accessToken: "test-access-token" });
+    apiRequest.mockResolvedValue({ success: true, data: guardians });
+  });
+
+  it("loads and displays school guardian records", async () => {
+    render(<GuardianDirectory />);
+
+    expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
+    expect(screen.getAllByText("Sara Khan").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("9999999999").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("imran@example.com").length).toBeGreaterThan(0);
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/guardians",
+      expect.objectContaining({
+        accessToken: "test-access-token",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("filters guardian records by name, phone and email", async () => {
+    const user = userEvent.setup();
+    render(<GuardianDirectory />);
+
+    await screen.findByText("Imran Khan");
+    await user.type(screen.getByRole("searchbox", { name: "Search guardians" }), "sara@example.com");
+
+    expect(screen.getAllByText("Sara Khan").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Imran Khan")).not.toBeInTheDocument();
+    expect(screen.getByText("1 guardian found")).toBeInTheDocument();
+  });
+
+  it("filters guardian records by active status", async () => {
+    const user = userEvent.setup();
+    render(<GuardianDirectory />);
+
+    await screen.findByText("Imran Khan");
+    await user.selectOptions(screen.getByLabelText("Filter guardians by status"), "active");
+
+    expect(screen.getAllByText("Imran Khan").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Sara Khan")).not.toBeInTheDocument();
+    expect(screen.getByText("1 guardian found")).toBeInTheDocument();
+  });
+
+  it("paginates guardian records", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockResolvedValue({
+      success: true,
+      data: Array.from({ length: 12 }, (_, index) => ({
+        _id: `guardian-${index + 1}`,
+        firstName: `Guardian${index + 1}`,
+        lastName: "Test",
+        status: "active",
+      })),
+    });
+
+    render(<GuardianDirectory />);
+
+    expect(await screen.findByText("Guardian1 Test")).toBeInTheDocument();
+    expect(screen.queryByText("Guardian11 Test")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Guardian11 Test")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+  });
+
+  it("shows a load error and retries the directory request", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockRejectedValueOnce(new Error("Directory unavailable"))
+      .mockResolvedValueOnce({ success: true, data: guardians });
+
+    render(<GuardianDirectory />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Directory unavailable");
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(2));
+  });
+});
