@@ -17,6 +17,7 @@ vi.mock("../components/AcademicYearManagement.jsx", () => ({ default: () => <h2>
 vi.mock("../components/ClassesManagement.jsx", () => ({ default: () => <h2>Classes management displayed</h2> }));
 vi.mock("../components/SectionsManagement.jsx", () => ({ default: () => <h2>Sections management displayed</h2> }));
 vi.mock("../components/EnrollmentsManagement.jsx", () => ({ default: () => <h2>Enrollments management displayed</h2> }));
+vi.mock("../components/AttendanceManagement.jsx", () => ({ default: () => <h2>Attendance management displayed</h2> }));
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>Platform Administrator workspace displayed</h1> }));
 vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));
 
@@ -84,13 +85,12 @@ describe("App", () => {
     expect(logout).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a placeholder for unfinished modules", async () => {
+  it("opens Attendance management from academic navigation", async () => {
     const user = userEvent.setup();
     useAuth.mockReturnValue(schoolAdmin());
     render(<App />);
     await user.click(screen.getByRole("button", { name: /Attendance/ }));
-    expect(screen.getAllByRole("heading", { name: "Attendance" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Back to overview" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Attendance management displayed" })).toBeInTheDocument();
   });
 
  it("shows an unavailable message when the authenticated user has no role", () => {
@@ -156,7 +156,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Close navigation" }));
     expect(screen.queryByRole("button", { name: "Close navigation" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Attendance/ }));
-    await user.click(screen.getByRole("button", { name: "Back to overview" }));
+    await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(screen.getByRole("heading", { name: "Good day, Administrator" })).toBeInTheDocument();
   });
 
