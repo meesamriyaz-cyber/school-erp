@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./GuardianDirectory.css";
+import PortalAccountLink from "./PortalAccountLink.jsx";
 
 const PAGE_SIZE = 10;
 
@@ -407,6 +408,22 @@ export default function GuardianDirectory() {
                     <span><strong>Email:</strong> {selectedGuardian.email || "—"}</span>
                     <span><strong>Status:</strong> <GuardianStatus status={selectedGuardian.status} /></span>
                   </div>}
+                  {canManage && !editing && (
+                    <div className="guardian-directory-portal-link">
+                      <h4>Parent portal access</h4>
+                      <PortalAccountLink
+                        record={selectedGuardian}
+                        recordType="guardian"
+                        onLinked={(updated) => {
+                          setSelectedGuardian((current) => ({ ...current, ...updated }));
+                          setGuardians((current) => current.map((item) => (
+                            item._id === updated._id ? { ...item, ...updated } : item
+                          )));
+                          setMutationNotice("Parent portal account linked successfully.");
+                        }}
+                      />
+                    </div>
+                  )}
                   <h4>Linked students ({selectedGuardian.linkedStudents?.length || 0})</h4>
                   {!selectedGuardian.linkedStudents?.length ? (
                     <p>No students are currently linked to this guardian.</p>
