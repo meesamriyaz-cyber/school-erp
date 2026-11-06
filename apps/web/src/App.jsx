@@ -12,6 +12,7 @@ import SectionsManagement from "./components/SectionsManagement.jsx";
 import EnrollmentsManagement from "./components/EnrollmentsManagement.jsx";
 import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
 import SchoolUserDirectory from "./components/SchoolUserDirectory.jsx";
+import GuardianDirectory from "./components/GuardianDirectory.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -383,6 +384,8 @@ function DashboardApp() {
             </>
           ) : activePage === "Students" ? (
   <StudentDirectory />
+) : activePage === "Guardians" ? (
+  <GuardianDirectory />
 ) : activePage === "Academic Years" ? (
   <AcademicYearManagement />
 ) : activePage === "Classes & Sections" ? (
