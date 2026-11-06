@@ -84,7 +84,7 @@ describe("GuardianDirectory", () => {
     expect(screen.getByText("Linked students (2)")).toBeInTheDocument();
     expect(screen.getByText("Ayaan Khan")).toBeInTheDocument();
     expect(screen.getByText("Areeba Khan")).toBeInTheDocument();
-    expect(screen.getByText("ADM-001")).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element.tagName === "SPAN" && element.textContent.includes("ADM-001"))).toBeInTheDocument();
     expect(screen.getByText("Emergency contact")).toBeInTheDocument();
     expect(apiRequest).toHaveBeenLastCalledWith(
       "/guardians/guardian-1",
