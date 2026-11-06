@@ -131,3 +131,81 @@ export const saveAttendance = async (req, res, next) => {
     return next(error);
   }
 };
+
+
+export const getAttendanceReports = async (req, res, next) => {
+  try {
+    const { academicYearId, from, to, classId } = req.query;
+    const start = parseDay(from);
+    const end = parseDay(to);
+    if (!validId(academicYearId)) return invalid(res, "A valid academic year is required");
+    if (!start || !end || start > end) return invalid(res, "Provide a valid date range in YYYY-MM-DD format");
+    if ((end - start) / 86400000 > 366) return invalid(res, "Date range cannot exceed 367 calendar days");
+    if (classId && !validId(classId)) return invalid(res, "Invalid class ID");
+    const year = await AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId }).select("startDate endDate").lean();
+    if (!year) return res.status(404).json({ success: false, message: "Academic year not found" });
+    const yearStart = new Date(year.startDate); yearStart.setUTCHours(0, 0, 0, 0);
+    const yearEnd = new Date(year.endDate); yearEnd.setUTCHours(0, 0, 0, 0);
+    if (start < yearStart || end > yearEnd) return invalid(res, "Report dates must fall within the selected academic year");
+
+    const enrollmentFilter = { tenantId: req.tenantId, academicYearId, status: "active" };
+    if (classId) enrollmentFilter.classId = classId;
+    const enrollments = await Enrollment.find(enrollmentFilter)
+      .populate("studentId", "admissionNumber firstName lastName status")
+      .populate("classId", "name")
+      .populate("sectionId", "name")
+      .lean();
+    const activeEnrollments = enrollments.filter((item) => item.studentId?.status === "active");
+    const classIds = [...new Set(activeEnrollments.map((item) => String(item.classId?._id)).filter(Boolean))];
+    const records = await Attendance.find({
+      tenantId: req.tenantId, academicYearId,
+      date: { $gte: start, $lte: end },
+      ...(classId ? { classId } : {}),
+    }).select("studentId classId sectionId date status").lean();
+
+    const tally = (items) => {
+      const counts = { present: 0, absent: 0, late: 0, excused: 0 };
+      items.forEach((item) => { if (counts[item.status] !== undefined) counts[item.status] += 1; });
+      const considered = counts.present + counts.absent + counts.late;
+      return { ...counts, marked: items.length, considered, attended: counts.present + counts.late,
+        percentage: considered ? Math.round(((counts.present + counts.late) / considered) * 1000) / 10 : null };
+    };
+    const students = activeEnrollments.map((enrollment) => {
+      const studentRecords = records.filter((item) => String(item.studentId) === String(enrollment.studentId._id));
+      return {
+        studentId: enrollment.studentId._id,
+        admissionNumber: enrollment.studentId.admissionNumber,
+        name: [enrollment.studentId.firstName, enrollment.studentId.lastName].filter(Boolean).join(" "),
+        classId: enrollment.classId?._id,
+        className: enrollment.classId?.name || "Unassigned",
+        sectionName: enrollment.sectionId?.name || "—",
+        ...tally(studentRecords),
+      };
+    }).sort((a, b) => a.className.localeCompare(b.className) || a.name.localeCompare(b.name));
+    const classMap = new Map();
+    activeEnrollments.forEach((item) => {
+      const id = String(item.classId?._id);
+      if (!id) return;
+      if (!classMap.has(id)) classMap.set(id, { classId: item.classId._id, className: item.classId.name, studentCount: 0 });
+      classMap.get(id).studentCount += 1;
+    });
+    const monthlyMap = new Map();
+    records.forEach((record) => {
+      const month = record.date.toISOString().slice(0, 7);
+      const key = String(record.classId) + ":" + month;
+      if (!monthlyMap.has(key)) {
+        const classInfo = classMap.get(String(record.classId));
+        monthlyMap.set(key, { classId: record.classId, className: classInfo?.className || "Class", month, records: [] });
+      }
+      monthlyMap.get(key).records.push(record);
+    });
+    const monthly = [...monthlyMap.values()].map((item) => ({
+      classId: item.classId, className: item.className, month: item.month, ...tally(item.records),
+    })).sort((a, b) => a.month.localeCompare(b.month) || a.className.localeCompare(b.className));
+    const overall = tally(records);
+    return res.status(200).json({ success: true, range: { from, to }, summary: {
+      students: activeEnrollments.length, ...overall,
+      classes: classMap.size,
+    }, students, monthly });
+  } catch (error) { return next(error); }
+};
