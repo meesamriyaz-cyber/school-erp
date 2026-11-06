@@ -31,6 +31,7 @@ const studentGuardianSchema = new mongoose.Schema(
       immutable: true,
     },
     relationship: { type: String, enum: RELATIONSHIPS, required: true },
+    source: { type: String, enum: ["manual", "legacy_student"], default: "manual" },
     isPrimary: { type: Boolean, default: false },
     isEmergencyContact: { type: Boolean, default: false },
     canPickup: { type: Boolean, default: false },
