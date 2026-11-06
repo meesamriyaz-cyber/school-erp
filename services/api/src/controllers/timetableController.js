@@ -133,8 +133,27 @@ export const updateTimetableEntry = async (req, res, next) => {
     const entry = await TimetableEntry.findOne({ _id: req.params.entryId, tenantId: req.tenantId });
     if (!entry) return res.status(404).json({ success: false, message: "Timetable entry not found" });
     if (req.body.status === "active") {
-      const assignment = await TeacherAssignment.exists({ _id: entry.assignmentId, tenantId: req.tenantId, status: "active" });
+      const assignment = await TeacherAssignment.findOne({ _id: entry.assignmentId, tenantId: req.tenantId, status: "active" }).select("teacherId").lean();
       if (!assignment) return res.status(409).json({ success: false, message: "Activate the linked teacher assignment before activating this timetable entry" });
+      const classScope = {
+        tenantId: req.tenantId, academicYearId: entry.academicYearId, classId: entry.classId,
+        dayOfWeek: entry.dayOfWeek, status: "active", _id: { $ne: entry._id },
+        ...(entry.sectionId ? { $or: [{ sectionId: null }, { sectionId: entry.sectionId }] } : {}),
+      };
+      const classEntries = await TimetableEntry.find(classScope).select("periodNumber startTime endTime").lean();
+      const start = timeToMinutes(entry.startTime), end = timeToMinutes(entry.endTime);
+      const overlaps = (item) => start < timeToMinutes(item.endTime) && end > timeToMinutes(item.startTime);
+      if (classEntries.some((item) => item.periodNumber === entry.periodNumber || overlaps(item))) {
+        return res.status(409).json({ success: false, message: "This class or section now has another timetable entry in the selected period or time range" });
+      }
+      const teacherAssignmentIds = await TeacherAssignment.find({ tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId }).distinct("_id");
+      const teacherEntries = await TimetableEntry.find({
+        tenantId: req.tenantId, academicYearId: entry.academicYearId, dayOfWeek: entry.dayOfWeek,
+        status: "active", _id: { $ne: entry._id }, assignmentId: { $in: teacherAssignmentIds },
+      }).select("startTime endTime").lean();
+      if (teacherEntries.some(overlaps)) {
+        return res.status(409).json({ success: false, message: "This teacher already has a class during the selected time range" });
+      }
     }
     entry.status = req.body.status;
     await entry.save();
