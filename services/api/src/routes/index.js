@@ -9,6 +9,8 @@ import academicYearRoutes from "./academicYearRoutes.js";
 import schoolClassRoutes from "./schoolClassRoutes.js";
 import sectionRoutes from "./sectionRoutes.js";
 import enrollmentRoutes from "./enrollmentRoutes.js";
+import guardianRoutes from "./guardianRoutes.js";
+import studentGuardianRoutes from "./studentGuardianRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -24,6 +26,8 @@ router.get("/health/ready", (req, res) => {
 router.use("/auth", authRoutes);
 router.use("/platform", platformRoutes);
 router.use("/school", schoolRoutes);
+router.use("/students/:studentId/guardians", studentGuardianRoutes);
+router.use("/guardians", guardianRoutes);
 router.use("/students", studentRoutes);
 router.use("/academic-years", academicYearRoutes);
 router.use("/classes", schoolClassRoutes);
