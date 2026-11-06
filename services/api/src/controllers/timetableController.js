@@ -91,7 +91,7 @@ export const createTimetableEntry = async (req, res, next) => {
     const scope = { tenantId: req.tenantId, academicYearId, classId, dayOfWeek: day, status: "active" };
     const sectionConflict = selectedSection
       ? { $or: [{ sectionId: null }, { sectionId: selectedSection }] }
-      : { sectionId: null };
+      : {};
     const classEntries = await TimetableEntry.find({ ...scope, ...sectionConflict }).select("periodNumber startTime endTime").lean();
     const overlaps = (entry) => start < timeToMinutes(entry.endTime) && end > timeToMinutes(entry.startTime);
     if (classEntries.some((entry) => entry.periodNumber === period || overlaps(entry))) {
