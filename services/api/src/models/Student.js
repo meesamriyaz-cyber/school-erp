@@ -16,7 +16,6 @@ const studentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
-      immutable: true,
     },
 
     // Admission numbers must be unique within each school,
