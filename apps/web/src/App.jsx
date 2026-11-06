@@ -15,6 +15,7 @@ import SchoolUserDirectory from "./components/SchoolUserDirectory.jsx";
 import GuardianDirectory from "./components/GuardianDirectory.jsx";
 import AttendanceManagement from "./components/AttendanceManagement.jsx";
 import SubjectManagement from "./components/SubjectManagement.jsx";
+import TeacherAssignments from "./components/TeacherAssignments.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -26,6 +27,7 @@ const navigation = [
   { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
   { label: "Subjects", icon: "▤", section: "ACADEMICS" },
+  { label: "Teacher Assignments", icon: "♙", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
   { label: "Fees & Payments", icon: "₹", section: "FINANCE" },
@@ -401,6 +403,8 @@ function DashboardApp() {
   <AttendanceManagement />
 ) : activePage === "Subjects" ? (
   <SubjectManagement />
+) : activePage === "Teacher Assignments" ? (
+  <TeacherAssignments />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
 ) : (
