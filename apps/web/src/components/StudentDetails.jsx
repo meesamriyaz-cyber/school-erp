@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import EditStudentForm from "./EditStudentForm.jsx";
+import StudentGuardianManagement from "./StudentGuardianManagement.jsx";
 
 function formatDate(value) {
   if (!value) return "Not provided";
@@ -27,7 +28,7 @@ function enrollmentName(enrollment) {
 }
 
 export default function StudentDetails({ studentId, onBack }) {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -165,6 +166,12 @@ export default function StudentDetails({ studentId, onBack }) {
           <DetailItem label="Guardian Email" value={student.guardianEmail} />
         </div>
       </div>
+
+      <StudentGuardianManagement
+        studentId={studentId}
+        accessToken={accessToken}
+        canManage={["school_admin", "principal"].includes(user?.role)}
+      />
 
       <section className="student-details-card student-academic-profile" aria-labelledby="student-current-placement-title">
         <h3 id="student-current-placement-title">Current Academic Placement</h3>
