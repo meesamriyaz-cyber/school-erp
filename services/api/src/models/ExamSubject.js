@@ -67,11 +67,10 @@ const examSubjectSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
-examSubjectSchema.pre("validate", function validateTimeRange(next) {
+examSubjectSchema.pre("validate", function validateTimeRange() {
   if (this.startTime && this.endTime && this.endTime <= this.startTime) {
     this.invalidate("endTime", "End time must be later than start time");
   }
-  next();
 });
 
 examSubjectSchema.index(
