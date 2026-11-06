@@ -50,6 +50,48 @@ describe("GuardianDirectory", () => {
     );
   });
 
+  it("opens guardian details and displays all linked students", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce({ success: true, data: guardians })
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          ...guardians[0],
+          linkedStudents: [
+            {
+              _id: "link-1",
+              relationship: "father",
+              status: "active",
+              isPrimary: true,
+              student: { firstName: "Ayaan", lastName: "Khan", admissionNumber: "ADM-001" },
+            },
+            {
+              _id: "link-2",
+              relationship: "father",
+              status: "active",
+              isEmergencyContact: true,
+              student: { firstName: "Areeba", lastName: "Khan", admissionNumber: "ADM-002" },
+            },
+          ],
+        },
+      });
+
+    render(<GuardianDirectory />);
+    await user.click(await screen.findByRole("button", { name: "Imran Khan" }));
+
+    expect(await screen.findByRole("heading", { name: "Guardian details" })).toBeInTheDocument();
+    expect(screen.getByText("Linked students (2)")).toBeInTheDocument();
+    expect(screen.getByText("Ayaan Khan")).toBeInTheDocument();
+    expect(screen.getByText("Areeba Khan")).toBeInTheDocument();
+    expect(screen.getByText("ADM-001")).toBeInTheDocument();
+    expect(screen.getByText("Emergency contact")).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenLastCalledWith(
+      "/guardians/guardian-1",
+      { accessToken: "test-access-token" },
+    );
+  });
+
   it("filters guardian records by name, phone and email", async () => {
     const user = userEvent.setup();
     render(<GuardianDirectory />);
