@@ -64,13 +64,14 @@ export default function TimetableManagement() {
   }, [accessToken, loadEntries]);
 
   useEffect(() => {
-    if (!form.classId) { setSections([]); return undefined; }
+    const sectionClassId = form.classId || filter.classId;
+    if (!sectionClassId) { setSections([]); return undefined; }
     const controller = new AbortController();
-    apiRequest(`/sections?classId=${encodeURIComponent(form.classId)}&status=active`, { accessToken, signal: controller.signal })
+    apiRequest(`/sections?classId=${encodeURIComponent(sectionClassId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => { if (!controller.signal.aborted) setSections(Array.isArray(response?.data) ? response.data : []); })
       .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load sections."); });
     return () => controller.abort();
-  }, [accessToken, form.classId]);
+  }, [accessToken, form.classId, filter.classId]);
 
   const submit = async (event) => {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
