@@ -179,7 +179,7 @@ export default function ExaminationManagement() {
 
   const nextStatus = useMemo(() => ({ draft: "scheduled", scheduled: "in_progress", in_progress: "completed" }[selectedExam?.status] || null), [selectedExam?.status]);
   const canConfigure = selectedExam && !["completed", "published"].includes(selectedExam.status);
-  const canEnterMarks = selectedExam && selectedExam.status !== "published";
+  const canEnterMarks = selectedExam && ["scheduled", "in_progress", "completed"].includes(selectedExam.status);
 
   return <section className="examinations-page" aria-labelledby="examinations-title">
     <div className="examinations-intro"><div><p className="examinations-eyebrow">ACADEMIC OPERATIONS</p><h2 id="examinations-title">Examinations & results</h2><p>Create examinations, configure subjects, enter marks and publish consolidated results.</p></div><span className="examinations-count">{exams.length} examinations</span></div>
