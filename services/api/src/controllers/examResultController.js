@@ -17,7 +17,7 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
       tenantId,
       academicYearId: exam.academicYearId,
       classId: exam.classId,
-      ...(includeHistoricalEnrollments ? { status: { $in: ["active", "completed", "transferred"] } } : { status: "active" }),
+      ...(includeHistoricalEnrollments ? { status: { $in: ["active", "completed", "transferred", "withdrawn"] } } : { status: "active" }),
       ...(exam.sectionId ? { sectionId: exam.sectionId } : {}),
     })
       .populate("studentId", "admissionNumber firstName lastName")
