@@ -38,6 +38,7 @@ export default function GuardianDirectory() {
   const [detailError, setDetailError] = useState("");
   const { user } = useAuth();
   const canManage = ["school_admin", "principal"].includes(user?.role);
+  const canLinkPortal = user?.role === "school_admin";
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -408,7 +409,7 @@ export default function GuardianDirectory() {
                     <span><strong>Email:</strong> {selectedGuardian.email || "—"}</span>
                     <span><strong>Status:</strong> <GuardianStatus status={selectedGuardian.status} /></span>
                   </div>}
-                  {canManage && !editing && (
+                  {canLinkPortal && !editing && (
                     <div className="guardian-directory-portal-link">
                       <h4>Parent portal access</h4>
                       <PortalAccountLink
