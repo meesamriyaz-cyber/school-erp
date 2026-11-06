@@ -19,6 +19,5 @@ router.post("/", authorizeRoles("school_admin", "principal"), createGuardian);
 router.get("/:guardianId", authorizeRoles("school_admin", "principal", "teacher"), getGuardian);
 router.patch("/:guardianId", authorizeRoles("school_admin", "principal"), updateGuardian);
 router.post("/:guardianId/account", authorizeRoles("school_admin", "principal"), linkGuardianAccount);
-router.post("/:guardianId/account", authorizeRoles("school_admin", "principal"), linkGuardianAccount);
 
 export default router;
