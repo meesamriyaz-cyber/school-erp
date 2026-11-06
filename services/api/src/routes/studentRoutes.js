@@ -39,7 +39,7 @@ router.get(
   getStudent
 );
 
-// Update student details.
+// Explicitly link a student record to a student login account.\nrouter.post("/:studentId/account", authorizeRoles("school_admin", "principal"), linkStudentAccount);\n\n// Update student details.
 router.patch(
   "/:studentId",
   authorizeRoles("school_admin", "principal"),
