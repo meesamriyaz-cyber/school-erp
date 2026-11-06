@@ -8,7 +8,7 @@ import Section from "../models/Section.js";
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const timeToMinutes = (value) => {
-  if (typeof value !== "string" || !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(value)) return null;
+  if (typeof value !== "string" || !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(value)) return null;
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
 };
