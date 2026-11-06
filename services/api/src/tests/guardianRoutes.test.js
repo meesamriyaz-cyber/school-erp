@@ -691,6 +691,12 @@ describe("Guardian API integration tests", () => {
     expect(response.body.success).toBe(true);
     expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].guardianId).toMatchObject({
+      firstName: guardian.firstName,
+      lastName: guardian.lastName,
+      phone: guardian.phone,
+      email: guardian.email,
+    });
   });
 
   it("prevents a teacher from creating a student-guardian link", async () => {
