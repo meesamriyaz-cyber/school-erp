@@ -137,40 +137,103 @@ export const createTimetableEntry = async (req, res, next) => {
 export const updateTimetableEntry = async (req, res, next) => {
   try {
     if (!validId(req.params.entryId)) return invalid(res, "Invalid timetable entry ID");
-    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) ||
-      Object.keys(req.body).length !== 1 || !["active", "inactive"].includes(req.body.status)) {
-      return invalid(res, "Only active or inactive status can be changed");
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body) || !Object.keys(body).length) {
+      return invalid(res, "Provide timetable changes");
     }
     const entry = await TimetableEntry.findOne({ _id: req.params.entryId, tenantId: req.tenantId });
     if (!entry) return res.status(404).json({ success: false, message: "Timetable entry not found" });
-    if (req.body.status === "active") {
-      const assignment = await TeacherAssignment.findOne({ _id: entry.assignmentId, tenantId: req.tenantId, status: "active" }).select("teacherId").lean();
-      if (!assignment) return res.status(409).json({ success: false, message: "Activate the linked teacher assignment before activating this timetable entry" });
-      const classScope = {
-        tenantId: req.tenantId, academicYearId: entry.academicYearId, classId: entry.classId,
-        dayOfWeek: entry.dayOfWeek, status: "active", _id: { $ne: entry._id },
-        ...(entry.sectionId ? { $or: [{ sectionId: null }, { sectionId: entry.sectionId }] } : {}),
-      };
-      const classEntries = await TimetableEntry.find(classScope).select("periodNumber startTime endTime").lean();
-      const start = timeToMinutes(entry.startTime), end = timeToMinutes(entry.endTime);
-      const overlaps = (item) => start < timeToMinutes(item.endTime) && end > timeToMinutes(item.startTime);
-      if (classEntries.some((item) => item.periodNumber === entry.periodNumber || overlaps(item))) {
-        return res.status(409).json({ success: false, message: "This class or section now has another timetable entry in the selected period or time range" });
+
+    if (Object.keys(body).length === 1 && ["active", "inactive"].includes(body.status)) {
+      if (body.status === "active") {
+        const assignment = await TeacherAssignment.findOne({ _id: entry.assignmentId, tenantId: req.tenantId, status: "active" }).select("teacherId").lean();
+        if (!assignment) return res.status(409).json({ success: false, message: "Activate the linked teacher assignment before activating this timetable entry" });
+        const classScope = {
+          tenantId: req.tenantId, academicYearId: entry.academicYearId, classId: entry.classId,
+          dayOfWeek: entry.dayOfWeek, status: "active", _id: { $ne: entry._id },
+          ...(entry.sectionId ? { $or: [{ sectionId: null }, { sectionId: entry.sectionId }] } : {}),
+        };
+        const classEntries = await TimetableEntry.find(classScope).select("periodNumber startTime endTime").lean();
+        const start = timeToMinutes(entry.startTime), end = timeToMinutes(entry.endTime);
+        const overlaps = (item) => start < timeToMinutes(item.endTime) && end > timeToMinutes(item.startTime);
+        if (classEntries.some((item) => item.periodNumber === entry.periodNumber || overlaps(item))) {
+          return res.status(409).json({ success: false, message: "This class or section now has another timetable entry in the selected period or time range" });
+        }
+        const teacherAssignmentIds = await TeacherAssignment.find({ tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId }).distinct("_id");
+        const teacherEntries = await TimetableEntry.find({
+          tenantId: req.tenantId, academicYearId: entry.academicYearId, dayOfWeek: entry.dayOfWeek,
+          status: "active", _id: { $ne: entry._id }, assignmentId: { $in: teacherAssignmentIds },
+        }).select("startTime endTime").lean();
+        if (teacherEntries.some(overlaps)) {
+          return res.status(409).json({ success: false, message: "This teacher already has a class during the selected time range" });
+        }
       }
-      const teacherAssignmentIds = await TeacherAssignment.find({ tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId }).distinct("_id");
+      entry.status = body.status;
+    } else {
+      const editableFields = ["assignmentId", "dayOfWeek", "periodNumber", "startTime", "endTime", "room"];
+      if (Object.keys(body).some((key) => !editableFields.includes(key))) {
+        return invalid(res, "Only assignment, weekday, period, time and room can be edited");
+      }
+      const assignmentId = body.assignmentId ?? String(entry.assignmentId);
+      const day = Number(body.dayOfWeek ?? entry.dayOfWeek);
+      const period = Number(body.periodNumber ?? entry.periodNumber);
+      const startTime = body.startTime ?? entry.startTime;
+      const endTime = body.endTime ?? entry.endTime;
+      const room = body.room ?? entry.room;
+      if (!validId(assignmentId)) return invalid(res, "Select a valid teacher assignment");
+      if (!Number.isInteger(day) || day < 1 || day > 6) return invalid(res, "Select a weekday from Monday to Saturday");
+      if (!Number.isInteger(period) || period < 1 || period > 20) return invalid(res, "Period number must be between 1 and 20");
+      const start = timeToMinutes(startTime), end = timeToMinutes(endTime);
+      if (start === null || end === null || end <= start) return invalid(res, "Provide valid 24-hour times and ensure the end time is after the start time");
+      if (typeof room !== "string" || room.trim().length > 50) return invalid(res, "Room must be 50 characters or fewer");
+
+      const [year, assignment] = await Promise.all([
+        AcademicYear.findOne({ _id: entry.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").lean(),
+        TeacherAssignment.findOne({ _id: assignmentId, tenantId: req.tenantId, status: "active" }).select("teacherId academicYearId classId sectionId").lean(),
+      ]);
+      if (!year) return res.status(409).json({ success: false, message: "A timetable in a closed academic year cannot be edited" });
+      if (!assignment || String(assignment.academicYearId) !== String(entry.academicYearId) ||
+        String(assignment.classId) !== String(entry.classId) ||
+        (assignment.sectionId && String(assignment.sectionId) !== String(entry.sectionId || ""))) {
+        return invalid(res, "Select an active teacher assignment for this class, section and academic year");
+      }
+
+      const sectionConflict = entry.sectionId
+        ? { $or: [{ sectionId: null }, { sectionId: entry.sectionId }] }
+        : {};
+      const classEntries = await TimetableEntry.find({
+        tenantId: req.tenantId, academicYearId: entry.academicYearId, classId: entry.classId,
+        dayOfWeek: day, status: "active", _id: { $ne: entry._id }, ...sectionConflict,
+      }).select("periodNumber startTime endTime").lean();
+      const overlaps = (item) => start < timeToMinutes(item.endTime) && end > timeToMinutes(item.startTime);
+      if (entry.status === "active" && classEntries.some((item) => item.periodNumber === period || overlaps(item))) {
+        return res.status(409).json({ success: false, message: "This class or section already has a timetable entry in the selected period or time range" });
+      }
+
+      const teacherAssignmentIds = await TeacherAssignment.find({
+        tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId,
+      }).distinct("_id");
       const teacherEntries = await TimetableEntry.find({
-        tenantId: req.tenantId, academicYearId: entry.academicYearId, dayOfWeek: entry.dayOfWeek,
+        tenantId: req.tenantId, academicYearId: entry.academicYearId, dayOfWeek: day,
         status: "active", _id: { $ne: entry._id }, assignmentId: { $in: teacherAssignmentIds },
       }).select("startTime endTime").lean();
-      if (teacherEntries.some(overlaps)) {
+      if (entry.status === "active" && teacherEntries.some(overlaps)) {
         return res.status(409).json({ success: false, message: "This teacher already has a class during the selected time range" });
       }
+
+      entry.assignmentId = assignmentId;
+      entry.dayOfWeek = day;
+      entry.periodNumber = period;
+      entry.startTime = startTime;
+      entry.endTime = endTime;
+      entry.room = room.trim();
     }
-    entry.status = req.body.status;
     await entry.save();
-    return res.status(200).json({ success: true, data: entry });
+    const data = await populateEntry(TimetableEntry.findOne({ _id: entry._id, tenantId: req.tenantId })).lean();
+    return res.status(200).json({ success: true, data });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ success: false, message: "This class period is already occupied" });
+    if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more timetable fields are invalid");
     return next(error);
   }
 };
