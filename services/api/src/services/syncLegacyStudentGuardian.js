@@ -61,12 +61,29 @@ export const syncLegacyStudentGuardian = async (student) => {
     guardian = await Guardian.create({ tenantId, ...details });
   }
 
-  if (existingLink) {
-    existingLink.guardianId = guardian._id;
+  if (existingLink && String(existingLink.guardianId) === String(guardian._id)) {
     existingLink.relationship = "other";
     existingLink.status = "active";
     await existingLink.save();
     return { guardian, relationship: existingLink };
+  }
+
+  if (existingLink?.status === "active") {
+    existingLink.status = "inactive";
+    await existingLink.save();
+  }
+
+  const existingPair = await StudentGuardian.findOne({
+    tenantId,
+    studentId,
+    guardianId: guardian._id,
+  });
+  if (existingPair) {
+    existingPair.source = "legacy_student";
+    existingPair.relationship = "other";
+    existingPair.status = "active";
+    await existingPair.save();
+    return { guardian, relationship: existingPair };
   }
 
   const activePrimary = await StudentGuardian.exists({
