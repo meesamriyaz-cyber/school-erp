@@ -107,3 +107,69 @@ export const createStudentGuardian = async (req, res, next) => {
     return handleError(error, res, next);
   }
 };
+
+export const updateStudentGuardian = async (req, res, next) => {
+  try {
+    const result = await findStudent(req.params.studentId, req.tenantId);
+    if (result.invalidId) return invalid(res, "Invalid student ID");
+    if (!result.student) {
+      return res.status(404).json({ success: false, message: "Student not found" });
+    }
+
+    if (!mongoose.isValidObjectId(req.params.studentGuardianId)) {
+      return invalid(res, "Invalid student-guardian relationship ID");
+    }
+
+    const body = req.body;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return invalid(res, "Provide student-guardian fields to update");
+    }
+
+    const allowed = ["relationship", ...BOOLEAN_FIELDS, "status"];
+    if (Object.keys(body).some((field) => !allowed.includes(field))) {
+      return invalid(res, "One or more unsupported relationship fields were provided");
+    }
+
+    if (Object.keys(body).length === 0) {
+      return invalid(res, "Provide at least one relationship field to update");
+    }
+
+    if (Object.hasOwn(body, "relationship") &&
+        !RELATIONSHIPS.includes(body.relationship)) {
+      return invalid(res, "Invalid guardian relationship type");
+    }
+
+    for (const field of BOOLEAN_FIELDS) {
+      if (Object.hasOwn(body, field) && typeof body[field] !== "boolean") {
+        return invalid(res, `${field} must be a boolean`);
+      }
+    }
+
+    if (Object.hasOwn(body, "status") &&
+        !["active", "inactive"].includes(body.status)) {
+      return invalid(res, "Status must be active or inactive");
+    }
+
+    const link = await StudentGuardian.findOneAndUpdate(
+      {
+        _id: req.params.studentGuardianId,
+        tenantId: req.tenantId,
+        studentId: result.student._id,
+      },
+      { $set: body },
+      { new: true, runValidators: true },
+    ).lean();
+
+    if (!link) {
+      return res.status(404).json({
+        success: false,
+        message: "Student-guardian relationship not found",
+      });
+    }
+
+    return res.status(200).json({ success: true, data: link });
+  } catch (error) {
+    return handleError(error, res, next);
+  }
+};
+
