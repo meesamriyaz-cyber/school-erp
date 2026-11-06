@@ -11,6 +11,14 @@ const studentSchema = new mongoose.Schema(
       immutable: true,
     },
 
+    // Explicitly linked by a school administrator to a student login account.
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      immutable: true,
+    },
+
     // Admission numbers must be unique within each school,
     // not globally across the entire ERP.
     admissionNumber: {
@@ -96,6 +104,10 @@ studentSchema.index(
 
 // Supports common school-scoped status filters.
 studentSchema.index({ tenantId: 1, status: 1 });
+studentSchema.index(
+  { tenantId: 1, userId: 1 },
+  { unique: true, partialFilterExpression: { userId: { $type: "objectId" } } },
+);
 
 const Student = mongoose.model("Student", studentSchema);
 
