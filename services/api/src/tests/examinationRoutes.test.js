@@ -16,6 +16,8 @@ import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
 import Enrollment from "../models/Enrollment.js";
 import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
+import StudentGuardian from "../models/StudentGuardian.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import { createAccessToken } from "../utils/tokens.js";
 
@@ -60,7 +62,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -83,6 +85,8 @@ describe("Examination API integration", () => {
         await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
         await TeacherAssignment.deleteMany({ tenantId: { $in: tenantIds } });
         await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
+        await StudentGuardian.deleteMany({ tenantId: { $in: tenantIds } });
+        await Guardian.deleteMany({ tenantId: { $in: tenantIds } });
         await Student.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamSubject.deleteMany({ tenantId: { $in: tenantIds } });
         await Examination.deleteMany({ tenantId: { $in: tenantIds } });
@@ -174,6 +178,22 @@ describe("Examination API integration", () => {
     const published = await request(`/examinations/${id}/publish`, { method: "POST", token: adminA.token });
     expect(published.status).toBe(200);
     expect(published.body.data.status).toBe("published");
+    const studentAccount = await createUser(schoolA, "student");
+    const parentAccount = await createUser(schoolA, "parent");
+    const guardian = await Guardian.create({ tenantId: schoolA._id, firstName: "Parent", lastName: "Tester", email: parentAccount.user.email });
+    await StudentGuardian.create({ tenantId: schoolA._id, studentId: studentA._id, guardianId: guardian._id, relationship: "father", status: "active" });
+    expect((await request("/students/" + studentA._id + "/account", { method: "POST", token: adminA.token, body: JSON.stringify({ userId: String(studentAccount.user._id) }) })).status).toBe(200);
+    expect((await request("/guardians/" + guardian._id + "/account", { method: "POST", token: adminA.token, body: JSON.stringify({ userId: String(parentAccount.user._id) }) })).status).toBe(200);
+    const studentResults = await request("/portal/results", { token: studentAccount.token });
+    expect(studentResults.status).toBe(200);
+    expect(studentResults.body.data).toHaveLength(1);
+    expect(studentResults.body.data[0].result.totalObtained).toBe(82);
+    const parentResults = await request("/portal/results", { token: parentAccount.token });
+    expect(parentResults.status).toBe(200);
+    expect(parentResults.body.data).toHaveLength(1);
+    expect(String(parentResults.body.data[0].student._id)).toBe(String(studentA._id));
+    expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: studentAccount.token })).status).toBe(403);
+    expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: parentAccount.token })).status).toBe(403);
 
     const locked = await request(`/examinations/${id}/marks`, {
       method: "POST", token: adminA.token,
