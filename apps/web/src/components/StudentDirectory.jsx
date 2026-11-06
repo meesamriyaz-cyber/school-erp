@@ -289,7 +289,7 @@ export default function StudentDirectory() {
               <th>Admission date</th>
               <th>Status</th>
               <th>Actions</th>
-              {canLinkPortal && {canLinkPortal && <th>Portal account</th>}}
+              {canLinkPortal && <th>Portal account</th>}
             </tr>
           </thead>
 
@@ -302,13 +302,13 @@ export default function StudentDirectory() {
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={6} className="student-empty">
+                <td colSpan={canLinkPortal ? 7 : 6} className="student-empty">
                   Student records could not be loaded.
                 </td>
               </tr>
             ) : students.length === 0 ? (
               <tr>
-                <td colSpan={6} className="student-empty">
+                <td colSpan={canLinkPortal ? 7 : 6} className="student-empty">
                   No students found. Try another search or add your first
                   student.
                 </td>
