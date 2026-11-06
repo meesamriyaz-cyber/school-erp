@@ -45,5 +45,6 @@ router.use("/subjects", subjectRoutes);
 router.use("/teacher-assignments", teacherAssignmentRoutes);
 router.use("/timetable", timetableRoutes);
 router.use("/examinations", examRoutes);
-router.use("/examinations", examMarkRoutes);\nrouter.use("/portal", portalRoutes);
+router.use("/examinations", examMarkRoutes);
+router.use("/portal", portalRoutes);
 export default router;
