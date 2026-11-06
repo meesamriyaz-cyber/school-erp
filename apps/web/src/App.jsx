@@ -395,6 +395,8 @@ function DashboardApp() {
   <SectionsManagement />
 ) : activePage === "Enrollments" ? (
   <EnrollmentsManagement />
+) : activePage === "Attendance" ? (
+  <AttendanceManagement />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
 ) : (
