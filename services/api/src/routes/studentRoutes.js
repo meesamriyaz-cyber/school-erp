@@ -4,6 +4,7 @@ import { Router } from "express";
 import authenticate from "../middleware/authenticate.js";
 import requireActiveTenant from "../middleware/requireActiveTenant.js";
 import { authorizeRoles } from "../middleware/authorizeRoles.js";
+import { linkStudentAccount } from "../controllers/studentResultPortalController.js";
 
 import {
   listStudents,
@@ -39,7 +40,12 @@ router.get(
   getStudent
 );
 
-// Explicitly link a student record to a student login account.\nrouter.post("/:studentId/account", authorizeRoles("school_admin", "principal"), linkStudentAccount);\n\n// Update student details.
+// Explicitly link a student record to a student login account.
+router.post("/:studentId/account", authorizeRoles("school_admin", "principal"), linkStudentAccount);
+
+router.post("/:studentId/account", authorizeRoles("school_admin", "principal"), linkStudentAccount);
+
+// Update student details.
 router.patch(
   "/:studentId",
   authorizeRoles("school_admin", "principal"),
