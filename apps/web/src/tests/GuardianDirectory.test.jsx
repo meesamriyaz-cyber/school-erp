@@ -59,7 +59,7 @@ describe("GuardianDirectory", () => {
 
     expect(screen.getAllByText("Sara Khan").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Imran Khan")).toHaveLength(0);
-    expect(screen.getByText("1 guardian found")).toBeInTheDocument();
+    expect(screen.getByText("1", { selector: "strong" })).toBeInTheDocument();
   });
 
   it("filters guardian records by active status", async () => {
@@ -71,7 +71,7 @@ describe("GuardianDirectory", () => {
 
     expect(screen.getAllByText("Imran Khan").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Sara Khan")).toHaveLength(0);
-    expect(screen.getByText("1 guardian found")).toBeInTheDocument();
+    expect(screen.getByText("1", { selector: "strong" })).toBeInTheDocument();
   });
 
   it("paginates guardian records", async () => {
