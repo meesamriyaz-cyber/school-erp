@@ -1,0 +1,20 @@
+.teacher-timetable-page { min-height: 100vh; padding: 32px clamp(18px, 5vw, 64px); background: #f6f8fc; color: #17243a; }
+.teacher-timetable-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; max-width: 1100px; margin: 0 auto 24px; }
+.teacher-timetable-header span { color: #64748b; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.teacher-timetable-header h1 { margin: 7px 0; font-size: clamp(25px, 4vw, 34px); }
+.teacher-timetable-header p, .teacher-timetable-welcome { color: #64748b; }
+.teacher-timetable-header button { border: 1px solid #d8dfeb; border-radius: 9px; padding: 10px 15px; background: white; color: #24334b; font-weight: 700; cursor: pointer; }
+.teacher-timetable-welcome, .teacher-timetable-days, .teacher-timetable-empty, .teacher-timetable-error { max-width: 1100px; margin-left: auto; margin-right: auto; }
+.teacher-timetable-welcome { margin-bottom: 20px; font-weight: 650; }
+.teacher-timetable-day { margin: 24px 0; }
+.teacher-timetable-day h2 { margin: 0 0 10px; font-size: 17px; }
+.teacher-timetable-periods { display: grid; gap: 10px; }
+.teacher-timetable-period { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(180px, 1.5fr) minmax(120px, .7fr); align-items: center; gap: 16px; padding: 17px 19px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; box-shadow: 0 3px 12px #17243a08; }
+.teacher-timetable-period-time strong, .teacher-timetable-period-time span { display: block; }
+.teacher-timetable-period-time span, .teacher-timetable-period-main p, .teacher-timetable-room { margin-top: 5px; color: #64748b; font-size: 13px; }
+.teacher-timetable-period-main h3 { margin: 0; font-size: 16px; }
+.teacher-timetable-period-main p { margin-bottom: 0; }
+.teacher-timetable-room { text-align: right; }
+.teacher-timetable-empty, .teacher-timetable-error { padding: 18px; border-radius: 10px; background: white; }
+.teacher-timetable-error { color: #b42318; }
+@media (max-width: 640px) { .teacher-timetable-page { padding: 22px 14px; } .teacher-timetable-period { grid-template-columns: 1fr; gap: 8px; } .teacher-timetable-room { text-align: left; } }
