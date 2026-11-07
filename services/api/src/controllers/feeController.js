@@ -5,6 +5,7 @@ import FeePayment from "../models/FeePayment.js";
 import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Enrollment from "../models/Enrollment.js";
+import Section from "../models/Section.js";
 
 const validId = mongoose.isValidObjectId;
 const fail = (res, status, message) => res.status(status).json({ success: false, message });
@@ -114,6 +115,12 @@ export const createBulkFeeInvoices = async (req, res, next) => {
     ]);
     if (!year || !schoolClass) return fail(res, 404, "Class or academic year was not found in this school");
     if (!structure) return fail(res, 400, "Select an active fee structure for the chosen class and academic year");
+    if (sectionId) {
+      const section = await Section.findOne({
+        _id: sectionId, tenantId: req.tenantId, classId, status: "active",
+      }).select("_id").lean();
+      if (!section) return fail(res, 400, "Select an active section belonging to the chosen class");
+    }
 
     const enrollmentFilter = { tenantId: req.tenantId, academicYearId, classId, status: "active" };
     if (sectionId) enrollmentFilter.sectionId = sectionId;
