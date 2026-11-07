@@ -77,5 +77,5 @@ describe("TimetableManagement", () => {
     expect(formControls.getByLabelText("Teacher & subject assignment")).toBeTruthy();
     expect(formControls.getByLabelText("Period number").type).toBe("number");
     expect(formControls.getByRole("button", { name: "Save period" })).toBeDisabled();
-  });;
+  });
 });
