@@ -65,31 +65,35 @@ export default function TimetableManagement() {
         if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load timetable data.");
       } finally { if (!controller.signal.aborted) setLoading(false); }
     };
-    void load();
+    void Promise.resolve().then(() => load());
     return () => controller.abort();
   }, [accessToken, loadEntries]);
 
   useEffect(() => {
     const sectionClassId = form.classId || filter.classId;
-    if (!sectionClassId) { setSections([]); return undefined; }
     const controller = new AbortController();
-    apiRequest(`/sections?classId=${encodeURIComponent(sectionClassId)}&status=active`, { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!sectionClassId) { setSections([]); return undefined; }
+      return apiRequest(`/sections?classId=${encodeURIComponent(sectionClassId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => { if (!controller.signal.aborted) setSections(Array.isArray(response?.data) ? response.data : []); })
       .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load sections."); });
+    });
     return () => controller.abort();
   }, [accessToken, form.classId, filter.classId]);
 
   useEffect(() => {
-    if (!filter.academicYearId) { setAcademicSchedule({ periods: [], breaks: [] }); return undefined; }
     const controller = new AbortController();
-    setScheduleLoading(true);
-    apiRequest(`/academic-schedule?academicYearId=${encodeURIComponent(filter.academicYearId)}`, { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!filter.academicYearId) { setAcademicSchedule({ periods: [], breaks: [] }); return undefined; }
+      setScheduleLoading(true);
+      return apiRequest(`/academic-schedule?academicYearId=${encodeURIComponent(filter.academicYearId)}`, { accessToken, signal: controller.signal })
       .then((response) => {
         if (!response?.success) throw new Error(response?.message || "Unable to load academic periods.");
         if (!controller.signal.aborted) setAcademicSchedule({ periods: response.data?.periods || [], breaks: response.data?.breaks || [] });
       })
       .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load academic schedule."); })
       .finally(() => { if (!controller.signal.aborted) setScheduleLoading(false); });
+    });
     return () => controller.abort();
   }, [accessToken, filter.academicYearId]);
 
