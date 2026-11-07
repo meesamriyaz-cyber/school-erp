@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const mocks = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 
@@ -58,7 +58,7 @@ describe("TimetableManagement", () => {
 
     expect(await screen.findByText("Mathematics")).toBeTruthy();
     expect(screen.getByText("Ayaan Khan")).toBeTruthy();
-    expect(screen.getByText("Class 5")).toBeTruthy();
+    expect(screen.getAllByText("Class 5").length).toBeGreaterThan(0);
     expect(screen.getByText("Room 4")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "List view" }));
@@ -70,12 +70,19 @@ describe("TimetableManagement", () => {
     render(<TimetableManagement />);
     fireEvent.click(screen.getByRole("button", { name: "+ Add period" }));
 
-    const yearSelect = screen.getAllByLabelText("Academic year")[0];
-    fireEvent.change(yearSelect, { target: { value: year._id } });
-    await waitFor(() => expect(screen.getByLabelText("Period number").tagName).toBe("SELECT"));
+    const form = screen.getByRole("heading", { name: "New timetable period" }).closest("form");
+    const formControls = within(form);
+    fireEvent.change(formControls.getByLabelText("Academic year"), { target: { value: year._id } });
+    await waitFor(() => {
+      expect(mocks.apiRequest).toHaveBeenCalledWith(
+        `/academic-schedule?academicYearId=${year._id}`,
+        expect.objectContaining({ accessToken: "admin-token" }),
+      );
+      expect(formControls.getByLabelText("Period number").tagName).toBe("SELECT");
+    });
 
-    fireEvent.change(screen.getAllByLabelText("Class")[0], { target: { value: schoolClass._id } });
-    fireEvent.change(screen.getByLabelText("Teacher & subject assignment"), { target: { value: assignment._id } });
+    fireEvent.change(formControls.getByLabelText("Class"), { target: { value: schoolClass._id } });
+    fireEvent.change(formControls.getByLabelText("Teacher & subject assignment"), { target: { value: assignment._id } });
     fireEvent.click(screen.getByRole("button", { name: "Save period" }));
 
     await waitFor(() => {
