@@ -12,6 +12,7 @@ export default function TeacherExaminations() {
   const [examId, setExamId] = useState("");
   const [roster, setRoster] = useState(null);
   const [marks, setMarks] = useState({});
+  const [changeReason, setChangeReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -87,7 +88,7 @@ export default function TeacherExaminations() {
         const batch = batches[index];
         setNotice(`Saving batch ${index + 1} of ${batches.length}…`);
         const response = await apiRequest(`/examinations/${examId}/marks`, {
-          accessToken, method: "POST", body: { marks: batch },
+          accessToken, method: "POST", body: { marks: batch, changeReason },
         });
         if (!response?.success) throw new Error("The server did not confirm this marks batch.");
         savedCount += Number.isFinite(response.count) ? response.count : batch.length;
@@ -132,9 +133,15 @@ export default function TeacherExaminations() {
             </div> : "—"}</td>;
           })}
         </tr>)}</tbody></table></div>
-        {editable && <button type="button" disabled={saving || !roster.enrollments.length} onClick={() => void save()}>
-          {saving ? "Saving…" : "Save marks"}
-        </button>}
+        {editable && <>
+          <label className="teacher-exams-change-reason">Reason for corrections (required when changing a saved mark)
+            <textarea maxLength={500} rows={2} value={changeReason} onChange={(event) => setChangeReason(event.target.value)}
+              placeholder="e.g. Corrected after answer-sheet rechecking" />
+          </label>
+          <button type="button" disabled={saving || !roster.enrollments.length} onClick={() => void save()}>
+            {saving ? "Saving…" : "Save marks"}
+          </button>
+        </>}
       </>}
   </section>;
 }
