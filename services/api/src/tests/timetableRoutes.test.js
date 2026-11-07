@@ -121,6 +121,44 @@ describe("Timetable API integration", () => {
     expect(response.body.data.dayOfWeek).toBe(1);
   });
 
+  it("requires timetable periods to be deactivated before their teacher assignment", async () => {
+    const listed = await request("/timetable", { token: adminA.token });
+    const entry = listed.body.data.find((item) => String(item.assignmentId._id) === String(assignmentA._id));
+    expect(entry).toBeTruthy();
+
+    const blocked = await request(`/teacher-assignments/${assignmentA._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "inactive" }),
+    });
+    expect(blocked.status).toBe(409);
+
+    const periodOff = await request(`/timetable/${entry._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "inactive" }),
+    });
+    expect(periodOff.status).toBe(200);
+
+    const assignmentOff = await request(`/teacher-assignments/${assignmentA._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "inactive" }),
+    });
+    expect(assignmentOff.status).toBe(200);
+    expect(assignmentOff.body.data.status).toBe("inactive");
+
+    const assignmentOn = await request(`/teacher-assignments/${assignmentA._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "active" }),
+    });
+    expect(assignmentOn.status).toBe(200);
+
+    const periodOn = await request(`/timetable/${entry._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "active" }),
+    });
+    expect(periodOn.status).toBe(200);
+    expect(periodOn.body.data.status).toBe("active");
+  });
+
   it("allows administrators to edit a timetable period without bypassing assignment scope", async () => {
     const listed = await request("/timetable", { token: adminA.token });
     const entry = listed.body.data.find((item) => String(item.assignmentId._id) === String(assignmentA._id));
@@ -189,6 +227,8 @@ describe("Timetable API integration", () => {
     expect(String(teacherAView.body.data[0].assignmentId._id)).toBe(String(assignmentA._id));
     expect(teacherBView.body.data).toHaveLength(1);
     expect(String(teacherBView.body.data[0].assignmentId._id)).toBe(String(assignmentB._id));
+    const attemptedOverride = await request(`/timetable?assignmentId=${assignmentB._id}`, { token: teacherA.token });
+    expect(attemptedOverride.status).toBe(403);
     expect(adminView.body.data).toHaveLength(2);
   });
 
