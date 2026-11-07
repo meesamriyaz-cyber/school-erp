@@ -5,6 +5,7 @@ import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 import Enrollment from "../models/Enrollment.js";
 import Examination from "../models/Examination.js";
+import Homework from "../models/Homework.js";
 import { loadResultContext } from "./examResultController.js";
 
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -121,3 +122,51 @@ export const getMyPublishedResults = async (req, res, next) => {
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };
+
+
+export const getMyHomework = async (req, res, next) => {
+  try {
+    let students = [];
+    if (req.auth.role === "student") {
+      const student = await Student.findOne({ tenantId: req.tenantId, userId: req.auth.userId })
+        .select("_id admissionNumber firstName lastName").lean();
+      if (!student) return res.status(409).json({ success: false, message: "Your student account has not been linked by the school" });
+      students = [student];
+    } else {
+      const guardian = await Guardian.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" }).select("_id").lean();
+      if (!guardian) return res.status(409).json({ success: false, message: "Your parent account has not been linked by the school" });
+      const links = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id, status: "active" }).select("studentId").lean();
+      students = await Student.find({ tenantId: req.tenantId, _id: { $in: links.map((item) => item.studentId) } })
+        .select("_id admissionNumber firstName lastName").sort({ firstName: 1, lastName: 1 }).lean();
+    }
+    if (!students.length) return res.status(200).json({ success: true, data: [] });
+    const enrollments = await Enrollment.find({
+      tenantId: req.tenantId, studentId: { $in: students.map((item) => item._id) },
+      status: { $in: ["active", "completed", "transferred"] },
+    }).select("_id studentId academicYearId classId sectionId").lean();
+    if (!enrollments.length) return res.status(200).json({ success: true, data: [] });
+    const now = new Date();
+    const clauses = enrollments.map((item) => ({
+      academicYearId: item.academicYearId, classId: item.classId,
+      $or: [{ sectionId: null }, ...(item.sectionId ? [{ sectionId: item.sectionId }] : [])],
+    }));
+    const tasks = await Homework.find({
+      tenantId: req.tenantId, status: "published", assignedDate: { $lte: now }, $or: clauses,
+    }).populate("subjectId", "name code").populate("teacherId", "firstName lastName")
+      .populate("classId", "name").populate("sectionId", "name")
+      .sort({ dueDate: 1, assignedDate: -1 }).limit(500).lean();
+    const data = [];
+    for (const enrollment of enrollments) {
+      const student = students.find((item) => String(item._id) === String(enrollment.studentId));
+      for (const task of tasks) {
+        if (String(task.academicYearId) !== String(enrollment.academicYearId) ||
+            String(task.classId?._id || task.classId) !== String(enrollment.classId) ||
+            (task.sectionId && String(task.sectionId._id || task.sectionId) !== String(enrollment.sectionId))) continue;
+        data.push({ homework: task, student, enrollmentId: enrollment._id });
+      }
+    }
+    data.sort((a, b) => new Date(a.homework.dueDate) - new Date(b.homework.dueDate));
+    return res.status(200).json({ success: true, data });
+  } catch (error) { return next(error); }
+};
+
