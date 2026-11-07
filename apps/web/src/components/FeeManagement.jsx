@@ -64,7 +64,8 @@ export default function FeeManagement() {
   const [invoiceForm, setInvoiceForm] = useState({ enrollmentId: "", feeStructureId: "", invoiceNumber: "", dueDate: "" });
   const [paymentInvoice, setPaymentInvoice] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", method: "cash", paymentDate: new Date().toISOString().slice(0, 10), reference: "", notes: "" });
-  const [payments, setPayments] = useState([]);\n  const [reversalReason, setReversalReason] = useState("");
+  const [payments, setPayments] = useState([]);
+  const [reversalReason, setReversalReason] = useState("");
   const [bulkSections, setBulkSections] = useState([]);
   const [bulkForm, setBulkForm] = useState({ classId: "", sectionId: "", feeStructureId: "", dueDate: "", invoiceNumberPrefix: "" });
   const [bulkResult, setBulkResult] = useState(null);
