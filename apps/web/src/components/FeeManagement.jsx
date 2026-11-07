@@ -51,7 +51,6 @@ export default function FeeManagement() {
   const { accessToken } = useAuth();
   const [years, setYears] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [students, setStudents] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [structures, setStructures] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -77,13 +76,12 @@ export default function FeeManagement() {
 
   const load = useCallback(async () => {
     try {
-      const [yr, cls, stu, enr] = await Promise.all([
+      const [yr, cls, enr] = await Promise.all([
         apiRequest("/academic-years", { accessToken }),
         apiRequest("/classes", { accessToken }),
-        apiRequest("/students?limit=500", { accessToken }),
-        apiRequest("/enrollments?status=active", { accessToken }),
+                apiRequest("/enrollments?status=active", { accessToken }),
       ]);
-      setYears(yr.data || []); setClasses(cls.data || []); setStudents(stu.data || []); setEnrollments(enr.data || []);
+      setYears(yr.data || []); setClasses(cls.data || []); setEnrollments(enr.data || []);
       const active = (yr.data || []).find((item) => item.status === "active");
       setYearId((current) => current || active?._id || (yr.data || [])[0]?._id || "");
     } catch (err) { setError(err.message || "Unable to load fee management data."); }
@@ -114,30 +112,31 @@ export default function FeeManagement() {
     } catch (err) { setError(err.message || "Unable to load outstanding fees."); }
   }, [accessToken, yearId, outstandingClassId, outstandingSectionId, overdueOnly]);
 
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => { void loadStructures(); void loadInvoices(); }, [loadStructures, loadInvoices]);
-  useEffect(() => { void loadOutstanding(); }, [loadOutstanding]);
+  useEffect(() => { void Promise.resolve().then(() => load()); }, [load]);
+  useEffect(() => { void Promise.resolve().then(() => Promise.all([loadStructures(), loadInvoices()])); }, [loadStructures, loadInvoices]);
+  useEffect(() => { void Promise.resolve().then(() => loadOutstanding()); }, [loadOutstanding]);
   useEffect(() => {
-    if (!bulkForm.classId) { setBulkSections([]); return; }
     let cancelled = false;
-    apiRequest(`/sections?classId=${encodeURIComponent(bulkForm.classId)}&status=active`, { accessToken })
-      .then((response) => { if (!cancelled) setBulkSections(response.data || []); })
-      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load class sections."); });
+    Promise.resolve().then(() => {
+      if (!bulkForm.classId) { setBulkSections([]); return undefined; }
+      return apiRequest(`/sections?classId=${encodeURIComponent(bulkForm.classId)}&status=active`, { accessToken })
+        .then((response) => { if (!cancelled) setBulkSections(response.data || []); });
+    }).catch((err) => { if (!cancelled) setError(err.message || "Unable to load class sections."); });
     return () => { cancelled = true; };
   }, [accessToken, bulkForm.classId]);
 
 
   useEffect(() => {
-    if (!outstandingClassId) { setOutstandingSections([]); setOutstandingSectionId(""); return; }
     let cancelled = false;
-    apiRequest(`/sections?classId=${encodeURIComponent(outstandingClassId)}&status=active`, { accessToken })
-      .then((response) => { if (!cancelled) setOutstandingSections(response.data || []); })
-      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load sections."); });
+    Promise.resolve().then(() => {
+      if (!outstandingClassId) { setOutstandingSections([]); setOutstandingSectionId(""); return undefined; }
+      return apiRequest(`/sections?classId=${encodeURIComponent(outstandingClassId)}&status=active`, { accessToken })
+        .then((response) => { if (!cancelled) setOutstandingSections(response.data || []); });
+    }).catch((err) => { if (!cancelled) setError(err.message || "Unable to load sections."); });
     return () => { cancelled = true; };
   }, [accessToken, outstandingClassId]);
 
   const currentClasses = classes.filter((item) => item.academicYearId === yearId || item.academicYearId?._id === yearId);
-  const selectedClass = currentClasses.find((item) => item._id === structureForm.classId);
   const eligibleEnrollments = enrollments.filter((item) => {
     const eYear = item.academicYearId?._id || item.academicYearId;
     return eYear === yearId;
