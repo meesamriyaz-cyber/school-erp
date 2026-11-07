@@ -252,6 +252,37 @@ describe("Timetable API integration", () => {
     expect(response.body.message).toMatch(/overlaps/i);
   });
 
+  it("enforces configured periods and rejects lessons during breaks", async () => {
+    const valid = await request("/timetable", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        ...entryPayload(assignmentOtherClass._id, classB._id, 1),
+        dayOfWeek: 4, startTime: "09:00", endTime: "09:45",
+      }),
+    });
+    expect(valid.status).toBe(201);
+
+    const wrongTime = await request("/timetable", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        ...entryPayload(assignmentOtherClass._id, classB._id, 2),
+        dayOfWeek: 5, startTime: "09:15", endTime: "10:00",
+      }),
+    });
+    expect(wrongTime.status).toBe(400);
+    expect(wrongTime.body.message).toMatch(/configured time/i);
+
+    const breakTime = await request("/timetable", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        ...entryPayload(assignmentOtherClass._id, classB._id, 3),
+        dayOfWeek: 6, startTime: "09:45", endTime: "10:00",
+      }),
+    });
+    expect(breakTime.status).toBe(400);
+    expect(breakTime.body.message).toMatch(/configured period/i);
+  });
+
   it("allows teachers to view but not change the academic schedule", async () => {
     const read = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: teacherA.token });
     const write = await request("/academic-schedule", {
