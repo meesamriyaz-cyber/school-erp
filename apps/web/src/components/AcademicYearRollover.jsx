@@ -87,6 +87,8 @@ export default function AcademicYearRollover({ onComplete }) {
       const summary = response.data;
       setNotice(`Rollover completed: ${summary.promoted} promoted, ${summary.retained} retained, ${summary.transferred} transferred and ${summary.withdrawn} withdrawn. ${summary.targetAcademicYear.name} is now active.`);
       setPreview(null); setConfirming(false);
+      const yearsResponse = await apiRequest("/academic-years", { accessToken });
+      if (yearsResponse?.success && Array.isArray(yearsResponse.data)) setYears(yearsResponse.data);
       onComplete?.(summary);
     } catch (err) { setError(err.message || "The academic-year rollover could not be completed."); setConfirming(false); }
     finally { setSaving(false); }
