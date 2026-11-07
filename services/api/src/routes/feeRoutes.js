@@ -2,7 +2,7 @@ import { Router } from "express";
 import authenticate from "../middleware/authenticate.js";
 import requireActiveTenant from "../middleware/requireActiveTenant.js";
 import { authorizeRoles } from "../middleware/authorizeRoles.js";
-import { listFeeStructures, createFeeStructure, updateFeeStructureStatus, listFeeInvoices, createFeeInvoice, listInvoicePayments, recordFeePayment, reverseFeePayment, createBulkFeeInvoices } from "../controllers/feeController.js";
+import { listFeeStructures, createFeeStructure, updateFeeStructureStatus, listFeeInvoices, listOutstandingFees, createFeeInvoice, listInvoicePayments, recordFeePayment, reverseFeePayment, createBulkFeeInvoices } from "../controllers/feeController.js";
 
 const router = Router();
 router.use(authenticate, requireActiveTenant);
@@ -11,6 +11,7 @@ router.get("/structures", listFeeStructures);
 router.post("/structures", createFeeStructure);
 router.patch("/structures/:structureId/status", updateFeeStructureStatus);
 router.get("/invoices", listFeeInvoices);
+router.get("/outstanding", listOutstandingFees);
 router.post("/invoices", createFeeInvoice);
 router.post("/invoices/bulk", createBulkFeeInvoices);
 router.get("/invoices/:invoiceId/payments", listInvoicePayments);
