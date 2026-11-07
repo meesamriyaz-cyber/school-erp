@@ -14,3 +14,45 @@
 @media(max-width:600px){.portal-tabs{overflow-x:auto}.portal-tabs button{white-space:nowrap}.portal-homework-heading{display:block}.portal-homework-heading>strong{display:inline-block;margin-top:5px}}
 
 .portal-submit-form{display:grid;gap:8px;margin:16px 0;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px}.portal-submit-form label{font-size:12px;font-weight:700;color:#475569}.portal-submit-form textarea{width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:10px;font:inherit;font-size:13px;resize:vertical}.portal-submit-form button{justify-self:start;border:0;border-radius:7px;background:#17365d;color:#fff;padding:9px 13px;font-weight:700;cursor:pointer}.portal-submit-form button:disabled{opacity:.55;cursor:wait}.portal-submission-state{margin:14px 0;padding:13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px}.portal-submission-state>strong{font-size:12px;text-transform:capitalize;color:#334155}.portal-submission-state>p{white-space:pre-wrap;font-size:13px;color:#334155;line-height:1.5}.portal-submission-state small{font-size:11px;color:#64748b}.portal-review-feedback{padding:10px;border-radius:7px;background:#f0fdf4;color:#166534;font-size:13px;line-height:1.5}.portal-homework-notice{padding:10px 12px;border-radius:8px;background:#f0fdf4;color:#166534;font-size:13px}
+
+
+.portal-child-overview{margin:18px 0 22px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:13px}
+.portal-child-overview-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:14px}
+.portal-child-overview-heading>div{display:grid;gap:4px}
+.portal-child-overview-heading strong{font-size:14px;color:#172b4d}
+.portal-child-overview-heading span{font-size:12px;color:#64748b}
+.portal-child-overview-heading label{display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b}
+.portal-child-overview-heading select{border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:7px 9px;color:#172033}
+.portal-child-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.portal-child-card{display:flex;align-items:center;gap:11px;text-align:left;padding:12px;background:#fff;border:1px solid #dbe2ea;border-radius:10px;cursor:pointer;color:inherit}
+.portal-child-card.selected{border-color:#315b88;box-shadow:0 0 0 2px rgba(49,91,136,.1)}
+.portal-child-avatar{flex:0 0 36px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#e8eef6;color:#17365d;font-weight:800}
+.portal-child-info{min-width:0;display:grid;gap:3px;flex:1}
+.portal-child-info strong{font-size:13px;color:#172b4d}
+.portal-child-info small{font-size:11px;color:#64748b}
+.portal-child-action{font-size:10px;color:#315b88;font-weight:700;white-space:nowrap}
+.portal-data-panel,.portal-fee-card{background:#fff;border:1px solid #dbe2ea;border-radius:12px;padding:18px;margin-bottom:14px}
+.portal-data-heading,.portal-fee-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.portal-data-heading h2,.portal-fee-heading h2{font-size:17px;color:#172b4d;margin:0}
+.portal-data-heading span,.portal-fee-heading>div>span{font-size:11px;color:#64748b}
+.portal-table-wrap{overflow-x:auto}
+.portal-data-table{width:100%;border-collapse:collapse;font-size:12px}
+.portal-data-table th,.portal-data-table td{padding:10px;text-align:left;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+.portal-data-table th{background:#f8fafc;color:#64748b;text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+.portal-attendance-status,.portal-fee-status{display:inline-block;padding:4px 8px;border-radius:20px;font-size:10px;font-weight:800;text-transform:capitalize}
+.attendance-present,.attendance-late,.fee-paid{background:#ecfdf5;color:#047857}
+.attendance-absent,.fee-unpaid{background:#fef2f2;color:#b91c1c}
+.attendance-excused,.fee-partial{background:#fffbeb;color:#a16207}
+.portal-fee-list{display:grid;gap:12px}
+.portal-fee-heading{align-items:flex-start}
+.portal-fee-heading>div{display:grid;gap:5px}
+.portal-fee-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:12px 0;border-top:1px solid #e2e8f0}
+.portal-fee-totals div{display:grid;gap:5px}
+.portal-fee-totals span,.portal-receipts>strong{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+.portal-fee-totals strong{font-size:14px;color:#172b4d}
+.portal-receipts{border-top:1px solid #e2e8f0;padding-top:12px;display:grid;gap:8px}
+.portal-receipts>strong{margin-bottom:2px}
+.portal-receipts div{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#475569}
+.portal-receipts b{white-space:nowrap;color:#172b4d}
+.portal-timetable-list{display:grid;gap:12px}
+@media(max-width:650px){.portal-child-overview-heading{align-items:flex-start;flex-direction:column}.portal-data-heading,.portal-fee-heading{align-items:flex-start;flex-direction:column}.portal-fee-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-receipts div{align-items:flex-start;flex-direction:column;gap:3px}}
