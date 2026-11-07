@@ -97,6 +97,71 @@ export const createFeeInvoice = async (req, res, next) => {
   }
 };
 
+export const createBulkFeeInvoices = async (req, res, next) => {
+  try {
+    const { academicYearId, classId, sectionId, feeStructureId, dueDate, invoiceNumberPrefix } = req.body || {};
+    if (Object.hasOwn(req.body || {}, "tenantId") || !validId(academicYearId) || !validId(classId) || !validId(feeStructureId) ||
+      (sectionId !== undefined && sectionId !== null && !validId(sectionId)) ||
+      typeof invoiceNumberPrefix !== "string" || !/^[A-Za-z0-9-]{1,24}$/.test(invoiceNumberPrefix.trim()) ||
+      Number.isNaN(new Date(dueDate).getTime())) {
+      return fail(res, 400, "Academic year, class, fee structure, invoice prefix and valid due date are required");
+    }
+
+    const [year, schoolClass, structure] = await Promise.all([
+      AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId }).select("_id").lean(),
+      SchoolClass.findOne({ _id: classId, tenantId: req.tenantId, academicYearId }).select("_id").lean(),
+      FeeStructure.findOne({ _id: feeStructureId, tenantId: req.tenantId, academicYearId, classId, status: "active" }).lean(),
+    ]);
+    if (!year || !schoolClass) return fail(res, 404, "Class or academic year was not found in this school");
+    if (!structure) return fail(res, 400, "Select an active fee structure for the chosen class and academic year");
+
+    const enrollmentFilter = { tenantId: req.tenantId, academicYearId, classId, status: "active" };
+    if (sectionId !== undefined) enrollmentFilter.sectionId = sectionId || null;
+    const enrollments = await Enrollment.find(enrollmentFilter)
+      .populate("studentId", "admissionNumber firstName lastName")
+      .sort({ "studentId.admissionNumber": 1, _id: 1 }).lean();
+    if (!enrollments.length) return fail(res, 404, "No active student enrollments were found for this class selection");
+
+    const normalizedDueDate = new Date(dueDate);
+    normalizedDueDate.setUTCHours(0, 0, 0, 0);
+    const totalAmount = Math.round(structure.items.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
+    const results = [];
+    for (const enrollment of enrollments) {
+      const student = enrollment.studentId;
+      if (!student?._id || !student.admissionNumber) {
+        results.push({ enrollmentId: String(enrollment._id), status: "skipped", reason: "Student admission number is missing" });
+        continue;
+      }
+      const existing = await FeeInvoice.findOne({
+        tenantId: req.tenantId, enrollmentId: enrollment._id, feeStructureId: structure._id, dueDate: normalizedDueDate,
+      }).select("_id invoiceNumber").lean();
+      if (existing) {
+        results.push({ enrollmentId: String(enrollment._id), studentName: [student.firstName, student.lastName].filter(Boolean).join(" "), admissionNumber: student.admissionNumber, status: "skipped", reason: `Already invoiced as ${existing.invoiceNumber}` });
+        continue;
+      }
+      const admissionSuffix = String(student.admissionNumber).replace(/[^A-Za-z0-9-]/g, "").slice(0, 20);
+      const invoiceNumber = `${invoiceNumberPrefix.trim()}-${admissionSuffix}`.slice(0, 40);
+      try {
+        const [created] = await FeeInvoice.create([{
+          tenantId: req.tenantId, enrollmentId: enrollment._id, studentId: student._id,
+          academicYearId, feeStructureId: structure._id, invoiceNumber,
+          items: structure.items.map(({ name, amount, frequency }) => ({ name, amount, frequency })),
+          totalAmount, dueDate: normalizedDueDate, status: "unpaid",
+        }]);
+        results.push({ enrollmentId: String(enrollment._id), invoiceId: String(created._id), invoiceNumber, studentName: [student.firstName, student.lastName].filter(Boolean).join(" "), admissionNumber: student.admissionNumber, status: "created" });
+      } catch (error) {
+        if (error.code === 11000) results.push({ enrollmentId: String(enrollment._id), studentName: [student.firstName, student.lastName].filter(Boolean).join(" "), admissionNumber: student.admissionNumber, status: "skipped", reason: "Invoice number already exists" });
+        else throw error;
+      }
+    }
+    const created = results.filter((item) => item.status === "created").length;
+    return res.status(201).json({ success: true, data: { totalEligible: enrollments.length, created, skipped: results.length - created, results } });
+  } catch (error) {
+    if (error.name === "ValidationError" || error.name === "CastError") return fail(res, 400, "Bulk invoice details are invalid");
+    return next(error);
+  }
+};
+
 export const listInvoicePayments = async (req, res, next) => {
   try {
     if (!validId(req.params.invoiceId)) return fail(res, 400, "Invalid invoice ID");
