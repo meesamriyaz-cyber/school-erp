@@ -83,8 +83,11 @@ export default function TeacherTimetablePortal() {
           <div className="teacher-timetable-view-toggle" role="group" aria-label="Timetable layout">
             <button type="button" className={scheduleView === "week" ? "active" : ""} aria-pressed={scheduleView === "week"} onClick={() => setScheduleView("week")}>Weekly view</button>
             <button type="button" className={scheduleView === "list" ? "active" : ""} aria-pressed={scheduleView === "list"} onClick={() => setScheduleView("list")}>List view</button>
+            <button type="button" className="teacher-timetable-print-button" onClick={() => window.print()}>Print timetable</button>
           </div>
         )}
+        <div className="teacher-timetable-print-area">
+        <div className="teacher-timetable-print-heading"><h2>Teacher Timetable</h2><p>{name}</p></div>
         {loading ? <p className="teacher-timetable-empty">Loading your timetable…</p> : entries.length === 0 ? (
           <p className="teacher-timetable-empty">No active timetable periods are assigned to you yet. Please contact your school administrator.</p>
         ) : scheduleView === "list" ? (
@@ -115,6 +118,7 @@ export default function TeacherTimetablePortal() {
             ))}
           </div>
         )}
+        </div>
       </>}
     </main>
   );
