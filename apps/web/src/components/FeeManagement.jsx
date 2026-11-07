@@ -55,6 +55,11 @@ export default function FeeManagement() {
   const [enrollments, setEnrollments] = useState([]);
   const [structures, setStructures] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [outstanding, setOutstanding] = useState({ data: [], summary: { invoiceCount: 0, totalOutstanding: 0, overdueCount: 0, overdueAmount: 0 } });
+  const [outstandingClassId, setOutstandingClassId] = useState("");
+  const [outstandingSectionId, setOutstandingSectionId] = useState("");
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [outstandingSections, setOutstandingSections] = useState([]);
   const [yearId, setYearId] = useState("");
   const [tab, setTab] = useState("structures");
   const [error, setError] = useState("");
@@ -96,8 +101,22 @@ export default function FeeManagement() {
     catch (err) { setError(err.message || "Unable to load fee invoices."); }
   }, [accessToken, yearId]);
 
+
+  const loadOutstanding = useCallback(async () => {
+    if (!yearId) { setOutstanding({ data: [], summary: { invoiceCount: 0, totalOutstanding: 0, overdueCount: 0, overdueAmount: 0 } }); return; }
+    try {
+      const params = new URLSearchParams({ academicYearId: yearId });
+      if (outstandingClassId) params.set("classId", outstandingClassId);
+      if (outstandingSectionId) params.set("sectionId", outstandingSectionId);
+      if (overdueOnly) params.set("overdueOnly", "true");
+      const response = await apiRequest(`/fees/outstanding?${params.toString()}`, { accessToken });
+      setOutstanding({ data: response.data || [], summary: response.summary || { invoiceCount: 0, totalOutstanding: 0, overdueCount: 0, overdueAmount: 0 } });
+    } catch (err) { setError(err.message || "Unable to load outstanding fees."); }
+  }, [accessToken, yearId, outstandingClassId, outstandingSectionId, overdueOnly]);
+
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadStructures(); void loadInvoices(); }, [loadStructures, loadInvoices]);
+  useEffect(() => { void loadOutstanding(); }, [loadOutstanding]);
   useEffect(() => {
     if (!bulkForm.classId) { setBulkSections([]); return; }
     let cancelled = false;
@@ -106,6 +125,16 @@ export default function FeeManagement() {
       .catch((err) => { if (!cancelled) setError(err.message || "Unable to load class sections."); });
     return () => { cancelled = true; };
   }, [accessToken, bulkForm.classId]);
+
+
+  useEffect(() => {
+    if (!outstandingClassId) { setOutstandingSections([]); setOutstandingSectionId(""); return; }
+    let cancelled = false;
+    apiRequest(`/sections?classId=${encodeURIComponent(outstandingClassId)}&status=active`, { accessToken })
+      .then((response) => { if (!cancelled) setOutstandingSections(response.data || []); })
+      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load sections."); });
+    return () => { cancelled = true; };
+  }, [accessToken, outstandingClassId]);
 
   const currentClasses = classes.filter((item) => item.academicYearId === yearId || item.academicYearId?._id === yearId);
   const selectedClass = currentClasses.find((item) => item._id === structureForm.classId);
@@ -190,7 +219,7 @@ export default function FeeManagement() {
   };
   return <section className="fees-page" aria-labelledby="fees-title">
     <div className="fees-intro"><div><p className="fees-eyebrow">SCHOOL FINANCE</p><h2 id="fees-title">Fees &amp; Payments</h2><p>Set class-wise fee structures, issue student invoices and record payments with receipt references.</p></div></div>
-    <div className="fees-toolbar"><label>Academic year<select value={yearId} onChange={(event) => setYearId(event.target.value)}>{years.map((year) => <option key={year._id} value={year._id}>{year.name}{year.status === "active" ? " · Active" : ""}</option>)}</select></label><div className="fees-tabs"><button type="button" className={tab === "structures" ? "active" : ""} onClick={() => setTab("structures")}>Fee structures</button><button type="button" className={tab === "invoices" ? "active" : ""} onClick={() => setTab("invoices")}>Invoices &amp; payments</button></div></div>
+    <div className="fees-toolbar"><label>Academic year<select value={yearId} onChange={(event) => setYearId(event.target.value)}>{years.map((year) => <option key={year._id} value={year._id}>{year.name}{year.status === "active" ? " · Active" : ""}</option>)}</select></label><div className="fees-tabs"><button type="button" className={tab === "structures" ? "active" : ""} onClick={() => setTab("structures")}>Fee structures</button><button type="button" className={tab === "invoices" ? "active" : ""} onClick={() => setTab("invoices")}>Invoices &amp; payments</button><button type="button" className={tab === "outstanding" ? "active" : ""} onClick={() => setTab("outstanding")}>Outstanding fees</button></div></div>
     {notice && <p className="fees-notice" role="status">{notice}</p>}{error && <p className="fees-error" role="alert">{error}</p>}
     {tab === "structures" ? <>
       <form className="fees-form" onSubmit={createStructure}>
@@ -203,7 +232,7 @@ export default function FeeManagement() {
       </form>
       <div className="fees-list-heading"><h3>Configured fee structures</h3><span>{structures.length} structures</span></div>
       {structures.length ? <div className="fees-structure-grid">{structures.map((structure) => <article className="fees-card" key={structure._id}><div className="fees-card-top"><strong>{structure.name}</strong><span>{structure.classId?.name || "Class"}</span></div>{structure.items.map((item, i) => <div className="fees-line" key={i}><span>{item.name} <small>{item.frequency.replace("_", " ")}</small></span><strong>{money(item.amount)}</strong></div>)}<div className="fees-total"><span>Total</span><strong>{money(structure.items.reduce((sum, item) => sum + item.amount, 0))}</strong></div></article>)}</div> : <p className="fees-empty">No fee structures configured for this academic year.</p>}
-    </> : <>
+    </> : tab === "invoices" ? <>
       <form className="fees-form" onSubmit={createInvoice}><h3>Issue student invoice</h3><div className="fees-form-grid">
         <label>Active student enrollment<select required value={invoiceForm.enrollmentId} onChange={(e) => setInvoiceForm((s) => ({ ...s, enrollmentId: e.target.value, feeStructureId: "" }))}><option value="">Select student</option>{eligibleEnrollments.map((enrollment) => { const student = enrollment.studentId; const className = enrollment.classId?.name || ""; return <option key={enrollment._id} value={enrollment._id}>{studentName(student)} · {student?.admissionNumber || ""} · {className}</option>; })}</select></label>
         <label>Fee structure<select required value={invoiceForm.feeStructureId} onChange={(e) => setInvoiceForm((s) => ({ ...s, feeStructureId: e.target.value }))}><option value="">Select structure</option>{structures.filter((s) => { const classId = s.classId?._id || s.classId; const enrollment = eligibleEnrollments.find((e) => e._id === invoiceForm.enrollmentId); return enrollment && classId === (enrollment.classId?._id || enrollment.classId) && s.status === "active"; }).map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}</select></label>
@@ -225,6 +254,23 @@ export default function FeeManagement() {
       </form>
       <div className="fees-list-heading"><h3>Student invoices</h3><span>{invoices.length} invoices</span></div>
       {invoices.length ? <div className="fees-table-wrap"><table className="fees-table"><thead><tr><th>Invoice / Student</th><th>Due date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map((invoice) => <tr key={invoice._id}><td><strong>{invoice.invoiceNumber}</strong><small>{studentName(invoice.studentId)} · {invoice.studentId?.admissionNumber}</small></td><td>{new Date(invoice.dueDate).toLocaleDateString("en-IN")}</td><td>{money(invoice.totalAmount)}</td><td>{money(invoice.paidAmount)}</td><td>{money(invoice.totalAmount - invoice.paidAmount)}</td><td><span className={`fees-status fees-${invoice.status}`}>{invoice.status}</span></td><td><button type="button" className="fees-secondary" onClick={() => void openPayments(invoice)}>Record payment / receipts</button></td></tr>)}</tbody></table></div> : <p className="fees-empty">No invoices issued for this academic year.</p>}
+    </>
+    </> : <>
+      <div className="fees-form">
+        <h3>Outstanding fee report</h3>
+        <div className="fees-form-grid">
+          <label>Class<select value={outstandingClassId} onChange={(event) => { setOutstandingClassId(event.target.value); setOutstandingSectionId(""); }}><option value="">All classes</option>{currentClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+          <label>Section<select value={outstandingSectionId} onChange={(event) => setOutstandingSectionId(event.target.value)} disabled={!outstandingClassId}><option value="">All sections</option>{outstandingSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+          <label className="fees-checkbox-label"><input type="checkbox" checked={overdueOnly} onChange={(event) => setOverdueOnly(event.target.checked)} /> Overdue invoices only</label>
+        </div>
+        <div className="fees-summary-grid">
+          <div><span>Outstanding invoices</span><strong>{outstanding.summary.invoiceCount}</strong></div>
+          <div><span>Total outstanding</span><strong>{money(outstanding.summary.totalOutstanding)}</strong></div>
+          <div><span>Overdue invoices</span><strong>{outstanding.summary.overdueCount}</strong></div>
+          <div><span>Overdue amount</span><strong>{money(outstanding.summary.overdueAmount)}</strong></div>
+        </div>
+      </div>
+      {outstanding.data.length ? <div className="fees-table-wrap"><table className="fees-table"><thead><tr><th>Invoice / Student</th><th>Class / Section</th><th>Due date</th><th>Total</th><th>Paid</th><th>Outstanding</th><th>Status</th></tr></thead><tbody>{outstanding.data.map((invoice) => <tr key={invoice._id}><td><strong>{invoice.invoiceNumber}</strong><small>{studentName(invoice.studentId)} · {invoice.studentId?.admissionNumber || ""}</small></td><td>{invoice.enrollmentId?.classId?.name || "—"} / {invoice.enrollmentId?.sectionId?.name || "—"}</td><td>{new Date(invoice.dueDate).toLocaleDateString("en-IN")}</td><td>{money(invoice.totalAmount)}</td><td>{money(invoice.paidAmount)}</td><td>{money(invoice.totalAmount - invoice.paidAmount)}</td><td><span className={`fees-status fees-${invoice.status}`}>{new Date(invoice.dueDate) < new Date() ? "overdue" : invoice.status}</span></td></tr>)}</tbody></table></div> : <p className="fees-empty">No outstanding invoices match these filters.</p>}
     </>}
     {paymentInvoice && <div className="fees-modal-backdrop" role="presentation"><section className="fees-modal" role="dialog" aria-modal="true" aria-labelledby="payment-title"><button className="fees-modal-close" type="button" onClick={() => setPaymentInvoice(null)} aria-label="Close">×</button><h3 id="payment-title">Record payment</h3><p>{paymentInvoice.invoiceNumber} · Outstanding {money(paymentInvoice.totalAmount - paymentInvoice.paidAmount)}</p><form onSubmit={recordPayment}><div className="fees-form-grid"><label>Amount (₹)<input required type="number" min="0.01" max={paymentInvoice.totalAmount - paymentInvoice.paidAmount} step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm((s) => ({ ...s, amount: e.target.value }))} /></label><label>Payment method<select value={paymentForm.method} onChange={(e) => setPaymentForm((s) => ({ ...s, method: e.target.value }))}><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="cheque">Cheque</option><option value="upi">UPI</option><option value="card">Card</option><option value="other">Other</option></select></label><label>Payment date<input type="date" required value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((s) => ({ ...s, paymentDate: e.target.value }))} /></label><label>Reference<input maxLength="100" value={paymentForm.reference} onChange={(e) => setPaymentForm((s) => ({ ...s, reference: e.target.value }))} placeholder="Transaction / cheque no." /></label></div><label>Notes<textarea maxLength="300" value={paymentForm.notes} onChange={(e) => setPaymentForm((s) => ({ ...s, notes: e.target.value }))} /></label><div className="fees-form-actions"><button className="fees-primary" disabled={busy}>{busy ? "Saving…" : "Save payment"}</button></div></form><h4>Payment history</h4><label className="fees-reversal-reason">Reversal reason (required for reversal)<textarea minLength="5" maxLength="300" value={reversalReason} onChange={(event) => setReversalReason(event.target.value)} placeholder="Explain why this payment is being reversed" /></label>{payments.length ? payments.map((payment) => <div className="fees-payment-row" key={payment._id}><span>{payment.receiptNumber}<small>{payment.method.replace("_", " ")} · {new Date(payment.paymentDate).toLocaleDateString("en-IN")} · {payment.status || "posted"}{payment.status === "reversed" ? ` · Reversed: ${payment.reversalReason}` : ""}</small></span><strong>{money(payment.amount)}</strong><div className="fees-payment-actions"><button type="button" className="fees-secondary" onClick={() => printPaymentReceipt(payment, paymentInvoice)}>Print receipt</button>{payment.status !== "reversed" && <button type="button" className="fees-danger" disabled={busy || reversalReason.trim().length < 5} onClick={() => void reversePayment(payment)}>Reverse</button>}</div></div>) : <p className="fees-empty">No payments recorded yet.</p>}</section></div>}
   </section>;
