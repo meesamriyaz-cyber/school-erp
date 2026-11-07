@@ -21,6 +21,7 @@ import TimetableManagement from "./components/TimetableManagement.jsx";
 import ExaminationManagement from "./components/ExaminationManagement.jsx";
 import StudentResultsPortal from "./components/StudentResultsPortal.jsx";
 import HomeworkManagement from "./components/HomeworkManagement.jsx";
+import FeeManagement from "./components/FeeManagement.jsx";
 import TeacherTimetablePortal from "./components/TeacherTimetablePortal.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
@@ -429,6 +430,8 @@ function DashboardApp() {
   <ExaminationManagement />
 ) : activePage === "Homework & Classwork" ? (
   <HomeworkManagement />
+) : activePage === "Fees & Payments" ? (
+  <FeeManagement />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
 ) : (
