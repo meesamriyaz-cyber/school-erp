@@ -148,6 +148,7 @@ export default function TimetableManagement() {
       <label>Academic year<select value={filter.academicYearId} onChange={(e) => setFilter((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "" }))}><option value="">All years</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}</select></label>
       <label>Class<select value={filter.classId} onChange={(e) => setFilter((v) => ({ ...v, classId: e.target.value, sectionId: "" }))}><option value="">All classes</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Section<select value={filter.sectionId} onChange={(e) => setFilter((v) => ({ ...v, sectionId: e.target.value }))}><option value="">All sections</option>{sections.map((section) => <option key={section._id} value={section._id}>{section.name}</option>)}</select></label>
+      <button type="button" className="timetable-print-button" onClick={() => window.print()}>Print timetable</button>
     </div></div>
     <div className="timetable-view-toggle" role="group" aria-label="Timetable display">
       <button type="button" className={scheduleView === "week" ? "active" : ""} aria-pressed={scheduleView === "week"} onClick={() => setScheduleView("week")}>Weekly view</button>
