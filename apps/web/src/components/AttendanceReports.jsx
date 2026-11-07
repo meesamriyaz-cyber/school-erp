@@ -35,13 +35,15 @@ export default function AttendanceReports() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!yearId) { setClasses([]); setClassId(""); return undefined; }
     const controller = new AbortController();
-    apiRequest("/classes?academicYearId=" + encodeURIComponent(yearId), { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!yearId) { setClasses([]); setClassId(""); return undefined; }
+      return apiRequest("/classes?academicYearId=" + encodeURIComponent(yearId), { accessToken, signal: controller.signal })
       .then((response) => {
         if (!response?.success || !Array.isArray(response.data)) throw new Error("Unable to load classes.");
         setClasses(response.data);
       }).catch((err) => { if (err.name !== "AbortError") setError(err.message); });
+    });
     return () => controller.abort();
   }, [accessToken, yearId]);
 
