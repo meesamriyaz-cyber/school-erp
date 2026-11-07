@@ -39,7 +39,7 @@ describe("TeacherTimetablePortal", () => {
     render(<TeacherTimetablePortal />);
     expect(await screen.findByText("Science")).toBeInTheDocument();
     screen.getByRole("button", { name: "List view" }).click();
-    expect(screen.getByRole("region", { name: "Timetable periods" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Tuesday")).toBeInTheDocument();
     expect(screen.getByText("Lab 2")).toBeInTheDocument();
   });
