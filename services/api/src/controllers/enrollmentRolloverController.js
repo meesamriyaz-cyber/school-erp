@@ -35,9 +35,10 @@ export const getPromotionPreview = async (req, res, next) => {
       SchoolClass.find({ tenantId: req.tenantId, academicYearId: targetYear._id, status: "active" })
         .select("name sortOrder").sort({ sortOrder: 1, name: 1 }).lean(),
     ]);
+    const sections = classes.length ? await Section.find({ tenantId: req.tenantId, classId: { $in: classes.map((item) => item._id) }, status: "active" }).select("classId name capacity").sort({ name: 1 }).lean() : [];
     return res.status(200).json({
       success: true,
-      data: { sourceYear, targetYear, enrollments, targetClasses: classes, eligibleCount: enrollments.length },
+      data: { sourceYear, targetYear, enrollments, targetClasses: classes, targetSections: sections, eligibleCount: enrollments.length },
     });
   } catch (error) { return next(error); }
 };
@@ -48,7 +49,7 @@ export const executeAcademicYearRollover = async (req, res, next) => {
   if (Object.keys(body).some((key) => !allowed.includes(key)) ||
       !validId(body.sourceAcademicYearId) || !validId(body.targetAcademicYearId) ||
       body.sourceAcademicYearId === body.targetAcademicYearId || !Array.isArray(body.placements) ||
-      body.placements.length === 0 || body.placements.length > 2000) {
+      body.placements.length > 2000) {
     return invalid(res, "Provide valid source and target academic years and between 1 and 2,000 student decisions");
   }
   const seen = new Set();
@@ -177,8 +178,8 @@ export const executeAcademicYearRollover = async (req, res, next) => {
     });
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
-    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY"].includes(error.code)) {
-      return res.status(error.code === "YEAR_STATE" ? 409 : error.code === "SECTION_CAPACITY" ? 409 : 400)
+    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY", "TARGET_NOT_EMPTY"].includes(error.code)) {
+      return res.status(error.code === "YEAR_STATE" ? 409 : ["SECTION_CAPACITY", "TARGET_NOT_EMPTY"].includes(error.code) ? 409 : 400)
         .json({ success: false, message: error.message });
     }
     if (error.code === 11000) return res.status(409).json({ success: false, message: "A student already has an active enrollment or a target placement conflicts with existing data" });
