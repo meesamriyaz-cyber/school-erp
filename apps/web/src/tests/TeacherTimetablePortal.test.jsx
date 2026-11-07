@@ -9,7 +9,7 @@ vi.mock("../context/authContext.js", () => ({
 }));
 
 describe("TeacherTimetablePortal", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.resetAllMocks(); apiRequest.mockResolvedValue({ success: true, data: [] }); });
 
   it("shows the teacher weekly schedule returned by the scoped timetable API", async () => {
     apiRequest.mockResolvedValueOnce({ success: true, data: [{
