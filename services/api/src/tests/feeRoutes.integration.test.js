@@ -90,7 +90,6 @@ describe("Fee management API", () => {
       enrollmentId: String(enrollment._id), feeStructureId: structure.body.data._id,
       invoiceNumber: "CROSS-TENANT", dueDate: "2026-05-10",
     })).status).toBe(404);
-    this.invoiceId = invoice.body.data._id;
   });
 
   it("records partial and final payments, prevents overpayment, and exposes receipt history", async () => {
