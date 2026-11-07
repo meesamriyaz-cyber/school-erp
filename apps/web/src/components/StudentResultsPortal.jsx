@@ -10,6 +10,8 @@ const formatDate = (value) => value
 export default function StudentResultsPortal() {
   const { user, accessToken, logout } = useAuth();
   const [results, setResults] = useState([]);
+  const [homework, setHomework] = useState([]);
+  const [activeTab, setActiveTab] = useState("results");
   const [selectedStudent, setSelectedStudent] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,14 +21,17 @@ export default function StudentResultsPortal() {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    apiRequest("/portal/results", { accessToken, signal: controller.signal })
-      .then((response) => setResults(Array.isArray(response?.data) ? response.data : []))
-      .catch((requestError) => {
-        if (!controller.signal.aborted) setError(requestError.message || "Unable to load published results.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
+    Promise.allSettled([
+      apiRequest("/portal/results", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/homework", { accessToken, signal: controller.signal }),
+    ]).then(([resultResponse, homeworkResponse]) => {
+      if (controller.signal.aborted) return;
+      if (resultResponse.status === "fulfilled") setResults(Array.isArray(resultResponse.value?.data) ? resultResponse.value.data : []);
+      else setError(resultResponse.reason?.message || "Unable to load published results.");
+      if (homeworkResponse.status === "fulfilled") setHomework(Array.isArray(homeworkResponse.value?.data) ? homeworkResponse.value.data : []);
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
     return () => controller.abort();
   }, [accessToken]);
 
@@ -58,6 +63,20 @@ export default function StudentResultsPortal() {
         </div>
       </header>
 
+      <nav className="portal-tabs no-print" aria-label="Student portal sections">
+        <button type="button" className={activeTab === "results" ? "active" : ""} aria-pressed={activeTab === "results"} onClick={() => setActiveTab("results")}>Examination results</button>
+        <button type="button" className={activeTab === "homework" ? "active" : ""} aria-pressed={activeTab === "homework"} onClick={() => setActiveTab("homework")}>Homework & classwork ({homework.length})</button>
+      </nav>
+      {activeTab === "homework" ? (
+        loading ? <div className="portal-state">Loading homework…</div> : homework.length === 0 ? <div className="portal-empty"><h2>No published homework</h2><p>Assignments shared by your school will appear here.</p></div> : (
+          <div className="portal-homework-list">{homework.map((item) => <article className="portal-homework-card" key={String(item.homework._id) + String(item.student?._id)}>
+            <div className="portal-homework-heading"><div><span>{item.homework.subjectId?.name || "Subject"} · {item.homework.classId?.name || "Class"}{item.homework.sectionId?.name ? ` · ${item.homework.sectionId.name}` : ""}</span><h2>{item.homework.title}</h2></div><strong>Due {formatDate(item.homework.dueDate)}</strong></div>
+            {isParent && <p className="portal-homework-student">For: {[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</p>}
+            <p className="portal-homework-instructions">{item.homework.instructions}</p>
+            <footer>Assigned {formatDate(item.homework.assignedDate)} · {item.homework.teacherId ? `By ${[item.homework.teacherId.firstName, item.homework.teacherId.lastName].filter(Boolean).join(" ")}` : "School assignment"}</footer>
+          </article>)}</div>
+        )
+      ) : <>
       {isParent && students.length > 1 && (
         <div className="portal-filter no-print">
           <label htmlFor="portal-student-filter">View results for</label>
@@ -128,6 +147,7 @@ export default function StudentResultsPortal() {
           ))}
         </div>
       )}
+      </>}
     </main>
   );
 }
