@@ -4,6 +4,7 @@ import { useAuth } from "../context/authContext.js";
 import "./TeacherTimetablePortal.css";
 import TeacherAttendancePortal from "./TeacherAttendancePortal.jsx";
 import HomeworkManagement from "./HomeworkManagement.jsx";
+import TeacherExaminations from "./TeacherExaminations.jsx";
 
 const DAYS = [
   { value: 1, label: "Monday" },
@@ -22,6 +23,7 @@ const timeValue = (value) => {
 export default function TeacherTimetablePortal() {
   const { accessToken, user, logout } = useAuth();
   const [entries, setEntries] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeView, setActiveView] = useState("timetable");
@@ -43,6 +45,9 @@ export default function TeacherTimetablePortal() {
       }
     };
     void load();
+    apiRequest("/teacher-assignments?status=active", { accessToken, signal: controller.signal })
+      .then((response) => { if (!controller.signal.aborted && response?.success) setAssignments(response.data || []); })
+      .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message); });
     return () => controller.abort();
   }, [accessToken]);
 
@@ -71,8 +76,10 @@ export default function TeacherTimetablePortal() {
         <button type="button" className={activeView === "timetable" ? "active" : ""} onClick={() => setActiveView("timetable")}>My timetable</button>
         <button type="button" className={activeView === "attendance" ? "active" : ""} onClick={() => setActiveView("attendance")}>Mark attendance</button>
         <button type="button" className={activeView === "homework" ? "active" : ""} onClick={() => setActiveView("homework")}>Homework & classwork</button>
+        <button type="button" className={activeView === "classes" ? "active" : ""} onClick={() => setActiveView("classes")}>My classes</button>
+        <button type="button" className={activeView === "exams" ? "active" : ""} onClick={() => setActiveView("exams")}>Examination marks</button>
       </nav>
-      {activeView === "attendance" ? <TeacherAttendancePortal /> : activeView === "homework" ? <HomeworkManagement /> : <>
+      {activeView === "attendance" ? <TeacherAttendancePortal /> : activeView === "homework" ? <HomeworkManagement /> : activeView === "exams" ? <TeacherExaminations /> : activeView === "classes" ? <section className="teacher-classes"><h2>My assigned classes and subjects</h2><p>Assignments are managed by your school administrator.</p>{assignments.length ? <div className="teacher-classes-grid">{assignments.map((item) => <article key={item._id}><h3>{item.classId?.name || "Class"}{item.sectionId?.name ? ` · ${item.sectionId.name}` : " · All sections"}</h3><p><strong>{item.subjectId?.name || "Subject"}</strong></p><small>{item.academicYearId?.name || "Academic year"}</small></article>)}</div> : <p>No active teaching assignments found.</p>}</section> : <>
         {error && <p className="teacher-timetable-error" role="alert">{error}</p>}
         {!loading && !error && entries.length > 0 && (
           <section className="teacher-timetable-summary" aria-label="Timetable summary">
