@@ -21,9 +21,26 @@ describe("TeacherTimetablePortal", () => {
     render(<TeacherTimetablePortal />);
     expect(await screen.findByRole("heading", { name: "My weekly timetable" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Monday" })).toBeInTheDocument();
+    expect(screen.getByText("No periods assigned")).toBeInTheDocument();
+    expect(screen.getByText("Weekly periods")).toBeInTheDocument();
+    expect(screen.getByText("Classes assigned")).toBeInTheDocument();
     expect(screen.getByText("Mathematics")).toBeInTheDocument();
     expect(screen.getByText("Class 5 · Section A")).toBeInTheDocument();
     expect(screen.getByText("Room 4")).toBeInTheDocument();
     expect(apiRequest).toHaveBeenCalledWith("/timetable", { accessToken: "teacher-token", signal: expect.any(AbortSignal) });
+  });
+
+  it("switches to a chronological list of the teacher's periods", async () => {
+    apiRequest.mockResolvedValueOnce({ success: true, data: [{
+      _id: "period-2", dayOfWeek: 2, periodNumber: 2, startTime: "10:00", endTime: "10:45", room: "Lab 2",
+      classId: { name: "Class 6" }, assignmentId: { subjectId: { name: "Science" } },
+    }] });
+
+    render(<TeacherTimetablePortal />);
+    expect(await screen.findByText("Science")).toBeInTheDocument();
+    screen.getByRole("button", { name: "List view" }).click();
+    expect(screen.getByLabelText("Timetable periods")).toBeInTheDocument();
+    expect(screen.getByText("Tuesday")).toBeInTheDocument();
+    expect(screen.getByText("Lab 2")).toBeInTheDocument();
   });
 });
