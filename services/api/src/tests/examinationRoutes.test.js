@@ -85,7 +85,7 @@ describe("Examination API integration", () => {
     if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
-        await ExamMarkAudit.deleteMany({ tenantId: { $in: tenantIds } });
+        await ExamMarkAudit.collection.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
         await HomeworkSubmission.deleteMany({ tenantId: { $in: tenantIds } });
         await Homework.deleteMany({ tenantId: { $in: tenantIds } });
