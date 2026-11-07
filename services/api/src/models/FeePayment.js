@@ -10,6 +10,10 @@ const feePaymentSchema = new mongoose.Schema({
   reference: { type: String, trim: true, default: "", maxlength: 100 },
   notes: { type: String, trim: true, default: "", maxlength: 300 },
   receivedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, immutable: true },
+  status: { type: String, enum: ["posted", "reversed"], default: "posted", required: true },
+  reversedAt: { type: Date, default: null },
+  reversedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  reversalReason: { type: String, trim: true, default: "", maxlength: 300 },
 }, { timestamps: true, versionKey: false });
 
 feePaymentSchema.index({ tenantId: 1, receiptNumber: 1 }, { unique: true });
