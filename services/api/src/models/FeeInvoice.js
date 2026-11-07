@@ -22,4 +22,5 @@ const feeInvoiceSchema = new mongoose.Schema({
 
 feeInvoiceSchema.index({ tenantId: 1, invoiceNumber: 1 }, { unique: true });
 feeInvoiceSchema.index({ tenantId: 1, enrollmentId: 1, academicYearId: 1 });
+feeInvoiceSchema.index({ tenantId: 1, enrollmentId: 1, feeStructureId: 1, dueDate: 1 }, { unique: true, name: "one_fee_invoice_per_enrollment_structure_due_date" });
 export default mongoose.model("FeeInvoice", feeInvoiceSchema);
