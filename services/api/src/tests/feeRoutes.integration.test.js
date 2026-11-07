@@ -37,8 +37,11 @@ const makeAdmin = async (tenant) => {
 describe("Fee management API", () => {
   beforeAll(async () => {
     if (env.nodeEnv !== "test" || !env.mongoUri) throw new Error("Safety stop: configure the test environment.");
-    let databaseName;
-    try { databaseName = decodeURIComponent(new URL(env.mongoUri).pathname.slice(1)); } catch { databaseName = ""; }
+    const mongoUriWithoutScheme = env.mongoUri.replace(/^mongodb(?:\\+srv)?:\\/\\//i, "");
+    const databasePathStart = mongoUriWithoutScheme.indexOf("/");
+    const databaseName = databasePathStart === -1
+      ? ""
+      : decodeURIComponent(mongoUriWithoutScheme.slice(databasePathStart + 1).split("?")[0]);
     if (databaseName !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== "school-erp-test") throw new Error("Safety stop: unexpected database.");
