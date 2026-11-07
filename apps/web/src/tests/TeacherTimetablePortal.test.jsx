@@ -38,6 +38,7 @@ describe("TeacherTimetablePortal", () => {
 
     render(<TeacherTimetablePortal />);
     expect(await screen.findByText("Science")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Print timetable" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "List view" }));
     expect(screen.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Tuesday")).toBeInTheDocument();
