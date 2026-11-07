@@ -131,12 +131,22 @@ export const getMyHomework = async (req, res, next) => {
       const student = await Student.findOne({ tenantId: req.tenantId, userId: req.auth.userId })
         .select("_id admissionNumber firstName lastName").lean();
       if (!student) return res.status(409).json({ success: false, message: "Your student account has not been linked by the school" });
+      if (req.query.studentId && String(req.query.studentId) !== String(student._id)) {
+        return res.status(403).json({ success: false, message: "You may only access your own homework" });
+      }
       students = [student];
     } else {
       const guardian = await Guardian.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" }).select("_id").lean();
       if (!guardian) return res.status(409).json({ success: false, message: "Your parent account has not been linked by the school" });
       const links = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id, status: "active" }).select("studentId").lean();
-      students = await Student.find({ tenantId: req.tenantId, _id: { $in: links.map((item) => item.studentId) } })
+      const linkedStudentIds = links.map((item) => item.studentId);
+      if (req.query.studentId && !validId(req.query.studentId)) return invalid(res, "Invalid studentId");
+      if (req.query.studentId && !linkedStudentIds.some((id) => String(id) === String(req.query.studentId))) {
+        return res.status(403).json({ success: false, message: "This student is not linked to your parent account" });
+      }
+      const filter = { tenantId: req.tenantId, _id: { $in: linkedStudentIds } };
+      if (req.query.studentId) filter._id = req.query.studentId;
+      students = await Student.find(filter)
         .select("_id admissionNumber firstName lastName").sort({ firstName: 1, lastName: 1 }).lean();
     }
     if (!students.length) return res.status(200).json({ success: true, data: [] });
