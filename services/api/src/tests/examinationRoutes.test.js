@@ -16,6 +16,7 @@ import Homework from "../models/Homework.js";
 import HomeworkSubmission from "../models/HomeworkSubmission.js";
 import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
+import ExamMarkAudit from "../models/ExamMarkAudit.js";
 import Enrollment from "../models/Enrollment.js";
 import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
@@ -64,7 +65,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init(), Homework.init(), HomeworkSubmission.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), ExamMarkAudit.init(), TeacherAssignment.init(), Homework.init(), HomeworkSubmission.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -84,6 +85,7 @@ describe("Examination API integration", () => {
     if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
+        await ExamMarkAudit.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
         await HomeworkSubmission.deleteMany({ tenantId: { $in: tenantIds } });
         await Homework.deleteMany({ tenantId: { $in: tenantIds } });
@@ -484,11 +486,43 @@ describe("Examination API integration", () => {
     });
     expect(forbiddenWrite.status).toBe(403);
 
-    const allowedWrite = await request(`/examinations/${examId}/marks`, {
+    const deniedCorrection = await request(`/examinations/${examId}/marks`, {
       method: "POST", token: teacherA.token,
       body: JSON.stringify({ marks: [{ examSubjectId: subject.body.data._id, enrollmentId: String(enrollmentInA._id), marksObtained: 79 }] }),
     });
+    expect(deniedCorrection.status).toBe(400);
+    expect(deniedCorrection.body.message).toMatch(/change reason.*required/i);
+
+    const allowedWrite = await request(`/examinations/${examId}/marks`, {
+      method: "POST", token: teacherA.token,
+      body: JSON.stringify({
+        marks: [{ examSubjectId: subject.body.data._id, enrollmentId: String(enrollmentInA._id), marksObtained: 79 }],
+        changeReason: "Corrected after answer-sheet rechecking",
+      }),
+    });
     expect(allowedWrite.status).toBe(200);
+    expect(allowedWrite.body.auditCount).toBe(1);
+
+    const adminHistory = await request(`/examinations/${examId}/marks/audit`, { token: adminA.token });
+    expect(adminHistory.status).toBe(200);
+    expect(adminHistory.body.pagination.total).toBe(3);
+    expect(adminHistory.body.data[0]).toMatchObject({
+      action: "updated",
+      previous: { marksObtained: 76, absent: false },
+      current: { marksObtained: 79, absent: false },
+      changeReason: "Corrected after answer-sheet rechecking",
+    });
+    expect(String(adminHistory.body.data[0].changedBy._id)).toBe(String(teacherA.user._id));
+
+    const teacherHistory = await request(`/examinations/${examId}/marks/audit`, { token: teacherA.token });
+    expect(teacherHistory.status).toBe(403);
+    const crossTenantHistory = await request(`/examinations/${examId}/marks/audit`, { token: adminB.token });
+    expect(crossTenantHistory.status).toBe(404);
+
+    await expect(ExamMarkAudit.updateOne(
+      { tenantId: schoolA._id, examinationId: examId },
+      { $set: { changeReason: "tampered" } }
+    )).rejects.toThrow(/immutable/i);
   });
 
 });
