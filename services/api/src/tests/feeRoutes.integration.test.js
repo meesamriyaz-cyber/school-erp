@@ -37,7 +37,7 @@ const makeAdmin = async (tenant) => {
 describe("Fee management API", () => {
   beforeAll(async () => {
     if (env.nodeEnv !== "test" || !env.mongoUri) throw new Error("Safety stop: configure the test environment.");
-    const mongoUriWithoutScheme = env.mongoUri.replace(/^mongodb(?:\\+srv)?:\\/\\//i, "");
+    const mongoUriWithoutScheme = env.mongoUri.replace(/^mongodb(?:\+srv)?:\/\//i, "");
     const databasePathStart = mongoUriWithoutScheme.indexOf("/");
     const databaseName = databasePathStart === -1
       ? ""
