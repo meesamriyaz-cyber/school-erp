@@ -116,7 +116,7 @@ export const createBulkFeeInvoices = async (req, res, next) => {
     if (!structure) return fail(res, 400, "Select an active fee structure for the chosen class and academic year");
 
     const enrollmentFilter = { tenantId: req.tenantId, academicYearId, classId, status: "active" };
-    if (sectionId !== undefined) enrollmentFilter.sectionId = sectionId || null;
+    if (sectionId) enrollmentFilter.sectionId = sectionId;
     const enrollments = await Enrollment.find(enrollmentFilter)
       .populate("studentId", "admissionNumber firstName lastName")
       .sort({ "studentId.admissionNumber": 1, _id: 1 }).lean();
