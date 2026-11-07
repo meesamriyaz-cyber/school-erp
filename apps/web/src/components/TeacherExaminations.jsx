@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../lib/api.js";
+import { chunkRecords } from "../lib/examinationMarks.js";
 import { useAuth } from "../context/authContext.js";
 
 const id = (value) => String(value?._id || value || "");
@@ -79,14 +80,24 @@ export default function TeacherExaminations() {
     }
     if (!records.length) { setError("Enter at least one mark or mark a student absent."); return; }
     setSaving(true); setError(""); setNotice("");
+    let savedCount = 0;
     try {
-      const response = await apiRequest(`/examinations/${examId}/marks`, {
-        accessToken, method: "POST", body: { marks: records },
-      });
-      if (!response?.success) throw new Error("Unable to save marks");
-      setNotice(`Saved ${response.count} mark records.`);
-    } catch (err) { setError(err.message || "Unable to save marks"); }
-    finally { setSaving(false); }
+      const batches = chunkRecords(records);
+      for (let index = 0; index < batches.length; index += 1) {
+        const batch = batches[index];
+        const response = await apiRequest(`/examinations/${examId}/marks`, {
+          accessToken, method: "POST", body: { marks: batch },
+        });
+        if (!response?.success) throw new Error("The server did not confirm this marks batch.");
+        savedCount += Number.isFinite(response.count) ? response.count : batch.length;
+      }
+      setNotice(`Saved all ${savedCount} mark records in ${batches.length} batch${batches.length === 1 ? "" : "es"}.`);
+    } catch (err) {
+      const message = err.message || "Unable to save marks";
+      setError(savedCount
+        ? `Saved ${savedCount} of ${records.length} records. Remaining batches were stopped; review the saved marks and retry. ${message}`
+        : message);
+    } finally { setSaving(false); }
   };
 
   return <section className="teacher-exams">
