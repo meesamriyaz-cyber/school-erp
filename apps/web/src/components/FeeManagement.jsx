@@ -188,7 +188,7 @@ export default function FeeManagement() {
     } catch (err) { setError(err.message || "Unable to reverse payment."); }
     finally { setBusy(false); }
   };
-\n  return <section className="fees-page" aria-labelledby="fees-title">
+  return <section className="fees-page" aria-labelledby="fees-title">
     <div className="fees-intro"><div><p className="fees-eyebrow">SCHOOL FINANCE</p><h2 id="fees-title">Fees &amp; Payments</h2><p>Set class-wise fee structures, issue student invoices and record payments with receipt references.</p></div></div>
     <div className="fees-toolbar"><label>Academic year<select value={yearId} onChange={(event) => setYearId(event.target.value)}>{years.map((year) => <option key={year._id} value={year._id}>{year.name}{year.status === "active" ? " · Active" : ""}</option>)}</select></label><div className="fees-tabs"><button type="button" className={tab === "structures" ? "active" : ""} onClick={() => setTab("structures")}>Fee structures</button><button type="button" className={tab === "invoices" ? "active" : ""} onClick={() => setTab("invoices")}>Invoices &amp; payments</button></div></div>
     {notice && <p className="fees-notice" role="status">{notice}</p>}{error && <p className="fees-error" role="alert">{error}</p>}
