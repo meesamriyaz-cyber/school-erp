@@ -169,6 +169,7 @@ export default function ExaminationManagement() {
     }
     setSaving(true); setError(""); setNotice("");
     let savedCount = 0;
+    let allBatchesSaved = false;
     try {
       const batches = chunkRecords(records);
       for (let index = 0; index < batches.length; index += 1) {
@@ -181,13 +182,16 @@ export default function ExaminationManagement() {
         savedCount += Number.isFinite(response.count) ? response.count : batch.length;
         setNotice(`Saved ${savedCount} of ${records.length} records…`);
       }
+      allBatchesSaved = true;
       await loadExam(selectedExam._id);
       setNotice(`Saved all ${savedCount} student-subject mark record${savedCount === 1 ? "" : "s"} in ${batches.length} batch${batches.length === 1 ? "" : "es"}.`);
     } catch (err) {
       const message = errorMessage(err, "Unable to save marks.");
-      setError(savedCount
-        ? `Saved ${savedCount} of ${records.length} records. Remaining batches were stopped; review the saved marks and retry. ${message}`
-        : message);
+      setError(allBatchesSaved
+        ? `All ${savedCount} records were saved, but the examination view could not be refreshed. ${message}`
+        : savedCount
+          ? `Saved ${savedCount} of ${records.length} records. Remaining batches were stopped; review the saved marks and retry. ${message}`
+          : message);
     } finally { setSaving(false); }
   };
 
