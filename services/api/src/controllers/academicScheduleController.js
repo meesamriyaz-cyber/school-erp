@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import AcademicSchedule from "../models/AcademicSchedule.js";
 import AcademicYear from "../models/AcademicYear.js";
+import TimetableEntry from "../models/TimetableEntry.js";
 
 const validTime = (value) => typeof value === "string" && /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(value);
 const minutes = (value) => Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
@@ -45,6 +46,23 @@ export const saveAcademicSchedule = async (req, res, next) => {
     if (year.status === "closed") return res.status(409).json({ success: false, message: "A closed academic year schedule cannot be changed" });
     const validationError = validateBlocks(periods, breaks);
     if (validationError) return invalid(res, validationError);
+
+    const activeEntries = await TimetableEntry.find({
+      tenantId: req.tenantId,
+      academicYearId,
+      status: "active",
+    }).select("periodNumber startTime endTime").lean();
+    const configuredByNumber = new Map(periods.map((period) => [period.periodNumber, period]));
+    for (const entry of activeEntries) {
+      const configured = configuredByNumber.get(entry.periodNumber);
+      if (!configured || configured.startTime !== entry.startTime || configured.endTime !== entry.endTime) {
+        return res.status(409).json({
+          success: false,
+          message: `Deactivate or update active timetable entries using period ${entry.periodNumber} before changing the bell schedule`,
+        });
+      }
+    }
+
     const data = await AcademicSchedule.findOneAndUpdate(
       { tenantId: req.tenantId, academicYearId },
       { $set: { periods, breaks, updatedBy: req.auth.userId }, $setOnInsert: { tenantId: req.tenantId, academicYearId } },
