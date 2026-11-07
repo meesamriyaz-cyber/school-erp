@@ -22,7 +22,6 @@ export default function TeacherAssignments() {
   const [notice, setNotice] = useState("");
   const [filterYear, setFilterYear] = useState("");
 
-  const selectedYear = useMemo(() => years.find((year) => year._id === form.academicYearId), [years, form.academicYearId]);
 
   const loadAssignments = useCallback(async (signal) => {
     const params = new URLSearchParams();
@@ -58,11 +57,13 @@ export default function TeacherAssignments() {
   }, [accessToken, loadAssignments]);
 
   useEffect(() => {
-    if (!form.classId) { setSections([]); return; }
     const controller = new AbortController();
-    apiRequest(`/sections?classId=${encodeURIComponent(form.classId)}&status=active`, { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!form.classId) { setSections([]); return undefined; }
+      return apiRequest(`/sections?classId=${encodeURIComponent(form.classId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => { if (!controller.signal.aborted) setSections(Array.isArray(response?.data) ? response.data : []); })
       .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load sections."); });
+    });
     return () => controller.abort();
   }, [accessToken, form.classId]);
 
