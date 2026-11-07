@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Subject from "../models/Subject.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const CATEGORIES = ["core", "elective"];
 const STATUSES = ["active", "inactive"];
@@ -117,6 +118,19 @@ export const updateSubject = async (req, res, next) => {
     if (!fields) return;
     const subject = await Subject.findOne({ _id: req.params.subjectId, tenantId: req.tenantId });
     if (!subject) return res.status(404).json({ success: false, message: "Subject not found" });
+    if (fields.status === "inactive") {
+      const hasActiveAssignments = await TeacherAssignment.exists({
+        tenantId: req.tenantId,
+        subjectId: subject._id,
+        status: "active",
+      });
+      if (hasActiveAssignments) {
+        return res.status(409).json({
+          success: false,
+          message: "Deactivate active teacher assignments before deactivating this subject",
+        });
+      }
+    }
     subject.set(fields);
     await subject.save();
     return res.status(200).json({ success: true, data: subject });
