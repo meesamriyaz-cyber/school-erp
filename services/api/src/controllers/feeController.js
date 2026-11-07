@@ -174,7 +174,7 @@ export const listInvoicePayments = async (req, res, next) => {
     if (!validId(req.params.invoiceId)) return fail(res, 400, "Invalid invoice ID");
     const invoice = await FeeInvoice.findOne({ _id: req.params.invoiceId, tenantId: req.tenantId }).select("_id").lean();
     if (!invoice) return fail(res, 404, "Invoice not found");
-    const data = await FeePayment.find({ tenantId: req.tenantId, invoiceId: invoice._id }).populate("receivedBy", "firstName lastName").sort({ paymentDate: -1 }).lean();
+    const data = await FeePayment.find({ tenantId: req.tenantId, invoiceId: invoice._id }).populate("receivedBy", "firstName lastName").populate("reversedBy", "firstName lastName").sort({ paymentDate: -1 }).lean();
     return res.json({ success: true, data });
   } catch (error) { return next(error); }
 };
@@ -206,6 +206,44 @@ export const recordFeePayment = async (req, res, next) => {
     return res.status(201).json({ success: true, data: payment });
   } catch (error) {
     if (error.name === "ValidationError" || error.name === "CastError") return fail(res, 400, "Payment details are invalid");
+    return next(error);
+  } finally { await session.endSession(); }
+};
+
+
+export const reverseFeePayment = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  try {
+    const { reason } = req.body || {};
+    if (!validId(req.params.invoiceId) || !validId(req.params.paymentId) ||
+      typeof reason !== "string" || reason.trim().length < 5 || reason.trim().length > 300 ||
+      Object.hasOwn(req.body || {}, "tenantId")) {
+      return fail(res, 400, "A valid invoice, payment and reversal reason (5–300 characters) are required");
+    }
+    let failure;
+    let reversed;
+    await session.withTransaction(async () => {
+      const invoice = await FeeInvoice.findOne({ _id: req.params.invoiceId, tenantId: req.tenantId }).session(session);
+      if (!invoice) { failure = [404, "Invoice not found"]; return; }
+      const payment = await FeePayment.findOne({
+        _id: req.params.paymentId, invoiceId: invoice._id, tenantId: req.tenantId,
+      }).session(session);
+      if (!payment) { failure = [404, "Payment not found"]; return; }
+      if (payment.status !== "posted") { failure = [409, "Payment has already been reversed"]; return; }
+      const remainingPaid = Math.max(0, Math.round((invoice.paidAmount - payment.amount) * 100) / 100);
+      invoice.paidAmount = remainingPaid;
+      invoice.status = remainingPaid >= invoice.totalAmount ? "paid" : remainingPaid > 0 ? "partial" : "unpaid";
+      payment.status = "reversed";
+      payment.reversedAt = new Date();
+      payment.reversedBy = req.auth.userId;
+      payment.reversalReason = reason.trim();
+      await Promise.all([invoice.save({ session }), payment.save({ session })]);
+      reversed = payment;
+    });
+    if (failure) return fail(res, failure[0], failure[1]);
+    return res.json({ success: true, data: reversed });
+  } catch (error) {
+    if (error.name === "ValidationError" || error.name === "CastError") return fail(res, 400, "Payment reversal details are invalid");
     return next(error);
   } finally { await session.endSession(); }
 };
