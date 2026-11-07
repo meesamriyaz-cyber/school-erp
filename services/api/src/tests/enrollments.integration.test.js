@@ -445,4 +445,99 @@ describe("Student Enrollment API", () => {
       expect(updatedHistory.body.data.map((item) => item.status).sort()).toEqual([status, "active"].sort());
     }
   }, 20000);
+
+  it("previews and atomically rolls students into the next academic year", async () => {
+    const school = await makeSchool("rollover");
+    const admin = await makeUser(school, "school_admin");
+    const sourceYear = await AcademicYear.create({
+      tenantId: school._id, name: `AY-source-${randomUUID().slice(0, 6)}`,
+      startDate: "2026-04-01", endDate: "2027-03-31", status: "active",
+    });
+    const targetYear = await AcademicYear.create({
+      tenantId: school._id, name: `AY-target-${randomUUID().slice(0, 6)}`,
+      startDate: "2027-04-01", endDate: "2028-03-31", status: "draft",
+    });
+    const sourceClass = await SchoolClass.create({ tenantId: school._id, academicYearId: sourceYear._id, name: "Class 4", sortOrder: 4 });
+    const targetClass = await SchoolClass.create({ tenantId: school._id, academicYearId: targetYear._id, name: "Class 5", sortOrder: 5 });
+    const targetSection = await Section.create({ tenantId: school._id, classId: targetClass._id, name: "A", capacity: 2 });
+    const cases = [];
+    for (const outcome of ["promote", "retain", "transfer", "withdraw"]) {
+      const student = await makeStudent(school, `roll-${outcome}-${randomUUID().slice(0, 5)}`);
+      const created = await post("/enrollments", admin.token, {
+        studentId: String(student._id), academicYearId: String(sourceYear._id), classId: String(sourceClass._id),
+      });
+      expect(created.status).toBe(201);
+      enrollmentIds.push(created.body.data._id);
+      cases.push({ student, enrollmentId: created.body.data._id, outcome });
+    }
+
+    const preview = await request(`/enrollments/promotion-preview?sourceAcademicYearId=${sourceYear._id}&targetAcademicYearId=${targetYear._id}`, { token: admin.token });
+    expect(preview.status).toBe(200);
+    expect(preview.body.data.eligibleCount).toBe(4);
+    expect(preview.body.data.targetClasses.some((item) => String(item._id) === String(targetClass._id))).toBe(true);
+    expect(preview.body.data.targetSections.some((item) => String(item._id) === String(targetSection._id))).toBe(true);
+
+    const placements = cases.map((item) => ({
+      enrollmentId: item.enrollmentId, outcome: item.outcome,
+      ...( ["promote", "retain"].includes(item.outcome) ? { classId: String(targetClass._id), sectionId: String(targetSection._id) } : {}),
+    }));
+    const incomplete = await request("/enrollments/rollover", {
+      token: admin.token, method: "POST",
+      body: JSON.stringify({ sourceAcademicYearId: String(sourceYear._id), targetAcademicYearId: String(targetYear._id), placements: placements.slice(0, 3) }),
+    });
+    expect(incomplete.status).toBe(400);
+    expect((await AcademicYear.findById(sourceYear._id).lean()).status).toBe("active");
+
+    const completed = await request("/enrollments/rollover", {
+      token: admin.token, method: "POST",
+      body: JSON.stringify({ sourceAcademicYearId: String(sourceYear._id), targetAcademicYearId: String(targetYear._id), placements }),
+    });
+    expect(completed.status).toBe(200);
+    expect(completed.body.data).toMatchObject({ processed: 4, promoted: 1, retained: 1, transferred: 1, withdrawn: 1 });
+    expect((await AcademicYear.findById(sourceYear._id).lean()).status).toBe("closed");
+    expect((await AcademicYear.findById(targetYear._id).lean()).status).toBe("active");
+    expect(await Enrollment.countDocuments({ tenantId: school._id, academicYearId: targetYear._id, status: "active" })).toBe(2);
+    const history = await Enrollment.find({ tenantId: school._id, studentId: { $in: cases.map((item) => item.student._id) } }).lean();
+    expect(history.filter((item) => item.academicYearId.equals(sourceYear._id) && item.status === "completed")).toHaveLength(2);
+    expect(history.filter((item) => item.academicYearId.equals(sourceYear._id) && item.status === "transferred")).toHaveLength(1);
+    expect(history.filter((item) => item.academicYearId.equals(sourceYear._id) && item.status === "withdrawn")).toHaveLength(1);
+    expect(history.filter((item) => item.academicYearId.equals(targetYear._id) && item.status === "active")).toHaveLength(2);
+    expect((await Student.findById(cases.find((item) => item.outcome === "transfer").student._id).lean()).status).toBe("inactive");
+    expect((await Student.findById(cases.find((item) => item.outcome === "withdraw").student._id).lean()).status).toBe("withdrawn");
+  }, 30000);
+
+  it("rejects rollover when target section capacity is insufficient without changing either year", async () => {
+    const school = await makeSchool("rollover-capacity");
+    const admin = await makeUser(school, "school_admin");
+    const sourceYear = await AcademicYear.create({
+      tenantId: school._id, name: `AY-src-${randomUUID().slice(0, 6)}`,
+      startDate: "2026-04-01", endDate: "2027-03-31", status: "active",
+    });
+    const targetYear = await AcademicYear.create({
+      tenantId: school._id, name: `AY-dst-${randomUUID().slice(0, 6)}`,
+      startDate: "2027-04-01", endDate: "2028-03-31", status: "draft",
+    });
+    const sourceClass = await SchoolClass.create({ tenantId: school._id, academicYearId: sourceYear._id, name: "Class 1" });
+    const targetClass = await SchoolClass.create({ tenantId: school._id, academicYearId: targetYear._id, name: "Class 2" });
+    const section = await Section.create({ tenantId: school._id, classId: targetClass._id, name: "A", capacity: 1 });
+    const students = [await makeStudent(school, `cap1-${randomUUID().slice(0, 5)}`), await makeStudent(school, `cap2-${randomUUID().slice(0, 5)}`)];
+    const placements = [];
+    for (const student of students) {
+      const created = await post("/enrollments", admin.token, { studentId: String(student._id), academicYearId: String(sourceYear._id), classId: String(sourceClass._id) });
+      expect(created.status).toBe(201);
+      enrollmentIds.push(created.body.data._id);
+      placements.push({ enrollmentId: created.body.data._id, outcome: "promote", classId: String(targetClass._id), sectionId: String(section._id) });
+    }
+    const response = await request("/enrollments/rollover", {
+      token: admin.token, method: "POST",
+      body: JSON.stringify({ sourceAcademicYearId: String(sourceYear._id), targetAcademicYearId: String(targetYear._id), placements }),
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.message).toMatch(/capacity/i);
+    expect((await AcademicYear.findById(sourceYear._id).lean()).status).toBe("active");
+    expect((await AcademicYear.findById(targetYear._id).lean()).status).toBe("draft");
+    expect(await Enrollment.countDocuments({ tenantId: school._id, academicYearId: sourceYear._id, status: "active" })).toBe(2);
+    expect(await Enrollment.countDocuments({ tenantId: school._id, academicYearId: targetYear._id })).toBe(0);
+  }, 30000);
+
 });
