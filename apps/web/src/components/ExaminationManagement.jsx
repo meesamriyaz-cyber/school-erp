@@ -200,7 +200,7 @@ export default function ExaminationManagement() {
   };
 
   const nextStatus = useMemo(() => ({ draft: "scheduled", scheduled: "in_progress", in_progress: "completed" }[selectedExam?.status] || null), [selectedExam?.status]);
-  const canConfigure = selectedExam && !["completed", "published"].includes(selectedExam.status);
+  const canConfigure = selectedExam?.status === "draft";
   const canEnterMarks = selectedExam && ["scheduled", "in_progress", "completed"].includes(selectedExam.status);
   const marksProgress = useMemo(() => {
     const total = enrollments.length * (selectedExam?.subjects?.length || 0);
