@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./HomeworkManagement.css";
@@ -24,7 +24,7 @@ export default function HomeworkManagement() {
   const [submissions, setSubmissions] = useState({});
   const [reviewForms, setReviewForms] = useState({});
 
-  const load = async (signal) => {
+  const load = useCallback(async (signal) => {
     setLoading(true);
     try {
       const [yearResponse, classResponse, sectionResponse, subjectResponse, homeworkResponse, assignmentResponse] = await Promise.all([
@@ -46,13 +46,13 @@ export default function HomeworkManagement() {
     } catch (err) {
       if (err.name !== "AbortError" && !signal?.aborted) setError(err.message || "Unable to load homework workspace.");
     } finally { if (!signal?.aborted) setLoading(false); }
-  };
+  }, [accessToken, isTeacher]);
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
+    void Promise.resolve().then(() => load(controller.signal));
     return () => controller.abort();
-  }, [accessToken]);
+  }, [load]);
 
   const permittedAssignments = teacherAssignments.filter((item) => String(item.academicYearId?._id || item.academicYearId) === form.academicYearId && String(item.classId?._id || item.classId) === form.classId);
   const availableSections = useMemo(() => sections.filter((item) => String(item.classId?._id || item.classId) === String(form.classId) && (!isTeacher || teacherAssignments.some((assignment) => String(assignment.classId?._id || assignment.classId) === form.classId && (!assignment.sectionId || String(assignment.sectionId?._id || assignment.sectionId) === String(item._id))))), [sections, form.classId, isTeacher, teacherAssignments]);
