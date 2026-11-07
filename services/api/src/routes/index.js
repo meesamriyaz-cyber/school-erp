@@ -19,6 +19,7 @@ import examMarkRoutes from "./examMarkRoutes.js";
 import guardianRoutes from "./guardianRoutes.js";
 import studentGuardianRoutes from "./studentGuardianRoutes.js";
 import portalRoutes from "./portalRoutes.js";
+import homeworkRoutes from "./homeworkRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -49,4 +50,5 @@ router.use("/academic-schedule", academicScheduleRoutes);
 router.use("/examinations", examRoutes);
 router.use("/examinations", examMarkRoutes);
 router.use("/portal", portalRoutes);
+router.use("/homework", homeworkRoutes);
 export default router;
