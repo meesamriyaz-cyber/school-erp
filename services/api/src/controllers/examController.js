@@ -153,6 +153,10 @@ export const addExaminationSubject = async (req, res, next) => {
     const maximum = Number(maxMarks), passing = Number(passMarks);
     if (!Number.isFinite(maximum) || maximum <= 0 || !Number.isFinite(passing) || passing < 0 || passing > maximum) return invalid(res, "Passing marks must be between zero and maximum marks");
     if (typeof startTime !== "string" || typeof endTime !== "string") return invalid(res, "Exam times must use 24-hour HH:mm format");
+    const timePattern = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+    if ((startTime && !timePattern.test(startTime)) || (endTime && !timePattern.test(endTime))) return invalid(res, "Exam times must use 24-hour HH:mm format");
+    if (Boolean(startTime) !== Boolean(endTime)) return invalid(res, "Provide both exam start and end times, or leave both blank");
+    if (startTime && endTime <= startTime) return invalid(res, "Exam end time must be later than start time");
     if (durationMinutes !== null && (!Number.isInteger(Number(durationMinutes)) || Number(durationMinutes) < 1)) return invalid(res, "Duration must be a positive whole number of minutes");
     const exam = await Examination.findOne({ _id: req.params.examinationId, tenantId: req.tenantId });
     if (!exam) return res.status(404).json({ success: false, message: "Examination not found" });
@@ -166,6 +170,12 @@ export const addExaminationSubject = async (req, res, next) => {
       academicYearId: exam.academicYearId, classId: exam.classId, status: "active",
       ...(exam.sectionId ? { $or: [{ sectionId: exam.sectionId }, { sectionId: null }] } : { sectionId: null }),
     })) return res.status(403).json({ success: false, message: "You are not assigned to this subject and class" });
+
+    if (startTime && endTime) {
+      const sameDaySubjects = await ExamSubject.find({ tenantId: req.tenantId, examinationId: exam._id, examDate: { $gte: new Date(date.toISOString().slice(0, 10)), $lt: new Date(new Date(date.toISOString().slice(0, 10)).getTime() + 86400000) } }).select("subjectId startTime endTime").lean();
+      const overlaps = sameDaySubjects.some((item) => item.startTime && item.endTime && startTime < item.endTime && endTime > item.startTime);
+      if (overlaps) return res.status(409).json({ success: false, message: "This subject exam time overlaps another subject scheduled on the same date" });
+    }
     const data = await ExamSubject.create({
       tenantId: req.tenantId, examinationId: exam._id, subjectId, examDate: date,
       startTime, endTime, maxMarks: maximum, passMarks: passing,
