@@ -160,7 +160,7 @@ export const addExaminationSubject = async (req, res, next) => {
     if (durationMinutes !== null && (!Number.isInteger(Number(durationMinutes)) || Number(durationMinutes) < 1)) return invalid(res, "Duration must be a positive whole number of minutes");
     const exam = await Examination.findOne({ _id: req.params.examinationId, tenantId: req.tenantId });
     if (!exam) return res.status(404).json({ success: false, message: "Examination not found" });
-    if (["completed", "published"].includes(exam.status)) return res.status(409).json({ success: false, message: "Subjects cannot be changed after an examination is completed" });
+    if (exam.status !== "draft") return res.status(409).json({ success: false, message: "Subjects can only be configured while the examination is in draft; configuration is locked once scheduled" });
     const date = new Date(examDate);
     if (date < new Date(exam.startDate) || date > new Date(exam.endDate)) return invalid(res, "Subject examination date must fall within the examination date range");
     const subject = await Subject.findOne({ _id: subjectId, tenantId: req.tenantId, status: "active" }).select("_id").lean();
