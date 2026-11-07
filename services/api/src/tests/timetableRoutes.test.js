@@ -132,6 +132,12 @@ describe("Timetable API integration", () => {
     });
     expect(blocked.status).toBe(409);
 
+    const subjectBlocked = await request(`/subjects/${subjectA._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "inactive" }),
+    });
+    expect(subjectBlocked.status).toBe(409);
+
     const periodOff = await request(`/timetable/${entry._id}`, {
       method: "PATCH", token: adminA.token,
       body: JSON.stringify({ status: "inactive" }),
@@ -144,6 +150,24 @@ describe("Timetable API integration", () => {
     });
     expect(assignmentOff.status).toBe(200);
     expect(assignmentOff.body.data.status).toBe("inactive");
+
+    const subjectOff = await request(`/subjects/${subjectA._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "inactive" }),
+    });
+    expect(subjectOff.status).toBe(200);
+
+    const blockedReactivation = await request(`/teacher-assignments/${assignmentA._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "active" }),
+    });
+    expect(blockedReactivation.status).toBe(409);
+
+    const subjectOn = await request(`/subjects/${subjectA._id}`, {
+      method: "PATCH", token: adminA.token,
+      body: JSON.stringify({ status: "active" }),
+    });
+    expect(subjectOn.status).toBe(200);
 
     const assignmentOn = await request(`/teacher-assignments/${assignmentA._id}`, {
       method: "PATCH", token: adminA.token,
