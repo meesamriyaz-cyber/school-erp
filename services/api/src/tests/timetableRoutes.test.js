@@ -210,6 +210,7 @@ describe("Timetable API integration", () => {
     const secondEntry = {
       ...entryPayload(assignmentB._id, classA._id, 1),
       dayOfWeek: 2,
+      periodNumber: 2,
       startTime: "10:00",
       endTime: "10:45",
     };
@@ -277,6 +278,22 @@ describe("Timetable API integration", () => {
     expect(saved.body.data.breaks[0].label).toBe("Short break");
     const otherSchool = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: adminB.token });
     expect(otherSchool.status).toBe(404);
+  });
+
+  it("prevents bell-schedule changes that invalidate active timetable periods", async () => {
+    const response = await request("/academic-schedule", {
+      method: "PUT", token: adminA.token,
+      body: JSON.stringify({
+        academicYearId: String(yearA._id),
+        periods: [
+          { periodNumber: 1, label: "Mathematics", startTime: "08:30", endTime: "09:15" },
+          { periodNumber: 2, label: "Science", startTime: "10:00", endTime: "10:45" },
+        ],
+        breaks: [{ label: "Short break", startTime: "09:45", endTime: "10:00" }],
+      }),
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.message).toMatch(/deactivate or update active timetable entries/i);
   });
 
   it("rejects overlapping periods and breaks in the academic schedule", async () => {
