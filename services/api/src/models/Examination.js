@@ -53,6 +53,9 @@ const examinationSchema = new mongoose.Schema(
       default: "draft",
       required: true,
     },
+    // A short-lived distributed lease serializes mark writes with result publication.
+    resultLockToken: { type: String, default: null, select: false },
+    resultLockExpiresAt: { type: Date, default: null, select: false },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
