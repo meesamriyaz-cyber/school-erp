@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { randomUUID } from "node:crypto";
+import { acquireExaminationResultLock, releaseExaminationResultLock } from "../utils/examinationResultLock.js";
 import Examination from "../models/Examination.js";
 import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
@@ -8,35 +9,6 @@ import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
-
-const RESULT_LOCK_LEASE_MS = 5 * 60 * 1000;
-
-const acquireResultLock = async (tenantId, examinationId, statuses, token) => {
-  const now = new Date();
-  return Examination.findOneAndUpdate(
-    {
-      _id: examinationId,
-      tenantId,
-      status: { $in: statuses },
-      $or: [
-        { resultLockExpiresAt: null },
-        { resultLockExpiresAt: { $lte: now } },
-      ],
-    },
-    {
-      $set: {
-        resultLockToken: token,
-        resultLockExpiresAt: new Date(now.getTime() + RESULT_LOCK_LEASE_MS),
-      },
-    },
-    { new: true }
-  ).select("_id status").lean();
-};
-
-const releaseResultLock = (tenantId, examinationId, token) => Examination.updateOne(
-  { _id: examinationId, tenantId, resultLockToken: token },
-  { $unset: { resultLockToken: 1, resultLockExpiresAt: 1 } }
-);
 
 const teacherAssignmentFilter = (req, exam, examSubject, enrollment = null) => {
   const filter = {
@@ -181,9 +153,12 @@ export const saveExaminationMarks = async (req, res, next) => {
       });
     }
     const lockToken = randomUUID();
-    const lockedExam = await acquireResultLock(
-      req.tenantId, exam._id, ["scheduled", "in_progress", "completed"], lockToken
-    );
+    const lockedExam = await acquireExaminationResultLock({
+      tenantId: req.tenantId,
+      examinationId: exam._id,
+      statuses: ["scheduled", "in_progress", "completed"],
+      token: lockToken,
+    });
     if (!lockedExam) {
       return res.status(409).json({
         success: false,
@@ -194,7 +169,7 @@ export const saveExaminationMarks = async (req, res, next) => {
     try {
       await ExamMark.bulkWrite(operations, { ordered: true });
     } finally {
-      await releaseResultLock(req.tenantId, exam._id, lockToken);
+      await releaseExaminationResultLock(req.tenantId, exam._id, lockToken);
     }
     return res.status(200).json({ success: true, message: "Examination marks saved", count: operations.length });
   } catch (error) {
