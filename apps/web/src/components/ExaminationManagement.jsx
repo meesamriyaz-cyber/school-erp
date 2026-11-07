@@ -97,7 +97,8 @@ export default function ExaminationManagement() {
       ["completed", "published"].includes(response.data.status)
         ? apiRequest(`/examinations/${id}/results`, { accessToken })
         : Promise.resolve(null),
-      apiRequest(`/examinations/${id}/marks/audit?limit=50`, { accessToken }),
+      apiRequest(`/examinations/${id}/marks/audit?limit=50`, { accessToken })
+        .catch(() => ({ success: false, data: [] })),
     ]);
     const savedMarks = {};
     for (const mark of markResponse.data || []) {
