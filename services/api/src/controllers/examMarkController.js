@@ -263,6 +263,56 @@ export const saveExaminationMarks = async (req, res, next) => {
 };
 
 
+export const listExaminationMarkAudit = async (req, res, next) => {
+  try {
+    if (!validId(req.params.examinationId)) return invalid(res, "Invalid examination ID");
+    const exam = await Examination.findOne({
+      _id: req.params.examinationId,
+      tenantId: req.tenantId,
+    }).select("_id").lean();
+    if (!exam) return res.status(404).json({ success: false, message: "Examination not found" });
+
+    const filter = { tenantId: req.tenantId, examinationId: exam._id };
+    for (const field of ["examSubjectId", "enrollmentId"]) {
+      if (req.query[field] !== undefined) {
+        if (!validId(req.query[field])) return invalid(res, `Invalid ${field}`);
+        filter[field] = req.query[field];
+      }
+    }
+
+    const requestedPage = Number.parseInt(req.query.page, 10);
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 100)
+      : 50;
+    const [data, total] = await Promise.all([
+      ExamMarkAudit.find(filter)
+        .populate("changedBy", "firstName lastName email role")
+        .populate("studentId", "firstName lastName admissionNumber")
+        .populate("examSubjectId", "subjectId maxMarks passMarks")
+        .sort({ createdAt: -1, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      ExamMarkAudit.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const getTeacherExamRoster = async (req, res, next) => {
   try {
     if (!validId(req.params.examinationId)) return invalid(res, "Invalid examination ID");
