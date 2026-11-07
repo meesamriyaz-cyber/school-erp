@@ -14,7 +14,7 @@ const student = { _id: "student-1", firstName: "Ayaan", lastName: "Khan", admiss
 const enrollment = { _id: "enrollment-1", studentId: student, classId: { _id: "old-class", name: "Class 4", sortOrder: 4 }, sectionId: null };
 const preview = {
   sourceYear: source, targetYear: target, eligibleCount: 1, enrollments: [enrollment],
-  targetClasses: [{ _id: "new-class", name: "Class 5", sortOrder: 5 }],
+  targetClasses: [{ _id: "new-class", name: "Class 5", sortOrder: 5, status: "active" }],
   targetSections: [{ _id: "new-section", classId: "new-class", name: "A", capacity: 30 }],
 };
 
@@ -58,7 +58,7 @@ describe("AcademicYearRollover", () => {
     await user.click(screen.getByRole("button", { name: "Prepare preview" }));
     await screen.findByText("Ayaan Khan");
     await user.selectOptions(screen.getByLabelText("Decision for Ayaan Khan"), "transfer");
-    expect(screen.getByLabelText("Target class for Ayaan Khan")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Target class for Ayaan Khan")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review and confirm rollover" })).toBeEnabled();
   });
 
