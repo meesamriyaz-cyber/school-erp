@@ -139,6 +139,7 @@ export default function StudentResultsPortal() {
         )
       ) : activeTab === "homework" ? (
         loading ? <div className="portal-state">Loading homework…</div> : visibleHomework.length === 0 ? <div className="portal-empty"><h2>No published homework</h2><p>Assignments shared by your school will appear here.</p></div> : (
+          <>
           {homeworkNotice && <div className="portal-homework-notice" role="status">{homeworkNotice}</div>}
           <div className="portal-homework-list">{visibleHomework.map((item) => <article className="portal-homework-card" key={String(item.homework._id) + String(item.student?._id)}>
             <div className="portal-homework-heading"><div><span>{item.homework.subjectId?.name || "Subject"} · {item.homework.classId?.name || "Class"}{item.homework.sectionId?.name ? ` · ${item.homework.sectionId.name}` : ""}</span><h2>{item.homework.title}</h2></div><strong>Due {formatDate(item.homework.dueDate)}</strong></div>
@@ -167,7 +168,7 @@ export default function StudentResultsPortal() {
             })()}
             <footer>Assigned {formatDate(item.homework.assignedDate)} · {item.homework.teacherId ? `By ${[item.homework.teacherId.firstName, item.homework.teacherId.lastName].filter(Boolean).join(" ")}` : "School assignment"}</footer>
           </article>)}</div>
-
+          </>
         )
       ) : <>
 
