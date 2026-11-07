@@ -280,7 +280,7 @@ describe("Timetable API integration", () => {
       }),
     });
     expect(breakTime.status).toBe(400);
-    expect(breakTime.body.message).toMatch(/configured period/i);
+    expect(breakTime.body.message).toMatch(/period configured/i);
   });
 
   it("allows teachers to view but not change the academic schedule", async () => {
