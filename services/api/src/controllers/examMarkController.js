@@ -141,3 +141,38 @@ export const saveExaminationMarks = async (req, res, next) => {
     return next(error);
   }
 };
+
+
+export const getTeacherExamRoster = async (req, res, next) => {
+  try {
+    if (!validId(req.params.examinationId)) return invalid(res, "Invalid examination ID");
+    const exam = await Examination.findOne({ _id: req.params.examinationId, tenantId: req.tenantId }).lean();
+    if (!exam) return res.status(404).json({ success: false, message: "Examination not found" });
+    const subjects = await ExamSubject.find({ tenantId: req.tenantId, examinationId: exam._id })
+      .populate("subjectId", "name code").lean();
+    const assignments = await TeacherAssignment.find({
+      tenantId: req.tenantId, teacherId: req.auth.userId, status: "active",
+      academicYearId: exam.academicYearId, classId: exam.classId,
+      subjectId: { $in: subjects.map((item) => item.subjectId?._id) },
+      ...(exam.sectionId ? { $or: [{ sectionId: null }, { sectionId: exam.sectionId }] } : {}),
+    }).select("subjectId sectionId").lean();
+    const permitted = subjects.filter((item) => assignments.some((assignment) =>
+      String(assignment.subjectId) === String(item.subjectId?._id)));
+    if (!permitted.length) return res.status(403).json({ success: false, message: "You are not assigned to this examination" });
+    const sectionIds = assignments.map((item) => item.sectionId).filter(Boolean);
+    const unrestricted = assignments.some((item) => !item.sectionId);
+    const enrollments = await Enrollment.find({
+      tenantId: req.tenantId, academicYearId: exam.academicYearId, classId: exam.classId,
+      status: "active",
+      ...(exam.sectionId ? { sectionId: exam.sectionId } :
+        unrestricted ? {} : { sectionId: { $in: sectionIds } }),
+    }).populate("studentId", "firstName lastName admissionNumber")
+      .populate("sectionId", "name").sort({ createdAt: 1 }).lean();
+    return res.status(200).json({
+      success: true,
+      data: { subjects: permitted, enrollments, assignments: assignments.map((item) => ({
+        subjectId: String(item.subjectId), sectionId: item.sectionId ? String(item.sectionId) : null,
+      })) },
+    });
+  } catch (error) { return next(error); }
+};
