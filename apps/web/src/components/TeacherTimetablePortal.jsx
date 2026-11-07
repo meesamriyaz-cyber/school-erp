@@ -88,7 +88,7 @@ export default function TeacherTimetablePortal() {
         {loading ? <p className="teacher-timetable-empty">Loading your timetable…</p> : entries.length === 0 ? (
           <p className="teacher-timetable-empty">No active timetable periods are assigned to you yet. Please contact your school administrator.</p>
         ) : scheduleView === "list" ? (
-          <div className="teacher-timetable-list" aria-label="Timetable periods">
+          <div className="teacher-timetable-list" role="region" aria-label="Timetable periods">
             {sortedEntries.map((entry) => {
               const day = DAYS.find((item) => item.value === entry.dayOfWeek);
               return <article className="teacher-timetable-period" key={entry._id}>
