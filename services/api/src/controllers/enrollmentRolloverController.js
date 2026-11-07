@@ -50,7 +50,7 @@ export const executeAcademicYearRollover = async (req, res, next) => {
       !validId(body.sourceAcademicYearId) || !validId(body.targetAcademicYearId) ||
       body.sourceAcademicYearId === body.targetAcademicYearId || !Array.isArray(body.placements) ||
       body.placements.length > 2000) {
-    return invalid(res, "Provide valid source and target academic years and between 1 and 2,000 student decisions");
+    return invalid(res, "Provide valid source and target academic years and no more than 2,000 student decisions");
   }
   const seen = new Set();
   for (const item of body.placements) {
@@ -86,6 +86,8 @@ export const executeAcademicYearRollover = async (req, res, next) => {
       if (!source || !target) throw fail("YEAR_STATE", "Rollover requires an active source year and a draft target year");
       if (new Date(target.startDate) <= new Date(source.endDate)) throw fail("YEAR_DATES", "The target academic year must start after the source academic year ends");
 
+      const targetActiveCount = await Enrollment.countDocuments({ tenantId: req.tenantId, academicYearId: target._id, status: "active" }).session(session);
+      if (targetActiveCount) throw fail("TARGET_NOT_EMPTY", "The draft target year already contains active enrollments; resolve them before rollover");
       const active = await Enrollment.find({
         tenantId: req.tenantId, academicYearId: source._id, status: "active",
       }).session(session).lean();
@@ -104,7 +106,6 @@ export const executeAcademicYearRollover = async (req, res, next) => {
         _id: { $in: sectionIds }, tenantId: req.tenantId, status: "active",
       }).session(session).lean() : [];
       if (sections.length !== sectionIds.length) throw fail("TARGET_SECTION", "One or more target sections are inactive or unavailable");
-      const classById = new Map(classes.map((item) => [String(item._id), item]));
       const sectionById = new Map(sections.map((item) => [String(item._id), item]));
       const plannedBySection = new Map();
       for (const item of body.placements) {
@@ -131,7 +132,6 @@ export const executeAcademicYearRollover = async (req, res, next) => {
       }
 
       const now = new Date();
-      const sourceIds = active.map((item) => item._id);
       const outcomeById = new Map(body.placements.map((item) => [String(item.enrollmentId), item]));
       for (const enrollment of active) {
         const decision = outcomeById.get(String(enrollment._id));
