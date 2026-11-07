@@ -132,6 +132,10 @@ export const getMyHomeworkSubmissions = async (req, res, next) => {
         return res.status(403).json({ success: false, message: "This student is not linked to your parent account" });
       }
       if (req.query.studentId) studentIds = [req.query.studentId];
+      const activeStudents = studentIds.length
+        ? await Student.find({ tenantId: req.tenantId, _id: { $in: studentIds }, status: "active" }).select("_id").lean()
+        : [];
+      studentIds = activeStudents.map((student) => student._id);
     }
     const data = await HomeworkSubmission.find({ tenantId: req.tenantId, studentId: { $in: studentIds } })
       .populate("homeworkId", "title dueDate subjectId").populate("reviewedBy", "firstName lastName")
