@@ -12,6 +12,7 @@ import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import Subject from "../models/Subject.js";
 import Examination from "../models/Examination.js";
+import Homework from "../models/Homework.js";
 import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
 import Enrollment from "../models/Enrollment.js";
@@ -62,7 +63,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init(), Homework.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -83,6 +84,7 @@ describe("Examination API integration", () => {
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
         await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
+        await Homework.deleteMany({ tenantId: { $in: tenantIds } });
         await TeacherAssignment.deleteMany({ tenantId: { $in: tenantIds } });
         await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
         await StudentGuardian.deleteMany({ tenantId: { $in: tenantIds } });
@@ -105,6 +107,38 @@ describe("Examination API integration", () => {
     academicYearId: String(yearA._id), classId: String(classA._id),
     name: `Mid Term ${randomUUID().slice(0, 6)}`,
     startDate: "2026-09-01", endDate: "2026-09-10",
+  });
+
+  it("creates and lists tenant-scoped homework with valid class and subject scope", async () => {
+    const payload = {
+      academicYearId: String(yearA._id), classId: String(classA._id), subjectId: String(subjectA._id),
+      title: "Complete exercise 1", instructions: "Solve questions 1 to 10 in your notebook.",
+      assignedDate: "2026-09-02", dueDate: "2026-09-05", status: "published",
+    };
+    const created = await request("/homework", { method: "POST", token: adminA.token, body: JSON.stringify(payload) });
+    expect(created.status).toBe(201);
+    expect(String(created.body.data.tenantId)).toBe(String(schoolA._id));
+    expect(String(created.body.data.teacherId._id)).toBe(String(adminA.user._id));
+    const listed = await request("/homework", { token: adminA.token });
+    expect(listed.status).toBe(200);
+    expect(listed.body.data.some((item) => item.title === payload.title)).toBe(true);
+    const hidden = await request("/homework", { token: adminB.token });
+    expect(hidden.body.data).toHaveLength(0);
+  });
+
+  it("rejects invalid homework dates and unassigned teacher creation", async () => {
+    const base = {
+      academicYearId: String(yearA._id), classId: String(classA._id), subjectId: String(subjectA._id),
+      title: "Homework task", instructions: "Complete the worksheet.",
+      assignedDate: "2026-09-05", dueDate: "2026-09-04",
+    };
+    const invalidDates = await request("/homework", { method: "POST", token: adminA.token, body: JSON.stringify(base) });
+    expect(invalidDates.status).toBe(400);
+    const teacherAttempt = await request("/homework", {
+      method: "POST", token: teacherA.token,
+      body: JSON.stringify({ ...base, dueDate: "2026-09-06" }),
+    });
+    expect(teacherAttempt.status).toBe(403);
   });
 
   it("requires authentication and limits exam creation to administrators", async () => {
