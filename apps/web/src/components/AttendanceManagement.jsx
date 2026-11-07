@@ -24,7 +24,6 @@ export default function AttendanceManagement() {
   const [sectionId, setSectionId] = useState("");
   const [date, setDate] = useState(today);
   const [roster, setRoster] = useState([]);
-  const [summary, setSummary] = useState({ total: 0, marked: 0, present: 0, absent: 0, late: 0, excused: 0 });
   const [loadingSetup, setLoadingSetup] = useState(true);
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,28 +49,32 @@ export default function AttendanceManagement() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!yearId) { setClasses([]); setClassId(""); return undefined; }
     const controller = new AbortController();
-    apiRequest(`/classes?academicYearId=${encodeURIComponent(yearId)}&status=active`, { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!yearId) { setClasses([]); setClassId(""); return undefined; }
+      return apiRequest(`/classes?academicYearId=${encodeURIComponent(yearId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => {
         if (!response?.success || !Array.isArray(response.data)) throw new Error("Unable to load classes.");
         setClasses(response.data);
         setClassId((current) => current && response.data.some((item) => item._id === current) ? current : response.data[0]?._id || "");
       })
       .catch((err) => { if (err.name !== "AbortError") setError(err.message || "Unable to load classes."); });
+    });
     return () => controller.abort();
   }, [accessToken, yearId]);
 
   useEffect(() => {
-    if (!classId) { setSections([]); setSectionId(""); return undefined; }
     const controller = new AbortController();
-    apiRequest(`/sections?classId=${encodeURIComponent(classId)}&status=active`, { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!classId) { setSections([]); setSectionId(""); return undefined; }
+      return apiRequest(`/sections?classId=${encodeURIComponent(classId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => {
         if (!response?.success || !Array.isArray(response.data)) throw new Error("Unable to load sections.");
         setSections(response.data);
         setSectionId((current) => current && response.data.some((item) => item._id === current) ? current : "");
       })
       .catch((err) => { if (err.name !== "AbortError") setError(err.message || "Unable to load sections."); });
+    });
     return () => controller.abort();
   }, [accessToken, classId]);
 
@@ -92,7 +95,6 @@ export default function AttendanceManagement() {
         status: item.attendance?.status || "",
         remarks: item.attendance?.remarks || "",
       })));
-      setSummary(response.summary || { total: response.data.length, marked: 0, present: 0, absent: 0, late: 0, excused: 0 });
     } catch (err) {
       if (err.name !== "AbortError") { setRoster([]); setError(err.message || "Unable to load the attendance register."); }
     } finally {
@@ -102,7 +104,7 @@ export default function AttendanceManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadRoster(controller.signal);
+    void Promise.resolve().then(() => loadRoster(controller.signal));
     return () => controller.abort();
   }, [loadRoster]);
 
