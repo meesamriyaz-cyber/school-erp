@@ -57,8 +57,8 @@ describe("StudentResultsPortal family overview", () => {
     render(<StudentResultsPortal />);
 
     expect(await screen.findByText("Family learning overview")).toBeTruthy();
-    expect(screen.getByText("Amina Khan")).toBeTruthy();
-    expect(screen.getByText("Bilal Khan")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Amina Khan/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Bilal Khan/ })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Attendance" }));
     expect(await screen.findByText("Attendance history")).toBeTruthy();
