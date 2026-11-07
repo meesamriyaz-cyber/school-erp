@@ -5,6 +5,7 @@ import Subject from "../models/Subject.js";
 import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
+import TimetableEntry from "../models/TimetableEntry.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -118,6 +119,19 @@ export const updateTeacherAssignment = async (req, res, next) => {
     }
     const assignment = await TeacherAssignment.findOne({ _id: req.params.assignmentId, tenantId: req.tenantId });
     if (!assignment) return res.status(404).json({ success: false, message: "Teacher assignment not found" });
+    if (req.body.status === "inactive") {
+      const hasActivePeriods = await TimetableEntry.exists({
+        tenantId: req.tenantId,
+        assignmentId: assignment._id,
+        status: "active",
+      });
+      if (hasActivePeriods) {
+        return res.status(409).json({
+          success: false,
+          message: "Deactivate linked timetable periods before deactivating this teacher assignment",
+        });
+      }
+    }
     if (req.body.status === "active") {
       const [teacher, subject, year, schoolClass] = await Promise.all([
         User.exists({ _id: assignment.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }),
