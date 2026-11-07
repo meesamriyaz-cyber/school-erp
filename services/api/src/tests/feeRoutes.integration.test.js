@@ -91,6 +91,23 @@ describe("Fee management API", () => {
       enrollmentId: String(enrollment._id), feeStructureId: structure.body.data._id,
       invoiceNumber: "CROSS-TENANT", dueDate: "2026-05-10",
     })).status).toBe(404);
+    const secondStudent = await Student.create({ tenantId: school._id, admissionNumber: `FEE-${randomUUID().slice(0, 8)}`, firstName: "Second", lastName: "Pupil", admissionDate: new Date("2026-04-01") });
+    const secondEnrollment = await Enrollment.create({ tenantId: school._id, studentId: secondStudent._id, academicYearId: year._id, classId: schoolClass._id, status: "active" });
+    const bulk = await post("/fees/invoices/bulk", admin.token, {
+      academicYearId: String(year._id), classId: String(schoolClass._id),
+      feeStructureId: structure.body.data._id, dueDate: "2026-05-10", invoiceNumberPrefix: "MAY26",
+    });
+    expect(bulk.status).toBe(201);
+    expect(bulk.body.data.totalEligible).toBe(2);
+    expect(bulk.body.data.created).toBe(1);
+    expect(bulk.body.data.skipped).toBe(1);
+    expect(bulk.body.data.results.some((item) => item.enrollmentId === String(secondEnrollment._id) && item.status === "created")).toBe(true);
+    const repeated = await post("/fees/invoices/bulk", admin.token, {
+      academicYearId: String(year._id), classId: String(schoolClass._id),
+      feeStructureId: structure.body.data._id, dueDate: "2026-05-10", invoiceNumberPrefix: "MAY26",
+    });
+    expect(repeated.body.data.created).toBe(0);
+    expect(repeated.body.data.skipped).toBe(2);
   });
 
   it("records partial and final payments, prevents overpayment, and exposes receipt history", async () => {
