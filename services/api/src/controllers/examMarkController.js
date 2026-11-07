@@ -4,6 +4,7 @@ import { acquireExaminationResultLock, releaseExaminationResultLock } from "../u
 import Examination from "../models/Examination.js";
 import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
+import ExamMarkAudit from "../models/ExamMarkAudit.js";
 import Enrollment from "../models/Enrollment.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 
@@ -166,13 +167,96 @@ export const saveExaminationMarks = async (req, res, next) => {
       });
     }
 
+    const changeReason = typeof req.body.changeReason === "string"
+      ? req.body.changeReason.trim()
+      : "";
+    if (req.body.changeReason !== undefined &&
+        (typeof req.body.changeReason !== "string" || changeReason.length > 500)) {
+      await releaseExaminationResultLock(req.tenantId, exam._id, lockToken);
+      return invalid(res, "Change reason must be 500 characters or fewer");
+    }
+
+    const session = await mongoose.startSession();
+    let auditCount = 0;
     try {
-      await ExamMark.bulkWrite(operations, { ordered: true });
+      await session.withTransaction(async () => {
+        const existingMarks = await ExamMark.find({
+          tenantId: req.tenantId,
+          examinationId: exam._id,
+          examSubjectId: { $in: subjectIds },
+          enrollmentId: { $in: enrollmentIds },
+        }).session(session).lean();
+        const existingMap = new Map(existingMarks.map((record) => [
+          `${record.examSubjectId}:${record.enrollmentId}`, record,
+        ]));
+        const auditEntries = [];
+
+        for (let index = 0; index < marks.length; index += 1) {
+          const item = marks[index];
+          const subject = subjectMap.get(String(item.examSubjectId));
+          const enrollment = enrollmentMap.get(String(item.enrollmentId));
+          const key = `${item.examSubjectId}:${item.enrollmentId}`;
+          const previous = existingMap.get(key) || null;
+          const nextValue = {
+            marksObtained: item.absent === true ? null : Number(item.marksObtained),
+            absent: item.absent === true,
+            remarks: (item.remarks || "").trim(),
+            enteredBy: req.auth.userId,
+          };
+          const changed = !previous ||
+            previous.marksObtained !== nextValue.marksObtained ||
+            Boolean(previous.absent) !== nextValue.absent ||
+            (previous.remarks || "") !== nextValue.remarks ||
+            String(previous.enteredBy) !== String(nextValue.enteredBy);
+
+          if (previous && changed && changeReason.length < 5) {
+            const error = new Error("A change reason of at least 5 characters is required when modifying an existing mark");
+            error.statusCode = 400;
+            throw error;
+          }
+
+          const markId = previous?._id || new mongoose.Types.ObjectId();
+          operations[index].updateOne.update.$setOnInsert._id = markId;
+          if (!changed) continue;
+
+          auditEntries.push({
+            tenantId: req.tenantId,
+            examinationId: exam._id,
+            examMarkId: markId,
+            examSubjectId: subject._id,
+            enrollmentId: enrollment._id,
+            studentId: enrollment.studentId,
+            action: previous ? "updated" : "created",
+            previous: previous ? {
+              marksObtained: previous.marksObtained ?? null,
+              absent: Boolean(previous.absent),
+              remarks: previous.remarks || "",
+              enteredBy: previous.enteredBy || null,
+            } : undefined,
+            current: nextValue,
+            changedBy: req.auth.userId,
+            changeReason: previous ? changeReason : "",
+          });
+        }
+
+        await ExamMark.bulkWrite(operations, { ordered: true, session });
+        if (auditEntries.length) {
+          await ExamMarkAudit.insertMany(auditEntries, { session, ordered: true });
+        }
+        auditCount = auditEntries.length;
+      });
     } finally {
+      await session.endSession();
       await releaseExaminationResultLock(req.tenantId, exam._id, lockToken);
     }
-    return res.status(200).json({ success: true, message: "Examination marks saved", count: operations.length });
+    return res.status(200).json({
+      success: true,
+      message: "Examination marks saved",
+      count: operations.length,
+      auditCount,
+    });
   } catch (error) {
+    if (error.statusCode === 400) return invalid(res, error.message);
     if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more mark records are invalid");
     return next(error);
   }
