@@ -290,7 +290,11 @@ export const listExaminationMarkAudit = async (req, res, next) => {
       ExamMarkAudit.find(filter)
         .populate("changedBy", "firstName lastName email role")
         .populate("studentId", "firstName lastName admissionNumber")
-        .populate("examSubjectId", "subjectId maxMarks passMarks")
+        .populate({
+          path: "examSubjectId",
+          select: "subjectId maxMarks passMarks",
+          populate: { path: "subjectId", select: "name code" },
+        })
         .sort({ createdAt: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
