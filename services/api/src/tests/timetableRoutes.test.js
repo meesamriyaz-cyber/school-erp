@@ -12,6 +12,7 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import TimetableEntry from "../models/TimetableEntry.js";
+import AcademicSchedule from "../models/AcademicSchedule.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 const EXPECTED_TEST_DATABASE = "school-erp-test";
@@ -51,6 +52,51 @@ const createUser = async (tenant, role) => {
 const entryPayload = (assignmentId, classId = classA._id, periodNumber = 1) => ({
   academicYearId: String(yearA._id), classId: String(classId), assignmentId: String(assignmentId),
   dayOfWeek: 1, periodNumber, startTime: "09:00", endTime: "09:45",
+  it("gets and saves academic periods and breaks within the authenticated school", async () => {
+    const initial = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: adminA.token });
+    expect(initial.status).toBe(200);
+    expect(initial.body.data.periods).toEqual([]);
+    const saved = await request("/academic-schedule", {
+      method: "PUT", token: adminA.token,
+      body: JSON.stringify({
+        academicYearId: String(yearA._id),
+        periods: [
+          { periodNumber: 1, label: "Mathematics", startTime: "09:00", endTime: "09:45" },
+          { periodNumber: 2, label: "Science", startTime: "10:00", endTime: "10:45" },
+        ],
+        breaks: [{ label: "Short break", startTime: "09:45", endTime: "10:00" }],
+      }),
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data.periods).toHaveLength(2);
+    expect(saved.body.data.breaks[0].label).toBe("Short break");
+    const otherSchool = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: adminB.token });
+    expect(otherSchool.status).toBe(404);
+  });
+
+  it("rejects overlapping periods and breaks in the academic schedule", async () => {
+    const response = await request("/academic-schedule", {
+      method: "PUT", token: adminA.token,
+      body: JSON.stringify({
+        academicYearId: String(yearA._id),
+        periods: [{ periodNumber: 1, label: "Period 1", startTime: "09:00", endTime: "10:00" }],
+        breaks: [{ label: "Break", startTime: "09:45", endTime: "10:15" }],
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/overlaps/i);
+  });
+
+  it("allows teachers to view but not change the academic schedule", async () => {
+    const read = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: teacherA.token });
+    const write = await request("/academic-schedule", {
+      method: "PUT", token: teacherA.token,
+      body: JSON.stringify({ academicYearId: String(yearA._id), periods: [], breaks: [] }),
+    });
+    expect(read.status).toBe(200);
+    expect(write.status).toBe(403);
+  });
+
 });
 
 describe("Timetable API integration", () => {
@@ -63,7 +109,7 @@ describe("Timetable API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), Subject.init(), AcademicYear.init(), SchoolClass.init(), TeacherAssignment.init(), TimetableEntry.init()]);
+    await Promise.all([Tenant.init(), User.init(), Subject.init(), AcademicYear.init(), SchoolClass.init(), TeacherAssignment.init(), TimetableEntry.init(), AcademicSchedule.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, teacherB, adminB] = await Promise.all([
@@ -97,6 +143,7 @@ describe("Timetable API integration", () => {
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
         await TimetableEntry.deleteMany({ tenantId: { $in: tenantIds } });
+        await AcademicSchedule.deleteMany({ tenantId: { $in: tenantIds } });
         await TeacherAssignment.deleteMany({ tenantId: { $in: tenantIds } });
         await Subject.deleteMany({ tenantId: { $in: tenantIds } });
         await SchoolClass.deleteMany({ tenantId: { $in: tenantIds } });
