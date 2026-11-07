@@ -118,12 +118,20 @@ export const getMyHomeworkSubmissions = async (req, res, next) => {
     if (req.auth.role === "student") {
       const student = await getStudentForUser(req);
       if (!student) return res.status(409).json({ success: false, message: "Your student account has not been linked by the school" });
+      if (req.query.studentId && String(req.query.studentId) !== String(student._id)) {
+        return res.status(403).json({ success: false, message: "You may only access your own homework submissions" });
+      }
       studentIds = [student._id];
     } else {
       const guardian = await Guardian.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" }).select("_id").lean();
       if (!guardian) return res.status(409).json({ success: false, message: "Your parent account has not been linked by the school" });
       const links = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id, status: "active" }).select("studentId").lean();
       studentIds = links.map((item) => item.studentId);
+      if (req.query.studentId && !validId(req.query.studentId)) return invalid(res, "Invalid studentId");
+      if (req.query.studentId && !studentIds.some((id) => String(id) === String(req.query.studentId))) {
+        return res.status(403).json({ success: false, message: "This student is not linked to your parent account" });
+      }
+      if (req.query.studentId) studentIds = [req.query.studentId];
     }
     const data = await HomeworkSubmission.find({ tenantId: req.tenantId, studentId: { $in: studentIds } })
       .populate("homeworkId", "title dueDate subjectId").populate("reviewedBy", "firstName lastName")
