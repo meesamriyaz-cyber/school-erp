@@ -151,17 +151,18 @@ export default function ExaminationManagement() {
       for (const subject of selectedExam.subjects) {
         const key = `${enrollment._id}:${subject._id}`;
         const entry = marks[key];
-        if (!entry || (!entry.absent && (entry.score === "" || entry.score === undefined))) {
-          setError("Enter marks or mark each student absent for every subject before saving.");
-          return;
-        }
+        if (!entry || (!entry.absent && (entry.score === "" || entry.score === undefined))) continue;
         records.push({ examSubjectId: subject._id, enrollmentId: enrollment._id, absent: Boolean(entry.absent), marksObtained: entry.absent ? null : Number(entry.score) });
       }
+    }
+    if (!records.length) {
+      setError("Enter marks or mark a student absent before saving.");
+      return;
     }
     setSaving(true); setError(""); setNotice("");
     try {
       await apiRequest(`/examinations/${selectedExam._id}/marks`, { method: "POST", accessToken, body: { marks: records } });
-      setNotice("Marks saved successfully.");
+      setNotice(`Saved ${records.length} student-subject mark record${records.length === 1 ? "" : "s"}. You can continue entering the remaining marks later.`);
       await loadExam(selectedExam._id);
     } catch (err) { setError(errorMessage(err, "Unable to save marks.")); }
     finally { setSaving(false); }
