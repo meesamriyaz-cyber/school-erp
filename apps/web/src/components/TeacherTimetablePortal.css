@@ -36,3 +36,23 @@
 .teacher-timetable-period-day{font-size:13px;font-weight:800;color:#3154d8}
 .teacher-timetable-list .teacher-timetable-period{grid-template-columns:minmax(90px,.55fr) minmax(150px,.8fr) minmax(180px,1.5fr) minmax(120px,.7fr)}
 @media(max-width:700px){.teacher-timetable-summary{gap:7px}.teacher-timetable-summary article{padding:12px 10px}.teacher-timetable-summary strong{font-size:21px}.teacher-timetable-summary span{font-size:11px}.teacher-timetable-list .teacher-timetable-period{grid-template-columns:1fr;gap:8px}.teacher-timetable-view-toggle{justify-content:flex-start}}
+
+
+.teacher-timetable-print-button{padding:8px 12px;border:1px solid #3154d8;border-radius:8px;background:#fff;color:#3154d8;font-weight:750;cursor:pointer}
+.teacher-timetable-print-heading{display:none}
+@media print{
+  @page{size:A4 portrait;margin:14mm}
+  body{background:#fff!important;color:#111!important}
+  body *{visibility:hidden!important}
+  .teacher-timetable-print-area,.teacher-timetable-print-area *{visibility:visible!important}
+  .teacher-timetable-page{min-height:0!important;padding:0!important;background:#fff!important;color:#111!important}
+  .teacher-timetable-print-area{position:absolute;inset:0 auto auto 0;width:100%;display:block!important}
+  .teacher-timetable-print-heading{display:block!important;margin:0 0 16px;text-align:center}
+  .teacher-timetable-print-heading h2{margin:0 0 4px;font-size:20px}
+  .teacher-timetable-print-heading p{margin:0;color:#333;font-size:12px}
+  .teacher-timetable-day{break-inside:avoid;margin:0 0 12px!important}
+  .teacher-timetable-day.is-today{padding:0!important;border:0!important;background:#fff!important}
+  .teacher-timetable-period{break-inside:avoid;padding:9px 11px!important;border:1px solid #bbb!important;border-radius:4px!important;box-shadow:none!important;background:#fff!important}
+  .teacher-timetable-period-main h3,.teacher-timetable-period-time strong{color:#111!important}
+  .teacher-timetable-period-time span,.teacher-timetable-period-main p,.teacher-timetable-room{color:#444!important}
+}
