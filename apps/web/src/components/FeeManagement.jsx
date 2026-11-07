@@ -6,6 +6,47 @@ import "./FeeManagement.css";
 const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value || 0));
 const studentName = (student) => [student?.firstName, student?.lastName].filter(Boolean).join(" ") || "Student";
 
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[character]));
+
+const printPaymentReceipt = (payment, invoice) => {
+  const popup = window.open("", "_blank", "width=760,height=720");
+  if (!popup) {
+    window.alert("Please allow pop-ups to print the payment receipt.");
+    return;
+  }
+  const student = invoice?.studentId;
+  const receivedBy = payment.receivedBy;
+  const rows = [
+    ["Receipt number", payment.receiptNumber],
+    ["Invoice number", invoice?.invoiceNumber],
+    ["Student", studentName(student)],
+    ["Admission number", student?.admissionNumber || "—"],
+    ["Payment date", new Date(payment.paymentDate).toLocaleDateString("en-IN")],
+    ["Payment method", String(payment.method || "").replaceAll("_", " ")],
+    ["Reference", payment.reference || "—"],
+    ["Amount received", money(payment.amount)],
+    ["Received by", [receivedBy?.firstName, receivedBy?.lastName].filter(Boolean).join(" ") || "School office"],
+  ];
+  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Receipt ${escapeHtml(payment.receiptNumber)}</title>
+    <style>
+      body{font:14px Arial,sans-serif;color:#1f2937;margin:36px auto;max-width:680px;padding:0 24px}
+      header{text-align:center;border-bottom:2px solid #1f2937;padding-bottom:18px;margin-bottom:22px}
+      h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#64748b}
+      table{width:100%;border-collapse:collapse}td{padding:12px 10px;border-bottom:1px solid #e5e7eb}
+      td:first-child{width:38%;color:#64748b}td:last-child{font-weight:600}
+      .amount{font-size:18px;color:#166534}.footer{margin-top:42px;display:flex;justify-content:space-between;color:#64748b;font-size:12px}
+      @media print{body{margin:12mm auto;padding:0}button{display:none}}
+    </style></head><body>
+    <header><h1>Fee Payment Receipt</h1><p>School ERP · Official payment acknowledgement</p></header>
+    <table>${rows.map(([label,value]) => `<tr><td>${escapeHtml(label)}</td><td class="${label === "Amount received" ? "amount" : ""}">${escapeHtml(value)}</td></tr>`).join("")}</table>
+    <div class="footer"><span>Generated electronically</span><span>Keep this receipt for your records</span></div>
+    <script>window.addEventListener("load",()=>window.print());</script>
+    </body></html>`);
+  popup.document.close();
+};
+
 export default function FeeManagement() {
   const { accessToken } = useAuth();
   const [years, setYears] = useState([]);
@@ -164,6 +205,6 @@ export default function FeeManagement() {
       <div className="fees-list-heading"><h3>Student invoices</h3><span>{invoices.length} invoices</span></div>
       {invoices.length ? <div className="fees-table-wrap"><table className="fees-table"><thead><tr><th>Invoice / Student</th><th>Due date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map((invoice) => <tr key={invoice._id}><td><strong>{invoice.invoiceNumber}</strong><small>{studentName(invoice.studentId)} · {invoice.studentId?.admissionNumber}</small></td><td>{new Date(invoice.dueDate).toLocaleDateString("en-IN")}</td><td>{money(invoice.totalAmount)}</td><td>{money(invoice.paidAmount)}</td><td>{money(invoice.totalAmount - invoice.paidAmount)}</td><td><span className={`fees-status fees-${invoice.status}`}>{invoice.status}</span></td><td><button type="button" className="fees-secondary" onClick={() => void openPayments(invoice)}>Record payment / receipts</button></td></tr>)}</tbody></table></div> : <p className="fees-empty">No invoices issued for this academic year.</p>}
     </>}
-    {paymentInvoice && <div className="fees-modal-backdrop" role="presentation"><section className="fees-modal" role="dialog" aria-modal="true" aria-labelledby="payment-title"><button className="fees-modal-close" type="button" onClick={() => setPaymentInvoice(null)} aria-label="Close">×</button><h3 id="payment-title">Record payment</h3><p>{paymentInvoice.invoiceNumber} · Outstanding {money(paymentInvoice.totalAmount - paymentInvoice.paidAmount)}</p><form onSubmit={recordPayment}><div className="fees-form-grid"><label>Amount (₹)<input required type="number" min="0.01" max={paymentInvoice.totalAmount - paymentInvoice.paidAmount} step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm((s) => ({ ...s, amount: e.target.value }))} /></label><label>Payment method<select value={paymentForm.method} onChange={(e) => setPaymentForm((s) => ({ ...s, method: e.target.value }))}><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="cheque">Cheque</option><option value="upi">UPI</option><option value="card">Card</option><option value="other">Other</option></select></label><label>Payment date<input type="date" required value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((s) => ({ ...s, paymentDate: e.target.value }))} /></label><label>Reference<input maxLength="100" value={paymentForm.reference} onChange={(e) => setPaymentForm((s) => ({ ...s, reference: e.target.value }))} placeholder="Transaction / cheque no." /></label></div><label>Notes<textarea maxLength="300" value={paymentForm.notes} onChange={(e) => setPaymentForm((s) => ({ ...s, notes: e.target.value }))} /></label><div className="fees-form-actions"><button className="fees-primary" disabled={busy}>{busy ? "Saving…" : "Save payment"}</button></div></form><h4>Payment history</h4>{payments.length ? payments.map((payment) => <div className="fees-payment-row" key={payment._id}><span>{payment.receiptNumber}<small>{payment.method.replace("_", " ")} · {new Date(payment.paymentDate).toLocaleDateString("en-IN")}</small></span><strong>{money(payment.amount)}</strong></div>) : <p className="fees-empty">No payments recorded yet.</p>}</section></div>}
+    {paymentInvoice && <div className="fees-modal-backdrop" role="presentation"><section className="fees-modal" role="dialog" aria-modal="true" aria-labelledby="payment-title"><button className="fees-modal-close" type="button" onClick={() => setPaymentInvoice(null)} aria-label="Close">×</button><h3 id="payment-title">Record payment</h3><p>{paymentInvoice.invoiceNumber} · Outstanding {money(paymentInvoice.totalAmount - paymentInvoice.paidAmount)}</p><form onSubmit={recordPayment}><div className="fees-form-grid"><label>Amount (₹)<input required type="number" min="0.01" max={paymentInvoice.totalAmount - paymentInvoice.paidAmount} step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm((s) => ({ ...s, amount: e.target.value }))} /></label><label>Payment method<select value={paymentForm.method} onChange={(e) => setPaymentForm((s) => ({ ...s, method: e.target.value }))}><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="cheque">Cheque</option><option value="upi">UPI</option><option value="card">Card</option><option value="other">Other</option></select></label><label>Payment date<input type="date" required value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((s) => ({ ...s, paymentDate: e.target.value }))} /></label><label>Reference<input maxLength="100" value={paymentForm.reference} onChange={(e) => setPaymentForm((s) => ({ ...s, reference: e.target.value }))} placeholder="Transaction / cheque no." /></label></div><label>Notes<textarea maxLength="300" value={paymentForm.notes} onChange={(e) => setPaymentForm((s) => ({ ...s, notes: e.target.value }))} /></label><div className="fees-form-actions"><button className="fees-primary" disabled={busy}>{busy ? "Saving…" : "Save payment"}</button></div></form><h4>Payment history</h4>{payments.length ? payments.map((payment) => <div className="fees-payment-row" key={payment._id}><span>{payment.receiptNumber}<small>{payment.method.replace("_", " ")} · {new Date(payment.paymentDate).toLocaleDateString("en-IN")}</small></span><strong>{money(payment.amount)}</strong><button type="button" className="fees-secondary" onClick={() => printPaymentReceipt(payment, paymentInvoice)}>Print receipt</button></div>) : <p className="fees-empty">No payments recorded yet.</p>}</section></div>}
   </section>;
 }
