@@ -23,6 +23,9 @@ export default function TimetableManagement() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [academicSchedule, setAcademicSchedule] = useState({ periods: [], breaks: [] });
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const visibleClasses = useMemo(() => classes.filter((item) => !filter.academicYearId || String(item.academicYearId) === String(filter.academicYearId)), [classes, filter.academicYearId]);
   const formClasses = useMemo(() => classes.filter((item) => !form.academicYearId || String(item.academicYearId) === String(form.academicYearId)), [classes, form.academicYearId]);
@@ -74,6 +77,31 @@ export default function TimetableManagement() {
       .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load sections."); });
     return () => controller.abort();
   }, [accessToken, form.classId, filter.classId]);
+
+  useEffect(() => {
+    if (!filter.academicYearId) { setAcademicSchedule({ periods: [], breaks: [] }); return undefined; }
+    const controller = new AbortController();
+    setScheduleLoading(true);
+    apiRequest(`/academic-schedule?academicYearId=${encodeURIComponent(filter.academicYearId)}`, { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!response?.success) throw new Error(response?.message || "Unable to load academic periods.");
+        if (!controller.signal.aborted) setAcademicSchedule({ periods: response.data?.periods || [], breaks: response.data?.breaks || [] });
+      })
+      .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load academic schedule."); })
+      .finally(() => { if (!controller.signal.aborted) setScheduleLoading(false); });
+    return () => controller.abort();
+  }, [accessToken, filter.academicYearId]);
+
+  const saveAcademicSchedule = async (event) => {
+    event.preventDefault(); setScheduleSaving(true); setError(""); setNotice("");
+    try {
+      const response = await apiRequest("/academic-schedule", { method: "PUT", accessToken, body: { academicYearId: filter.academicYearId, periods: academicSchedule.periods, breaks: academicSchedule.breaks } });
+      if (!response?.success) throw new Error(response?.message || "Unable to save academic schedule.");
+      setAcademicSchedule({ periods: response.data.periods || [], breaks: response.data.breaks || [] });
+      setNotice("Academic periods and breaks saved successfully.");
+    } catch (err) { setError(err.message || "Unable to save academic schedule."); }
+    finally { setScheduleSaving(false); }
+  };
 
   const submit = async (event) => {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
@@ -144,6 +172,33 @@ export default function TimetableManagement() {
       <div className="timetable-form-actions"><button type="submit" className="timetable-primary" disabled={saving || !form.academicYearId || !form.classId || !form.assignmentId}>{saving ? "Saving…" : editingEntryId ? "Update period" : "Save period"}</button></div>
       <p className="timetable-help">Monday–Saturday schedule. Class/section and teacher time conflicts are checked before saving.</p>
     </form>}
+    <section className="academic-schedule-panel" aria-labelledby="academic-schedule-title">
+      <div className="academic-schedule-heading"><div><h3 id="academic-schedule-title">Academic periods & breaks</h3><p>Configure the bell schedule for the selected academic year. Breaks are kept separate from teaching periods.</p></div></div>
+      {!filter.academicYearId ? <p className="timetable-help">Select an academic year above to configure its periods and breaks.</p> : scheduleLoading ? <p className="timetable-help">Loading academic schedule…</p> : (
+        <form onSubmit={saveAcademicSchedule}>
+          <div className="academic-schedule-columns">
+            <div><div className="academic-schedule-subheading"><strong>Teaching periods</strong><button type="button" className="timetable-action" onClick={() => setAcademicSchedule((v) => ({ ...v, periods: [...v.periods, { periodNumber: v.periods.length + 1, label: "", startTime: "09:00", endTime: "09:45" }] }))}>+ Add period</button></div>
+              {academicSchedule.periods.map((period, index) => <div className="academic-schedule-row" key={index}>
+                <label>Period<input type="number" min="1" max="20" value={period.periodNumber} onChange={(e) => setAcademicSchedule((v) => ({ ...v, periods: v.periods.map((item, i) => i === index ? { ...item, periodNumber: Number(e.target.value) } : item) }))} /></label>
+                <label>Name<input maxLength="40" value={period.label || ""} placeholder="e.g. Mathematics" onChange={(e) => setAcademicSchedule((v) => ({ ...v, periods: v.periods.map((item, i) => i === index ? { ...item, label: e.target.value } : item) }))} /></label>
+                <label>From<input type="time" value={period.startTime} onChange={(e) => setAcademicSchedule((v) => ({ ...v, periods: v.periods.map((item, i) => i === index ? { ...item, startTime: e.target.value } : item) }))} /></label>
+                <label>To<input type="time" value={period.endTime} onChange={(e) => setAcademicSchedule((v) => ({ ...v, periods: v.periods.map((item, i) => i === index ? { ...item, endTime: e.target.value } : item) }))} /></label>
+                <button type="button" className="timetable-action" aria-label={`Remove period ${period.periodNumber}`} onClick={() => setAcademicSchedule((v) => ({ ...v, periods: v.periods.filter((_, i) => i !== index) }))}>Remove</button>
+              </div>)}
+            </div>
+            <div><div className="academic-schedule-subheading"><strong>Breaks</strong><button type="button" className="timetable-action" onClick={() => setAcademicSchedule((v) => ({ ...v, breaks: [...v.breaks, { label: "", startTime: "10:30", endTime: "10:45" }] }))}>+ Add break</button></div>
+              {academicSchedule.breaks.map((item, index) => <div className="academic-schedule-row academic-break-row" key={index}>
+                <label>Name<input required maxLength="40" value={item.label} placeholder="e.g. Short break" onChange={(e) => setAcademicSchedule((v) => ({ ...v, breaks: v.breaks.map((row, i) => i === index ? { ...row, label: e.target.value } : row) }))} /></label>
+                <label>From<input type="time" value={item.startTime} onChange={(e) => setAcademicSchedule((v) => ({ ...v, breaks: v.breaks.map((row, i) => i === index ? { ...row, startTime: e.target.value } : row) }))} /></label>
+                <label>To<input type="time" value={item.endTime} onChange={(e) => setAcademicSchedule((v) => ({ ...v, breaks: v.breaks.map((row, i) => i === index ? { ...row, endTime: e.target.value } : row) }))} /></label>
+                <button type="button" className="timetable-action" aria-label={`Remove ${item.label || "break"}`} onClick={() => setAcademicSchedule((v) => ({ ...v, breaks: v.breaks.filter((_, i) => i !== index) }))}>Remove</button>
+              </div>)}
+            </div>
+          </div>
+          <div className="timetable-form-actions"><button type="submit" className="timetable-primary" disabled={scheduleSaving}>{scheduleSaving ? "Saving…" : "Save periods & breaks"}</button></div>
+        </form>
+      )}
+    </section>
     <div className="timetable-toolbar"><h3>Weekly schedule</h3><div className="timetable-toolbar-actions">
       <label>Academic year<select value={filter.academicYearId} onChange={(e) => setFilter((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "" }))}><option value="">All years</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}</select></label>
       <label>Class<select value={filter.classId} onChange={(e) => setFilter((v) => ({ ...v, classId: e.target.value, sectionId: "" }))}><option value="">All classes</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
