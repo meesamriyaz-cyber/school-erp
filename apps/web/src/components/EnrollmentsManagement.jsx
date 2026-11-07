@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./EnrollmentsManagement.css";
+import AcademicYearRollover from "./AcademicYearRollover.jsx";
 
 const canWriteRole = (role) => ["school_admin", "principal"].includes(String(role || "").toLowerCase());
 const displayName = (student) => [student?.firstName, student?.lastName].filter(Boolean).join(" ") || "Student";
@@ -251,6 +252,10 @@ export default function EnrollmentsManagement() {
     </div>
 
     {notice && <p className="enrollment-notice" role="status">{notice}</p>}
+    <AcademicYearRollover onComplete={async (summary) => {
+      await loadSetup();
+      if (summary?.targetAcademicYear?._id) setSelectedYearId(summary.targetAcademicYear._id);
+    }} />
     {error && <div className="enrollment-error-banner" role="alert"><span>{error}</span><button type="button" className="enrollment-button secondary" onClick={() => { setError(""); void loadSetup(); void loadClasses(); void loadEnrollments(); }}>Refresh data</button></div>}
 
     {formOpen && <form className="enrollment-form" onSubmit={createEnrollment}>
