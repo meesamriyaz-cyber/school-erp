@@ -211,6 +211,8 @@ describe("Examination API integration", () => {
     expect(result.body.summary.incompleteCount).toBe(2);
     const publish = await request(`/examinations/${examId}/publish`, { method: "POST", token: adminA.token });
     expect(publish.status).toBe(409);
+    await Enrollment.deleteOne({ _id: secondEnrollment._id, tenantId: schoolA._id });
+    await Student.deleteOne({ _id: secondStudent._id, tenantId: schoolA._id });
   });
 
   it("calculates consolidated results and publishes only complete results", async () => {
