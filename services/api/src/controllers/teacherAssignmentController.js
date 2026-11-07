@@ -44,7 +44,15 @@ const validateCreate = (body, res) => {
 export const listTeacherAssignments = async (req, res, next) => {
   try {
     const filter = { tenantId: req.tenantId };
+    // Teachers may only inspect their own assignments; never trust a teacherId query override.
+    if (req.auth.role === "teacher") filter.teacherId = req.auth.userId;
     for (const field of ["teacherId", "subjectId", "academicYearId", "classId", "sectionId"]) {
+      if (field === "teacherId" && req.auth.role === "teacher") {
+        if (req.query.teacherId !== undefined && String(req.query.teacherId) !== String(req.auth.userId)) {
+          return res.status(403).json({ success: false, message: "You may only view your own assignments" });
+        }
+        continue;
+      }
       if (req.query[field] !== undefined) {
         if (field === "sectionId" && req.query[field] === "none") filter.sectionId = null;
         else if (!validId(req.query[field])) return invalid(res, `Invalid ${field}`);
