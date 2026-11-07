@@ -38,7 +38,7 @@ describe("Fee management API", () => {
   beforeAll(async () => {
     if (env.nodeEnv !== "test" || !env.mongoUri) throw new Error("Safety stop: configure the test environment.");
     let databaseName;
-    try { databaseName = decodeURIComponent(new URL(env.mongoUri).pathname.replace(/^\\//, "")); } catch { databaseName = ""; }
+    try { databaseName = decodeURIComponent(new URL(env.mongoUri).pathname.slice(1)); } catch { databaseName = ""; }
     if (databaseName !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== "school-erp-test") throw new Error("Safety stop: unexpected database.");
