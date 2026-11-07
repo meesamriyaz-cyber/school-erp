@@ -38,8 +38,9 @@ const populateEntry = (query) => query
 export const listTimetableEntries = async (req, res, next) => {
   try {
     const filter = { tenantId: req.tenantId };
+    let ownAssignments = null;
     if (req.auth.role === "teacher") {
-      const ownAssignments = await TeacherAssignment.find({
+      ownAssignments = await TeacherAssignment.find({
         tenantId: req.tenantId,
         teacherId: req.auth.userId,
         status: "active",
@@ -52,6 +53,10 @@ export const listTimetableEntries = async (req, res, next) => {
     for (const field of ["academicYearId", "classId", "assignmentId"]) {
       if (req.query[field] !== undefined) {
         if (!validId(req.query[field])) return invalid(res, `Invalid ${field}`);
+        if (field === "assignmentId" && ownAssignments &&
+          !ownAssignments.some((id) => String(id) === String(req.query.assignmentId))) {
+          return res.status(403).json({ success: false, message: "You may only view timetable entries for your own active assignments" });
+        }
         filter[field] = req.query[field];
       }
     }
@@ -127,7 +132,7 @@ export const createTimetableEntry = async (req, res, next) => {
     }
 
     const teacherAssignments = await TeacherAssignment.find({
-      tenantId: req.tenantId, academicYearId, teacherId: assignment.teacherId._id,
+      tenantId: req.tenantId, academicYearId, teacherId: assignment.teacherId._id, status: "active",
     }).select("_id").lean();
     const teacherEntries = await TimetableEntry.find({
       tenantId: req.tenantId, academicYearId, dayOfWeek: day, status: "active",
@@ -181,7 +186,7 @@ export const updateTimetableEntry = async (req, res, next) => {
         if (classEntries.some((item) => item.periodNumber === entry.periodNumber || overlaps(item))) {
           return res.status(409).json({ success: false, message: "This class or section now has another timetable entry in the selected period or time range" });
         }
-        const teacherAssignmentIds = await TeacherAssignment.find({ tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId }).distinct("_id");
+        const teacherAssignmentIds = await TeacherAssignment.find({ tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId, status: "active" }).distinct("_id");
         const teacherEntries = await TimetableEntry.find({
           tenantId: req.tenantId, academicYearId: entry.academicYearId, dayOfWeek: entry.dayOfWeek,
           status: "active", _id: { $ne: entry._id }, assignmentId: { $in: teacherAssignmentIds },
@@ -236,7 +241,7 @@ export const updateTimetableEntry = async (req, res, next) => {
       }
 
       const teacherAssignmentIds = await TeacherAssignment.find({
-        tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId,
+        tenantId: req.tenantId, academicYearId: entry.academicYearId, teacherId: assignment.teacherId, status: "active",
       }).distinct("_id");
       const teacherEntries = await TimetableEntry.find({
         tenantId: req.tenantId, academicYearId: entry.academicYearId, dayOfWeek: day,
