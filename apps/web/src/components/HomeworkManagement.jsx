@@ -7,7 +7,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 const initialForm = () => ({ academicYearId: "", classId: "", sectionId: "", subjectId: "", title: "", instructions: "", assignedDate: today(), dueDate: today(), status: "published" });
 
 export default function HomeworkManagement() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const isTeacher = user?.role === "teacher";
+  const [teacherAssignments, setTeacherAssignments] = useState([]);
   const [years, setYears] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -25,18 +27,20 @@ export default function HomeworkManagement() {
   const load = async (signal) => {
     setLoading(true);
     try {
-      const [yearResponse, classResponse, sectionResponse, subjectResponse, homeworkResponse] = await Promise.all([
+      const [yearResponse, classResponse, sectionResponse, subjectResponse, homeworkResponse, assignmentResponse] = await Promise.all([
         apiRequest("/academic-years", { accessToken, signal }),
         apiRequest("/classes", { accessToken, signal }),
         apiRequest("/sections", { accessToken, signal }),
         apiRequest("/subjects", { accessToken, signal }),
         apiRequest("/homework", { accessToken, signal }),
+        isTeacher ? apiRequest("/teacher-assignments?status=active", { accessToken, signal }) : Promise.resolve({ data: [] }),
       ]);
       setYears(yearResponse.data || []);
       setClasses(classResponse.data || []);
       setSections(sectionResponse.data || []);
       setSubjects(subjectResponse.data || []);
       setItems(homeworkResponse.data || []);
+      setTeacherAssignments(assignmentResponse.data || []);
       const activeYear = (yearResponse.data || []).find((year) => year.status === "active");
       if (activeYear) setForm((v) => v.academicYearId ? v : { ...v, academicYearId: activeYear._id });
     } catch (err) {
@@ -50,8 +54,10 @@ export default function HomeworkManagement() {
     return () => controller.abort();
   }, [accessToken]);
 
-  const availableSections = useMemo(() => sections.filter((item) => String(item.classId?._id || item.classId) === String(form.classId)), [sections, form.classId]);
-  const availableClasses = useMemo(() => classes.filter((item) => !form.academicYearId || String(item.academicYearId?._id || item.academicYearId) === String(form.academicYearId)), [classes, form.academicYearId]);
+  const permittedAssignments = teacherAssignments.filter((item) => String(item.academicYearId?._id || item.academicYearId) === form.academicYearId && String(item.classId?._id || item.classId) === form.classId);
+  const availableSections = useMemo(() => sections.filter((item) => String(item.classId?._id || item.classId) === String(form.classId) && (!isTeacher || teacherAssignments.some((assignment) => String(assignment.classId?._id || assignment.classId) === form.classId && (!assignment.sectionId || String(assignment.sectionId?._id || assignment.sectionId) === String(item._id))))), [sections, form.classId, isTeacher, teacherAssignments]);
+  const availableClasses = useMemo(() => classes.filter((item) => (!form.academicYearId || String(item.academicYearId?._id || item.academicYearId) === String(form.academicYearId)) && (!isTeacher || teacherAssignments.some((assignment) => String(assignment.classId?._id || assignment.classId) === String(item._id)))), [classes, form.academicYearId, isTeacher, teacherAssignments]);
+  const availableSubjects = isTeacher ? subjects.filter((item) => permittedAssignments.some((assignment) => String(assignment.subjectId?._id || assignment.subjectId) === String(item._id) && (!form.sectionId ? !assignment.sectionId : !assignment.sectionId || String(assignment.sectionId?._id || assignment.sectionId) === form.sectionId))) : subjects;
 
   const submit = async (event) => {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
@@ -101,10 +107,10 @@ export default function HomeworkManagement() {
     {error && <p className="homework-error" role="alert">{error}</p>}
     {notice && <p className="homework-notice" role="status">{notice}</p>}
     <article className="homework-card"><h3>Create assignment</h3><form className="homework-form" onSubmit={submit}>
-      <label>Academic year<select required value={form.academicYearId} onChange={(e) => setForm((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "" }))}><option value="">Select academic year</option>{years.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Academic year<select required value={form.academicYearId} onChange={(e) => setForm((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "" }))}><option value="">Select academic year</option>{years.filter((item) => !isTeacher || teacherAssignments.some((assignment) => String(assignment.academicYearId?._id || assignment.academicYearId) === String(item._id))).map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Class<select required value={form.classId} onChange={(e) => setForm((v) => ({ ...v, classId: e.target.value, sectionId: "" }))}><option value="">Select class</option>{availableClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
-      <label>Section<select value={form.sectionId} onChange={(e) => setForm((v) => ({ ...v, sectionId: e.target.value }))}><option value="">All sections</option>{availableSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
-      <label>Subject<select required value={form.subjectId} onChange={(e) => setForm((v) => ({ ...v, subjectId: e.target.value }))}><option value="">Select subject</option>{subjects.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Section<select value={form.sectionId} onChange={(e) => setForm((v) => ({ ...v, sectionId: e.target.value }))}><option value="">{isTeacher ? "All sections (if assigned)" : "All sections"}</option>{availableSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Subject<select required value={form.subjectId} onChange={(e) => setForm((v) => ({ ...v, subjectId: e.target.value }))}><option value="">Select subject</option>{availableSubjects.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label className="homework-wide">Assignment title<input required minLength="3" maxLength="120" value={form.title} onChange={(e) => setForm((v) => ({ ...v, title: e.target.value }))} placeholder="e.g. Chapter 4 exercise" /></label>
       <label className="homework-wide">Instructions<textarea required maxLength="5000" rows="4" value={form.instructions} onChange={(e) => setForm((v) => ({ ...v, instructions: e.target.value }))} placeholder="Describe the work students need to complete." /></label>
       <label>Assigned date<input type="date" required value={form.assignedDate} onChange={(e) => setForm((v) => ({ ...v, assignedDate: e.target.value, dueDate: v.dueDate < e.target.value ? e.target.value : v.dueDate }))} /></label>
