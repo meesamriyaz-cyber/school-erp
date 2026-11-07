@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./TeacherAttendancePortal.css";
@@ -35,7 +35,7 @@ export default function TeacherAttendancePortal() {
   }, [accessToken]);
 
   const selected = assignments.find((item) => item._id === assignmentId);
-  const loadRoster = async (signal) => {
+  const loadRoster = useCallback(async (signal) => {
     if (!selected || !date) { setRoster([]); return; }
     setLoading(true); setError("");
     try {
@@ -47,8 +47,8 @@ export default function TeacherAttendancePortal() {
       setSummary(response.summary || { total: response.data.length, marked: 0, present: 0, absent: 0, late: 0, excused: 0 });
     } catch (err) { if (err.name !== "AbortError") { setRoster([]); setError(err.message || "Unable to load attendance."); } }
     finally { if (!signal?.aborted) setLoading(false); }
-  };
-  useEffect(() => { const controller = new AbortController(); void loadRoster(controller.signal); return () => controller.abort(); }, [assignmentId, date, assignments.length]);
+  }, [accessToken, selected, date]);
+  useEffect(() => { const controller = new AbortController(); void Promise.resolve().then(() => loadRoster(controller.signal)); return () => controller.abort(); }, [loadRoster]);
   const counts = useMemo(() => roster.reduce((result, item) => { if (item.status) result[item.status] += 1; return result; }, { present: 0, absent: 0, late: 0, excused: 0 }), [roster]);
   const markAll = (status) => setRoster((current) => current.map((item) => ({ ...item, status })));
   const save = async () => {
