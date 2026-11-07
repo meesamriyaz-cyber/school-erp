@@ -21,7 +21,7 @@ describe("TeacherTimetablePortal", () => {
     render(<TeacherTimetablePortal />);
     expect(await screen.findByRole("heading", { name: "My weekly timetable" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Monday" })).toBeInTheDocument();
-    expect(screen.getByText("No periods assigned")).toBeInTheDocument();
+    expect(screen.getAllByText("No periods assigned")).toHaveLength(5);
     expect(screen.getByText("Weekly periods")).toBeInTheDocument();
     expect(screen.getByText("Classes assigned")).toBeInTheDocument();
     expect(screen.getByText("Mathematics")).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe("TeacherTimetablePortal", () => {
     render(<TeacherTimetablePortal />);
     expect(await screen.findByText("Science")).toBeInTheDocument();
     screen.getByRole("button", { name: "List view" }).click();
-    expect(screen.getByLabelText("Timetable periods")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Timetable periods" })).toBeInTheDocument();
     expect(screen.getByText("Tuesday")).toBeInTheDocument();
     expect(screen.getByText("Lab 2")).toBeInTheDocument();
   });
