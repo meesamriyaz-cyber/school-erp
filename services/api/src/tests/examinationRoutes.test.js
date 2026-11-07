@@ -145,9 +145,15 @@ describe("Examination API integration", () => {
 
   it("accepts student homework submissions and allows the assigned teacher to review them", async () => {
     const studentAccount = await createUser(schoolA, "student");
-    studentA.userId = studentAccount.user._id;
-    await studentA.save();
-    await TeacherAssignment.create({
+    const submissionStudent = await Student.create({
+      tenantId: schoolA._id, userId: studentAccount.user._id,
+      admissionNumber: `HW-${randomUUID().slice(0, 8)}`, firstName: "Homework Student",
+    });
+    const submissionEnrollment = await Enrollment.create({
+      tenantId: schoolA._id, studentId: submissionStudent._id, academicYearId: yearA._id,
+      classId: classA._id, status: "active",
+    });
+    const homeworkAssignment = await TeacherAssignment.create({
       tenantId: schoolA._id, teacherId: teacherA.user._id, subjectId: subjectA._id,
       academicYearId: yearA._id, classId: classA._id, sectionId: null, assignedBy: adminA.user._id,
     });
@@ -166,7 +172,7 @@ describe("Examination API integration", () => {
     });
     expect(submitted.status).toBe(200);
     expect(submitted.body.data.status).toBe("submitted");
-    expect(String(submitted.body.data.studentId)).toBe(String(studentA._id));
+    expect(String(submitted.body.data.studentId)).toBe(String(submissionStudent._id));
     const listed = await request(`/homework/${homeworkId}/submissions`, { token: teacherA.token });
     expect(listed.status).toBe(200);
     expect(listed.body.data).toHaveLength(1);
@@ -187,6 +193,12 @@ describe("Examination API integration", () => {
     expect(locked.status).toBe(409);
     const hidden = await request(`/homework/${homeworkId}/submissions`, { token: adminB.token });
     expect(hidden.status).toBe(404);
+
+    await HomeworkSubmission.deleteMany({ tenantId: schoolA._id, homeworkId });
+    await Homework.deleteOne({ _id: homeworkId, tenantId: schoolA._id });
+    await TeacherAssignment.deleteOne({ _id: homeworkAssignment._id });
+    await Enrollment.deleteOne({ _id: submissionEnrollment._id });
+    await Student.deleteOne({ _id: submissionStudent._id });
   });
 
   it("requires authentication and limits exam creation to administrators", async () => {
