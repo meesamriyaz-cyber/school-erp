@@ -1,0 +1,131 @@
+import { useCallback, useEffect, useState } from "react";
+import { apiRequest } from "../lib/api.js";
+import { useAuth } from "../context/authContext.js";
+import "./FeeManagement.css";
+
+const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value || 0));
+const studentName = (student) => [student?.firstName, student?.lastName].filter(Boolean).join(" ") || "Student";
+
+export default function FeeManagement() {
+  const { accessToken } = useAuth();
+  const [years, setYears] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+  const [structures, setStructures] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [yearId, setYearId] = useState("");
+  const [tab, setTab] = useState("structures");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [structureForm, setStructureForm] = useState({ classId: "", name: "", items: [{ name: "Tuition Fee", amount: "", frequency: "monthly" }] });
+  const [invoiceForm, setInvoiceForm] = useState({ enrollmentId: "", feeStructureId: "", invoiceNumber: "", dueDate: "" });
+  const [paymentInvoice, setPaymentInvoice] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: "", method: "cash", paymentDate: new Date().toISOString().slice(0, 10), reference: "", notes: "" });
+  const [payments, setPayments] = useState([]);
+
+  const load = useCallback(async () => {
+    try {
+      const [yr, cls, stu, enr] = await Promise.all([
+        apiRequest("/academic-years", { accessToken }),
+        apiRequest("/classes", { accessToken }),
+        apiRequest("/students?limit=500", { accessToken }),
+        apiRequest("/enrollments?status=active", { accessToken }),
+      ]);
+      setYears(yr.data || []); setClasses(cls.data || []); setStudents(stu.data || []); setEnrollments(enr.data || []);
+      const active = (yr.data || []).find((item) => item.status === "active");
+      setYearId((current) => current || active?._id || (yr.data || [])[0]?._id || "");
+    } catch (err) { setError(err.message || "Unable to load fee management data."); }
+  }, [accessToken]);
+
+  const loadStructures = useCallback(async () => {
+    if (!yearId) { setStructures([]); return; }
+    try { const response = await apiRequest(`/fees/structures?academicYearId=${encodeURIComponent(yearId)}`, { accessToken }); setStructures(response.data || []); }
+    catch (err) { setError(err.message || "Unable to load fee structures."); }
+  }, [accessToken, yearId]);
+
+  const loadInvoices = useCallback(async () => {
+    if (!yearId) { setInvoices([]); return; }
+    try { const response = await apiRequest(`/fees/invoices?academicYearId=${encodeURIComponent(yearId)}`, { accessToken }); setInvoices(response.data || []); }
+    catch (err) { setError(err.message || "Unable to load fee invoices."); }
+  }, [accessToken, yearId]);
+
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadStructures(); void loadInvoices(); }, [loadStructures, loadInvoices]);
+
+  const currentClasses = classes.filter((item) => item.academicYearId === yearId || item.academicYearId?._id === yearId);
+  const selectedClass = currentClasses.find((item) => item._id === structureForm.classId);
+  const eligibleEnrollments = enrollments.filter((item) => {
+    const eYear = item.academicYearId?._id || item.academicYearId;
+    return eYear === yearId;
+  });
+  const updateItem = (index, key, value) => setStructureForm((current) => ({ ...current, items: current.items.map((item, i) => i === index ? { ...item, [key]: value } : item) }));
+
+  const createStructure = async (event) => {
+    event.preventDefault(); setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await apiRequest("/fees/structures", { method: "POST", accessToken, body: {
+        academicYearId: yearId, classId: structureForm.classId, name: structureForm.name,
+        items: structureForm.items.map((item) => ({ ...item, amount: Number(item.amount) })),
+      }});
+      if (!response.success) throw new Error("Unable to create fee structure.");
+      setNotice("Fee structure created."); setStructureForm({ classId: "", name: "", items: [{ name: "Tuition Fee", amount: "", frequency: "monthly" }] }); await loadStructures();
+    } catch (err) { setError(err.message || "Unable to create fee structure."); }
+    finally { setBusy(false); }
+  };
+
+  const createInvoice = async (event) => {
+    event.preventDefault(); setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await apiRequest("/fees/invoices", { method: "POST", accessToken, body: invoiceForm });
+      if (!response.success) throw new Error("Unable to create invoice.");
+      setNotice(`Invoice ${response.data.invoiceNumber} created.`); setInvoiceForm({ enrollmentId: "", feeStructureId: "", invoiceNumber: "", dueDate: "" }); await loadInvoices();
+    } catch (err) { setError(err.message || "Unable to create invoice."); }
+    finally { setBusy(false); }
+  };
+
+  const openPayments = async (invoice) => {
+    setPaymentInvoice(invoice); setPaymentForm({ amount: "", method: "cash", paymentDate: new Date().toISOString().slice(0, 10), reference: "", notes: "" });
+    try { const response = await apiRequest(`/fees/invoices/${invoice._id}/payments`, { accessToken }); setPayments(response.data || []); }
+    catch (err) { setError(err.message || "Unable to load receipts."); }
+  };
+
+  const recordPayment = async (event) => {
+    event.preventDefault(); if (!paymentInvoice) return; setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await apiRequest(`/fees/invoices/${paymentInvoice._id}/payments`, { method: "POST", accessToken, body: { ...paymentForm, amount: Number(paymentForm.amount) } });
+      if (!response.success) throw new Error("Unable to record payment.");
+      setNotice(`Payment recorded. Receipt: ${response.data.receiptNumber}`); setPaymentInvoice(null); await loadInvoices();
+    } catch (err) { setError(err.message || "Unable to record payment."); }
+    finally { setBusy(false); }
+  };
+
+  return <section className="fees-page" aria-labelledby="fees-title">
+    <div className="fees-intro"><div><p className="fees-eyebrow">SCHOOL FINANCE</p><h2 id="fees-title">Fees &amp; Payments</h2><p>Set class-wise fee structures, issue student invoices and record payments with receipt references.</p></div></div>
+    <div className="fees-toolbar"><label>Academic year<select value={yearId} onChange={(event) => setYearId(event.target.value)}>{years.map((year) => <option key={year._id} value={year._id}>{year.name}{year.status === "active" ? " · Active" : ""}</option>)}</select></label><div className="fees-tabs"><button type="button" className={tab === "structures" ? "active" : ""} onClick={() => setTab("structures")}>Fee structures</button><button type="button" className={tab === "invoices" ? "active" : ""} onClick={() => setTab("invoices")}>Invoices &amp; payments</button></div></div>
+    {notice && <p className="fees-notice" role="status">{notice}</p>}{error && <p className="fees-error" role="alert">{error}</p>}
+    {tab === "structures" ? <>
+      <form className="fees-form" onSubmit={createStructure}>
+        <h3>Create fee structure</h3><div className="fees-form-grid">
+          <label>Class<select required value={structureForm.classId} onChange={(e) => setStructureForm((s) => ({ ...s, classId: e.target.value }))}><option value="">Select class</option>{currentClasses.filter((c) => c.status === "active").map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}</select></label>
+          <label>Structure name<input required maxLength="120" value={structureForm.name} onChange={(e) => setStructureForm((s) => ({ ...s, name: e.target.value }))} placeholder="e.g. Class 5 General Fee" /></label>
+        </div>
+        <div className="fees-heads"><strong>Fee heads</strong>{structureForm.items.map((item, index) => <div className="fees-head-row" key={index}><input aria-label={`Fee head ${index + 1}`} required placeholder="Fee head" value={item.name} onChange={(e) => updateItem(index, "name", e.target.value)} /><input aria-label="Amount in rupees" required type="number" min="0" step="0.01" placeholder="Amount (₹)" value={item.amount} onChange={(e) => updateItem(index, "amount", e.target.value)} /><select aria-label="Frequency" value={item.frequency} onChange={(e) => updateItem(index, "frequency", e.target.value)}><option value="one_time">One time</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="half_yearly">Half yearly</option><option value="annually">Annually</option></select>{structureForm.items.length > 1 && <button type="button" className="fees-remove" onClick={() => setStructureForm((s) => ({ ...s, items: s.items.filter((_, i) => i !== index) }))}>Remove</button>}</div>)}</div>
+        <div className="fees-form-actions"><button type="button" className="fees-secondary" onClick={() => setStructureForm((s) => ({ ...s, items: [...s.items, { name: "", amount: "", frequency: "annually" }] }))}>+ Add fee head</button><button className="fees-primary" disabled={busy || !yearId}>{busy ? "Saving…" : "Save fee structure"}</button></div>
+      </form>
+      <div className="fees-list-heading"><h3>Configured fee structures</h3><span>{structures.length} structures</span></div>
+      {structures.length ? <div className="fees-structure-grid">{structures.map((structure) => <article className="fees-card" key={structure._id}><div className="fees-card-top"><strong>{structure.name}</strong><span>{structure.classId?.name || "Class"}</span></div>{structure.items.map((item, i) => <div className="fees-line" key={i}><span>{item.name} <small>{item.frequency.replace("_", " ")}</small></span><strong>{money(item.amount)}</strong></div>)}<div className="fees-total"><span>Total</span><strong>{money(structure.items.reduce((sum, item) => sum + item.amount, 0))}</strong></div></article>)}</div> : <p className="fees-empty">No fee structures configured for this academic year.</p>}
+    </> : <>
+      <form className="fees-form" onSubmit={createInvoice}><h3>Issue student invoice</h3><div className="fees-form-grid">
+        <label>Active student enrollment<select required value={invoiceForm.enrollmentId} onChange={(e) => setInvoiceForm((s) => ({ ...s, enrollmentId: e.target.value, feeStructureId: "" }))}><option value="">Select student</option>{eligibleEnrollments.map((enrollment) => { const student = enrollment.studentId; const className = enrollment.classId?.name || ""; return <option key={enrollment._id} value={enrollment._id}>{studentName(student)} · {student?.admissionNumber || ""} · {className}</option>; })}</select></label>
+        <label>Fee structure<select required value={invoiceForm.feeStructureId} onChange={(e) => setInvoiceForm((s) => ({ ...s, feeStructureId: e.target.value }))}><option value="">Select structure</option>{structures.filter((s) => { const classId = s.classId?._id || s.classId; const enrollment = eligibleEnrollments.find((e) => e._id === invoiceForm.enrollmentId); return enrollment && classId === (enrollment.classId?._id || enrollment.classId) && s.status === "active"; }).map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}</select></label>
+        <label>Invoice number<input required maxLength="40" value={invoiceForm.invoiceNumber} onChange={(e) => setInvoiceForm((s) => ({ ...s, invoiceNumber: e.target.value }))} placeholder="e.g. INV-2026-001" /></label>
+        <label>Due date<input required type="date" value={invoiceForm.dueDate} onChange={(e) => setInvoiceForm((s) => ({ ...s, dueDate: e.target.value }))} /></label>
+      </div><div className="fees-form-actions"><button className="fees-primary" disabled={busy || !yearId}>{busy ? "Creating…" : "Create invoice"}</button></div></form>
+      <div className="fees-list-heading"><h3>Student invoices</h3><span>{invoices.length} invoices</span></div>
+      {invoices.length ? <div className="fees-table-wrap"><table className="fees-table"><thead><tr><th>Invoice / Student</th><th>Due date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map((invoice) => <tr key={invoice._id}><td><strong>{invoice.invoiceNumber}</strong><small>{studentName(invoice.studentId)} · {invoice.studentId?.admissionNumber}</small></td><td>{new Date(invoice.dueDate).toLocaleDateString("en-IN")}</td><td>{money(invoice.totalAmount)}</td><td>{money(invoice.paidAmount)}</td><td>{money(invoice.totalAmount - invoice.paidAmount)}</td><td><span className={`fees-status fees-${invoice.status}`}>{invoice.status}</span></td><td><button type="button" className="fees-secondary" onClick={() => void openPayments(invoice)}>Record payment / receipts</button></td></tr>)}</tbody></table></div> : <p className="fees-empty">No invoices issued for this academic year.</p>}
+    </>}
+    {paymentInvoice && <div className="fees-modal-backdrop" role="presentation"><section className="fees-modal" role="dialog" aria-modal="true" aria-labelledby="payment-title"><button className="fees-modal-close" type="button" onClick={() => setPaymentInvoice(null)} aria-label="Close">×</button><h3 id="payment-title">Record payment</h3><p>{paymentInvoice.invoiceNumber} · Outstanding {money(paymentInvoice.totalAmount - paymentInvoice.paidAmount)}</p><form onSubmit={recordPayment}><div className="fees-form-grid"><label>Amount (₹)<input required type="number" min="0.01" max={paymentInvoice.totalAmount - paymentInvoice.paidAmount} step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm((s) => ({ ...s, amount: e.target.value }))} /></label><label>Payment method<select value={paymentForm.method} onChange={(e) => setPaymentForm((s) => ({ ...s, method: e.target.value }))}><option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="cheque">Cheque</option><option value="upi">UPI</option><option value="card">Card</option><option value="other">Other</option></select></label><label>Payment date<input type="date" required value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((s) => ({ ...s, paymentDate: e.target.value }))} /></label><label>Reference<input maxLength="100" value={paymentForm.reference} onChange={(e) => setPaymentForm((s) => ({ ...s, reference: e.target.value }))} placeholder="Transaction / cheque no." /></label></div><label>Notes<textarea maxLength="300" value={paymentForm.notes} onChange={(e) => setPaymentForm((s) => ({ ...s, notes: e.target.value }))} /></label><div className="fees-form-actions"><button className="fees-primary" disabled={busy}>{busy ? "Saving…" : "Save payment"}</button></div></form><h4>Payment history</h4>{payments.length ? payments.map((payment) => <div className="fees-payment-row" key={payment._id}><span>{payment.receiptNumber}<small>{payment.method.replace("_", " ")} · {new Date(payment.paymentDate).toLocaleDateString("en-IN")}</small></span><strong>{money(payment.amount)}</strong></div>) : <p className="fees-empty">No payments recorded yet.</p>}</section></div>}
+  </section>;
+}
