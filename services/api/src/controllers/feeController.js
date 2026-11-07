@@ -75,6 +75,47 @@ export const listFeeInvoices = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
+export const listOutstandingFees = async (req, res, next) => {
+  try {
+    const { academicYearId, classId, sectionId, overdueOnly } = req.query;
+    if (academicYearId && !validId(academicYearId)) return fail(res, 400, "Invalid academic year");
+    if (classId && !validId(classId)) return fail(res, 400, "Invalid class");
+    if (sectionId && !validId(sectionId)) return fail(res, 400, "Invalid section");
+    if (overdueOnly !== undefined && !["true", "false"].includes(overdueOnly)) return fail(res, 400, "Invalid overdue filter");
+    if (academicYearId && !await AcademicYear.exists({ _id: academicYearId, tenantId: req.tenantId })) return fail(res, 404, "Academic year not found");
+    let enrollmentIds;
+    if (classId || sectionId) {
+      const enrollmentFilter = { tenantId: req.tenantId };
+      if (academicYearId) enrollmentFilter.academicYearId = academicYearId;
+      if (classId) enrollmentFilter.classId = classId;
+      if (sectionId) enrollmentFilter.sectionId = sectionId;
+      enrollmentIds = await Enrollment.find(enrollmentFilter).distinct("_id");
+    }
+    const filter = { tenantId: req.tenantId, status: { $in: ["unpaid", "partial"] } };
+    if (academicYearId) filter.academicYearId = academicYearId;
+    if (enrollmentIds) filter.enrollmentId = { $in: enrollmentIds };
+    const now = new Date();
+    if (overdueOnly === "true") filter.dueDate = { $lt: now };
+    const data = await FeeInvoice.find(filter)
+      .populate("studentId", "admissionNumber firstName lastName")
+      .populate("academicYearId", "name")
+      .populate({ path: "enrollmentId", select: "classId sectionId", populate: [
+        { path: "classId", select: "name" }, { path: "sectionId", select: "name" },
+      ] })
+      .sort({ dueDate: 1, createdAt: -1 }).lean();
+    const summary = data.reduce((result, invoice) => {
+      const balance = Math.max(0, Math.round((invoice.totalAmount - invoice.paidAmount) * 100) / 100);
+      result.invoiceCount += 1;
+      result.totalOutstanding += balance;
+      if (new Date(invoice.dueDate) < now) { result.overdueCount += 1; result.overdueAmount += balance; }
+      return result;
+    }, { invoiceCount: 0, totalOutstanding: 0, overdueCount: 0, overdueAmount: 0 });
+    summary.totalOutstanding = Math.round(summary.totalOutstanding * 100) / 100;
+    summary.overdueAmount = Math.round(summary.overdueAmount * 100) / 100;
+    return res.json({ success: true, data, summary });
+  } catch (error) { return next(error); }
+};
+
 export const createFeeInvoice = async (req, res, next) => {
   try {
     const { enrollmentId, feeStructureId, dueDate, invoiceNumber } = req.body || {};
