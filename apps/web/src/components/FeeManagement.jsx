@@ -24,6 +24,9 @@ export default function FeeManagement() {
   const [paymentInvoice, setPaymentInvoice] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", method: "cash", paymentDate: new Date().toISOString().slice(0, 10), reference: "", notes: "" });
   const [payments, setPayments] = useState([]);
+  const [bulkSections, setBulkSections] = useState([]);
+  const [bulkForm, setBulkForm] = useState({ classId: "", sectionId: "", feeStructureId: "", dueDate: "", invoiceNumberPrefix: "" });
+  const [bulkResult, setBulkResult] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -53,6 +56,14 @@ export default function FeeManagement() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadStructures(); void loadInvoices(); }, [loadStructures, loadInvoices]);
+  useEffect(() => {
+    if (!bulkForm.classId) { setBulkSections([]); return; }
+    let cancelled = false;
+    apiRequest(`/sections?classId=${encodeURIComponent(bulkForm.classId)}&status=active`, { accessToken })
+      .then((response) => { if (!cancelled) setBulkSections(response.data || []); })
+      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load class sections."); });
+    return () => { cancelled = true; };
+  }, [accessToken, bulkForm.classId]);
 
   const currentClasses = classes.filter((item) => item.academicYearId === yearId || item.academicYearId?._id === yearId);
   const selectedClass = currentClasses.find((item) => item._id === structureForm.classId);
@@ -82,6 +93,20 @@ export default function FeeManagement() {
       if (!response.success) throw new Error("Unable to create invoice.");
       setNotice(`Invoice ${response.data.invoiceNumber} created.`); setInvoiceForm({ enrollmentId: "", feeStructureId: "", invoiceNumber: "", dueDate: "" }); await loadInvoices();
     } catch (err) { setError(err.message || "Unable to create invoice."); }
+    finally { setBusy(false); }
+  };
+
+  const createBulkInvoices = async (event) => {
+    event.preventDefault(); setBusy(true); setError(""); setNotice(""); setBulkResult(null);
+    try {
+      const response = await apiRequest("/fees/invoices/bulk", { method: "POST", accessToken, body: {
+        academicYearId: yearId, ...bulkForm, sectionId: bulkForm.sectionId || null,
+      }});
+      if (!response.success) throw new Error("Unable to generate class invoices.");
+      setBulkResult(response.data);
+      setNotice(`Bulk generation complete: ${response.data.created} created, ${response.data.skipped} skipped.`);
+      await loadInvoices();
+    } catch (err) { setError(err.message || "Unable to generate class invoices."); }
     finally { setBusy(false); }
   };
 
@@ -123,6 +148,19 @@ export default function FeeManagement() {
         <label>Invoice number<input required maxLength="40" value={invoiceForm.invoiceNumber} onChange={(e) => setInvoiceForm((s) => ({ ...s, invoiceNumber: e.target.value }))} placeholder="e.g. INV-2026-001" /></label>
         <label>Due date<input required type="date" value={invoiceForm.dueDate} onChange={(e) => setInvoiceForm((s) => ({ ...s, dueDate: e.target.value }))} /></label>
       </div><div className="fees-form-actions"><button className="fees-primary" disabled={busy || !yearId}>{busy ? "Creating…" : "Create invoice"}</button></div></form>
+      <form className="fees-form fees-bulk-form" onSubmit={createBulkInvoices}>
+        <h3>Generate invoices for a class</h3>
+        <p className="fees-help">One invoice is created for each active enrollment. Students already invoiced for the same fee structure and due date are skipped.</p>
+        <div className="fees-form-grid">
+          <label>Class<select required value={bulkForm.classId} onChange={(e) => setBulkForm((s) => ({ ...s, classId: e.target.value, sectionId: "", feeStructureId: "" }))}><option value="">Select class</option>{currentClasses.filter((item) => item.status === "active").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+          <label>Section<select value={bulkForm.sectionId} onChange={(e) => setBulkForm((s) => ({ ...s, sectionId: e.target.value }))} disabled={!bulkForm.classId}><option value="">All sections / no section</option>{bulkSections.map((section) => <option key={section._id} value={section._id}>{section.name}</option>)}</select></label>
+          <label>Fee structure<select required value={bulkForm.feeStructureId} onChange={(e) => setBulkForm((s) => ({ ...s, feeStructureId: e.target.value }))}><option value="">Select structure</option>{structures.filter((item) => (item.classId?._id || item.classId) === bulkForm.classId && item.status === "active").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+          <label>Due date<input required type="date" value={bulkForm.dueDate} onChange={(e) => setBulkForm((s) => ({ ...s, dueDate: e.target.value }))} /></label>
+          <label>Invoice prefix<input required maxLength="24" pattern="[A-Za-z0-9-]+" value={bulkForm.invoiceNumberPrefix} onChange={(e) => setBulkForm((s) => ({ ...s, invoiceNumberPrefix: e.target.value.toUpperCase() }))} placeholder="e.g. MAY26" /></label>
+        </div>
+        <div className="fees-form-actions"><button className="fees-primary" disabled={busy || !yearId}>{busy ? "Generating…" : "Generate class invoices"}</button></div>
+        {bulkResult && <div className="fees-bulk-results" role="status"><strong>{bulkResult.created} created · {bulkResult.skipped} skipped · {bulkResult.totalEligible} eligible</strong><div className="fees-bulk-result-list">{bulkResult.results.map((item) => <div key={item.enrollmentId}><span>{item.studentName || item.enrollmentId} {item.admissionNumber ? `· ${item.admissionNumber}` : ""}</span><span className={item.status === "created" ? "fees-result-created" : "fees-result-skipped"}>{item.status}{item.invoiceNumber ? ` · ${item.invoiceNumber}` : item.reason ? ` · ${item.reason}` : ""}</span></div>)}</div></div>}
+      </form>
       <div className="fees-list-heading"><h3>Student invoices</h3><span>{invoices.length} invoices</span></div>
       {invoices.length ? <div className="fees-table-wrap"><table className="fees-table"><thead><tr><th>Invoice / Student</th><th>Due date</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody>{invoices.map((invoice) => <tr key={invoice._id}><td><strong>{invoice.invoiceNumber}</strong><small>{studentName(invoice.studentId)} · {invoice.studentId?.admissionNumber}</small></td><td>{new Date(invoice.dueDate).toLocaleDateString("en-IN")}</td><td>{money(invoice.totalAmount)}</td><td>{money(invoice.paidAmount)}</td><td>{money(invoice.totalAmount - invoice.paidAmount)}</td><td><span className={`fees-status fees-${invoice.status}`}>{invoice.status}</span></td><td><button type="button" className="fees-secondary" onClick={() => void openPayments(invoice)}>Record payment / receipts</button></td></tr>)}</tbody></table></div> : <p className="fees-empty">No invoices issued for this academic year.</p>}
     </>}
