@@ -61,7 +61,7 @@ export const getMyPublishedResults = async (req, res, next) => {
   try {
     let students = [];
     if (req.auth.role === "student") {
-      const student = await Student.findOne({ tenantId: req.tenantId, userId: req.auth.userId })
+      const student = await Student.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" })
         .select("_id admissionNumber firstName lastName").lean();
       if (!student) return res.status(409).json({ success: false, message: "Your student account has not been linked by the school" });
       if (req.query.studentId && String(req.query.studentId) !== String(student._id)) {
@@ -79,7 +79,7 @@ export const getMyPublishedResults = async (req, res, next) => {
       if (req.query.studentId && !studentIds.some((id) => String(id) === String(req.query.studentId))) {
         return res.status(403).json({ success: false, message: "This student is not linked to your parent account" });
       }
-      const filter = { tenantId: req.tenantId, _id: { $in: studentIds } };
+      const filter = { tenantId: req.tenantId, _id: { $in: studentIds }, status: "active" };
       if (req.query.studentId) filter._id = req.query.studentId;
       students = await Student.find(filter).select("_id admissionNumber firstName lastName").sort({ firstName: 1, lastName: 1 }).lean();
     }
