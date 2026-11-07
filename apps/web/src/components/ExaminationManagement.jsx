@@ -40,28 +40,32 @@ export default function ExaminationManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadSetup(controller.signal).catch((err) => { if (err.name !== "AbortError") setError(errorMessage(err, "Unable to load setup.")); })
+    Promise.resolve().then(() => loadSetup(controller.signal)).catch((err) => { if (err.name !== "AbortError") setError(errorMessage(err, "Unable to load setup.")); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [loadSetup]);
 
   useEffect(() => {
-    if (!examForm.academicYearId) { setClasses([]); return; }
     const controller = new AbortController();
-    apiRequest(`/classes?academicYearId=${encodeURIComponent(examForm.academicYearId)}&status=active`, { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!examForm.academicYearId) { setClasses([]); return undefined; }
+      return apiRequest(`/classes?academicYearId=${encodeURIComponent(examForm.academicYearId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => {
         setClasses(response.data || []);
         setExamForm((current) => ({ ...current, classId: current.classId && response.data?.some((item) => item._id === current.classId) ? current.classId : response.data?.[0]?._id || "", sectionId: "" }));
       }).catch((err) => { if (err.name !== "AbortError") setError(errorMessage(err, "Unable to load classes.")); });
+    });
     return () => controller.abort();
   }, [accessToken, examForm.academicYearId]);
 
   useEffect(() => {
-    if (!examForm.classId) { setSections([]); return; }
     const controller = new AbortController();
-    apiRequest(`/sections?classId=${encodeURIComponent(examForm.classId)}&status=active`, { accessToken, signal: controller.signal })
+    Promise.resolve().then(() => {
+      if (!examForm.classId) { setSections([]); return undefined; }
+      return apiRequest(`/sections?classId=${encodeURIComponent(examForm.classId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => setSections(response.data || []))
       .catch((err) => { if (err.name !== "AbortError") setError(errorMessage(err, "Unable to load sections.")); });
+    });
     return () => controller.abort();
   }, [accessToken, examForm.classId]);
 
@@ -74,7 +78,7 @@ export default function ExaminationManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadExams(controller.signal).catch((err) => { if (err.name !== "AbortError") setError(errorMessage(err, "Unable to load examinations.")); });
+    Promise.resolve().then(() => loadExams(controller.signal)).catch((err) => { if (err.name !== "AbortError") setError(errorMessage(err, "Unable to load examinations.")); });
     return () => controller.abort();
   }, [loadExams]);
 
@@ -105,8 +109,11 @@ export default function ExaminationManagement() {
 
   useEffect(() => {
     let cancelled = false;
-    if (selectedId) loadExam(selectedId).catch((err) => { if (!cancelled) setError(errorMessage(err, "Unable to load examination.")); });
-    else { setSelectedExam(null); setEnrollments([]); setResults(null); }
+    Promise.resolve().then(() => {
+      if (selectedId) return loadExam(selectedId).catch((err) => { if (!cancelled) setError(errorMessage(err, "Unable to load examination.")); });
+      setSelectedExam(null); setEnrollments([]); setResults(null);
+      return undefined;
+    });
     return () => { cancelled = true; };
   }, [selectedId, loadExam]);
 
