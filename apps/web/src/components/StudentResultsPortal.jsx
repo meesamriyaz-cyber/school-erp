@@ -27,8 +27,6 @@ export default function StudentResultsPortal() {
   useEffect(() => {
     if (!accessToken) return undefined;
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
     Promise.allSettled([
       apiRequest("/portal/children", { accessToken, signal: controller.signal }),
       apiRequest("/portal/results", { accessToken, signal: controller.signal }),
@@ -39,6 +37,7 @@ export default function StudentResultsPortal() {
       apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),
     ]).then(([childrenResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse]) => {
       if (controller.signal.aborted) return;
+      setError("");
       if (childrenResponse.status === "fulfilled") setChildren(Array.isArray(childrenResponse.value?.data) ? childrenResponse.value.data : []);
       else setError(childrenResponse.reason?.message || "Unable to load linked student records.");
       if (resultResponse.status === "fulfilled") setResults(Array.isArray(resultResponse.value?.data) ? resultResponse.value.data : []);
