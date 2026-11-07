@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api.js";
+import { chunkRecords } from "../lib/examinationMarks.js";
 import { useAuth } from "../context/authContext.js";
 import "./ExaminationManagement.css";
 
@@ -167,12 +168,25 @@ export default function ExaminationManagement() {
       return;
     }
     setSaving(true); setError(""); setNotice("");
+    let savedCount = 0;
     try {
-      await apiRequest(`/examinations/${selectedExam._id}/marks`, { method: "POST", accessToken, body: { marks: records } });
-      setNotice(`Saved ${records.length} student-subject mark record${records.length === 1 ? "" : "s"}. You can continue entering the remaining marks later.`);
+      const batches = chunkRecords(records);
+      for (let index = 0; index < batches.length; index += 1) {
+        const batch = batches[index];
+        const response = await apiRequest(`/examinations/${selectedExam._id}/marks`, {
+          method: "POST", accessToken, body: { marks: batch },
+        });
+        if (!response?.success) throw new Error("The server did not confirm this marks batch.");
+        savedCount += Number.isFinite(response.count) ? response.count : batch.length;
+      }
       await loadExam(selectedExam._id);
-    } catch (err) { setError(errorMessage(err, "Unable to save marks.")); }
-    finally { setSaving(false); }
+      setNotice(`Saved all ${savedCount} student-subject mark record${savedCount === 1 ? "" : "s"} in ${batches.length} batch${batches.length === 1 ? "" : "es"}.`);
+    } catch (err) {
+      const message = errorMessage(err, "Unable to save marks.");
+      setError(savedCount
+        ? `Saved ${savedCount} of ${records.length} records. Remaining batches were stopped; review the saved marks and retry. ${message}`
+        : message);
+    } finally { setSaving(false); }
   };
 
   const publishResults = async () => {
