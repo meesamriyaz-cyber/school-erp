@@ -474,6 +474,7 @@ describe("Examination API integration", () => {
       ] }),
     });
     expect(adminSave.status).toBe(200);
+    expect(adminSave.body.auditCount).toBe(2);
 
     const teacherRead = await request(`/examinations/${examId}/marks`, { token: teacherA.token });
     expect(teacherRead.status).toBe(200);
