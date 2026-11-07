@@ -172,6 +172,47 @@ describe("Examination API integration", () => {
     expect((await request(`/examinations/${id}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "completed" }) })).status).toBe(409);
   });
 
+  it("supports incremental mark saves while keeping incomplete results unpublished", async () => {
+    const secondStudent = await Student.create({
+      tenantId: schoolA._id, admissionNumber: `EX-${randomUUID().slice(0, 8)}`, firstName: "Second Student",
+    });
+    const secondEnrollment = await Enrollment.create({
+      tenantId: schoolA._id, studentId: secondStudent._id, academicYearId: yearA._id,
+      classId: classA._id, status: "active",
+    });
+    const secondSubject = await Subject.create({ tenantId: schoolA._id, name: `Science ${randomUUID().slice(0, 5)}` });
+    const created = await request("/examinations", {
+      method: "POST", token: adminA.token, body: JSON.stringify(createPayload()),
+    });
+    const examId = created.body.data._id;
+    const subjectOne = await request(`/examinations/${examId}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(subjectA._id), examDate: "2026-09-03", maxMarks: 100, passMarks: 35 }),
+    });
+    const subjectTwo = await request(`/examinations/${examId}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(secondSubject._id), examDate: "2026-09-04", maxMarks: 100, passMarks: 35 }),
+    });
+    expect(subjectOne.status).toBe(201);
+    expect(subjectTwo.status).toBe(201);
+    await request(`/examinations/${examId}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "scheduled" }) });
+    await request(`/examinations/${examId}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "in_progress" }) });
+    const partial = await request(`/examinations/${examId}/marks`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ marks: [{ examSubjectId: subjectOne.body.data._id, enrollmentId: String(enrollmentA._id), marksObtained: 76 }] }),
+    });
+    expect(partial.status).toBe(200);
+    expect(partial.body.count).toBe(1);
+    expect((await request(`/examinations/${examId}/marks`, { token: adminA.token })).body.data).toHaveLength(1);
+    await request(`/examinations/${examId}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "completed" }) });
+    const result = await request(`/examinations/${examId}/results`, { token: adminA.token });
+    expect(result.status).toBe(200);
+    expect(result.body.summary.publishable).toBe(false);
+    expect(result.body.summary.incompleteCount).toBe(2);
+    const publish = await request(`/examinations/${examId}/publish`, { method: "POST", token: adminA.token });
+    expect(publish.status).toBe(409);
+  });
+
   it("calculates consolidated results and publishes only complete results", async () => {
     const created = await request("/examinations", { method: "POST", token: adminA.token, body: JSON.stringify(createPayload()) });
     const id = created.body.data._id;
