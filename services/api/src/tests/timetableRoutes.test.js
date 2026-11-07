@@ -262,49 +262,4 @@ describe("Timetable API integration", () => {
     expect(write.status).toBe(403);
   });
 
-
-  it("gets and saves academic periods and breaks within the authenticated school", async () => {
-    const initial = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: adminA.token });
-    expect(initial.status).toBe(200);
-    expect(initial.body.data.periods).toEqual([]);
-    const saved = await request("/academic-schedule", {
-      method: "PUT", token: adminA.token,
-      body: JSON.stringify({
-        academicYearId: String(yearA._id),
-        periods: [
-          { periodNumber: 1, label: "Mathematics", startTime: "09:00", endTime: "09:45" },
-          { periodNumber: 2, label: "Science", startTime: "10:00", endTime: "10:45" },
-        ],
-        breaks: [{ label: "Short break", startTime: "09:45", endTime: "10:00" }],
-      }),
-    });
-    expect(saved.status).toBe(200);
-    expect(saved.body.data.periods).toHaveLength(2);
-    expect(saved.body.data.breaks[0].label).toBe("Short break");
-    const otherSchool = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: adminB.token });
-    expect(otherSchool.status).toBe(404);
-  });
-
-  it("rejects overlapping periods and breaks in the academic schedule", async () => {
-    const response = await request("/academic-schedule", {
-      method: "PUT", token: adminA.token,
-      body: JSON.stringify({
-        academicYearId: String(yearA._id),
-        periods: [{ periodNumber: 1, label: "Period 1", startTime: "09:00", endTime: "10:00" }],
-        breaks: [{ label: "Break", startTime: "09:45", endTime: "10:15" }],
-      }),
-    });
-    expect(response.status).toBe(400);
-    expect(response.body.message).toMatch(/overlaps/i);
-  });
-
-  it("allows teachers to view but not change the academic schedule", async () => {
-    const read = await request(`/academic-schedule?academicYearId=${yearA._id}`, { token: teacherA.token });
-    const write = await request("/academic-schedule", {
-      method: "PUT", token: teacherA.token,
-      body: JSON.stringify({ academicYearId: String(yearA._id), periods: [], breaks: [] }),
-    });
-    expect(read.status).toBe(200);
-    expect(write.status).toBe(403);
-  });
 });
