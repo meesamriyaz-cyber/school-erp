@@ -3,6 +3,7 @@ import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./TeacherTimetablePortal.css";
 import TeacherAttendancePortal from "./TeacherAttendancePortal.jsx";
+import HomeworkManagement from "./HomeworkManagement.jsx";
 
 const DAYS = [
   { value: 1, label: "Monday" },
@@ -69,8 +70,9 @@ export default function TeacherTimetablePortal() {
       <nav className="teacher-workspace-tabs" aria-label="Teacher workspace">
         <button type="button" className={activeView === "timetable" ? "active" : ""} onClick={() => setActiveView("timetable")}>My timetable</button>
         <button type="button" className={activeView === "attendance" ? "active" : ""} onClick={() => setActiveView("attendance")}>Mark attendance</button>
+        <button type="button" className={activeView === "homework" ? "active" : ""} onClick={() => setActiveView("homework")}>Homework & classwork</button>
       </nav>
-      {activeView === "attendance" ? <TeacherAttendancePortal /> : <>
+      {activeView === "attendance" ? <TeacherAttendancePortal /> : activeView === "homework" ? <HomeworkManagement /> : <>
         {error && <p className="teacher-timetable-error" role="alert">{error}</p>}
         {!loading && !error && entries.length > 0 && (
           <section className="teacher-timetable-summary" aria-label="Timetable summary">
