@@ -56,3 +56,26 @@
   .teacher-timetable-period-main h3,.teacher-timetable-period-time strong{color:#111!important}
   .teacher-timetable-period-time span,.teacher-timetable-period-main p,.teacher-timetable-room{color:#444!important}
 }
+
+
+.teacher-workspace-tabs{flex-wrap:wrap}
+.teacher-classes,.teacher-exams{max-width:1100px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}
+.teacher-classes h2,.teacher-exams h2{margin-top:0}
+.teacher-classes-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:20px}
+.teacher-classes-grid article{padding:16px;border:1px solid #e2e8f0;border-radius:10px}
+.teacher-classes-grid h3{margin:0 0 8px}
+.teacher-classes-grid p{margin:0 0 8px}
+.teacher-classes-grid small{color:#64748b}
+.teacher-exams>label{display:block;margin:18px 0;font-weight:700}
+.teacher-exams>label select{display:block;margin-top:7px;padding:9px;max-width:100%;min-width:260px}
+.teacher-exams-table{overflow-x:auto;margin:18px 0}
+.teacher-exams-table table{width:100%;border-collapse:collapse}
+.teacher-exams-table th,.teacher-exams-table td{border:1px solid #e2e8f0;padding:12px;text-align:left;min-width:130px}
+.teacher-exams-table th{background:#f8fafc}
+.teacher-exams-table small{display:block;color:#64748b}
+.teacher-exams-mark{display:flex;align-items:center;gap:10px}
+.teacher-exams-mark input[type=number]{width:80px;padding:8px}
+.teacher-exams-mark label{display:flex;align-items:center;gap:4px;font-size:12px}
+.teacher-exams>button{border:0;border-radius:8px;background:#3154d8;color:#fff;padding:11px 20px;font-weight:700;cursor:pointer}
+.teacher-exams>button:disabled{opacity:.5}
+.teacher-workspace-notice{color:#166534}
