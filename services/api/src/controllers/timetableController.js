@@ -4,6 +4,7 @@ import TeacherAssignment from "../models/TeacherAssignment.js";
 import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
+import AcademicSchedule from "../models/AcademicSchedule.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -12,6 +13,19 @@ const timeToMinutes = (value) => {
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
 };
+
+const validateConfiguredPeriod = async ({ tenantId, academicYearId, periodNumber, startTime, endTime }) => {
+  const schedule = await AcademicSchedule.findOne({ tenantId, academicYearId }).select("periods breaks").lean();
+  if (!schedule || !schedule.periods?.length) return null;
+  const period = schedule.periods.find((item) => item.periodNumber === periodNumber);
+  if (!period) return "Select a period configured in this academic year's bell schedule";
+  if (period.startTime !== startTime || period.endTime !== endTime) return `Period ${periodNumber} must use the configured time ${period.startTime}–${period.endTime}`;
+  const start = timeToMinutes(startTime), end = timeToMinutes(endTime);
+  const overlapsBreak = (schedule.breaks || []).some((item) => start < timeToMinutes(item.endTime) && end > timeToMinutes(item.startTime));
+  if (overlapsBreak) return "A lesson cannot be scheduled during a configured break";
+  return null;
+};
+
 const populateEntry = (query) => query
   .populate({ path: "assignmentId", populate: [
     { path: "teacherId", select: "firstName lastName email" },
@@ -90,6 +104,9 @@ export const createTimetableEntry = async (req, res, next) => {
     if (!assignment || String(assignment.academicYearId) !== String(academicYearId) || String(assignment.classId) !== String(classId)) {
       return invalid(res, "Select an active teacher assignment for this class and academic year");
     }
+    const scheduleError = await validateConfiguredPeriod({ tenantId: req.tenantId, academicYearId, periodNumber: period, startTime, endTime });
+    if (scheduleError) return invalid(res, scheduleError);
+
     const selectedSection = sectionId || null;
     if (selectedSection) {
       const section = await Section.findOne({ _id: selectedSection, tenantId: req.tenantId, classId, status: "active" }).select("_id").lean();
@@ -146,6 +163,11 @@ export const updateTimetableEntry = async (req, res, next) => {
 
     if (Object.keys(body).length === 1 && ["active", "inactive"].includes(body.status)) {
       if (body.status === "active") {
+        const scheduleError = await validateConfiguredPeriod({
+          tenantId: req.tenantId, academicYearId: entry.academicYearId,
+          periodNumber: entry.periodNumber, startTime: entry.startTime, endTime: entry.endTime,
+        });
+        if (scheduleError) return res.status(409).json({ success: false, message: scheduleError });
         const assignment = await TeacherAssignment.findOne({ _id: entry.assignmentId, tenantId: req.tenantId, status: "active" }).select("teacherId").lean();
         if (!assignment) return res.status(409).json({ success: false, message: "Activate the linked teacher assignment before activating this timetable entry" });
         const classScope = {
@@ -197,6 +219,9 @@ export const updateTimetableEntry = async (req, res, next) => {
         (assignment.sectionId && String(assignment.sectionId) !== String(entry.sectionId || ""))) {
         return invalid(res, "Select an active teacher assignment for this class, section and academic year");
       }
+
+      const scheduleError = await validateConfiguredPeriod({ tenantId: req.tenantId, academicYearId: entry.academicYearId, periodNumber: period, startTime, endTime });
+      if (scheduleError) return invalid(res, scheduleError);
 
       const sectionConflict = entry.sectionId
         ? { $or: [{ sectionId: null }, { sectionId: entry.sectionId }] }
