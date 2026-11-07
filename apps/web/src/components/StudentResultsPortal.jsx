@@ -11,6 +11,10 @@ export default function StudentResultsPortal() {
   const { user, accessToken, logout } = useAuth();
   const [results, setResults] = useState([]);
   const [homework, setHomework] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState("");
+  const [homeworkNotice, setHomeworkNotice] = useState("");
   const [activeTab, setActiveTab] = useState("results");
   const [selectedStudent, setSelectedStudent] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -24,11 +28,13 @@ export default function StudentResultsPortal() {
     Promise.allSettled([
       apiRequest("/portal/results", { accessToken, signal: controller.signal }),
       apiRequest("/portal/homework", { accessToken, signal: controller.signal }),
-    ]).then(([resultResponse, homeworkResponse]) => {
+      apiRequest("/portal/homework-submissions", { accessToken, signal: controller.signal }),
+    ]).then(([resultResponse, homeworkResponse, submissionResponse]) => {
       if (controller.signal.aborted) return;
       if (resultResponse.status === "fulfilled") setResults(Array.isArray(resultResponse.value?.data) ? resultResponse.value.data : []);
       else setError(resultResponse.reason?.message || "Unable to load published results.");
       if (homeworkResponse.status === "fulfilled") setHomework(Array.isArray(homeworkResponse.value?.data) ? homeworkResponse.value.data : []);
+      if (submissionResponse.status === "fulfilled") setSubmissions(Array.isArray(submissionResponse.value?.data) ? submissionResponse.value.data : []);
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });
@@ -73,8 +79,30 @@ export default function StudentResultsPortal() {
             <div className="portal-homework-heading"><div><span>{item.homework.subjectId?.name || "Subject"} · {item.homework.classId?.name || "Class"}{item.homework.sectionId?.name ? ` · ${item.homework.sectionId.name}` : ""}</span><h2>{item.homework.title}</h2></div><strong>Due {formatDate(item.homework.dueDate)}</strong></div>
             {isParent && <p className="portal-homework-student">For: {[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</p>}
             <p className="portal-homework-instructions">{item.homework.instructions}</p>
+            {(() => {
+              const submission = submissions.find((entry) => String(entry.homeworkId?._id || entry.homeworkId) === String(item.homework._id) && String(entry.studentId?._id || entry.studentId) === String(item.student?._id));
+              return submission ? <div className="portal-submission-state">
+                <strong>Your submission · {submission.status}</strong>
+                <p>{submission.answer}</p>
+                {submission.status === "reviewed" && <div className="portal-review-feedback">{submission.marksObtained !== null ? `Marks: ${submission.marksObtained}/${submission.maxMarks}. ` : ""}{submission.feedback || "Your teacher has reviewed this work."}</div>}
+                <small>Submitted {formatDate(submission.submittedAt)}</small>
+              </div> : !isParent ? <form className="portal-submit-form" onSubmit={async (event) => {
+                event.preventDefault(); setSubmitting(item.homework._id); setError(""); setHomeworkNotice("");
+                try {
+                  await apiRequest(`/homework/${item.homework._id}/submissions`, { method: "POST", accessToken, body: { answer: answers[item.homework._id] || "" } });
+                  const response = await apiRequest("/portal/homework-submissions", { accessToken });
+                  setSubmissions(response.data || []); setHomeworkNotice("Your homework has been submitted.");
+                } catch (err) { setError(err.message || "Unable to submit homework."); }
+                finally { setSubmitting(""); }
+              }}>
+                <label htmlFor={`answer-${item.homework._id}`}>Your answer</label>
+                <textarea id={`answer-${item.homework._id}`} required maxLength="10000" rows="4" value={answers[item.homework._id] || ""} onChange={(event) => setAnswers((current) => ({ ...current, [item.homework._id]: event.target.value }))} placeholder="Write your answer here…" />
+                <button type="submit" disabled={submitting === item.homework._id}>{submitting === item.homework._id ? "Submitting…" : "Submit homework"}</button>
+              </form> : <p className="portal-homework-student">No submission recorded yet.</p>;
+            })()}
             <footer>Assigned {formatDate(item.homework.assignedDate)} · {item.homework.teacherId ? `By ${[item.homework.teacherId.firstName, item.homework.teacherId.lastName].filter(Boolean).join(" ")}` : "School assignment"}</footer>
           </article>)}</div>
+
         )
       ) : <>
       {isParent && students.length > 1 && (
