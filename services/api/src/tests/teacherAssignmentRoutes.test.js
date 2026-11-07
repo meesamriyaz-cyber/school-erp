@@ -175,4 +175,16 @@ describe("Teacher assignment API integration", () => {
     expect(crossSchool.status).toBe(200);
     expect(crossSchool.body.data).toHaveLength(0);
   });
+  it("limits teachers to their own assignment directory", async () => {
+    const mine = await request("/teacher-assignments?status=active", { token: teacherA.token });
+    expect(mine.status).toBe(200);
+    expect(mine.body.data.length).toBeGreaterThan(0);
+    expect(mine.body.data.every((item) => String(item.teacherId._id) === String(teacherA.user._id))).toBe(true);
+    const other = await request(`/teacher-assignments?teacherId=${teacherB.user._id}`, { token: teacherA.token });
+    expect(other.status).toBe(403);
+    const own = await request(`/teacher-assignments?teacherId=${teacherA.user._id}`, { token: teacherA.token });
+    expect(own.status).toBe(200);
+    expect(own.body.data.every((item) => String(item.teacherId._id) === String(teacherA.user._id))).toBe(true);
+  });
+
 });
