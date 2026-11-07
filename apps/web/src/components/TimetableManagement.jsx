@@ -144,7 +144,7 @@ export default function TimetableManagement() {
       <div className="timetable-form-actions"><button type="submit" className="timetable-primary" disabled={saving || !form.academicYearId || !form.classId || !form.assignmentId}>{saving ? "Saving…" : editingEntryId ? "Update period" : "Save period"}</button></div>
       <p className="timetable-help">Monday–Saturday schedule. Class/section and teacher time conflicts are checked before saving.</p>
     </form>}
-    <div className="timetable-toolbar"><h3>Weekly schedule</h3><div>
+    <div className="timetable-toolbar"><h3>Weekly schedule</h3><div className="timetable-toolbar-actions">
       <label>Academic year<select value={filter.academicYearId} onChange={(e) => setFilter((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "" }))}><option value="">All years</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}</select></label>
       <label>Class<select value={filter.classId} onChange={(e) => setFilter((v) => ({ ...v, classId: e.target.value, sectionId: "" }))}><option value="">All classes</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Section<select value={filter.sectionId} onChange={(e) => setFilter((v) => ({ ...v, sectionId: e.target.value }))}><option value="">All sections</option>{sections.map((section) => <option key={section._id} value={section._id}>{section.name}</option>)}</select></label>
@@ -153,6 +153,8 @@ export default function TimetableManagement() {
       <button type="button" className={scheduleView === "week" ? "active" : ""} aria-pressed={scheduleView === "week"} onClick={() => setScheduleView("week")}>Weekly view</button>
       <button type="button" className={scheduleView === "list" ? "active" : ""} aria-pressed={scheduleView === "list"} onClick={() => setScheduleView("list")}>List view</button>
     </div>
+    <div className="timetable-print-area">
+    <div className="timetable-print-heading"><h2>Class Timetable</h2><p>{years.find((year) => String(year._id) === String(filter.academicYearId))?.name || "All academic years"} · {visibleClasses.find((item) => String(item._id) === String(filter.classId))?.name || "All classes"}{filter.sectionId ? ` · ${sections.find((item) => String(item._id) === String(filter.sectionId))?.name || "Selected section"}` : ""}</p></div>
     {scheduleView === "week" ? <div className="timetable-week-grid">
       {entriesByDay.map((day) => <section className="timetable-week-day" key={day.value} aria-label={day.label}>
         <h4>{day.label}<span>{day.entries.length} {day.entries.length === 1 ? "period" : "periods"}</span></h4>
@@ -172,6 +174,7 @@ export default function TimetableManagement() {
         <td><div className="timetable-row-actions"><button type="button" className="timetable-action" onClick={() => editEntry(entry)}>Edit</button><button type="button" className="timetable-action" onClick={() => void toggleStatus(entry)}>{entry.status === "active" ? "Deactivate" : "Activate"}</button></div></td>
       </tr>) : <tr><td colSpan="9">No timetable periods found for these filters.</td></tr>}
     </tbody></table></div>}
+    </div>
     <p className="timetable-help">Inactive periods are hidden from the active schedule. Reactivating a period is blocked if its linked teacher assignment is inactive.</p>
   </section>;
 }
