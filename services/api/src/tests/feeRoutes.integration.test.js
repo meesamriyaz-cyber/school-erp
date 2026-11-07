@@ -163,5 +163,12 @@ describe("Fee management API", () => {
     const updatedHistory = await request(`/fees/invoices/${invoice._id}/payments`, { token: admin.token });
     expect(updatedHistory.body.data).toHaveLength(2);
     expect(updatedHistory.body.data.find((payment) => payment._id === paymentToReverse._id).status).toBe("reversed");
+    const outstanding = await request(`/fees/outstanding?academicYearId=${year._id}&overdueOnly=true`, { token: admin.token });
+    expect(outstanding.status).toBe(200);
+    expect(outstanding.body.data.some((item) => String(item._id) === String(invoice._id))).toBe(true);
+    expect(outstanding.body.summary.invoiceCount).toBeGreaterThan(0);
+    expect(outstanding.body.summary.overdueCount).toBeGreaterThan(0);
+    expect(outstanding.body.summary.totalOutstanding).toBeGreaterThanOrEqual(500);
+    expect((await request(`/fees/outstanding?academicYearId=${otherSchool._id}`, { token: admin.token })).status).toBe(404);
   });
 });
