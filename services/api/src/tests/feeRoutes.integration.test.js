@@ -11,6 +11,7 @@ import Student from "../models/Student.js";
 import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Enrollment from "../models/Enrollment.js";
+import Section from "../models/Section.js";
 import FeeStructure from "../models/FeeStructure.js";
 import FeeInvoice from "../models/FeeInvoice.js";
 import FeePayment from "../models/FeePayment.js";
@@ -45,7 +46,7 @@ describe("Fee management API", () => {
     if (databaseName !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== "school-erp-test") throw new Error("Safety stop: unexpected database.");
-    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), FeeStructure.init(), FeeInvoice.init(), FeePayment.init()]);
+    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), FeeStructure.init(), FeeInvoice.init(), FeePayment.init(), Section.init()]);
     school = await makeSchool("main"); otherSchool = await makeSchool("other");
     admin = await makeAdmin(school); otherAdmin = await makeAdmin(otherSchool);
     year = await AcademicYear.create({ tenantId: school._id, name: `AY-${randomUUID().slice(0, 8)}`, startDate: "2026-04-01", endDate: "2027-03-31", status: "active" });
@@ -65,6 +66,7 @@ describe("Fee management API", () => {
         await FeeInvoice.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await FeeStructure.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await Enrollment.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
+        await Section.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await Student.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await SchoolClass.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await AcademicYear.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
@@ -111,6 +113,15 @@ describe("Fee management API", () => {
     });
     expect(repeated.body.data.created).toBe(0);
     expect(repeated.body.data.skipped).toBe(2);
+
+    const anotherClass = await SchoolClass.create({ tenantId: school._id, academicYearId: year._id, name: "Class 6" });
+    const wrongSection = await Section.create({ tenantId: school._id, classId: anotherClass._id, name: "A", status: "active" });
+    const invalidSectionBulk = await post("/fees/invoices/bulk", admin.token, {
+      academicYearId: String(year._id), classId: String(schoolClass._id), sectionId: String(wrongSection._id),
+      feeStructureId: structure.body.data._id, dueDate: "2026-06-10", invoiceNumberPrefix: "JUN26",
+    });
+    expect(invalidSectionBulk.status).toBe(400);
+    expect(invalidSectionBulk.body.message).toMatch(/active section belonging to the chosen class/i);
   });
 
   it("records partial and final payments, prevents overpayment, and exposes receipt history", async () => {
