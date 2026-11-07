@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import TeacherTimetablePortal from "../components/TeacherTimetablePortal.jsx";
 import { apiRequest } from "../lib/api.js";
 
@@ -38,7 +38,7 @@ describe("TeacherTimetablePortal", () => {
 
     render(<TeacherTimetablePortal />);
     expect(await screen.findByText("Science")).toBeInTheDocument();
-    screen.getByRole("button", { name: "List view" }).click();
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
     expect(screen.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Tuesday")).toBeInTheDocument();
     expect(screen.getByText("Lab 2")).toBeInTheDocument();
