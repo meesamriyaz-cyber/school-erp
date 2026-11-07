@@ -13,6 +13,7 @@ import Section from "../models/Section.js";
 import Subject from "../models/Subject.js";
 import Examination from "../models/Examination.js";
 import Homework from "../models/Homework.js";
+import HomeworkSubmission from "../models/HomeworkSubmission.js";
 import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
 import Enrollment from "../models/Enrollment.js";
@@ -63,7 +64,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init(), Homework.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), TeacherAssignment.init(), Homework.init(), HomeworkSubmission.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -84,6 +85,7 @@ describe("Examination API integration", () => {
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
         await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
+        await HomeworkSubmission.deleteMany({ tenantId: { $in: tenantIds } });
         await Homework.deleteMany({ tenantId: { $in: tenantIds } });
         await TeacherAssignment.deleteMany({ tenantId: { $in: tenantIds } });
         await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
@@ -139,6 +141,52 @@ describe("Examination API integration", () => {
       body: JSON.stringify({ ...base, dueDate: "2026-09-06" }),
     });
     expect(teacherAttempt.status).toBe(403);
+  });
+
+  it("accepts student homework submissions and allows the assigned teacher to review them", async () => {
+    const studentAccount = await createUser(schoolA, "student");
+    studentA.userId = studentAccount.user._id;
+    await studentA.save();
+    await TeacherAssignment.create({
+      tenantId: schoolA._id, teacherId: teacherA.user._id, subjectId: subjectA._id,
+      academicYearId: yearA._id, classId: classA._id, sectionId: null, assignedBy: adminA.user._id,
+    });
+    const created = await request("/homework", {
+      method: "POST", token: teacherA.token,
+      body: JSON.stringify({
+        academicYearId: String(yearA._id), classId: String(classA._id), subjectId: String(subjectA._id),
+        title: "Written assignment", instructions: "Answer the questions.",
+        assignedDate: "2026-09-02", dueDate: "2026-09-10", status: "published",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const homeworkId = created.body.data._id;
+    const submitted = await request(`/homework/${homeworkId}/submissions`, {
+      method: "POST", token: studentAccount.token, body: JSON.stringify({ answer: "My completed answers." }),
+    });
+    expect(submitted.status).toBe(200);
+    expect(submitted.body.data.status).toBe("submitted");
+    expect(String(submitted.body.data.studentId)).toBe(String(studentA._id));
+    const listed = await request(`/homework/${homeworkId}/submissions`, { token: teacherA.token });
+    expect(listed.status).toBe(200);
+    expect(listed.body.data).toHaveLength(1);
+    const submissionId = listed.body.data[0]._id;
+    const reviewed = await request(`/homework/${homeworkId}/submissions/${submissionId}/review`, {
+      method: "PATCH", token: teacherA.token,
+      body: JSON.stringify({ marksObtained: 8, maxMarks: 10, feedback: "Good work." }),
+    });
+    expect(reviewed.status).toBe(200);
+    expect(reviewed.body.data.status).toBe("reviewed");
+    const history = await request("/portal/homework-submissions", { token: studentAccount.token });
+    expect(history.status).toBe(200);
+    expect(history.body.data).toHaveLength(1);
+    expect(history.body.data[0].feedback).toBe("Good work.");
+    const locked = await request(`/homework/${homeworkId}/submissions`, {
+      method: "POST", token: studentAccount.token, body: JSON.stringify({ answer: "Attempt to replace reviewed answer." }),
+    });
+    expect(locked.status).toBe(409);
+    const hidden = await request(`/homework/${homeworkId}/submissions`, { token: adminB.token });
+    expect(hidden.status).toBe(404);
   });
 
   it("requires authentication and limits exam creation to administrators", async () => {
