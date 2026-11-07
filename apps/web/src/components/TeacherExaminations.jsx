@@ -30,10 +30,11 @@ export default function TeacherExaminations() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!examId) { setRoster(null); return; }
     const controller = new AbortController();
-    setLoading(true); setRoster(null); setMarks({}); setError(""); setNotice("");
-    Promise.all([
+    Promise.resolve().then(() => {
+      if (!examId) { setRoster(null); return undefined; }
+      setLoading(true); setRoster(null); setMarks({}); setError(""); setNotice("");
+      return Promise.all([
       apiRequest(`/examinations/${examId}/teacher-roster`, { accessToken, signal: controller.signal }),
       apiRequest(`/examinations/${examId}/marks`, { accessToken, signal: controller.signal }),
     ]).then(([rosterResponse, marksResponse]) => {
@@ -48,8 +49,9 @@ export default function TeacherExaminations() {
         };
       });
       setMarks(saved);
-    }).catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      }).catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message); })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    });
     return () => controller.abort();
   }, [accessToken, examId]);
 
