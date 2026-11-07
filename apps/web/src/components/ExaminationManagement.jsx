@@ -173,11 +173,13 @@ export default function ExaminationManagement() {
       const batches = chunkRecords(records);
       for (let index = 0; index < batches.length; index += 1) {
         const batch = batches[index];
+        setNotice(`Saving batch ${index + 1} of ${batches.length}…`);
         const response = await apiRequest(`/examinations/${selectedExam._id}/marks`, {
           method: "POST", accessToken, body: { marks: batch },
         });
         if (!response?.success) throw new Error("The server did not confirm this marks batch.");
         savedCount += Number.isFinite(response.count) ? response.count : batch.length;
+        setNotice(`Saved ${savedCount} of ${records.length} records…`);
       }
       await loadExam(selectedExam._id);
       setNotice(`Saved all ${savedCount} student-subject mark record${savedCount === 1 ? "" : "s"} in ${batches.length} batch${batches.length === 1 ? "" : "es"}.`);
