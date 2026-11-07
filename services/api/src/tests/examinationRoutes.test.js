@@ -228,6 +228,13 @@ describe("Examination API integration", () => {
     expect((await request(`/examinations/${id}/subjects`, { method: "POST", token: adminA.token, body: JSON.stringify(subjectPayload) })).status).toBe(201);
     expect((await request(`/examinations/${id}/subjects`, { method: "POST", token: adminA.token, body: JSON.stringify(subjectPayload) })).status).toBe(409);
     expect((await request(`/examinations/${id}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "scheduled" }) })).status).toBe(200);
+    const anotherSubject = await Subject.create({ tenantId: schoolA._id, name: `History ${randomUUID().slice(0, 5)}` });
+    const lateSubject = await request(`/examinations/${id}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(anotherSubject._id), examDate: "2026-09-04", maxMarks: 100, passMarks: 35 }),
+    });
+    expect(lateSubject.status).toBe(409);
+    expect(lateSubject.body.message).toMatch(/only be configured while.*draft/i);
   });
 
   it("requires complete exam times and rejects overlapping subject sessions", async () => {
@@ -381,6 +388,52 @@ describe("Examination API integration", () => {
     expect(published.status).toBe(409);
     expect(published.body.incompleteCount).toBe(1);
   });
+  it("serializes mark saves and result publication with an expiring examination lock", async () => {
+    const created = await request("/examinations", {
+      method: "POST", token: adminA.token, body: JSON.stringify(createPayload()),
+    });
+    const examId = created.body.data._id;
+    const subject = await request(`/examinations/${examId}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(subjectA._id), examDate: "2026-09-03", maxMarks: 100, passMarks: 35 }),
+    });
+    expect(subject.status).toBe(201);
+    await request(`/examinations/${examId}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "scheduled" }) });
+    await request(`/examinations/${examId}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "completed" }) });
+
+    await Examination.updateOne(
+      { _id: examId, tenantId: schoolA._id },
+      { $set: { resultLockToken: "active-test-lock", resultLockExpiresAt: new Date(Date.now() + 60_000) } }
+    );
+    const payload = {
+      marks: [{ examSubjectId: subject.body.data._id, enrollmentId: String(enrollmentA._id), marksObtained: 74 }],
+    };
+    const blockedSave = await request(`/examinations/${examId}/marks`, {
+      method: "POST", token: adminA.token, body: JSON.stringify(payload),
+    });
+    expect(blockedSave.status).toBe(409);
+
+    const blockedPublish = await request(`/examinations/${examId}/publish`, {
+      method: "POST", token: adminA.token,
+    });
+    expect(blockedPublish.status).toBe(409);
+
+    await Examination.updateOne(
+      { _id: examId, tenantId: schoolA._id },
+      { $set: { resultLockExpiresAt: new Date(Date.now() - 1_000) } }
+    );
+    const recoveredSave = await request(`/examinations/${examId}/marks`, {
+      method: "POST", token: adminA.token, body: JSON.stringify(payload),
+    });
+    expect(recoveredSave.status).toBe(200);
+
+    const published = await request(`/examinations/${examId}/publish`, {
+      method: "POST", token: adminA.token,
+    });
+    expect(published.status).toBe(200);
+    expect(published.body.data.status).toBe("published");
+  });
+
   it("limits teachers to their assigned section in class-wide exams for both reading and mark entry", async () => {
     const [sectionA, sectionB] = await Promise.all([
       Section.create({ tenantId: schoolA._id, classId: classA._id, name: "Section A" }),
