@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { randomUUID } from "node:crypto";
+import { acquireExaminationResultLock, releaseExaminationResultLock } from "../utils/examinationResultLock.js";
 import Examination from "../models/Examination.js";
 import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
@@ -136,6 +138,8 @@ export const getExaminationResults = async (req, res, next) => {
 };
 
 export const publishExaminationResults = async (req, res, next) => {
+  let lockToken = null;
+  let examinationId = null;
   try {
     if (!validId(req.params.examinationId)) return invalid(res, "Invalid examination ID");
 
@@ -147,6 +151,21 @@ export const publishExaminationResults = async (req, res, next) => {
     if (!exam) return res.status(404).json({ success: false, message: "Examination not found" });
     if (exam.status !== "completed") {
       return res.status(409).json({ success: false, message: "Only completed examinations can be published" });
+    }
+
+    examinationId = exam._id;
+    lockToken = randomUUID();
+    const lockedExam = await acquireExaminationResultLock({
+      tenantId: req.tenantId,
+      examinationId,
+      statuses: ["completed"],
+      token: lockToken,
+    });
+    if (!lockedExam) {
+      return res.status(409).json({
+        success: false,
+        message: "Marks are being saved or another publication is in progress. Refresh and try again.",
+      });
     }
 
     const context = await loadResultContext(req.tenantId, exam);
@@ -166,13 +185,21 @@ export const publishExaminationResults = async (req, res, next) => {
     }
 
     const published = await Examination.findOneAndUpdate(
-      { _id: exam._id, tenantId: req.tenantId, status: "completed" },
-      { $set: { status: "published" } },
+      {
+        _id: exam._id,
+        tenantId: req.tenantId,
+        status: "completed",
+        resultLockToken: lockToken,
+      },
+      {
+        $set: { status: "published" },
+        $unset: { resultLockToken: 1, resultLockExpiresAt: 1 },
+      },
       { new: true, runValidators: true }
     );
 
     if (!published) {
-      return res.status(409).json({ success: false, message: "The examination status changed; refresh and try again" });
+      return res.status(409).json({ success: false, message: "The examination changed during publication; refresh and try again" });
     }
 
     return res.status(200).json({
@@ -182,5 +209,9 @@ export const publishExaminationResults = async (req, res, next) => {
     });
   } catch (error) {
     return next(error);
+  } finally {
+    if (lockToken && examinationId) {
+      await releaseExaminationResultLock(req.tenantId, examinationId, lockToken);
+    }
   }
 };
