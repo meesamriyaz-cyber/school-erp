@@ -85,11 +85,13 @@ export default function TeacherExaminations() {
       const batches = chunkRecords(records);
       for (let index = 0; index < batches.length; index += 1) {
         const batch = batches[index];
+        setNotice(`Saving batch ${index + 1} of ${batches.length}…`);
         const response = await apiRequest(`/examinations/${examId}/marks`, {
           accessToken, method: "POST", body: { marks: batch },
         });
         if (!response?.success) throw new Error("The server did not confirm this marks batch.");
         savedCount += Number.isFinite(response.count) ? response.count : batch.length;
+        setNotice(`Saved ${savedCount} of ${records.length} records…`);
       }
       setNotice(`Saved all ${savedCount} mark records in ${batches.length} batch${batches.length === 1 ? "" : "es"}.`);
     } catch (err) {
