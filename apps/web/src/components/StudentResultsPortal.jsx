@@ -54,11 +54,6 @@ export default function StudentResultsPortal() {
     return () => controller.abort();
   }, [accessToken]);
 
-  const students = useMemo(
-    () => children.map((item) => item.student).filter(Boolean),
-    [children],
-  );
-
   const visibleResults = useMemo(() => selectedStudent === "all"
     ? results
     : results.filter((item) => String(item.student?._id) === selectedStudent),
@@ -144,6 +139,7 @@ export default function StudentResultsPortal() {
         )
       ) : activeTab === "homework" ? (
         loading ? <div className="portal-state">Loading homework…</div> : visibleHomework.length === 0 ? <div className="portal-empty"><h2>No published homework</h2><p>Assignments shared by your school will appear here.</p></div> : (
+          {homeworkNotice && <div className="portal-homework-notice" role="status">{homeworkNotice}</div>}
           <div className="portal-homework-list">{visibleHomework.map((item) => <article className="portal-homework-card" key={String(item.homework._id) + String(item.student?._id)}>
             <div className="portal-homework-heading"><div><span>{item.homework.subjectId?.name || "Subject"} · {item.homework.classId?.name || "Class"}{item.homework.sectionId?.name ? ` · ${item.homework.sectionId.name}` : ""}</span><h2>{item.homework.title}</h2></div><strong>Due {formatDate(item.homework.dueDate)}</strong></div>
             {isParent && <p className="portal-homework-student">For: {[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</p>}
