@@ -140,5 +140,28 @@ describe("Fee management API", () => {
     const history = await request(`/fees/invoices/${invoice._id}/payments`, { token: admin.token });
     expect(history.status).toBe(200); expect(history.body.data).toHaveLength(2);
     expect(history.body.data.every((payment) => payment.receiptNumber)).toBe(true);
+    const paymentToReverse = history.body.data.find((payment) => payment.method === "cash");
+    const reversal = await request(`/fees/invoices/${invoice._id}/payments/${paymentToReverse._id}/reverse`, {
+      token: admin.token, method: "PATCH", body: JSON.stringify({ reason: "Duplicate cash receipt entry" }),
+    });
+    expect(reversal.status).toBe(200);
+    expect(reversal.body.data.status).toBe("reversed");
+    expect(reversal.body.data.reversalReason).toBe("Duplicate cash receipt entry");
+    expect(reversal.body.data.reversedAt).toBeTruthy();
+    expect(String(reversal.body.data.reversedBy)).toBe(String(admin.user._id));
+    const adjusted = await FeeInvoice.findById(invoice._id);
+    expect(adjusted.paidAmount).toBe(1000);
+    expect(adjusted.status).toBe("partial");
+    const duplicateReversal = await request(`/fees/invoices/${invoice._id}/payments/${paymentToReverse._id}/reverse`, {
+      token: admin.token, method: "PATCH", body: JSON.stringify({ reason: "Trying to reverse again" }),
+    });
+    expect(duplicateReversal.status).toBe(409);
+    const crossTenant = await request(`/fees/invoices/${invoice._id}/payments/${paymentToReverse._id}/reverse`, {
+      token: otherAdmin.token, method: "PATCH", body: JSON.stringify({ reason: "Cross tenant attempt" }),
+    });
+    expect(crossTenant.status).toBe(404);
+    const updatedHistory = await request(`/fees/invoices/${invoice._id}/payments`, { token: admin.token });
+    expect(updatedHistory.body.data).toHaveLength(2);
+    expect(updatedHistory.body.data.find((payment) => payment._id === paymentToReverse._id).status).toBe("reversed");
   });
 });
