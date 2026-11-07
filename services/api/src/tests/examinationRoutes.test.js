@@ -136,6 +136,34 @@ describe("Examination API integration", () => {
     expect((await request(`/examinations/${id}/status`, { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "scheduled" }) })).status).toBe(200);
   });
 
+  it("requires complete exam times and rejects overlapping subject sessions", async () => {
+    const created = await request("/examinations", {
+      method: "POST", token: adminA.token, body: JSON.stringify(createPayload()),
+    });
+    const id = created.body.data._id;
+    const secondSubject = await Subject.create({
+      tenantId: schoolA._id, name: `English ${randomUUID().slice(0, 5)}`,
+    });
+    const missingTime = await request(`/examinations/${id}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(subjectA._id), examDate: "2026-09-03", startTime: "09:00", maxMarks: 100, passMarks: 35 }),
+    });
+    expect(missingTime.status).toBe(400);
+    expect(missingTime.body.message).toMatch(/both exam start and end/i);
+
+    const first = await request(`/examinations/${id}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(subjectA._id), examDate: "2026-09-03", startTime: "09:00", endTime: "10:00", maxMarks: 100, passMarks: 35 }),
+    });
+    expect(first.status).toBe(201);
+    const overlap = await request(`/examinations/${id}/subjects`, {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ subjectId: String(secondSubject._id), examDate: "2026-09-03", startTime: "09:45", endTime: "10:30", maxMarks: 100, passMarks: 35 }),
+    });
+    expect(overlap.status).toBe(409);
+    expect(overlap.body.message).toMatch(/overlaps another subject/i);
+  });
+
   it("rejects invalid subject mark ranges and lifecycle skips", async () => {
     const created = await request("/examinations", { method: "POST", token: adminA.token, body: JSON.stringify(createPayload()) });
     const id = created.body.data._id;
