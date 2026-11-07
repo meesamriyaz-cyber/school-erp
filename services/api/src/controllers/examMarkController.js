@@ -38,6 +38,8 @@ export const listExaminationMarks = async (req, res, next) => {
     const exam = await Examination.findOne({ _id: req.params.examinationId, tenantId: req.tenantId }).lean();
     if (!exam) return res.status(404).json({ success: false, message: "Examination not found" });
     const filter = { tenantId: req.tenantId, examinationId: exam._id };
+    let teacherAssignments = null;
+    let examSubjectMap = null;
     if (req.query.examSubjectId !== undefined) {
       if (!validId(req.query.examSubjectId)) return invalid(res, "Invalid examination subject ID");
       filter.examSubjectId = req.query.examSubjectId;
@@ -54,6 +56,8 @@ export const listExaminationMarks = async (req, res, next) => {
         subjectId: { $in: subjectConfigs.map((item) => item.subjectId) },
         ...(exam.sectionId ? { $or: [{ sectionId: exam.sectionId }, { sectionId: null }] } : {}),
       }).lean();
+      teacherAssignments = assigned;
+      examSubjectMap = new Map(subjectConfigs.map((item) => [String(item._id), String(item.subjectId)]));
       const allowedSubjectIds = [...new Set(assigned.map((item) => String(item.subjectId)))];
       const allowedConfigs = subjectConfigs
         .filter((item) => allowedSubjectIds.includes(String(item.subjectId)))
@@ -73,6 +77,18 @@ export const listExaminationMarks = async (req, res, next) => {
       .populate("studentId", "admissionNumber firstName lastName")
       .populate("examSubjectId", "subjectId maxMarks passMarks")
       .sort({ createdAt: 1, _id: 1 }).lean();
+    if (teacherAssignments) {
+      const enrollmentIds = [...new Set(data.map((item) => String(item.enrollmentId)))];
+      const enrollments = await Enrollment.find({
+        tenantId: req.tenantId, _id: { $in: enrollmentIds },
+        academicYearId: exam.academicYearId, classId: exam.classId,
+      }).select("_id sectionId").lean();
+      const enrollmentSections = new Map(enrollments.map((item) => [String(item._id), String(item.sectionId || "")]));
+      const scoped = data.filter((item) => teacherAssignments.some((assignment) =>
+        String(assignment.subjectId) === examSubjectMap.get(String(item.examSubjectId?._id || item.examSubjectId)) &&
+        (!assignment.sectionId || String(assignment.sectionId) === enrollmentSections.get(String(item.enrollmentId)))));
+      return res.status(200).json({ success: true, data: scoped });
+    }
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };
