@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { guardianFind, linkFindOne, linkExists, guardianCreate, linkCreate } = vi.hoisted(() => ({
-  guardianFind: vi.fn(), linkFindOne: vi.fn(), linkExists: vi.fn(), guardianCreate: vi.fn(), linkCreate: vi.fn(),
+const { guardianFind, guardianFindOne, linkFindOne, linkExists, guardianCreate, linkCreate } = vi.hoisted(() => ({
+  guardianFind: vi.fn(), guardianFindOne: vi.fn(), linkFindOne: vi.fn(), linkExists: vi.fn(), guardianCreate: vi.fn(), linkCreate: vi.fn(),
 }));
-vi.mock("../models/Guardian.js", () => ({ default: { find: guardianFind, create: guardianCreate } }));
+vi.mock("../models/Guardian.js", () => ({ default: { find: guardianFind, findOne: guardianFindOne, create: guardianCreate } }));
 vi.mock("../models/StudentGuardian.js", () => ({ default: { findOne: linkFindOne, exists: linkExists, create: linkCreate } }));
 
 import { previewLegacyStudentGuardian, syncLegacyStudentGuardian } from "../services/syncLegacyStudentGuardian.js";
@@ -40,6 +40,16 @@ describe("legacy guardian normalization", () => {
   it("reports an existing guardian match", async () => {
     guardianFind.mockReturnValue(query([{ _id: "guardian-1", phone: "9999999999", email: "amina@example.test" }]));
     await expect(previewLegacyStudentGuardian(student())).resolves.toMatchObject({ status: "matched", guardianId: "guardian-1" });
+  });
+
+  it("reuses the existing linked guardian for name-only legacy records on repeated syncs", async () => {
+    const linkedGuardian = { _id: "guardian-existing", firstName: "Amina" };
+    const link = { guardianId: "guardian-existing", status: "active" };
+    linkFindOne.mockResolvedValue(link);
+    guardianFindOne.mockReturnValue({ lean: vi.fn().mockResolvedValue(linkedGuardian), session: vi.fn().mockReturnThis() });
+    await expect(previewLegacyStudentGuardian(student({ guardianPhone: null, guardianEmail: null })))
+      .resolves.toMatchObject({ status: "matched", guardianId: "guardian-existing" });
+    expect(guardianFind).not.toHaveBeenCalled();
   });
 
   it("deactivates only legacy-derived links when legacy fields are cleared", async () => {

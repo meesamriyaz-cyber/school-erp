@@ -2,7 +2,7 @@ import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 
 const splitGuardianName = (value = "") => {
-  const parts = value.trim().split(/\\s+/).filter(Boolean);
+  const parts = value.trim().split(/\s+/).filter(Boolean);
   return { firstName: parts.shift() || "", lastName: parts.join(" ") };
 };
 
@@ -55,7 +55,15 @@ export const previewLegacyStudentGuardian = async (student) => {
   if (!hasLegacyGuardianDetails(student)) return { status: "skipped", reason: "no_legacy_details" };
   const details = buildDetails(student);
   try {
-    const guardian = await resolveIdentity(student.tenantId, details);
+    let guardian = await resolveIdentity(student.tenantId, details);
+    if (!guardian && !details.phone && !details.email) {
+      const link = await StudentGuardian.findOne({
+        tenantId: student.tenantId,
+        studentId: student._id,
+        source: { $in: ["legacy_student", "manual_and_legacy"] },
+      });
+      if (link) guardian = await Guardian.findOne({ _id: link.guardianId, tenantId: student.tenantId }).lean();
+    }
     return { status: guardian ? "matched" : "new_guardian", guardianId: guardian?._id || null };
   } catch (error) {
     if (error.code === "GUARDIAN_IDENTITY_CONFLICT") {
@@ -89,6 +97,11 @@ export const syncLegacyStudentGuardian = async (student, { session } = {}) => {
 
   const details = buildDetails(student);
   let guardian = await resolveIdentity(tenantId, details, session);
+  if (!guardian && !details.phone && !details.email && existingLink) {
+    let linkedGuardianQuery = Guardian.findOne({ _id: existingLink.guardianId, tenantId });
+    if (session) linkedGuardianQuery = linkedGuardianQuery.session(session);
+    guardian = await linkedGuardianQuery;
+  }
   if (!guardian) {
     const [created] = await Guardian.create([{ tenantId, ...details }], { session });
     guardian = created;
