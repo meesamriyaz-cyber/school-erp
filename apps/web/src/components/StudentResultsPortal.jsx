@@ -201,10 +201,14 @@ export default function StudentResultsPortal() {
               <div className="report-student">
                 <div><span>Student</span><strong>{[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</strong></div>
                 <div><span>Admission No.</span><strong>{item.student?.admissionNumber || "—"}</strong></div>
+                <div><span>Academic year</span><strong>{item.examination.academicYear?.name || "—"}</strong></div>
+                <div><span>Class</span><strong>{item.examination.class?.name || "—"}</strong></div>
+                <div><span>Section</span><strong>{item.examination.section?.name || "All sections"}</strong></div>
+                <div><span>Examination period</span><strong>{formatDate(item.examination.startDate)} – {formatDate(item.examination.endDate)}</strong></div>
               </div>
               <div className="report-table-wrap">
                 <table className="report-table">
-                  <thead><tr><th>Subject</th><th>Maximum</th><th>Pass mark</th><th>Marks obtained</th><th>Status</th></tr></thead>
+                  <thead><tr><th>Subject</th><th>Maximum</th><th>Pass mark</th><th>Marks obtained</th><th>Status</th><th>Remarks</th></tr></thead>
                   <tbody>
                     {item.result.subjects.map((subject) => (
                       <tr key={String(subject.examSubjectId)}>
@@ -213,6 +217,7 @@ export default function StudentResultsPortal() {
                         <td>{subject.passMarks}</td>
                         <td>{subject.absent ? "Absent" : subject.marksObtained ?? "—"}</td>
                         <td><span className={"result-status status-" + subject.status}>{subject.status}</span></td>
+                        <td>{subject.remarks || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
