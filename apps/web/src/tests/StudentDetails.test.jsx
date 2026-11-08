@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import StudentDetails from "../components/StudentDetails.jsx";
 import { apiRequest } from "../lib/api.js";
+import { useAuth } from "../context/authContext.js";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../lib/api.js", () => ({
@@ -10,7 +11,7 @@ vi.mock("../lib/api.js", () => ({
 }));
 
 vi.mock("../context/authContext.js", () => ({
-  useAuth: () => ({ accessToken: "test-access-token" }),
+  useAuth: vi.fn(),
 }));
 
 
@@ -37,6 +38,7 @@ vi.mock("../components/EditStudentForm.jsx", () => ({
 describe("StudentDetails", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    useAuth.mockReturnValue({ accessToken: "test-access-token", user: { role: "school_admin" } });
     apiRequest.mockResolvedValue({ success: true, data: [] });
   });
 
@@ -132,6 +134,24 @@ it("opens the edit form for the loaded student", async () => {
 
   expect(await screen.findByRole("heading", { name: "Edit form opened" }))
     .toBeInTheDocument();
+});
+
+it("does not expose student editing controls to teachers", async () => {
+  useAuth.mockReturnValue({ accessToken: "test-access-token", user: { role: "teacher" } });
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      _id: "student-readonly",
+      firstName: "Ayaan",
+      lastName: "Khan",
+      admissionNumber: "ADM-READONLY",
+      status: "active",
+    },
+  });
+
+  render(<StudentDetails studentId="student-readonly" onBack={vi.fn()} />);
+  expect(await screen.findByRole("heading", { name: /Ayaan Khan/ })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Edit Student" })).not.toBeInTheDocument();
 });
 
 it("updates the displayed student details after saving edits", async () => {
