@@ -60,15 +60,23 @@ export default function GradingScaleManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadScales(controller.signal)
+    apiRequest("/grading-scales", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!response?.success || !Array.isArray(response.data)) {
+          throw new Error("Unable to load grading scales.");
+        }
+        if (!controller.signal.aborted) setScales(response.data);
+      })
       .catch((err) => {
-        if (err.name !== "AbortError") setError(err.message || "Unable to load grading scales.");
+        if (!controller.signal.aborted && err.name !== "AbortError") {
+          setError(err.message || "Unable to load grading scales.");
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [loadScales]);
+  }, [accessToken]);
 
   const startNew = () => {
     setEditingId("");
