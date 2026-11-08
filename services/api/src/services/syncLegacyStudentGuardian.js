@@ -71,7 +71,12 @@ export const previewLegacyStudentGuardian = async (student) => {
  * Synchronizes the guardian captured on the student profile as the active primary
  * guardian. Caller must pass a transaction session.
  */
-export const syncLegacyStudentGuardian = async (student, { session } = {}) => {
+const appendRelationshipAudit = (record, { action, actorUserId, changes = [] }) => {
+  record.auditTrail.push({ action, actorUserId: actorUserId || null, changes, changedAt: new Date() });
+  if (record.auditTrail.length > 50) record.auditTrail.splice(0, record.auditTrail.length - 50);
+};
+
+export const syncLegacyStudentGuardian = async (student, { session, actorUserId = null } = {}) => {
   if (!hasLegacyGuardianDetails(student)) {
     const error = new Error("A primary guardian name is required for every student");
     error.code = "PRIMARY_GUARDIAN_REQUIRED";
@@ -105,17 +110,44 @@ export const syncLegacyStudentGuardian = async (student, { session } = {}) => {
   const existingPair = await pairQuery;
 
   // Demote any previous primary before promoting/reaffirming this guardian.
-  await StudentGuardian.updateMany(
-    { tenantId, studentId, status: "active", isPrimary: true, ...(existingPair ? { _id: { $ne: existingPair._id } } : {}) },
-    { $set: { isPrimary: false } },
-    { session },
-  );
+  let previousPrimariesQuery = StudentGuardian.find({
+    tenantId, studentId, status: "active", isPrimary: true,
+    ...(existingPair ? { _id: { $ne: existingPair._id } } : {}),
+  });
+  if (session) previousPrimariesQuery = previousPrimariesQuery.session(session);
+  const previousPrimaries = await previousPrimariesQuery;
+  for (const previous of previousPrimaries) {
+    previous.isPrimary = false;
+    appendRelationshipAudit(previous, {
+      action: "primary_demoted",
+      actorUserId,
+      changes: [{ field: "isPrimary", from: true, to: false }],
+    });
+    await previous.save({ session });
+  }
 
   if (existingPair) {
+    const changes = [];
+    if (existingPair.relationship !== relationshipType) {
+      changes.push({ field: "relationship", from: existingPair.relationship, to: relationshipType });
+    }
+    if (existingPair.status !== "active") {
+      changes.push({ field: "status", from: existingPair.status, to: "active" });
+    }
+    if (!existingPair.isPrimary) {
+      changes.push({ field: "isPrimary", from: false, to: true });
+    }
     existingPair.relationship = relationshipType;
     existingPair.status = "active";
     existingPair.isPrimary = true;
     if (existingPair.source === "manual") existingPair.source = "manual_and_legacy";
+    if (changes.length) {
+      appendRelationshipAudit(existingPair, {
+        action: changes.some((change) => change.field === "isPrimary") ? "primary_promoted" : "updated",
+        actorUserId,
+        changes,
+      });
+    }
     await existingPair.save({ session });
     return { guardian, relationship: existingPair };
   }
@@ -123,6 +155,15 @@ export const syncLegacyStudentGuardian = async (student, { session } = {}) => {
   const [relationship] = await StudentGuardian.create([{
     tenantId, studentId, guardianId: guardian._id, relationship: relationshipType,
     source: "legacy_student", isPrimary: true, receivesCommunication: true,
+    auditTrail: [{
+      action: "created",
+      actorUserId,
+      changes: [
+        { field: "relationship", from: null, to: relationshipType },
+        { field: "isPrimary", from: null, to: true },
+      ],
+      changedAt: new Date(),
+    }],
   }], { session });
   return { guardian, relationship };
 };
