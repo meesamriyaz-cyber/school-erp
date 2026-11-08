@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import User from "../models/User.js";
+import Tenant from "../models/Tenant.js";
 import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
@@ -85,6 +86,9 @@ export const getMyPublishedResults = async (req, res, next) => {
     }
 
     if (!students.length) return res.status(200).json({ success: true, data: [] });
+    const school = await Tenant.findOne({ _id: req.tenantId, status: "active" })
+      .select("name contactEmail")
+      .lean();
     const enrollments = await Enrollment.find({
       tenantId: req.tenantId,
       studentId: { $in: students.map((student) => student._id) },
@@ -133,6 +137,7 @@ export const getMyPublishedResults = async (req, res, next) => {
             class: exam.classId,
             section: exam.sectionId,
           },
+          school: school ? { name: school.name, contactEmail: school.contactEmail } : null,
           student,
           result,
         });
