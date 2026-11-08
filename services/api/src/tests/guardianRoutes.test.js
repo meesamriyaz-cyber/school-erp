@@ -726,9 +726,40 @@ describe("Guardian API integration tests", () => {
     });
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
+    expect(first.body.data.auditTrail).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "created", actorUserId: String(adminA.user._id) }),
+      expect.objectContaining({ action: "primary_demoted", actorUserId: String(adminA.user._id) }),
+    ]));
+    expect(second.body.data.auditTrail).toEqual(expect.arrayContaining([
+      expect.objectContaining({ action: "created", actorUserId: String(adminA.user._id) }),
+    ]));
     const relationships = await request(`/students/${student._id}/guardians`, { token: adminA.token });
     expect(relationships.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
     expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianTwo._id)).isPrimary).toBe(true);
+  });
+
+  it("restores a missing primary when a new active guardian relationship is added", async () => {
+    const student = await createStudent(adminA.token);
+    await StudentGuardian.updateMany(
+      { tenantId: schoolA._id, studentId: student._id, status: "active", isPrimary: true },
+      { $set: { isPrimary: false } },
+    );
+    const guardian = await createGuardian(adminA.token);
+    const response = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ guardianId: String(guardian._id), relationship: "uncle", isPrimary: false }),
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.data.isPrimary).toBe(true);
+    expect(response.body.data.auditTrail).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "created",
+        changes: expect.arrayContaining([expect.objectContaining({ field: "isPrimary", from: null, to: true })]),
+      }),
+    ]));
+    const links = await request(`/students/${student._id}/guardians`, { token: adminA.token });
+    expect(links.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
   });
 
   it("rejects an unsupported relationship type", async () => {
