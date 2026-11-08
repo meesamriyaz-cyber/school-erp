@@ -16,7 +16,7 @@ const linkAccount = async ({ req, res, Model, idParam, expectedRole, label, requ
   const recordId = req.params[idParam];
   const userId = req.body?.userId;
   if (!validId(recordId) || !validId(userId)) return invalid(res, "A valid record ID and userId are required");
-  const record = await Model.findOne({ _id: recordId, tenantId: req.tenantId }).lean();
+  const record = await Model.findOne({ _id: recordId, tenantId: req.tenantId, status: "active" }).lean();
   if (!record) return res.status(404).json({ success: false, message: `${label} not found` });
   const user = await User.findOne({
     _id: userId, tenantId: req.tenantId, role: expectedRole, status: "active",
