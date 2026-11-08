@@ -1041,6 +1041,14 @@ describe("Guardian API integration tests", () => {
     );
     expect(details.body.data.linkedStudents[0].relationship).toBe("uncle");
     expect(details.body.data.linkedStudents[0].isPrimary).toBe(true);
+    const studentLinks = await request(`/students/${student._id}/guardians`, { token: adminA.token });
+    expect(studentLinks.body.data[0].auditTrail).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "created",
+        actorUserId: String(adminA.user._id),
+        changes: expect.arrayContaining([expect.objectContaining({ field: "isPrimary", from: null, to: true })]),
+      }),
+    ]));
   });
 
 });
