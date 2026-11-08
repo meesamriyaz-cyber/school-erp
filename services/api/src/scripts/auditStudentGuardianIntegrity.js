@@ -27,13 +27,14 @@ const run = async () => {
   await mongoose.connect(getAuditMongoUri());
   try {
     const [students, guardians, relationships] = await Promise.all([
-      Student.find({ status: "active" }).select("_id tenantId admissionNumber").lean(),
+      Student.find({}).select("_id tenantId admissionNumber status").lean(),
       Guardian.find({}).select("_id tenantId status").lean(),
       StudentGuardian.find({}).select("_id tenantId studentId guardianId status isPrimary").lean(),
     ]);
 
     const guardianById = new Map(guardians.map((guardian) => [String(guardian._id), guardian]));
     const studentById = new Map(students.map((student) => [String(student._id), student]));
+    const activeStudents = students.filter((student) => student.status === "active");
     const linksByStudent = new Map();
     const exceptions = {
       activeStudentsWithoutPrimary: [],
@@ -55,7 +56,7 @@ const run = async () => {
           tenantId: String(relationship.tenantId),
           studentId: String(relationship.studentId),
           guardianId: String(relationship.guardianId),
-          studentIssue: !student ? "missing_or_inactive_student" : !studentTenantMatches ? "tenant_mismatch" : null,
+          studentIssue: !student ? "missing_student" : !studentTenantMatches ? "tenant_mismatch" : null,
           guardianIssue: !guardian ? "missing_guardian" : !guardianTenantMatches ? "tenant_mismatch" : null,
         });
       }
@@ -75,7 +76,7 @@ const run = async () => {
       }
     }
 
-    for (const student of students) {
+    for (const student of activeStudents) {
       const studentLinks = linksByStudent.get(String(student._id)) || [];
       const activePrimaries = studentLinks.filter(({ relationship }) =>
         relationship.status === "active" && relationship.isPrimary === true,
@@ -114,7 +115,8 @@ const run = async () => {
     console.log("Guardian integrity audit target: MONGO_TEST_URI (test database)");
     console.log(JSON.stringify({
       readOnly: true,
-      activeStudentsChecked: students.length,
+      studentsChecked: students.length,
+      activeStudentsChecked: activeStudents.length,
       guardiansChecked: guardians.length,
       relationshipsChecked: relationships.length,
       summary,
