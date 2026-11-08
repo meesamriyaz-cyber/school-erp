@@ -882,6 +882,7 @@ describe("Guardian API integration tests", () => {
       phone: guardian.phone,
       email: guardian.email,
     });
+    expect(linkedGuardian.auditTrail).toBeUndefined();
   });
 
   it("prevents a teacher from creating a student-guardian link", async () => {
