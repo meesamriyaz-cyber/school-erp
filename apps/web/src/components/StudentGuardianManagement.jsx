@@ -99,6 +99,8 @@ export default function StudentGuardianManagement({
   }, [studentId, accessToken, refreshKey]);
 
   const refresh = () => setRefreshKey((value) => value + 1);
+  const linkedGuardianIds = new Set(links.map((link) => String(link.guardianId?._id || link.guardianId)));
+  const availableGuardians = guardians.filter((guardian) => !linkedGuardianIds.has(String(guardian._id)));
 
   const handleAddGuardian = async (event) => {
     event.preventDefault();
@@ -257,11 +259,14 @@ export default function StudentGuardianManagement({
               onChange={(event) => setSelectedGuardianId(event.target.value)}
             >
               <option value="__new__">Create a new guardian</option>
-              {guardians.map((guardian) => (
+              {availableGuardians.map((guardian) => (
                 <option key={guardian._id} value={guardian._id}>
                   {guardianName(guardian)}{guardian.phone ? ` · ${guardian.phone}` : ""}
                 </option>
               ))}
+              {availableGuardians.length === 0 && (
+                <option value="" disabled>No unlinked active guardians available</option>
+              )}
             </select>
           </label>
 
@@ -407,6 +412,20 @@ export default function StudentGuardianManagement({
                       </button>
                     </div>
                   </form>
+                )}
+
+                {Array.isArray(link.auditTrail) && link.auditTrail.length > 0 && (
+                  <details className="student-guardian-audit">
+                    <summary>Relationship history ({link.auditTrail.length})</summary>
+                    <ol>
+                      {link.auditTrail.slice().reverse().map((entry, index) => (
+                        <li key={`${entry.changedAt || entry.action}-${index}`}>
+                          <span>{String(entry.action || "updated").replaceAll("_", " ")}</span>
+                          <time dateTime={entry.changedAt}>{entry.changedAt ? new Date(entry.changedAt).toLocaleString("en-IN") : "Date unavailable"}</time>
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
                 )}
 
                 {canManage && !isEditing && (
