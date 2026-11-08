@@ -108,26 +108,7 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     expect(denied.status).toBe(403);
     const crossTenant = await request(`/academic-terms?academicYearId=${year._id}`, { token: otherAdmin.token });
     expect(crossTenant.status).toBe(404);
-    const capacityStudent = await Student.create({
-      tenantId: school._id, admissionNumber: `CAP-${randomUUID().slice(0, 6)}`, firstName: "Capacity", status: "active",
-    });
-    await Enrollment.create({
-      tenantId: school._id, studentId: capacityStudent._id, academicYearId: year._id,
-      classId: classB._id, sectionId: sectionB._id, enrollmentDate: new Date("2026-04-01"), status: "active",
-    });
-    const secondSourceStudent = await Student.create({
-      tenantId: school._id, admissionNumber: `SRC-${randomUUID().slice(0, 6)}`, firstName: "Second", status: "active",
-    });
-    const secondSource = await Enrollment.create({
-      tenantId: school._id, studentId: secondSourceStudent._id, academicYearId: year._id,
-      classId: classA._id, sectionId: sectionA._id, enrollmentDate: new Date("2026-04-01"), status: "active",
-    });
-    const fullTarget = await request(`/enrollments/${secondSource._id}/transfer`, { token: admin.token, method: "PATCH", body: JSON.stringify({
-      targetClassId: String(classB._id), targetSectionId: String(sectionB._id), reason: "Capacity check",
-    }) });
-    expect(fullTarget.status).toBe(409);
-    expect((await Enrollment.findById(secondSource._id).lean()).status).toBe("active");
-    expect(await EnrollmentTransferAudit.exists({ tenantId: school._id, fromEnrollmentId: secondSource._id })).toBeNull();
+
   });
 
   it("maps subjects to a class curriculum and freezes that curriculum on examinations", async () => {
@@ -147,6 +128,10 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
       subjectId: String(subject._id), category: "compulsory", weeklyPeriods: 5, sortOrder: 1, status: "inactive",
     }) });
     expect(deactivatedMapping.status).toBe(200);
+    const curriculumHistory = await request(`/class-subjects?academicYearId=${year._id}&classId=${classA._id}`, { token: admin.token });
+    expect(curriculumHistory.status).toBe(200);
+    expect(curriculumHistory.body.data[0].revision).toBe(2);
+    expect(curriculumHistory.body.data[0].history).toHaveLength(1);
     const historicalExam = await request(`/examinations/${exam.body.data._id}`, { token: admin.token });
     expect(historicalExam.body.data.curriculumSnapshot).toHaveLength(1);
     const attendanceSaved = await request("/attendance", { token: admin.token, method: "PUT", body: JSON.stringify({
@@ -187,6 +172,26 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
       targetClassId: String(classA._id), reason: "Should not cross tenants",
     }) });
     expect(crossTenant.status).toBe(404);
+    const capacityStudent = await Student.create({
+      tenantId: school._id, admissionNumber: `CAP-${randomUUID().slice(0, 6)}`, firstName: "Capacity", status: "active",
+    });
+    await Enrollment.create({
+      tenantId: school._id, studentId: capacityStudent._id, academicYearId: year._id,
+      classId: classB._id, sectionId: sectionB._id, enrollmentDate: new Date("2026-04-01"), status: "active",
+    });
+    const secondSourceStudent = await Student.create({
+      tenantId: school._id, admissionNumber: `SRC-${randomUUID().slice(0, 6)}`, firstName: "Second", status: "active",
+    });
+    const secondSource = await Enrollment.create({
+      tenantId: school._id, studentId: secondSourceStudent._id, academicYearId: year._id,
+      classId: classA._id, sectionId: sectionA._id, enrollmentDate: new Date("2026-04-01"), status: "active",
+    });
+    const fullTarget = await request(`/enrollments/${secondSource._id}/transfer`, { token: admin.token, method: "PATCH", body: JSON.stringify({
+      targetClassId: String(classB._id), targetSectionId: String(sectionB._id), reason: "Capacity check",
+    }) });
+    expect(fullTarget.status).toBe(409);
+    expect((await Enrollment.findById(secondSource._id).lean()).status).toBe("active");
+    expect(await EnrollmentTransferAudit.exists({ tenantId: school._id, fromEnrollmentId: secondSource._id })).toBeNull();
   });
   it("requires a reason and preserves lineage when re-admitting a withdrawn student", async () => {
     const returningStudent = await Student.create({

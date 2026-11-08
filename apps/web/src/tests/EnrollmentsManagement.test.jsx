@@ -227,6 +227,30 @@ describe("EnrollmentsManagement", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("Student transferred within the school.");
   });
 
+  it("shows the immutable reason and previous/next placement in transfer history", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation(async (path) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [enrollment] };
+      if (path === "/enrollments/enrollment-a/transfers") return { success: true, data: [{
+        _id: "transfer-a", reason: "Approved academic reassignment", transferredAt: "2026-05-01T00:00:00.000Z",
+        previousPlacement: { classId: { name: "Class 1" }, sectionId: { name: "A" } },
+        nextPlacement: { classId: { name: "Class 2" }, sectionId: { name: "B" } },
+        changedBy: { firstName: "School", lastName: "Admin" },
+      }] };
+      return { success: true, data: [] };
+    });
+    render(<EnrollmentsManagement />);
+    await screen.findByText("Ayaan Khan");
+    await user.click(screen.getByRole("button", { name: "Transfer history" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Approved academic reassignment");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Class 1 · A → Class 2 · B");
+    expect(screen.getByRole("dialog")).toHaveTextContent("School Admin");
+  });
+
   it("prevents duplicate termination requests while one is pending", async () => {
     const user = userEvent.setup();
     let resolveTermination;

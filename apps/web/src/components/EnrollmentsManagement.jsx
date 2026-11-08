@@ -55,6 +55,8 @@ export default function EnrollmentsManagement() {
   const [transferSectionId, setTransferSectionId] = useState("");
   const [transferReason, setTransferReason] = useState("");
   const [transferring, setTransferring] = useState(false);
+  const [transferHistory, setTransferHistory] = useState(null);
+  const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
   const [endingEnrollment, setEndingEnrollment] = useState(false);
   const endingEnrollmentRef = useRef(false);
 
@@ -239,6 +241,16 @@ export default function EnrollmentsManagement() {
     finally { setTransferring(false); }
   };
 
+  const loadTransferHistory = async (enrollment) => {
+    setLoadingTransferHistory(true); setError("");
+    try {
+      const response = await apiRequest(`/enrollments/${enrollment._id}/transfers`, { accessToken });
+      if (!response?.success || !Array.isArray(response.data)) throw new Error("Unable to load transfer history.");
+      setTransferHistory({ student: enrollment.studentId, records: response.data });
+    } catch (err) { setError(err.message || "Unable to load transfer history."); }
+    finally { setLoadingTransferHistory(false); }
+  };
+
   const confirmEndEnrollment = async () => {
     if (!pendingEnrollment || endingEnrollmentRef.current) return;
     endingEnrollmentRef.current = true;
@@ -310,6 +322,15 @@ export default function EnrollmentsManagement() {
       <div className="enrollment-form-actions"><button className="enrollment-button secondary" type="button" onClick={() => setFormOpen(false)}>Cancel</button><button className="enrollment-button primary" type="submit" disabled={saving || !canCreate}>{saving ? "Saving…" : "Create enrollment"}</button></div>
     </form>}
 
+    {transferHistory && <div className="enrollment-confirm" role="dialog" aria-labelledby="transfer-history-title">
+      <div><h3 id="transfer-history-title">Transfer history — {displayName(transferHistory.student)}</h3><p>Recorded within-school class and section changes.</p></div>
+      {loadingTransferHistory ? <p role="status">Loading transfer history…</p> : transferHistory.records.length ? <ol className="transfer-history-list">{transferHistory.records.map((record) => <li key={record._id}>
+        <strong>{record.previousPlacement?.classId?.name || "Previous class"}{record.previousPlacement?.sectionId?.name ? ` · ${record.previousPlacement.sectionId.name}` : ""} → {record.nextPlacement?.classId?.name || "New class"}{record.nextPlacement?.sectionId?.name ? ` · ${record.nextPlacement.sectionId.name}` : ""}</strong>
+        <p>{record.reason}</p><small>{formatDate(record.transferredAt)} · {displayName(record.changedBy)}</small>
+      </li>)}</ol> : <p>No within-school transfers have been recorded for this student.</p>}
+      <div className="enrollment-form-actions"><button type="button" className="enrollment-button secondary" onClick={() => setTransferHistory(null)}>Close</button></div>
+    </div>}
+
     {pendingTransfer && <form className="enrollment-form" onSubmit={confirmTransfer}>
       <div><h3>Transfer {displayName(pendingTransfer.studentId)} within this school</h3><p>The current placement will be retained in history and a new active placement will be created atomically.</p></div>
       <label>Target class<select required value={transferClassId} onChange={(event) => { setTransferClassId(event.target.value); setTransferSectionId(""); setTransferSections([]); }}><option value="">Select class</option>{classes.filter((item) => item.status === "active").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
@@ -328,15 +349,15 @@ export default function EnrollmentsManagement() {
         : !selectedYear ? <div className="enrollments-empty"><h3>No academic years available</h3><p>Create an academic year before managing enrollments.</p></div>
           : loadingEnrollments ? <p className="enrollments-empty" role="status">Loading enrollment history…</p>
             : enrollments.length === 0 && !error ? <div className="enrollments-empty"><h3>No enrollments for {selectedYear.name}</h3><p>{selectedYear.status === "active" && canManage ? "Enroll a student to assign their current class and section." : "No enrollment history exists for this academic year."}</p></div>
-              : <div className="enrollments-table-wrap"><table className="enrollments-table"><thead><tr><th>Student</th><th>Admission no.</th><th>Class</th><th>Section</th><th>Enrolled on</th><th>Status</th>{canManage && <th>Actions</th>}</tr></thead><tbody>
+              : <div className="enrollments-table-wrap"><table className="enrollments-table"><thead><tr><th>Student</th><th>Admission no.</th><th>Class</th><th>Section</th><th>Enrolled on</th><th>Admission type</th><th>Status</th>{canManage && <th>Actions</th>}</tr></thead><tbody>
                 {enrollments.map((item) => <tr key={item._id}>
-                  <td><strong>{displayName(item.studentId)}</strong></td><td>{item.studentId?.admissionNumber || "—"}</td><td>{item.classId?.name || "—"}</td><td>{item.sectionId?.name || "—"}</td><td>{formatDate(item.enrollmentDate)}</td>
+                  <td><strong>{displayName(item.studentId)}</strong></td><td>{item.studentId?.admissionNumber || "—"}</td><td>{item.classId?.name || "—"}</td><td>{item.sectionId?.name || "—"}</td><td>{formatDate(item.enrollmentDate)}</td><td><span>{item.admissionType || "initial"}</span>{item.reAdmissionReason && <small title={item.reAdmissionReason}>Re-admission: {item.reAdmissionReason}</small>}</td>
                   <td><span className={`enrollment-status status-${item.status}`}>{item.status}</span></td>
                   {canManage && <td>{item.status === "active" ? <div className="enrollment-row-actions">
                     <button type="button" className="enrollment-text-button" onClick={() => setPendingEnrollment({ enrollment: item, status: "completed" })}>Complete</button>
                     <button type="button" className="enrollment-text-button" onClick={() => { setPendingTransfer(item); setTransferClassId(item.classId?._id || ""); setTransferSectionId(item.sectionId?._id || ""); setTransferReason(""); }}>Move class/section</button>
                     <button type="button" className="enrollment-text-button danger" onClick={() => setPendingEnrollment({ enrollment: item, status: "withdrawn" })}>Withdraw</button>
-                  </div> : <span>—</span>}</td>}
+                  </div> : <span>—</span>}<button type="button" className="enrollment-text-button" onClick={() => void loadTransferHistory(item)}>Transfer history</button></td>}
                 </tr>)}
               </tbody></table></div>}
     </div>

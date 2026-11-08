@@ -19,7 +19,9 @@ export const listClassSubjects = async (req, res, next) => {
     ]);
     if (!year || !schoolClass) return res.status(404).json({ success: false, message: "Academic class scope not found" });
     const data = await ClassSubject.find({ tenantId: req.tenantId, academicYearId, classId })
-      .populate("subjectId", "name code category status").sort({ sortOrder: 1, _id: 1 }).lean();
+      .populate("subjectId", "name code category status")
+      .populate("history.changedBy", "firstName lastName")
+      .sort({ sortOrder: 1, _id: 1 }).lean();
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };

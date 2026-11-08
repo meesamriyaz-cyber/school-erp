@@ -29,7 +29,6 @@ export const getAttendanceRoster = async (req, res, next) => {
     const day = parseDay(date);
     if (!day) return invalid(res, "Provide a valid attendance date in YYYY-MM-DD format");
     if (!validId(academicYearId) || !validId(classId)) return invalid(res, "Academic year and class are required");
-    if (academicTermId !== null && !validId(academicTermId)) return invalid(res, "Invalid academic term ID");
     if (sectionId !== undefined && sectionId !== "none" && !validId(sectionId)) return invalid(res, "Invalid section ID");
 
     const year = await AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId }).select("startDate endDate status").lean();
