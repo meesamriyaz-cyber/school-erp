@@ -141,11 +141,12 @@ export default function GradingScaleManagement() {
     setError("");
     setNotice("");
     try {
-      await apiRequest(`/grading-scales/${scale._id}/status`, {
+      const response = await apiRequest(`/grading-scales/${scale._id}/status`, {
         method: "PATCH",
         accessToken,
         body: { status },
       });
+      if (!response?.success) throw new Error(`The server did not ${status} the grading scale.`);
       await loadScales();
       if (editingId === scale._id) {
         setEditingId("");
