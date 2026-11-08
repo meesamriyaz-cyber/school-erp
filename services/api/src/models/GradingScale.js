@@ -55,9 +55,38 @@ const gradingScaleSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator(bands) {
-          return Array.isArray(bands) && bands.length > 0;
+          if (!Array.isArray(bands) || bands.length === 0) return false;
+
+          const normalizedGrades = bands.map((band) =>
+            band.grade?.trim().toLocaleLowerCase()
+          );
+          if (
+            normalizedGrades.some((grade) => !grade) ||
+            new Set(normalizedGrades).size !== normalizedGrades.length
+          ) return false;
+
+          const orderedBands = [...bands].sort(
+            (a, b) => a.minPercentage - b.minPercentage
+          );
+          if (orderedBands.some((band) =>
+            !Number.isFinite(band.minPercentage) ||
+            !Number.isFinite(band.maxPercentage) ||
+            band.minPercentage < 0 ||
+            band.maxPercentage > 100 ||
+            band.minPercentage >= band.maxPercentage
+          )) return false;
+
+          if (
+            orderedBands[0].minPercentage !== 0 ||
+            orderedBands[orderedBands.length - 1].maxPercentage !== 100
+          ) return false;
+
+          return orderedBands.every((band, index) =>
+            index === 0 ||
+            band.minPercentage === orderedBands[index - 1].maxPercentage
+          );
         },
-        message: "At least one grading band is required",
+        message: "Grading bands must have unique labels and cover 0 to 100 without gaps, overlaps, or invalid bounds",
       },
     },
     status: {
@@ -80,38 +109,6 @@ const gradingScaleSchema = new mongoose.Schema(
   },
   { timestamps: true, versionKey: false }
 );
-
-gradingScaleSchema.pre("validate", function validateGradingBands() {
-  if (!Array.isArray(this.bands) || this.bands.length === 0) return;
-
-  const normalizedGrades = this.bands.map((band) => band.grade?.trim().toLocaleLowerCase());
-  if (normalizedGrades.some((grade) => !grade) ||
-      new Set(normalizedGrades).size !== normalizedGrades.length) {
-    this.invalidate("bands", "Grade labels must be present and unique within a grading scale");
-  }
-
-  const orderedBands = [...this.bands].sort((a, b) => a.minPercentage - b.minPercentage);
-  if (orderedBands.some((band) =>
-    !Number.isFinite(band.minPercentage) ||
-    !Number.isFinite(band.maxPercentage) ||
-    band.minPercentage >= band.maxPercentage
-  )) {
-    this.invalidate("bands", "Each grading band must have a minimum percentage below its maximum");
-    return;
-  }
-
-  if (orderedBands[0].minPercentage !== 0 ||
-      orderedBands[orderedBands.length - 1].maxPercentage !== 100) {
-    this.invalidate("bands", "Grading bands must cover the complete range from 0 to 100");
-  }
-
-  for (let index = 1; index < orderedBands.length; index += 1) {
-    if (orderedBands[index].minPercentage !== orderedBands[index - 1].maxPercentage) {
-      this.invalidate("bands", "Grading bands must be contiguous without overlaps or gaps");
-      break;
-    }
-  }
-});
 
 // Percentage ranges are [minimum, maximum), except that the final band includes 100.
 gradingScaleSchema.index(
