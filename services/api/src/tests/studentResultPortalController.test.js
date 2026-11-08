@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  tenantFindOne: vi.fn(),
+}));
+
+vi.mock("../models/Tenant.js", () => ({
+  default: { findOne: mocks.tenantFindOne },
+}));
+
+const mocks = vi.hoisted(() => ({
   studentFindOne: vi.fn(),
   studentFind: vi.fn(),
   guardianFindOne: vi.fn(),
@@ -70,6 +78,7 @@ describe("student and parent portal results and homework access", () => {
     };
     next = vi.fn();
     configureParent();
+    mocks.tenantFindOne.mockReturnValue(query({ name: "Test School", contactEmail: "office@example.com" }, ["select"]));
   });
 
   it("limits parent results to active students linked in the same tenant", async () => {
