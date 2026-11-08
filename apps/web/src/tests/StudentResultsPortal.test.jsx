@@ -113,7 +113,7 @@ describe("StudentResultsPortal family overview", () => {
     expect(await screen.findByText("Mid Term")).toBeTruthy();
     expect(screen.getByText("2026-27")).toBeTruthy();
     expect(screen.getByText("Class 5")).toBeTruthy();
-    expect(screen.getByText("A")).toBeTruthy();
+    expect(screen.getByText("A", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Mathematics")).toBeTruthy();
     expect(screen.getByText("Good progress")).toBeTruthy();
   });
