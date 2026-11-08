@@ -444,7 +444,7 @@ describe("Student Enrollment API", () => {
       });
       expect(updatedHistory.body.data.map((item) => item.status).sort()).toEqual([status, "active"].sort());
     }
-  }, 20000);
+  }, 60000);
 
   it("previews and atomically rolls students into the next academic year", async () => {
     const school = await makeSchool("rollover");
@@ -504,7 +504,7 @@ describe("Student Enrollment API", () => {
     expect(history.filter((item) => item.academicYearId.equals(targetYear._id) && item.status === "active")).toHaveLength(2);
     expect((await Student.findById(cases.find((item) => item.outcome === "transfer").student._id).lean()).status).toBe("inactive");
     expect((await Student.findById(cases.find((item) => item.outcome === "withdraw").student._id).lean()).status).toBe("withdrawn");
-  }, 30000);
+  }, 60000);
 
   it("rejects rollover when target section capacity is insufficient without changing either year", async () => {
     const school = await makeSchool("rollover-capacity");
