@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Attendance from "../models/Attendance.js";
 import Enrollment from "../models/Enrollment.js";
 import AcademicYear from "../models/AcademicYear.js";
+import AcademicTerm from "../models/AcademicTerm.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const STATUSES = ["present", "absent", "late", "excused"];
@@ -24,10 +25,11 @@ const teacherAssignmentFilter = async (req, academicYearId, classId, sectionId) 
 
 export const getAttendanceRoster = async (req, res, next) => {
   try {
-    const { date, academicYearId, classId, sectionId } = req.query;
+    const { date, academicYearId, classId, sectionId, academicTermId } = req.query;
     const day = parseDay(date);
     if (!day) return invalid(res, "Provide a valid attendance date in YYYY-MM-DD format");
     if (!validId(academicYearId) || !validId(classId)) return invalid(res, "Academic year and class are required");
+    if (academicTermId !== null && !validId(academicTermId)) return invalid(res, "Invalid academic term ID");
     if (sectionId !== undefined && sectionId !== "none" && !validId(sectionId)) return invalid(res, "Invalid section ID");
 
     const year = await AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId }).select("startDate endDate status").lean();
@@ -36,6 +38,24 @@ export const getAttendanceRoster = async (req, res, next) => {
     if (teacherScope === false) return res.status(403).json({ success: false, message: "You are not assigned to this class or section" });
     if (day < new Date(year.startDate).setUTCHours(0, 0, 0, 0) || day > new Date(year.endDate).setUTCHours(0, 0, 0, 0)) {
       return invalid(res, "Attendance date must fall within the selected academic year");
+    }
+    let term = null;
+    if (academicTermId) {
+      term = await AcademicTerm.findOne({ _id: academicTermId, tenantId: req.tenantId, academicYearId, status: "active" }).select("_id startDate endDate").lean();
+      if (!term) return res.status(409).json({ success: false, message: "Attendance can only be recorded against an active term in this academic year" });
+      if (day < new Date(term.startDate).setUTCHours(0, 0, 0, 0) || day > new Date(term.endDate).setUTCHours(0, 0, 0, 0)) {
+        return invalid(res, "Attendance date must fall within the selected academic term");
+      }
+    }
+
+    let termFilter = {};
+    if (academicTermId !== undefined) {
+      if (!validId(academicTermId)) return invalid(res, "Invalid academic term ID");
+      const term = await AcademicTerm.findOne({ _id: academicTermId, tenantId: req.tenantId, academicYearId }).select("_id startDate endDate").lean();
+      if (!term || day < new Date(term.startDate).setUTCHours(0, 0, 0, 0) || day > new Date(term.endDate).setUTCHours(0, 0, 0, 0)) {
+        return invalid(res, "Attendance date must fall within the selected academic term");
+      }
+      termFilter = { academicTermId: term._id };
     }
 
     const enrollmentFilter = { tenantId: req.tenantId, academicYearId, classId, status: "active" };
@@ -50,7 +70,7 @@ export const getAttendanceRoster = async (req, res, next) => {
       .populate("sectionId", "name")
       .sort({ "studentId.firstName": 1, "studentId.lastName": 1 })
       .lean();
-    const records = await Attendance.find({ tenantId: req.tenantId, academicYearId, classId, date: day }).lean();
+    const records = await Attendance.find({ tenantId: req.tenantId, academicYearId, classId, date: day, ...termFilter }).lean();
     const byStudent = new Map(records.map((record) => [String(record.studentId), record]));
     const data = enrollments.filter((item) => item.studentId?.status === "active").map((item) => ({
       enrollmentId: item._id,
@@ -71,7 +91,7 @@ export const getAttendanceRoster = async (req, res, next) => {
 
 export const saveAttendance = async (req, res, next) => {
   try {
-    const { date, academicYearId, classId, sectionId, records } = req.body || {};
+    const { date, academicYearId, academicTermId = null, classId, sectionId, records } = req.body || {};
     const day = parseDay(date);
     if (!day) return invalid(res, "Provide a valid attendance date in YYYY-MM-DD format");
     if (!validId(academicYearId) || !validId(classId)) return invalid(res, "Academic year and class are required");
@@ -116,7 +136,7 @@ export const saveAttendance = async (req, res, next) => {
       return { updateOne: {
         filter: { tenantId: req.tenantId, studentId: record.studentId, date: day },
         update: { $set: {
-          enrollmentId: enrollment._id, academicYearId, classId, sectionId: enrollment.sectionId || null,
+          enrollmentId: enrollment._id, academicYearId, academicTermId: term?._id || null, classId, sectionId: enrollment.sectionId || null,
           status: record.status, remarks: record.remarks?.trim() || "", markedBy: req.auth.userId,
         }},
         upsert: true,

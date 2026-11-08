@@ -18,6 +18,7 @@ import Enrollment from "../models/Enrollment.js";
 import EnrollmentTransferAudit from "../models/EnrollmentTransferAudit.js";
 import Examination from "../models/Examination.js";
 import ExamSubject from "../models/ExamSubject.js";
+import Attendance from "../models/Attendance.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 const TEST_DB = "school-erp-test";
@@ -43,7 +44,7 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     if (!match || decodeURIComponent(match[1]) !== TEST_DB) throw new Error(`Safety stop: expected ${TEST_DB}`);
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== TEST_DB) throw new Error("Safety stop: connected to an unexpected database.");
-    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), AcademicTerm.init(), SchoolClass.init(), Section.init(), Subject.init(), ClassSubject.init(), Enrollment.init(), EnrollmentTransferAudit.init(), Examination.init(), ExamSubject.init()]);
+    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), AcademicTerm.init(), SchoolClass.init(), Section.init(), Subject.init(), ClassSubject.init(), Enrollment.init(), EnrollmentTransferAudit.init(), Examination.init(), ExamSubject.init(), Attendance.init()]);
     const suffix = randomUUID().replaceAll("-", "").slice(0, 10);
     school = await Tenant.create({ name: `Phase 7 ${suffix}`, slug: `phase7-${suffix}`, status: "active" });
     otherSchool = await Tenant.create({ name: `Phase 7 Other ${suffix}`, slug: `phase7-other-${suffix}`, status: "active" });
@@ -69,6 +70,7 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
         await EnrollmentTransferAudit.deleteMany({ tenantId: school._id });
         await Enrollment.deleteMany({ tenantId: { $in: [school._id, otherSchool?._id].filter(Boolean) } });
         await ExamSubject.deleteMany({ tenantId: school._id });
+        await Attendance.deleteMany({ tenantId: school._id });
         await Examination.deleteMany({ tenantId: school._id });
         await ClassSubject.deleteMany({ tenantId: school._id });
         await AcademicTerm.deleteMany({ tenantId: school._id });
@@ -106,6 +108,26 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     expect(denied.status).toBe(403);
     const crossTenant = await request(`/academic-terms?academicYearId=${year._id}`, { token: otherAdmin.token });
     expect(crossTenant.status).toBe(404);
+    const capacityStudent = await Student.create({
+      tenantId: school._id, admissionNumber: `CAP-${randomUUID().slice(0, 6)}`, firstName: "Capacity", status: "active",
+    });
+    await Enrollment.create({
+      tenantId: school._id, studentId: capacityStudent._id, academicYearId: year._id,
+      classId: classB._id, sectionId: sectionB._id, enrollmentDate: new Date("2026-04-01"), status: "active",
+    });
+    const secondSourceStudent = await Student.create({
+      tenantId: school._id, admissionNumber: `SRC-${randomUUID().slice(0, 6)}`, firstName: "Second", status: "active",
+    });
+    const secondSource = await Enrollment.create({
+      tenantId: school._id, studentId: secondSourceStudent._id, academicYearId: year._id,
+      classId: classA._id, sectionId: sectionA._id, enrollmentDate: new Date("2026-04-01"), status: "active",
+    });
+    const fullTarget = await request(`/enrollments/${secondSource._id}/transfer`, { token: admin.token, method: "PATCH", body: JSON.stringify({
+      targetClassId: String(classB._id), targetSectionId: String(sectionB._id), reason: "Capacity check",
+    }) });
+    expect(fullTarget.status).toBe(409);
+    expect((await Enrollment.findById(secondSource._id).lean()).status).toBe("active");
+    expect(await EnrollmentTransferAudit.exists({ tenantId: school._id, fromEnrollmentId: secondSource._id })).toBeNull();
   });
 
   it("maps subjects to a class curriculum and freezes that curriculum on examinations", async () => {
@@ -121,6 +143,21 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     expect(exam.status).toBe(201);
     expect(exam.body.data.curriculumSnapshot).toHaveLength(1);
     expect(exam.body.data.academicTermId.name).toBe("Semester One");
+    const deactivatedMapping = await request(`/class-subjects/classes/${classA._id}`, { token: admin.token, method: "PUT", body: JSON.stringify({
+      subjectId: String(subject._id), category: "compulsory", weeklyPeriods: 5, sortOrder: 1, status: "inactive",
+    }) });
+    expect(deactivatedMapping.status).toBe(200);
+    const historicalExam = await request(`/examinations/${exam.body.data._id}`, { token: admin.token });
+    expect(historicalExam.body.data.curriculumSnapshot).toHaveLength(1);
+    const attendanceSaved = await request("/attendance", { token: admin.token, method: "PUT", body: JSON.stringify({
+      date: "2026-05-11", academicYearId: String(year._id), academicTermId: String((await AcademicTerm.findOne({ tenantId: school._id, status: "active" }))._id),
+      classId: String(classA._id), records: [{ studentId: String(student._id), status: "present", remarks: "Term-linked attendance" }],
+    }) });
+    expect(attendanceSaved.status).toBe(200);
+    expect(String(attendanceSaved.body.data[0].academicTermId)).toBe(String((await AcademicTerm.findOne({ tenantId: school._id, status: "active" }))._id));
+    const attendanceRoster = await request(`/attendance?date=2026-05-11&academicYearId=${year._id}&classId=${classA._id}&academicTermId=${(await AcademicTerm.findOne({ tenantId: school._id, status: "active" }))._id}`, { token: admin.token });
+    expect(attendanceRoster.status).toBe(200);
+    expect(attendanceRoster.body.data[0].attendance.status).toBe("present");
     const notMapped = await request(`/examinations/${exam.body.data._id}/subjects`, { token: admin.token, method: "POST", body: JSON.stringify({
       subjectId: String(unmappedSubject._id), examDate: "2026-05-10", maxMarks: 100, passMarks: 35,
     }) });
@@ -180,7 +217,7 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     }) });
     expect(readmitted.status).toBe(201);
     expect(readmitted.body.data.admissionType).toBe("readmission");
-    expect(String(readmitted.body.data.previousEnrollmentId)).toBe(String(prior._id));
+    expect(String(readmitted.body.data.previousEnrollmentId?._id || readmitted.body.data.previousEnrollmentId)).toBe(String(prior._id));
     expect(readmitted.body.data.reAdmissionReason).toBe("Returning after family relocation");
   });
 

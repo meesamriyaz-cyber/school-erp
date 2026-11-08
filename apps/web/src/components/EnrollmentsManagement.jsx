@@ -334,7 +334,7 @@ export default function EnrollmentsManagement() {
                   <td><span className={`enrollment-status status-${item.status}`}>{item.status}</span></td>
                   {canManage && <td>{item.status === "active" ? <div className="enrollment-row-actions">
                     <button type="button" className="enrollment-text-button" onClick={() => setPendingEnrollment({ enrollment: item, status: "completed" })}>Complete</button>
-                    <button type="button" className="enrollment-text-button" onClick={() => { setPendingTransfer(item); setTransferClassId(item.classId?._id || ""); setTransferSectionId(""); setTransferReason(""); }}>Move class/section</button>
+                    <button type="button" className="enrollment-text-button" onClick={() => { setPendingTransfer(item); setTransferClassId(item.classId?._id || ""); setTransferSectionId(item.sectionId?._id || ""); setTransferReason(""); }}>Move class/section</button>
                     <button type="button" className="enrollment-text-button danger" onClick={() => setPendingEnrollment({ enrollment: item, status: "withdrawn" })}>Withdraw</button>
                   </div> : <span>—</span>}</td>}
                 </tr>)}

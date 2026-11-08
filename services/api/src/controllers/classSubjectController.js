@@ -4,8 +4,6 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Subject from "../models/Subject.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
-import Examination from "../models/Examination.js";
-import ExamSubject from "../models/ExamSubject.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -47,14 +45,11 @@ export const saveClassSubject = async (req, res, next) => {
     const existing = await ClassSubject.findOne({ tenantId: req.tenantId, academicYearId: schoolClass.academicYearId, classId: schoolClass._id, subjectId: fields.subjectId });
     if (existing) {
       if (fields.status === "inactive" && existing.status === "active") {
-        const [assignment, examSubject] = await Promise.all([
-          TeacherAssignment.exists({ tenantId: req.tenantId, academicYearId: schoolClass.academicYearId, classId: schoolClass._id, subjectId: fields.subjectId, status: "active" }),
-          (async () => {
-            const exams = await Examination.find({ tenantId: req.tenantId, academicYearId: schoolClass.academicYearId, classId: schoolClass._id, status: { $in: ["scheduled", "in_progress", "completed", "published"] } }).select("_id").lean();
-            return exams.length ? ExamSubject.exists({ tenantId: req.tenantId, examinationId: { $in: exams.map((x) => x._id) }, subjectId: fields.subjectId }) : false;
-          })(),
-        ]);
-        if (assignment || examSubject) return res.status(409).json({ success: false, message: "Deactivate dependent teacher assignments and finish examination use before removing this subject from the active curriculum" });
+        const assignment = await TeacherAssignment.exists({
+          tenantId: req.tenantId, academicYearId: schoolClass.academicYearId,
+          classId: schoolClass._id, subjectId: fields.subjectId, status: "active",
+        });
+        if (assignment) return res.status(409).json({ success: false, message: "Deactivate active teacher assignments before removing this subject from the active curriculum" });
       }
       existing.history.push({ category: existing.category, weeklyPeriods: existing.weeklyPeriods, sortOrder: existing.sortOrder, status: existing.status, changedBy: req.auth.userId, changedAt: new Date() });
       if (existing.history.length > 50) existing.history.splice(0, existing.history.length - 50);

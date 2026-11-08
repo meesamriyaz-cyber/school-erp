@@ -188,13 +188,27 @@ export const addExaminationSubject = async (req, res, next) => {
     if (date < new Date(exam.startDate) || date > new Date(exam.endDate)) return invalid(res, "Subject examination date must fall within the examination date range");
     const subject = await Subject.findOne({ _id: subjectId, tenantId: req.tenantId, status: "active" }).select("_id").lean();
     if (!subject) return invalid(res, "Select an active subject from this school");
-    const curriculumConfigured = exam.curriculumSnapshot?.length
-      ? true
-      : await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: exam.academicYearId, classId: exam.classId, status: "active" });
-    const curriculumAllowsSubject = exam.curriculumSnapshot?.length
-      ? exam.curriculumSnapshot.some((item) => String(item.subjectId) === String(subjectId))
-      : !curriculumConfigured || await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: exam.academicYearId, classId: exam.classId, subjectId, status: "active" });
-    if (!curriculumAllowsSubject) return res.status(409).json({ success: false, message: "This subject is not included in the class curriculum snapshot for this examination" });
+    if (exam.curriculumSnapshot?.length) {
+      if (!exam.curriculumSnapshot.some((item) => String(item.subjectId) === String(subjectId))) {
+        return res.status(409).json({ success: false, message: "This subject is not included in the class curriculum snapshot for this examination" });
+      }
+    } else {
+      const currentCurriculum = await ClassSubject.find({
+        tenantId: req.tenantId, academicYearId: exam.academicYearId,
+        classId: exam.classId, status: "active",
+      }).populate("subjectId", "name code").sort({ sortOrder: 1, _id: 1 }).lean();
+      if (currentCurriculum.length) {
+        if (!currentCurriculum.some((item) => String(item.subjectId?._id) === String(subjectId))) {
+          return res.status(409).json({ success: false, message: "This subject is not included in the class curriculum for this examination" });
+        }
+        exam.curriculumSnapshot = currentCurriculum.map((item) => ({
+          subjectId: item.subjectId._id, subjectName: item.subjectId.name,
+          subjectCode: item.subjectId.code || "", category: item.category,
+          weeklyPeriods: item.weeklyPeriods, sortOrder: item.sortOrder,
+        }));
+        await exam.save();
+      }
+    }
     if (req.auth.role === "teacher" && !await TeacherAssignment.exists({
       tenantId: req.tenantId, teacherId: req.auth.userId, subjectId,
       academicYearId: exam.academicYearId, classId: exam.classId, status: "active",
