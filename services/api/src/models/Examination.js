@@ -53,6 +53,20 @@ const examinationSchema = new mongoose.Schema(
       default: "draft",
       required: true,
     },
+    // Frozen at publication so later school grading-scale changes cannot alter report cards.
+    gradingScaleSnapshot: {
+      type: new mongoose.Schema({
+        gradingScaleId: { type: mongoose.Schema.Types.ObjectId, ref: "GradingScale", required: true },
+        name: { type: String, required: true, trim: true, maxlength: 80 },
+        bands: [{
+          grade: { type: String, required: true, trim: true, maxlength: 20 },
+          minPercentage: { type: Number, required: true, min: 0, max: 100 },
+          maxPercentage: { type: Number, required: true, min: 0, max: 100 },
+          description: { type: String, trim: true, default: "", maxlength: 120 },
+        }],
+      }, { _id: false }),
+      default: null,
+    },
     // A short-lived distributed lease serializes mark writes with result publication.
     resultLockToken: { type: String, default: null, select: false },
     resultLockExpiresAt: { type: Date, default: null, select: false },
