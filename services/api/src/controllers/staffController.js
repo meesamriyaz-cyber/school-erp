@@ -77,6 +77,22 @@ function handleError(error, res, next) {
   return next(error);
 }
 
+export const listLinkableStaffUsers = async (req, res, next) => {
+  try {
+    const rolesByType = { teaching: ["teacher"], non_teaching: ["principal", "accountant", "librarian", "transport_manager"] };
+    const roles = rolesByType[req.query.employeeType];
+    if (!roles) return invalid(res, "Staff category must be teaching or non-teaching");
+    const users = await User.find({ tenantId: req.tenantId, status: "active", role: { $in: roles } })
+      .select("_id firstName lastName email role")
+      .sort({ firstName: 1, lastName: 1, _id: 1 })
+      .limit(100)
+      .lean();
+    return res.status(200).json({ success: true, data: users.map((user) => ({
+      id: String(user._id), firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role,
+    })) });
+  } catch (error) { return next(error); }
+};
+
 export const listStaff = async (req, res, next) => {
   try {
     const page = Number.parseInt(req.query.page ?? "1", 10), limit = Number.parseInt(req.query.limit ?? "20", 10);

@@ -13,7 +13,7 @@ import Session from "../models/Session.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 const EXPECTED_TEST_DATABASE = "school-erp-test";
-let server, baseUrl, schoolA, schoolB, adminA, adminB, teacherA, accountantA;
+let server, baseUrl, schoolA, schoolB, adminA, adminB, teacherA, accountantA, principalA;
 const tenantIds = [], userIds = [];
 
 const request = async (path, { token, ...options } = {}) => {
@@ -48,7 +48,7 @@ describe("Staff management API", () => {
     await Promise.all([Tenant.init(), User.init(), Staff.init(), Session.init()]);
     schoolA = await createSchool("alpha"); schoolB = await createSchool("beta");
     adminA = await createUser(schoolA, "school_admin"); adminB = await createUser(schoolB, "school_admin");
-    teacherA = await createUser(schoolA, "teacher"); accountantA = await createUser(schoolA, "accountant");
+    teacherA = await createUser(schoolA, "teacher"); accountantA = await createUser(schoolA, "accountant"); principalA = await createUser(schoolA, "principal");
     server = app.listen(0, "127.0.0.1");
     await new Promise((resolve, reject) => { server.once("listening", resolve); server.once("error", reject); });
     baseUrl = `http://127.0.0.1:${server.address().port}/api/v1`;
@@ -71,6 +71,14 @@ describe("Staff management API", () => {
     expect((await request("/staff")).status).toBe(401);
     const teacherResponse = await request("/staff", { token: teacherA.token });
     expect(teacherResponse.status).toBe(403);
+  });
+
+  it("returns only eligible same-school login accounts to school administrators and principals", async () => {
+    const teacherLinks = await request("/staff/linkable-users?employeeType=teaching", { token: principalA.token });
+    expect(teacherLinks.status).toBe(200);
+    expect(teacherLinks.body.data.some((user) => user.id === String(teacherA.user._id))).toBe(true);
+    const forbidden = await request("/staff/linkable-users?employeeType=teaching", { token: teacherA.token });
+    expect(forbidden.status).toBe(403);
   });
 
   it("creates a non-teaching staff profile without requiring a login account", async () => {

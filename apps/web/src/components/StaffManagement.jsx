@@ -41,8 +41,8 @@ export default function StaffManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
+    const timer = setTimeout(() => void load(controller.signal), 0);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [load]);
 
   useEffect(() => {
