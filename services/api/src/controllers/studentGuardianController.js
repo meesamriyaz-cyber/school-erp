@@ -155,12 +155,25 @@ export const updateStudentGuardian = async (req, res, next) => {
         lifecycleError = "Every student must retain exactly one active primary guardian";
         return;
       }
-      if (body.isPrimary === true) {
+
+      const updates = { ...body };
+      if (updates.status === "active" || updates.isPrimary === true) {
         const guardian = await Guardian.findOne({ _id: current.guardianId, tenantId: req.tenantId, status: "active" }).session(session).lean();
         if (!guardian) {
-          lifecycleError = "An inactive guardian cannot be promoted to primary";
+          lifecycleError = "An inactive guardian cannot be linked or promoted";
           return;
         }
+        const activePrimary = await StudentGuardian.findOne({
+          tenantId: req.tenantId,
+          studentId: result.student._id,
+          status: "active",
+          isPrimary: true,
+          _id: { $ne: current._id },
+        }).session(session).select("_id").lean();
+        if (!activePrimary && !current.isPrimary) updates.isPrimary = true;
+      }
+
+      if (updates.isPrimary === true) {
         await demotePrimaryRelationships({
           tenantId: req.tenantId,
           studentId: result.student._id,
@@ -171,8 +184,8 @@ export const updateStudentGuardian = async (req, res, next) => {
       }
 
       const wasPrimary = current.isPrimary;
-      const changes = auditChanges(current, body);
-      Object.assign(current, body);
+      const changes = auditChanges(current, updates);
+      Object.assign(current, updates);
       if (changes.length) {
         let action = "updated";
         if (body.isPrimary === true && !wasPrimary) action = "primary_promoted";
