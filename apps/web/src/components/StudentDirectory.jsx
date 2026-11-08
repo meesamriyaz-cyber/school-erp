@@ -107,6 +107,7 @@ function StudentMobileCard({ student, onView, onLinked, canLinkPortal }) {
 export default function StudentDirectory() {
   const { accessToken, user } = useAuth();
   const canLinkPortal = user?.role === "school_admin";
+  const canManageStudents = ["school_admin", "principal"].includes(user?.role);
 
   const [students, setStudents] = useState([]);
   const [searchInput, setSearchInput] = useState("");
@@ -215,16 +216,18 @@ export default function StudentDirectory() {
             <span>students found</span>
           </div>
 
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => {
-              setNotice("");
-              setShowStudentForm(true);
-            }}
-          >
-            + Add student
-          </button>
+          {canManageStudents && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setNotice("");
+                setShowStudentForm(true);
+              }}
+            >
+              + Add student
+            </button>
+          )}
         </div>
       </div>
 
