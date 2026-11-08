@@ -7,6 +7,7 @@ import ExamMark from "../models/ExamMark.js";
 import Enrollment from "../models/Enrollment.js";
 import GradingScale from "../models/GradingScale.js";
 import { getGradeForPercentage } from "../utils/grading.js";
+import { buildExaminationAnalytics } from "../utils/examinationAnalytics.js";
 
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
@@ -116,6 +117,13 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
   const averagePercentage = percentages.length
     ? Number((percentages.reduce((total, value) => total + value, 0) / percentages.length).toFixed(2))
     : null;
+  const analytics = buildExaminationAnalytics({
+    subjects,
+    enrollments,
+    marks,
+    results,
+    gradingBands,
+  });
 
   return {
     subjects,
@@ -127,6 +135,7 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
     averagePercentage,
     highestPercentage: percentages.length ? Math.max(...percentages) : null,
     lowestPercentage: percentages.length ? Math.min(...percentages) : null,
+    ...analytics,
   };
 };
 
@@ -163,6 +172,9 @@ export const getExaminationResults = async (req, res, next) => {
         averagePercentage: context.averagePercentage,
         highestPercentage: context.highestPercentage,
         lowestPercentage: context.lowestPercentage,
+        classPassRate: context.classPassRate,
+        gradeDistribution: context.gradeDistribution,
+        subjectAnalytics: context.subjectAnalytics,
         publishable: context.enrollments.length > 0 &&
           context.subjects.length > 0 &&
           context.incompleteCount === 0,
