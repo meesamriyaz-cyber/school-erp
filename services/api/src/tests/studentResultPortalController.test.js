@@ -2,13 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   tenantFindOne: vi.fn(),
-}));
-
-vi.mock("../models/Tenant.js", () => ({
-  default: { findOne: mocks.tenantFindOne },
-}));
-
-const mocks = vi.hoisted(() => ({
   studentFindOne: vi.fn(),
   studentFind: vi.fn(),
   guardianFindOne: vi.fn(),
@@ -19,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   loadResultContext: vi.fn(),
 }));
 
+vi.mock("../models/Tenant.js", () => ({
+  default: { findOne: mocks.tenantFindOne },
+}));
 vi.mock("../models/Student.js", () => ({
   default: { findOne: mocks.studentFindOne, find: mocks.studentFind },
 }));
