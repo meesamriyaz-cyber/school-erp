@@ -38,40 +38,46 @@ export const getAcademicSchedule = async (req, res, next) => {
 };
 
 export const saveAcademicSchedule = async (req, res, next) => {
+  const { academicYearId, periods, breaks } = req.body || {};
+  if (!mongoose.isValidObjectId(academicYearId)) return invalid(res, "A valid academicYearId is required");
+  const validationError = validateBlocks(periods, breaks);
+  if (validationError) return invalid(res, validationError);
+
+  const session = await mongoose.startSession();
   try {
-    const { academicYearId, periods, breaks } = req.body || {};
-    if (!mongoose.isValidObjectId(academicYearId)) return invalid(res, "A valid academicYearId is required");
-    const year = await AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId }).select("_id status").lean();
-    if (!year) return res.status(404).json({ success: false, message: "Academic year not found" });
-    if (year.status === "closed") return res.status(409).json({ success: false, message: "A closed academic year schedule cannot be changed" });
-    const validationError = validateBlocks(periods, breaks);
-    if (validationError) return invalid(res, validationError);
+    let data;
+    await session.withTransaction(async () => {
+      const year = await AcademicYear.findOneAndUpdate(
+        { _id: academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
+        { $inc: { lifecycleRevision: 1 } }, { new: true, session }
+      ).select("_id status").lean();
+      if (!year) { const error = new Error("A closed academic year schedule cannot be changed"); error.code = "SCHEDULE_YEAR_CLOSED"; throw error; }
 
-    const activeEntries = await TimetableEntry.find({
-      tenantId: req.tenantId,
-      academicYearId,
-      status: "active",
-    }).select("periodNumber startTime endTime").lean();
-    const configuredByNumber = new Map(periods.map((period) => [period.periodNumber, period]));
-    for (const entry of activeEntries) {
-      const configured = configuredByNumber.get(entry.periodNumber);
-      if (!configured || configured.startTime !== entry.startTime || configured.endTime !== entry.endTime) {
-        return res.status(409).json({
-          success: false,
-          message: `Deactivate or update active timetable entries using period ${entry.periodNumber} before changing the bell schedule`,
-        });
+      const activeEntries = await TimetableEntry.find({
+        tenantId: req.tenantId, academicYearId, status: "active",
+      }).select("periodNumber startTime endTime").session(session).lean();
+      const configuredByNumber = new Map(periods.map((period) => [period.periodNumber, period]));
+      for (const entry of activeEntries) {
+        const configured = configuredByNumber.get(entry.periodNumber);
+        if (!configured || configured.startTime !== entry.startTime || configured.endTime !== entry.endTime) {
+          const error = new Error(`Deactivate or update active timetable entries using period ${entry.periodNumber} before changing the bell schedule`);
+          error.code = "SCHEDULE_HAS_ACTIVE_ENTRIES";
+          throw error;
+        }
       }
-    }
 
-    const data = await AcademicSchedule.findOneAndUpdate(
-      { tenantId: req.tenantId, academicYearId },
-      { $set: { periods, breaks, updatedBy: req.auth.userId }, $setOnInsert: { tenantId: req.tenantId, academicYearId } },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
-    ).lean();
+      data = await AcademicSchedule.findOneAndUpdate(
+        { tenantId: req.tenantId, academicYearId },
+        { $set: { periods, breaks, updatedBy: req.auth.userId }, $setOnInsert: { tenantId: req.tenantId, academicYearId } },
+        { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true, session },
+      ).lean();
+    });
     return res.status(200).json({ success: true, data });
   } catch (error) {
+    if (error.code === "SCHEDULE_YEAR_CLOSED") return res.status(409).json({ success: false, message: error.message });
+    if (error.code === "SCHEDULE_HAS_ACTIVE_ENTRIES") return res.status(409).json({ success: false, message: error.message });
     if (error.code === 11000) return res.status(409).json({ success: false, message: "The academic schedule was updated concurrently. Reload and try again." });
     if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more academic schedule fields are invalid");
     return next(error);
-  }
+  } finally { await session.endSession(); }
 };
