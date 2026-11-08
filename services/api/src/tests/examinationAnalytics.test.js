@@ -36,7 +36,8 @@ describe("examination performance analytics", () => {
       gradingBands: bands,
     });
 
-    expect(analytics.classPassRate).toBe(50);
+    // All three complete results count, including the complete result without a grade.
+    expect(analytics.classPassRate).toBe(33.33);
     expect(analytics.gradeDistribution).toEqual([
       { grade: "F", count: 0, percentage: 0 },
       { grade: "B", count: 1, percentage: 50 },
