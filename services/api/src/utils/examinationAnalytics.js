@@ -4,10 +4,15 @@ const roundPercentage = (value) => Number(value.toFixed(2));
 
 const buildDistribution = (items, bands, getGrade) => {
   const denominator = items.length;
+  const counts = new Map();
+  items.forEach((item) => {
+    const grade = getGrade(item);
+    if (grade) counts.set(grade, (counts.get(grade) || 0) + 1);
+  });
   return [...bands]
     .sort((a, b) => a.minPercentage - b.minPercentage)
     .map((band) => {
-      const count = items.filter((item) => getGrade(item) === band.grade).length;
+      const count = counts.get(band.grade) || 0;
       return {
         grade: band.grade,
         count,
