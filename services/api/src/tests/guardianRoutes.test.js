@@ -103,6 +103,8 @@ const createStudent = async (token) => {
       lastName: "Guardian",
       admissionDate: "2026-04-01",
       gender: "not_specified",
+      guardianName: "Primary Guardian",
+      guardianRelationship: "other",
     }),
   });
 
