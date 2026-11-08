@@ -6,6 +6,15 @@ import Student from "../models/Student.js";
 const CREATE_FIELDS = ["firstName", "lastName", "phone", "email"];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
 const invalid = (res, message) => res.status(400).json({ success: false, message });
+const appendRelationshipAudit = (record, actorUserId) => {
+  record.auditTrail.push({
+    action: "deactivated",
+    actorUserId,
+    changes: [{ field: "status", from: "active", to: "inactive" }],
+    changedAt: new Date(),
+  });
+  if (record.auditTrail.length > 50) record.auditTrail.splice(0, record.auditTrail.length - 50);
+};
 const pick = (body, allowed) => Object.fromEntries(
   allowed.filter((field) => Object.hasOwn(body, field)).map((field) => [field, body[field]]),
 );
@@ -99,7 +108,16 @@ export const updateGuardian = async (req, res, next) => {
             error.code = "PRIMARY_GUARDIAN_IN_USE";
             throw error;
           }
-          await StudentGuardian.updateMany({ tenantId: req.tenantId, guardianId: guardian._id, status: "active" }, { $set: { status: "inactive" } }, { session });
+          const activeRelationships = await StudentGuardian.find({
+            tenantId: req.tenantId,
+            guardianId: guardian._id,
+            status: "active",
+          }).session(session);
+          for (const relationship of activeRelationships) {
+            relationship.status = "inactive";
+            appendRelationshipAudit(relationship, req.auth.userId);
+            await relationship.save({ session });
+          }
         }
 
         const contactFieldsChanged = ["firstName", "lastName", "phone", "email"].some((field) => Object.hasOwn(updates, field));
