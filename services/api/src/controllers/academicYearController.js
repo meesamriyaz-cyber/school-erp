@@ -317,7 +317,7 @@ export const updateAcademicYear = async (req, res, next) => {
           }
         }
 
-        if (lockedYear.status === "active" && nextStatus === "closed") {
+        if (nextStatus === "closed") {
           const unfinishedTerms = await AcademicTerm.exists({
             tenantId: req.tenantId, academicYearId: lockedYear._id, status: { $in: ["draft", "active"] },
           }).session(session);
@@ -334,6 +334,9 @@ export const updateAcademicYear = async (req, res, next) => {
             error.code = "ACADEMIC_YEAR_HAS_UNFINISHED_EXAMINATIONS";
             throw error;
           }
+        }
+
+        if (lockedYear.status === "active" && nextStatus === "closed") {
           const activeEnrollments = await Enrollment.exists({
             tenantId: req.tenantId,
             academicYearId: lockedYear._id,

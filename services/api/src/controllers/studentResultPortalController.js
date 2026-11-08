@@ -106,6 +106,7 @@ export const getMyPublishedResults = async (req, res, next) => {
       })),
     })
       .populate("academicYearId", "name startDate endDate")
+      .populate("academicTermId", "name startDate endDate")
       .populate("classId", "name")
       .populate("sectionId", "name")
       .sort({ endDate: -1, _id: -1 })
@@ -134,6 +135,7 @@ export const getMyPublishedResults = async (req, res, next) => {
             startDate: exam.startDate,
             endDate: exam.endDate,
             academicYear: exam.academicYearId,
+            academicTerm: exam.academicTermId || null,
             class: exam.classId,
             section: exam.sectionId,
             gradingScale: exam.gradingScaleSnapshot?.name || null,

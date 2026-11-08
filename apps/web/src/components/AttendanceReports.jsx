@@ -10,6 +10,8 @@ const percent = (value) => value === null || value === undefined ? "—" : value
 export default function AttendanceReports() {
   const { accessToken } = useAuth();
   const [years, setYears] = useState([]);
+  const [terms, setTerms] = useState([]);
+  const [termId, setTermId] = useState("");
   const [yearId, setYearId] = useState("");
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState("");
@@ -47,6 +49,19 @@ export default function AttendanceReports() {
     return () => controller.abort();
   }, [accessToken, yearId]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.resolve().then(() => {
+      if (!yearId) { setTerms([]); return undefined; }
+      return apiRequest(`/academic-terms?academicYearId=${encodeURIComponent(yearId)}`, { accessToken, signal: controller.signal })
+        .then((response) => {
+          if (!controller.signal.aborted) setTerms(Array.isArray(response?.data) ? response.data.filter((term) => term.status !== "cancelled") : []);
+        })
+        .catch((err) => { if (err.name !== "AbortError") setError(err.message || "Unable to load academic terms."); });
+    });
+    return () => controller.abort();
+  }, [accessToken, yearId]);
+
   const loadReport = async (event) => {
     event.preventDefault();
     if (!yearId || !from || !to || from > to) { setError("Select an academic year and a valid date range."); return; }
@@ -54,6 +69,7 @@ export default function AttendanceReports() {
     try {
       const params = new URLSearchParams({ academicYearId: yearId, from, to });
       if (classId) params.set("classId", classId);
+      if (termId) params.set("academicTermId", termId);
       const response = await apiRequest("/attendance/reports?" + params.toString(), { accessToken });
       if (!response?.success) throw new Error(response?.message || "Unable to generate attendance report.");
       setReport(response);
@@ -72,9 +88,10 @@ export default function AttendanceReports() {
     </div>
     {error && <p className="attendance-report-error" role="alert">{error}</p>}
     <form className="attendance-report-filters" onSubmit={loadReport}>
-      <label>Academic year<select value={yearId} onChange={(event) => setYearId(event.target.value)} required>
+      <label>Academic year<select value={yearId} onChange={(event) => { setYearId(event.target.value); setTermId(""); }} required>
         <option value="">Select academic year</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}
       </select></label>
+      <label>Academic term<select value={termId} onChange={(event) => setTermId(event.target.value)}><option value="">All terms</option>{terms.map((term) => <option key={term._id} value={term._id}>{term.name}</option>)}</select></label>
       <label>Class<select value={classId} onChange={(event) => setClassId(event.target.value)}>
         <option value="">All classes</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
       </select></label>

@@ -205,6 +205,7 @@ export default function StudentResultsPortal() {
                 <div><span>Student</span><strong>{[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</strong></div>
                 <div><span>Admission No.</span><strong>{item.student?.admissionNumber || "—"}</strong></div>
                 <div><span>Academic year</span><strong>{item.examination.academicYear?.name || "—"}</strong></div>
+                {item.examination.academicTerm?.name && <div><span>Academic term</span><strong>{item.examination.academicTerm.name}</strong></div>}
                 <div><span>Class</span><strong>{item.examination.class?.name || "—"}</strong></div>
                 <div><span>Section</span><strong>{item.examination.section?.name || "All sections"}</strong></div>
                 <div><span>Examination period</span><strong>{formatDate(item.examination.startDate)} – {formatDate(item.examination.endDate)}</strong></div>

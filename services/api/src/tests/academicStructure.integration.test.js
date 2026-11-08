@@ -97,6 +97,18 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     const blockedClose = await request(`/academic-years/${year._id}`, { token: admin.token, method: "PATCH", body: JSON.stringify({ status: "closed" }) });
     expect(blockedClose.status).toBe(409);
     expect(blockedClose.body.message).toMatch(/academic terms/i);
+    const draftYear = await request("/academic-years", { token: admin.token, method: "POST", body: JSON.stringify({
+      name: `Draft ${randomUUID().slice(0, 6)}`, startDate: "2027-04-01", endDate: "2028-03-31",
+    }) });
+    expect(draftYear.status).toBe(201);
+    const draftTerm = await request("/academic-terms", { token: admin.token, method: "POST", body: JSON.stringify({
+      academicYearId: String(draftYear.body.data._id), name: "Draft term",
+      startDate: "2027-04-01", endDate: "2027-07-31",
+    }) });
+    expect(draftTerm.status).toBe(201);
+    const blockedDraftClose = await request(`/academic-years/${draftYear.body.data._id}`, { token: admin.token, method: "PATCH", body: JSON.stringify({ status: "closed" }) });
+    expect(blockedDraftClose.status).toBe(409);
+    expect(blockedDraftClose.body.message).toMatch(/academic terms/i);
     const overlap = await request("/academic-terms", { token: admin.token, method: "POST", body: JSON.stringify({
       academicYearId: String(year._id), name: "Quarter One", startDate: "2026-07-01", endDate: "2026-09-30",
     }) });
