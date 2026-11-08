@@ -3,6 +3,7 @@ import Attendance from "../models/Attendance.js";
 import Enrollment from "../models/Enrollment.js";
 import AcademicYear from "../models/AcademicYear.js";
 import AcademicTerm from "../models/AcademicTerm.js";
+import SchoolClass from "../models/SchoolClass.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const STATUSES = ["present", "absent", "late", "excused"];
@@ -15,9 +16,11 @@ const parseDay = (value) => {
 };
 
 
-const teacherAssignmentFilter = async (req, academicYearId, classId, sectionId) => {
+const teacherAssignmentFilter = async (req, academicYearId, classId, sectionId, session = null) => {
   if (req.auth.role !== "teacher") return null;
-  const assignments = await TeacherAssignment.find({ tenantId: req.tenantId, teacherId: req.auth.userId, academicYearId, classId, status: "active" }).select("sectionId").lean();
+  let query = TeacherAssignment.find({ tenantId: req.tenantId, teacherId: req.auth.userId, academicYearId, classId, status: "active" }).select("sectionId");
+  if (session) query = query.session(session);
+  const assignments = await query.lean();
   if (!assignments.length) return false;
   if (sectionId !== undefined && sectionId !== null && !assignments.some((item) => !item.sectionId || String(item.sectionId) === String(sectionId))) return false;
   return assignments;
@@ -89,66 +92,95 @@ export const getAttendanceRoster = async (req, res, next) => {
 };
 
 export const saveAttendance = async (req, res, next) => {
+  const { date, academicYearId, academicTermId = null, classId, sectionId, records } = req.body || {};
+  const day = parseDay(date);
+  if (!day) return invalid(res, "Provide a valid attendance date in YYYY-MM-DD format");
+  if (!validId(academicYearId) || !validId(classId)) return invalid(res, "Academic year and class are required");
+  if (academicTermId !== null && !validId(academicTermId)) return invalid(res, "Invalid academic term ID");
+  if (sectionId !== undefined && sectionId !== null && !validId(sectionId)) return invalid(res, "Invalid section ID");
+  if (!Array.isArray(records) || records.length < 1 || records.length > 500) return invalid(res, "Provide between 1 and 500 attendance records");
+  if (Object.hasOwn(req.body, "tenantId") || records.some((item) => !item || Object.hasOwn(item, "tenantId"))) {
+    return invalid(res, "School assignment is determined by the authenticated account");
+  }
+  const ids = records.map((item) => item.studentId);
+  if (ids.some((id) => !validId(id)) || new Set(ids.map(String)).size !== ids.length) return invalid(res, "Student IDs must be valid and unique");
+  if (records.some((item) => !STATUSES.includes(item.status) || (item.remarks !== undefined && (typeof item.remarks !== "string" || item.remarks.trim().length > 300)))) {
+    return invalid(res, "Each record needs a valid status and remarks of at most 300 characters");
+  }
+
+  const session = await mongoose.startSession();
+  let saved = [];
   try {
-    const { date, academicYearId, academicTermId = null, classId, sectionId, records } = req.body || {};
-    const day = parseDay(date);
-    if (!day) return invalid(res, "Provide a valid attendance date in YYYY-MM-DD format");
-    if (!validId(academicYearId) || !validId(classId)) return invalid(res, "Academic year and class are required");
-    if (sectionId !== undefined && sectionId !== null && !validId(sectionId)) return invalid(res, "Invalid section ID");
-    if (!Array.isArray(records) || records.length < 1 || records.length > 500) return invalid(res, "Provide between 1 and 500 attendance records");
-    if (Object.hasOwn(req.body, "tenantId") || records.some((item) => !item || Object.hasOwn(item, "tenantId"))) {
-      return invalid(res, "School assignment is determined by the authenticated account");
-    }
+    await session.withTransaction(async () => {
+      const year = await AcademicYear.findOneAndUpdate(
+        { _id: academicYearId, tenantId: req.tenantId, status: "active" },
+        { $inc: { lifecycleRevision: 1 } }, { new: true, session }
+      ).select("startDate endDate status").lean();
+      if (!year) { const error = new Error("Attendance can only be recorded for this school's active academic year"); error.statusCode = 409; throw error; }
+      const schoolClass = await SchoolClass.findOneAndUpdate(
+        { _id: classId, tenantId: req.tenantId, academicYearId, status: "active" },
+        { $inc: { placementRevision: 1 } }, { new: true, session }
+      ).select("_id").lean();
+      if (!schoolClass) { const error = new Error("Attendance can only be recorded for an active class in this academic year"); error.statusCode = 409; throw error; }
+      if (day < new Date(year.startDate).setUTCHours(0, 0, 0, 0) || day > new Date(year.endDate).setUTCHours(0, 0, 0, 0)) {
+        const error = new Error("Attendance date must fall within the selected academic year"); error.statusCode = 400; throw error;
+      }
 
-    const year = await AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId, status: "active" }).select("startDate endDate").lean();
-    if (!year) return res.status(409).json({ success: false, message: "Attendance can only be recorded for this school's active academic year" });
-    if (day < new Date(year.startDate).setUTCHours(0, 0, 0, 0) || day > new Date(year.endDate).setUTCHours(0, 0, 0, 0)) {
-      return invalid(res, "Attendance date must fall within the selected academic year");
-    }
+      let term = null;
+      if (academicTermId) {
+        term = await AcademicTerm.findOne({
+          _id: academicTermId, tenantId: req.tenantId, academicYearId, status: "active",
+        }).select("_id startDate endDate").session(session).lean();
+        if (!term) { const error = new Error("Attendance can only be recorded against an active term in this academic year"); error.statusCode = 409; throw error; }
+        if (day < new Date(term.startDate).setUTCHours(0, 0, 0, 0) || day > new Date(term.endDate).setUTCHours(0, 0, 0, 0)) {
+          const error = new Error("Attendance date must fall within the selected academic term"); error.statusCode = 400; throw error;
+        }
+      }
 
-    const teacherScope = await teacherAssignmentFilter(req, academicYearId, classId, sectionId);
-    if (teacherScope === false) return res.status(403).json({ success: false, message: "You are not assigned to this class or section" });
+      const teacherScope = await teacherAssignmentFilter(req, academicYearId, classId, sectionId, session);
+      if (teacherScope === false) { const error = new Error("You are not assigned to this class or section"); error.statusCode = 403; throw error; }
 
-    const ids = records.map((item) => item.studentId);
-    if (ids.some((id) => !validId(id)) || new Set(ids.map(String)).size !== ids.length) return invalid(res, "Student IDs must be valid and unique");
-    if (records.some((item) => !STATUSES.includes(item.status) || (item.remarks !== undefined && (typeof item.remarks !== "string" || item.remarks.trim().length > 300)))) {
-      return invalid(res, "Each record needs a valid status and remarks of at most 300 characters");
-    }
-
-    const enrollmentFilter = {
-      tenantId: req.tenantId, academicYearId, classId, status: "active", studentId: { $in: ids },
-      ...(sectionId ? { sectionId } : {}),
-    };
-    if (sectionId === null) enrollmentFilter.sectionId = null;
-    const enrollments = await Enrollment.find(enrollmentFilter).select("_id studentId sectionId").lean();
-    if (enrollments.length !== records.length) {
-      return res.status(400).json({ success: false, message: "Every student must have an active enrollment in the selected class, section, academic year, and school" });
-    }
-    if (Array.isArray(teacherScope)) {
-      const allowedSections = teacherScope.filter((item) => item.sectionId).map((item) => String(item.sectionId));
-      const hasClassWideAssignment = teacherScope.some((item) => !item.sectionId);
-      if (enrollments.some((item) => item.sectionId && !hasClassWideAssignment && !allowedSections.includes(String(item.sectionId)))) return res.status(403).json({ success: false, message: "Attendance includes a section outside your teaching assignment" });
-    }
-    const enrollmentByStudent = new Map(enrollments.map((item) => [String(item.studentId), item]));
-    const operations = records.map((record) => {
-      const enrollment = enrollmentByStudent.get(String(record.studentId));
-      return { updateOne: {
-        filter: { tenantId: req.tenantId, studentId: record.studentId, date: day },
-        update: { $set: {
-          enrollmentId: enrollment._id, academicYearId, academicTermId: term?._id || null, classId, sectionId: enrollment.sectionId || null,
-          status: record.status, remarks: record.remarks?.trim() || "", markedBy: req.auth.userId,
-        }},
-        upsert: true,
-      }};
+      const enrollmentFilter = {
+        tenantId: req.tenantId, academicYearId, classId, status: "active", studentId: { $in: ids },
+        ...(sectionId ? { sectionId } : {}),
+      };
+      if (sectionId === null) enrollmentFilter.sectionId = null;
+      const enrollments = await Enrollment.find(enrollmentFilter).select("_id studentId sectionId").session(session).lean();
+      if (enrollments.length !== records.length) {
+        const error = new Error("Every student must have an active enrollment in the selected class, section, academic year, and school"); error.statusCode = 400; throw error;
+      }
+      if (Array.isArray(teacherScope)) {
+        const allowedSections = teacherScope.filter((item) => item.sectionId).map((item) => String(item.sectionId));
+        const hasClassWideAssignment = teacherScope.some((item) => !item.sectionId);
+        if (enrollments.some((item) => item.sectionId && !hasClassWideAssignment && !allowedSections.includes(String(item.sectionId)))) {
+          const error = new Error("Attendance includes a section outside your teaching assignment"); error.statusCode = 403; throw error;
+        }
+      }
+      const enrollmentByStudent = new Map(enrollments.map((item) => [String(item.studentId), item]));
+      const operations = records.map((record) => {
+        const enrollment = enrollmentByStudent.get(String(record.studentId));
+        return { updateOne: {
+          filter: { tenantId: req.tenantId, studentId: record.studentId, date: day },
+          update: { $set: {
+            enrollmentId: enrollment._id, academicYearId, academicTermId: term?._id || null,
+            classId, sectionId: enrollment.sectionId || null,
+            status: record.status, remarks: record.remarks?.trim() || "", markedBy: req.auth.userId,
+          }},
+          upsert: true,
+        }};
+      });
+      await Attendance.bulkWrite(operations, { ordered: true, session });
+      saved = await Attendance.find({
+        tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids },
+      }).session(session).lean();
     });
-    await Attendance.bulkWrite(operations, { ordered: true });
-    const saved = await Attendance.find({ tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids } }).lean();
     return res.status(200).json({ success: true, data: saved, savedCount: saved.length });
   } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
     if (error.code === 11000) return res.status(409).json({ success: false, message: "Attendance was updated concurrently. Reload the register and try again." });
     if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more attendance records are invalid");
     return next(error);
-  }
+  } finally { await session.endSession(); }
 };
 
 

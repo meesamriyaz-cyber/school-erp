@@ -316,6 +316,14 @@ export const updateAcademicYear = async (req, res, next) => {
             error.code = "ACADEMIC_YEAR_HAS_UNFINISHED_TERMS";
             throw error;
           }
+          const unfinishedExaminations = await Examination.exists({
+            tenantId: req.tenantId, academicYearId: lockedYear._id, status: { $in: ["draft", "scheduled", "in_progress"] },
+          }).session(session);
+          if (unfinishedExaminations) {
+            const error = new Error("Complete or cancel all draft and in-progress examinations before closing this academic year");
+            error.code = "ACADEMIC_YEAR_HAS_UNFINISHED_EXAMINATIONS";
+            throw error;
+          }
           const activeEnrollments = await Enrollment.exists({
             tenantId: req.tenantId,
             academicYearId: lockedYear._id,
@@ -347,6 +355,7 @@ export const updateAcademicYear = async (req, res, next) => {
         ACADEMIC_YEAR_HAS_ACTIVE_ENROLLMENTS: 409,
       ACADEMIC_YEAR_DEPENDENCIES_OUT_OF_RANGE: 409,
       ACADEMIC_YEAR_HAS_UNFINISHED_TERMS: 409,
+      ACADEMIC_YEAR_HAS_UNFINISHED_EXAMINATIONS: 409,
         ACADEMIC_YEAR_INVALID_DATE_RANGE: 400,
         ACADEMIC_YEAR_NOT_FOUND: 404,
       };

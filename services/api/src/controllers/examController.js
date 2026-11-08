@@ -86,50 +86,84 @@ export const getExamination = async (req, res, next) => {
 };
 
 export const createExamination = async (req, res, next) => {
+  const body = req.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return invalid(res, "Provide examination details");
+  if (["tenantId", "createdBy", "status"].some((key) => Object.hasOwn(body, key))) return invalid(res, "School, creator and initial status are determined by the server");
+  const { academicYearId, academicTermId = null, classId, sectionId = null, name, startDate, endDate } = body;
+  if (!validId(academicYearId) || !validId(classId)) return invalid(res, "A valid academic year and class are required");
+  if (academicTermId !== null && !validId(academicTermId)) return invalid(res, "Invalid academic term ID");
+  if (sectionId !== null && sectionId !== "" && !validId(sectionId)) return invalid(res, "Invalid section ID");
+  if (typeof name !== "string" || !name.trim() || name.trim().length > 100) return invalid(res, "Examination name is required and must be 100 characters or fewer");
+  const startDateValue = new Date(startDate), endDateValue = new Date(endDate);
+  if (!Number.isFinite(startDateValue.getTime()) || !Number.isFinite(endDateValue.getTime()) || endDateValue < startDateValue) return invalid(res, "Provide valid examination dates with the end date on or after the start date");
+
+  const session = await mongoose.startSession();
+  let examinationId;
   try {
-    const body = req.body;
-    if (!body || typeof body !== "object" || Array.isArray(body)) return invalid(res, "Provide examination details");
-    if (["tenantId", "createdBy", "status"].some((key) => Object.hasOwn(body, key))) return invalid(res, "School, creator and initial status are determined by the server");
-    const { academicYearId, academicTermId = null, classId, sectionId = null, name, startDate, endDate } = body;
-    if (!validId(academicYearId) || !validId(classId)) return invalid(res, "A valid academic year and class are required");
-    if (academicTermId !== null && !validId(academicTermId)) return invalid(res, "Invalid academic term ID");
-    if (sectionId !== null && sectionId !== "" && !validId(sectionId)) return invalid(res, "Invalid section ID");
-    if (typeof name !== "string" || !name.trim() || name.trim().length > 100) return invalid(res, "Examination name is required and must be 100 characters or fewer");
-    const start = new Date(startDate), end = new Date(endDate);
-    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end < start) return invalid(res, "Provide valid examination dates with the end date on or after the start date");
-    const [year, schoolClass] = await Promise.all([
-      AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id startDate endDate").lean(),
-      SchoolClass.findOne({ _id: classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").lean(),
-    ]);
-    if (!year) return invalid(res, "Select an open academic year from this school");
-    if (!schoolClass || String(schoolClass.academicYearId) !== String(academicYearId)) return invalid(res, "The selected class does not belong to this academic year and school");
-    if (start < new Date(year.startDate) || end > new Date(year.endDate)) return invalid(res, "Examination dates must fall within the selected academic year");
-    let selectedTerm = null;
-    if (academicTermId) {
-      selectedTerm = await AcademicTerm.findOne({ _id: academicTermId, tenantId: req.tenantId, academicYearId, status: { $ne: "cancelled" } }).select("_id startDate endDate").lean();
-      if (!selectedTerm) return invalid(res, "Select a valid term belonging to the selected academic year");
-      if (start < new Date(selectedTerm.startDate) || end > new Date(selectedTerm.endDate)) return invalid(res, "Examination dates must fall within the selected academic term");
-    }
-    const selectedSection = sectionId || null;
-    if (selectedSection && !await Section.exists({ _id: selectedSection, tenantId: req.tenantId, classId, status: "active" })) return invalid(res, "The selected section is not active in this class");
-    const curriculum = await ClassSubject.find({ tenantId: req.tenantId, academicYearId, classId, status: "active" })
-      .populate("subjectId", "name code category").sort({ sortOrder: 1, _id: 1 }).lean();
-    const exam = await Examination.create({
-      tenantId: req.tenantId, academicYearId, academicTermId: selectedTerm?._id || null, classId, sectionId: selectedSection,
-      name: name.trim(), startDate: start, endDate: end, createdBy: req.auth.userId,
-      curriculumSnapshot: curriculum.map((item) => ({
-        subjectId: item.subjectId._id, subjectName: item.subjectId.name,
-        subjectCode: item.subjectId.code || "", category: item.category,
-        weeklyPeriods: item.weeklyPeriods, sortOrder: item.sortOrder,
-      })),
+    await session.withTransaction(async () => {
+      const year = await AcademicYear.findOneAndUpdate(
+        { _id: academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
+        { $inc: { lifecycleRevision: 1 } }, { new: true, session }
+      ).select("_id startDate endDate status").lean();
+      if (!year) { const error = new Error("Select an open academic year from this school"); error.code = "EXAM_YEAR_INVALID"; throw error; }
+      if (startDateValue < new Date(year.startDate) || endDateValue > new Date(year.endDate)) {
+        const error = new Error("Examination dates must fall within the selected academic year"); error.code = "EXAM_OUTSIDE_YEAR"; throw error;
+      }
+      const schoolClass = await SchoolClass.findOneAndUpdate(
+        { _id: classId, tenantId: req.tenantId, academicYearId, status: "active" },
+        { $inc: { placementRevision: 1 } }, { new: true, session }
+      ).select("_id").lean();
+      if (!schoolClass) { const error = new Error("The selected class does not belong to this academic year and school or is inactive"); error.code = "EXAM_CLASS_INVALID"; throw error; }
+
+      let selectedTerm = null;
+      if (academicTermId) {
+        selectedTerm = await AcademicTerm.findOne({
+          _id: academicTermId, tenantId: req.tenantId, academicYearId, status: { $ne: "cancelled" },
+        }).select("_id startDate endDate").session(session).lean();
+        if (!selectedTerm) { const error = new Error("Select a valid term belonging to the selected academic year"); error.code = "EXAM_TERM_INVALID"; throw error; }
+        if (startDateValue < new Date(selectedTerm.startDate) || endDateValue > new Date(selectedTerm.endDate)) {
+          const error = new Error("Examination dates must fall within the selected academic term"); error.code = "EXAM_OUTSIDE_TERM"; throw error;
+        }
+      }
+      const selectedSection = sectionId || null;
+      if (selectedSection) {
+        const section = await Section.findOneAndUpdate(
+          { _id: selectedSection, tenantId: req.tenantId, classId, status: "active" },
+          { $inc: { capacityRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!section) { const error = new Error("The selected section is not active in this class"); error.code = "EXAM_SECTION_INVALID"; throw error; }
+      }
+      const curriculum = await ClassSubject.find({
+        tenantId: req.tenantId, academicYearId, classId, status: "active",
+      }).populate("subjectId", "name code category").sort({ sortOrder: 1, _id: 1 }).session(session).lean();
+      const [created] = await Examination.create([{
+        tenantId: req.tenantId, academicYearId, academicTermId: selectedTerm?._id || null,
+        classId, sectionId: selectedSection, name: name.trim(),
+        startDate: startDateValue, endDate: endDateValue, createdBy: req.auth.userId,
+        curriculumSnapshot: curriculum.map((item) => ({
+          subjectId: item.subjectId._id, subjectName: item.subjectId.name,
+          subjectCode: item.subjectId.code || "", category: item.category,
+          weeklyPeriods: item.weeklyPeriods, sortOrder: item.sortOrder,
+        })),
+      }], { session });
+      examinationId = created._id;
     });
-    const data = await populatedExam(Examination.findOne({ _id: exam._id, tenantId: req.tenantId })).lean();
+    const data = await populatedExam(Examination.findOne({ _id: examinationId, tenantId: req.tenantId })).lean();
     return res.status(201).json({ success: true, data });
   } catch (error) {
+    const conflicts = {
+      EXAM_YEAR_INVALID: [400, "Select an open academic year from this school"],
+      EXAM_OUTSIDE_YEAR: [400, "Examination dates must fall within the selected academic year"],
+      EXAM_CLASS_INVALID: [400, "The selected class does not belong to this academic year and school or is inactive"],
+      EXAM_TERM_INVALID: [400, "Select a valid term belonging to the selected academic year"],
+      EXAM_OUTSIDE_TERM: [400, "Examination dates must fall within the selected academic term"],
+      EXAM_SECTION_INVALID: [400, "The selected section is not active in this class"],
+    };
+    if (conflicts[error.code]) return res.status(conflicts[error.code][0]).json({ success: false, message: conflicts[error.code][1] });
     if (error.code === 11000) return res.status(409).json({ success: false, message: "An examination with this name already exists for this class and academic year scope" });
     if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more examination fields are invalid");
     return next(error);
-  }
+  } finally { await session.endSession(); }
 };
 
 export const updateExaminationStatus = async (req, res, next) => {

@@ -94,6 +94,9 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     expect(created.body.data.status).toBe("draft");
     const active = await request(`/academic-terms/${created.body.data._id}`, { token: admin.token, method: "PATCH", body: JSON.stringify({ status: "active" }) });
     expect(active.status).toBe(200);
+    const blockedClose = await request(`/academic-years/${year._id}`, { token: admin.token, method: "PATCH", body: JSON.stringify({ status: "closed" }) });
+    expect(blockedClose.status).toBe(409);
+    expect(blockedClose.body.message).toMatch(/academic terms/i);
     const overlap = await request("/academic-terms", { token: admin.token, method: "POST", body: JSON.stringify({
       academicYearId: String(year._id), name: "Quarter One", startDate: "2026-07-01", endDate: "2026-09-30",
     }) });
@@ -168,6 +171,8 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     const history = await request(`/enrollments/${enrollment._id}/transfers`, { token: admin.token });
     expect(history.status).toBe(200);
     expect(history.body.data).toHaveLength(1);
+    expect(history.body.data[0].previousPlacement.classId.name).toBe("Class A");
+    expect(history.body.data[0].nextPlacement.classId.name).toBe("Class B");
     const crossTenant = await request(`/enrollments/${moved.body.data._id}/transfer`, { token: otherAdmin.token, method: "PATCH", body: JSON.stringify({
       targetClassId: String(classA._id), reason: "Should not cross tenants",
     }) });

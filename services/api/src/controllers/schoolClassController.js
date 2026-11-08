@@ -3,6 +3,7 @@ import SchoolClass from "../models/SchoolClass.js";
 import AcademicYear from "../models/AcademicYear.js";
 import Section from "../models/Section.js";
 import Enrollment from "../models/Enrollment.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const CREATE_FIELDS = ["academicYearId", "name", "sortOrder", "status"];
 const UPDATE_FIELDS = ["name", "sortOrder", "status"];
@@ -86,14 +87,24 @@ export const getClass = async (req, res, next) => {
 };
 
 export const createClass = async (req, res, next) => {
+  const fields = validateBody(req.body, res, true);
+  if (!fields) return;
+  const session = await mongoose.startSession();
+  let data;
   try {
-    const fields = validateBody(req.body, res, true);
-    if (!fields) return;
-    const year = await findUsableAcademicYear(fields.academicYearId, req.tenantId);
-    if (!year) return res.status(400).json({ success: false, message: "Academic year was not found in this school or is closed" });
-    const data = await SchoolClass.create({ ...fields, tenantId: req.tenantId });
+    await session.withTransaction(async () => {
+      const year = await AcademicYear.findOneAndUpdate(
+        { _id: fields.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
+        { $inc: { lifecycleRevision: 1 } }, { new: true, session }
+      ).select("_id").lean();
+      if (!year) { const error = new Error("Academic year was not found in this school or is closed"); error.code = "CLASS_YEAR_UNAVAILABLE"; throw error; }
+      [data] = await SchoolClass.create([{ ...fields, tenantId: req.tenantId }], { session });
+    });
     return res.status(201).json({ success: true, data });
-  } catch (error) { return handleError(error, res, next); }
+  } catch (error) {
+    if (error.code === "CLASS_YEAR_UNAVAILABLE") return res.status(400).json({ success: false, message: "Academic year was not found in this school or is closed" });
+    return handleError(error, res, next);
+  } finally { await session.endSession(); }
 };
 
 export const updateClass = async (req, res, next) => {
@@ -104,22 +115,29 @@ export const updateClass = async (req, res, next) => {
   let updated;
   try {
     await session.withTransaction(async () => {
+      const snapshot = await SchoolClass.findOne({ _id: req.params.classId, tenantId: req.tenantId }).select("_id academicYearId status").session(session).lean();
+      if (!snapshot) { const error = new Error("Class not found"); error.code = "CLASS_NOT_FOUND"; throw error; }
+      if (fields.status === "active") {
+        const year = await AcademicYear.findOneAndUpdate(
+          { _id: snapshot.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
+          { $inc: { lifecycleRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!year) { const error = new Error("A class cannot be activated for a closed academic year"); error.code = "CLASS_YEAR_CLOSED"; throw error; }
+      }
       const schoolClass = await SchoolClass.findOneAndUpdate(
         { _id: req.params.classId, tenantId: req.tenantId },
         { $inc: { placementRevision: 1 } }, { new: true, session }
       );
       if (!schoolClass) { const error = new Error("Class not found"); error.code = "CLASS_NOT_FOUND"; throw error; }
-      if (schoolClass.status === "inactive" && fields.status === "active") {
-        const year = await AcademicYear.findOne({ _id: schoolClass.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).session(session).select("_id").lean();
-        if (!year) { const error = new Error("A class cannot be activated for a closed academic year"); error.code = "CLASS_YEAR_CLOSED"; throw error; }
-      }
       if (fields.status === "inactive") {
-        const [activeSections, activeEnrollments] = await Promise.all([
+        const [activeSections, activeEnrollments, activeAssignments] = await Promise.all([
           Section.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
           Enrollment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
+          TeacherAssignment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
         ]);
         if (activeSections) { const error = new Error("Deactivate this class's active sections before deactivating the class"); error.code = "CLASS_HAS_ACTIVE_SECTIONS"; throw error; }
         if (activeEnrollments) { const error = new Error("End active student enrollments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ENROLLMENTS"; throw error; }
+        if (activeAssignments) { const error = new Error("Deactivate active teacher assignments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ASSIGNMENTS"; throw error; }
       }
       schoolClass.set(fields);
       await schoolClass.save({ session });
@@ -132,6 +150,7 @@ export const updateClass = async (req, res, next) => {
       CLASS_YEAR_CLOSED: [409, "A class cannot be activated for a closed academic year"],
       CLASS_HAS_ACTIVE_SECTIONS: [409, "Deactivate this class's active sections before deactivating the class"],
       CLASS_HAS_ACTIVE_ENROLLMENTS: [409, "End active student enrollments before deactivating this class"],
+      CLASS_HAS_ACTIVE_ASSIGNMENTS: [409, "Deactivate active teacher assignments before deactivating this class"],
     };
     if (conflicts[error.code]) return res.status(conflicts[error.code][0]).json({ success: false, message: conflicts[error.code][1] });
     return handleError(error, res, next);

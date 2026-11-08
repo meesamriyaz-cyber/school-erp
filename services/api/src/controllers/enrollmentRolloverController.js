@@ -5,6 +5,7 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import AcademicTerm from "../models/AcademicTerm.js";
+import Examination from "../models/Examination.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -91,6 +92,10 @@ export const executeAcademicYearRollover = async (req, res, next) => {
         tenantId: req.tenantId, academicYearId: source._id, status: { $in: ["draft", "active"] },
       }).session(session);
       if (unfinishedSourceTerms) throw fail("SOURCE_TERMS", "Complete or cancel all source-year academic terms before rollover");
+      const unfinishedSourceExaminations = await Examination.exists({
+        tenantId: req.tenantId, academicYearId: source._id, status: { $in: ["draft", "scheduled", "in_progress"] },
+      }).session(session);
+      if (unfinishedSourceExaminations) throw fail("SOURCE_EXAMINATIONS", "Complete or cancel all draft and in-progress source-year examinations before rollover");
 
       const targetActiveCount = await Enrollment.countDocuments({ tenantId: req.tenantId, academicYearId: target._id, status: "active" }).session(session);
       if (targetActiveCount) throw fail("TARGET_NOT_EMPTY", "The draft target year already contains active enrollments; resolve them before rollover");
@@ -212,8 +217,8 @@ export const executeAcademicYearRollover = async (req, res, next) => {
     });
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
-    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS", "SOURCE_CLASS", "SOURCE_SECTION"].includes(error.code)) {
-      return res.status(error.code === "YEAR_STATE" ? 409 : ["SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS", "SOURCE_CLASS", "SOURCE_SECTION"].includes(error.code) ? 409 : 400)
+    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS", "SOURCE_CLASS", "SOURCE_SECTION", "SOURCE_EXAMINATIONS"].includes(error.code)) {
+      return res.status(error.code === "YEAR_STATE" ? 409 : ["SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS", "SOURCE_CLASS", "SOURCE_SECTION", "SOURCE_EXAMINATIONS"].includes(error.code) ? 409 : 400)
         .json({ success: false, message: error.message });
     }
     if (error.code === 11000) return res.status(409).json({ success: false, message: "A student already has an active enrollment or a target placement conflicts with existing data" });

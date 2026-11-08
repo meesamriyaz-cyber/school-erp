@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import AcademicTerm from "../models/AcademicTerm.js";
 import AcademicYear from "../models/AcademicYear.js";
+import Attendance from "../models/Attendance.js";
+import Examination from "../models/Examination.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -40,6 +42,8 @@ const handle = (error, res, next) => {
     TERM_YEAR_CLOSED: [409, "Terms cannot be changed after the academic year is closed"],
     TERM_LIFECYCLE: [409, "Invalid academic-term lifecycle transition or the term is locked"],
     TERM_NOT_FOUND: [404, "Academic term not found"],
+    TERM_HAS_DEPENDENT_RECORDS: [409, "The term cannot be cancelled or shortened because attendance or examination records are linked to dates outside its range"],
+    TERM_HAS_UNFINISHED_EXAMINATIONS: [409, "Complete or cancel all draft and in-progress examinations before completing the term"],
   };
   if (statuses[error.code]) return res.status(statuses[error.code][0]).json({ success: false, message: statuses[error.code][1] });
   if (error.code === 11000) return res.status(409).json({ success: false, message: "A term with this name already exists or another term is already active" });
@@ -113,9 +117,37 @@ export const updateAcademicTerm = async (req, res, next) => {
         const error = new Error("An academic term can only be activated while its academic year is active"); error.code = "TERM_YEAR_CLOSED"; throw error;
       }
       const nextStart = fields.startDate ?? term.startDate, nextEnd = fields.endDate ?? term.endDate;
-      if (Object.hasOwn(fields, "startDate") || Object.hasOwn(fields, "endDate")) await checkRangeAndOverlap({
-        tenantId: req.tenantId, year, startDate: nextStart, endDate: nextEnd, excludeId: term._id, session,
-      });
+      const startDay = dayStart(nextStart);
+      const endDayExclusive = new Date(dayStart(nextEnd).getTime() + 86400000);
+      if (Object.hasOwn(fields, "startDate") || Object.hasOwn(fields, "endDate")) {
+        await checkRangeAndOverlap({
+          tenantId: req.tenantId, year, startDate: nextStart, endDate: nextEnd, excludeId: term._id, session,
+        });
+        const [outOfRangeAttendance, outOfRangeExaminations] = await Promise.all([
+          Attendance.exists({ tenantId: req.tenantId, academicTermId: term._id, $or: [{ date: { $lt: startDay } }, { date: { $gte: endDayExclusive } }] }).session(session),
+          Examination.exists({ tenantId: req.tenantId, academicTermId: term._id, $or: [{ startDate: { $lt: startDay } }, { endDate: { $gte: endDayExclusive } }] }).session(session),
+        ]);
+        if (outOfRangeAttendance || outOfRangeExaminations) {
+          const error = new Error("The term cannot be shortened or moved outside existing attendance or examination dates"); error.code = "TERM_HAS_DEPENDENT_RECORDS"; throw error;
+        }
+      }
+      if (fields.status === "cancelled") {
+        const [hasAttendance, hasExaminations] = await Promise.all([
+          Attendance.exists({ tenantId: req.tenantId, academicTermId: term._id }).session(session),
+          Examination.exists({ tenantId: req.tenantId, academicTermId: term._id }).session(session),
+        ]);
+        if (hasAttendance || hasExaminations) {
+          const error = new Error("A term with linked attendance or examination records cannot be cancelled"); error.code = "TERM_HAS_DEPENDENT_RECORDS"; throw error;
+        }
+      }
+      if (fields.status === "completed") {
+        const unfinishedExaminations = await Examination.exists({
+          tenantId: req.tenantId, academicTermId: term._id, status: { $in: ["draft", "scheduled", "in_progress"] },
+        }).session(session);
+        if (unfinishedExaminations) {
+          const error = new Error("Complete or cancel all draft and in-progress examinations before completing the term"); error.code = "TERM_HAS_UNFINISHED_EXAMINATIONS"; throw error;
+        }
+      }
       term.set(fields); term.updatedBy = req.auth.userId;
       await term.save({ session }); updated = term;
     });
