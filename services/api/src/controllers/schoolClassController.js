@@ -131,11 +131,9 @@ export const updateClass = async (req, res, next) => {
       );
       if (!schoolClass) { const error = new Error("Class not found"); error.code = "CLASS_NOT_FOUND"; throw error; }
       if (fields.status === "inactive") {
-        const [activeSections, activeEnrollments, activeAssignments] = await Promise.all([
-          Section.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
-          Enrollment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
-          TeacherAssignment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
-        ]);
+        const activeSections = await Section.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session);
+        const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session);
+        const activeAssignments = await TeacherAssignment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session);
         if (activeSections) { const error = new Error("Deactivate this class's active sections before deactivating the class"); error.code = "CLASS_HAS_ACTIVE_SECTIONS"; throw error; }
         if (activeEnrollments) { const error = new Error("End active student enrollments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ENROLLMENTS"; throw error; }
         if (activeAssignments) { const error = new Error("Deactivate active teacher assignments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ASSIGNMENTS"; throw error; }

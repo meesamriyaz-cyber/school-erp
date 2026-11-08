@@ -35,13 +35,11 @@ export const transferEnrollment = async (req, res, next) => {
       }).session(session);
       if (!source) { const error = new Error("Enrollment not found"); error.code = "ENROLLMENT_NOT_FOUND"; throw error; }
       if (source.status !== "active") { const error = new Error("Only an active enrollment can be transferred within the school"); error.code = "SOURCE_ENROLLMENT_NOT_ACTIVE"; throw error; }
-      const [student, year] = await Promise.all([
-        Student.findOne({ _id: source.studentId, tenantId: req.tenantId, status: "active" }).select("_id").session(session).lean(),
-        AcademicYear.findOneAndUpdate(
-          { _id: source.academicYearId, tenantId: req.tenantId, status: "active" },
-          { $inc: { lifecycleRevision: 1 } }, { new: true, session }
-        ).select("_id startDate endDate status").lean(),
-      ]);
+      const student = await Student.findOne({ _id: source.studentId, tenantId: req.tenantId, status: "active" }).select("_id").session(session).lean();
+      const year = await AcademicYear.findOneAndUpdate(
+        { _id: source.academicYearId, tenantId: req.tenantId, status: "active" },
+        { $inc: { lifecycleRevision: 1 } }, { new: true, session }
+      ).select("_id startDate endDate status").lean();
       if (!student) { const error = new Error("The student is not active in this school"); error.code = "STUDENT_NOT_ACTIVE"; throw error; }
       if (!year) { const error = new Error("Within-school transfers require the active academic year"); error.code = "YEAR_NOT_ACTIVE"; throw error; }
 

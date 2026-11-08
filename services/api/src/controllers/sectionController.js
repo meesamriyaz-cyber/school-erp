@@ -145,10 +145,8 @@ export const updateSection = async (req, res, next) => {
       );
       if (!section) { const error = new Error("Section not found"); error.code = "SECTION_NOT_FOUND"; throw error; }
       if (fields.status === "inactive") {
-        const [activeEnrollments, activeAssignments] = await Promise.all([
-          Enrollment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" }).session(session),
-          TeacherAssignment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" }).session(session),
-        ]);
+        const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" }).session(session);
+        const activeAssignments = await TeacherAssignment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" }).session(session);
         if (activeEnrollments) { const error = new Error("End active student enrollments before deactivating this section"); error.code = "SECTION_HAS_ACTIVE_ENROLLMENTS"; throw error; }
         if (activeAssignments) { const error = new Error("Deactivate active teacher assignments before deactivating this section"); error.code = "SECTION_HAS_ACTIVE_ASSIGNMENTS"; throw error; }
       }

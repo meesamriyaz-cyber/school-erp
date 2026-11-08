@@ -83,30 +83,22 @@ export const createTeacherAssignment = async (req, res, next) => {
   let assignmentId;
   try {
     await ClassSubject.init();
-    console.log("[TA] topology", mongoose.connection.client?.topology?.description?.type);
     await session.withTransaction(async () => {
-      console.log("[TA] transaction started");
-      console.log("[TA] before teacher/subject");
-      const [teacher, subject] = await Promise.all([
-        User.findOne({ _id: fields.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).select("_id").session(session).lean(),
-        Subject.findOne({ _id: fields.subjectId, tenantId: req.tenantId, status: "active" }).select("_id").session(session).lean(),
-      ]);
+      const teacher = await User.findOne({ _id: fields.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).select("_id").session(session).lean();
+      const subject = await Subject.findOne({ _id: fields.subjectId, tenantId: req.tenantId, status: "active" }).select("_id").session(session).lean();
       if (!teacher) { const error = new Error("Select an active teacher account from this school"); error.code = "ASSIGNMENT_TEACHER_INVALID"; throw error; }
       if (!subject) { const error = new Error("Select an active subject from this school"); error.code = "ASSIGNMENT_SUBJECT_INVALID"; throw error; }
-      console.log("[TA] after teacher/subject");
       const year = await AcademicYear.findOneAndUpdate(
         { _id: fields.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
         { $inc: { lifecycleRevision: 1 } }, { new: true, session }
       ).select("_id").lean();
       if (!year) { const error = new Error("Select an open academic year from this school"); error.code = "ASSIGNMENT_YEAR_INVALID"; throw error; }
-      console.log("[TA] after year");
       const schoolClass = await SchoolClass.findOneAndUpdate(
         { _id: fields.classId, tenantId: req.tenantId, academicYearId: fields.academicYearId, status: "active" },
         { $inc: { placementRevision: 1 } }, { new: true, session }
       ).select("_id academicYearId").lean();
       if (!schoolClass) { const error = new Error("The selected class does not belong to this academic year and school or is inactive"); error.code = "ASSIGNMENT_CLASS_INVALID"; throw error; }
 
-      console.log("[TA] after class");
       const curriculumConfigured = await ClassSubject.exists({
         tenantId: req.tenantId, academicYearId: fields.academicYearId,
         classId: schoolClass._id, status: "active",
@@ -117,7 +109,6 @@ export const createTeacherAssignment = async (req, res, next) => {
       }).session(session)) {
         const error = new Error("Map this subject to the class curriculum before assigning a teacher"); error.code = "ASSIGNMENT_CURRICULUM_MISSING"; throw error;
       }
-      console.log("[TA] after curriculum");
       if (fields.sectionId) {
         const section = await Section.findOneAndUpdate(
           { _id: fields.sectionId, tenantId: req.tenantId, classId: schoolClass._id, status: "active" },
@@ -125,7 +116,6 @@ export const createTeacherAssignment = async (req, res, next) => {
         ).select("_id").lean();
         if (!section) { const error = new Error("The selected section is not active in this class"); error.code = "ASSIGNMENT_SECTION_INVALID"; throw error; }
       }
-      console.log("[TA] before create");
       const [created] = await TeacherAssignment.create([{
         ...fields, tenantId: req.tenantId, assignedBy: req.auth.userId,
       }], { session });
@@ -148,7 +138,6 @@ export const createTeacherAssignment = async (req, res, next) => {
       ASSIGNMENT_SECTION_INVALID: [400, "The selected section is not active in this class"],
     };
     if (conflicts[error.code]) return res.status(conflicts[error.code][0]).json({ success: false, message: conflicts[error.code][1] });
-    console.error("[teacher-assignment]", error.name, error.message, error.code, error.stack);
     return handleError(error, res, next);
   } finally { await session.endSession(); }
 };
@@ -180,10 +169,8 @@ export const updateTeacherAssignment = async (req, res, next) => {
         const hasActivePeriods = await TimetableEntry.exists({ tenantId: req.tenantId, assignmentId: assignment._id, status: "active" }).session(session);
         if (hasActivePeriods) { const error = new Error("Deactivate linked timetable periods before deactivating this teacher assignment"); error.code = "ASSIGNMENT_HAS_PERIODS"; throw error; }
       } else {
-        const [teacher, subject] = await Promise.all([
-          User.exists({ _id: assignment.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).session(session),
-          Subject.exists({ _id: assignment.subjectId, tenantId: req.tenantId, status: "active" }).session(session),
-        ]);
+        const teacher = await User.exists({ _id: assignment.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).session(session);
+        const subject = await Subject.exists({ _id: assignment.subjectId, tenantId: req.tenantId, status: "active" }).session(session);
         if (!teacher || !subject) { const error = new Error("Assignment cannot be activated while its teacher or subject is inactive"); error.code = "ASSIGNMENT_DEPENDENCY_INACTIVE"; throw error; }
         const curriculumConfigured = await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, status: "active" }).session(session);
         const curriculumAllows = !curriculumConfigured || await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, subjectId: assignment.subjectId, status: "active" }).session(session);

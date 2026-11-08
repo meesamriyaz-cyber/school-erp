@@ -124,19 +124,15 @@ export const updateAcademicTerm = async (req, res, next) => {
         await checkRangeAndOverlap({
           tenantId: req.tenantId, year, startDate: nextStart, endDate: nextEnd, excludeId: term._id, session,
         });
-        const [outOfRangeAttendance, outOfRangeExaminations] = await Promise.all([
-          Attendance.exists({ tenantId: req.tenantId, academicTermId: term._id, $or: [{ date: { $lt: startDay } }, { date: { $gte: endDayExclusive } }] }).session(session),
-          Examination.exists({ tenantId: req.tenantId, academicTermId: term._id, $or: [{ startDate: { $lt: startDay } }, { endDate: { $gte: endDayExclusive } }] }).session(session),
-        ]);
+        const outOfRangeAttendance = await Attendance.exists({ tenantId: req.tenantId, academicTermId: term._id, $or: [{ date: { $lt: startDay } }, { date: { $gte: endDayExclusive } }] }).session(session);
+        const outOfRangeExaminations = await Examination.exists({ tenantId: req.tenantId, academicTermId: term._id, $or: [{ startDate: { $lt: startDay } }, { endDate: { $gte: endDayExclusive } }] }).session(session);
         if (outOfRangeAttendance || outOfRangeExaminations) {
           const error = new Error("The term cannot be shortened or moved outside existing attendance or examination dates"); error.code = "TERM_HAS_DEPENDENT_RECORDS"; throw error;
         }
       }
       if (fields.status === "cancelled") {
-        const [hasAttendance, hasExaminations] = await Promise.all([
-          Attendance.exists({ tenantId: req.tenantId, academicTermId: term._id }).session(session),
-          Examination.exists({ tenantId: req.tenantId, academicTermId: term._id }).session(session),
-        ]);
+        const hasAttendance = await Attendance.exists({ tenantId: req.tenantId, academicTermId: term._id }).session(session);
+        const hasExaminations = await Examination.exists({ tenantId: req.tenantId, academicTermId: term._id }).session(session);
         if (hasAttendance || hasExaminations) {
           const error = new Error("A term with linked attendance or examination records cannot be cancelled"); error.code = "TERM_HAS_DEPENDENT_RECORDS"; throw error;
         }
