@@ -488,6 +488,36 @@ describe("Guardian API integration tests", () => {
     );
   });
 
+  it("audits relationship deactivation when a non-primary guardian is deactivated", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linked = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ guardianId: String(guardian._id), relationship: "uncle" }),
+    });
+    expect(linked.status).toBe(201);
+
+    const deactivated = await request(`/guardians/${guardian._id}`, {
+      method: "PATCH",
+      token: adminA.token,
+      body: JSON.stringify({ status: "inactive" }),
+    });
+    expect(deactivated.status).toBe(200);
+    const relationships = await request(`/students/${student._id}/guardians`, { token: adminA.token });
+    const updatedLink = relationships.body.data.find(
+      (item) => String(item.guardianId?._id || item.guardianId) === String(guardian._id),
+    );
+    expect(updatedLink.status).toBe("inactive");
+    expect(updatedLink.auditTrail).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "deactivated",
+        actorUserId: String(adminA.user._id),
+        changes: expect.arrayContaining([expect.objectContaining({ field: "status", from: "active", to: "inactive" })]),
+      }),
+    ]));
+  });
+
   it("prevents a teacher from updating a guardian", async () => {
     const guardian = await createGuardian(adminA.token);
 
