@@ -78,6 +78,7 @@ describe("StudentResultsPortal family overview", () => {
   it("renders academic context and subject remarks on a published report card", async () => {
     mocks.apiRequest.mockImplementation((path) => Promise.resolve({
       data: path === "/portal/results" ? [{
+        school: { name: "Green Valley School", contactEmail: "office@example.test" },
         examination: {
           _id: "exam-a",
           name: "Mid Term",
@@ -111,6 +112,8 @@ describe("StudentResultsPortal family overview", () => {
     render(<StudentResultsPortal />);
 
     expect(await screen.findByText("Mid Term")).toBeTruthy();
+    expect(screen.getByText("Green Valley School")).toBeTruthy();
+    expect(screen.getByText("office@example.test")).toBeTruthy();
     expect(screen.getByText("2026-27")).toBeTruthy();
     expect(screen.getByText("Class 5")).toBeTruthy();
     expect(screen.getByText("A", { selector: "strong" })).toBeTruthy();
