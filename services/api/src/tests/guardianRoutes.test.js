@@ -1082,4 +1082,60 @@ describe("Guardian API integration tests", () => {
     ]));
   });
 
+
+  it("links active student and guardian records only to matching tenant portal accounts", async () => {
+    const student = await createStudent(adminA.token);
+    const studentAccount = await createTestUser(schoolA, "student");
+    const studentLink = await request(`/students/${student._id}/account`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ userId: String(studentAccount.user._id) }),
+    });
+    expect(studentLink.status).toBe(200);
+    expect(String(studentLink.body.data.userId)).toBe(String(studentAccount.user._id));
+
+    const guardian = await createGuardian(adminA.token, { firstName: "Parent", lastName: "Account" });
+    const parentAccount = await createTestUser(schoolA, "parent");
+    const guardianLink = await request(`/guardians/${guardian._id}/account`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ userId: String(parentAccount.user._id) }),
+    });
+    expect(guardianLink.status).toBe(200);
+    expect(String(guardianLink.body.data.userId)).toBe(String(parentAccount.user._id));
+  });
+
+  it("rejects portal account linking for inactive student and guardian records", async () => {
+    const student = await createStudent(adminA.token);
+    const studentAccount = await createTestUser(schoolA, "student");
+    await Student.updateOne({ _id: student._id, tenantId: schoolA._id }, { $set: { status: "inactive" } });
+    const studentLink = await request(`/students/${student._id}/account`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ userId: String(studentAccount.user._id) }),
+    });
+    expect(studentLink.status).toBe(404);
+
+    const guardian = await createGuardian(adminA.token, { firstName: "Inactive", lastName: "Guardian" });
+    const parentAccount = await createTestUser(schoolA, "parent");
+    await Guardian.updateOne({ _id: guardian._id, tenantId: schoolA._id }, { $set: { status: "inactive" } });
+    const guardianLink = await request(`/guardians/${guardian._id}/account`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ userId: String(parentAccount.user._id) }),
+    });
+    expect(guardianLink.status).toBe(404);
+  });
+
+  it("rejects linking a student record to a portal account from another school", async () => {
+    const student = await createStudent(adminA.token);
+    const foreignAccount = await createTestUser(schoolB, "student");
+    const response = await request(`/students/${student._id}/account`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ userId: String(foreignAccount.user._id) }),
+    });
+    expect(response.status).toBe(404);
+  });
+
 });
