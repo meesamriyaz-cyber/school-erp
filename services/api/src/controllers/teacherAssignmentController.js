@@ -79,10 +79,10 @@ export const listTeacherAssignments = async (req, res, next) => {
 export const createTeacherAssignment = async (req, res, next) => {
   const fields = validateCreate(req.body, res);
   if (!fields) return;
-  await ClassSubject.init();
   const session = await mongoose.startSession();
   let assignmentId;
   try {
+    await ClassSubject.init();
     await session.withTransaction(async () => {
       const [teacher, subject] = await Promise.all([
         User.findOne({ _id: fields.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).select("_id").session(session).lean(),
@@ -140,6 +140,7 @@ export const createTeacherAssignment = async (req, res, next) => {
       ASSIGNMENT_SECTION_INVALID: [400, "The selected section is not active in this class"],
     };
     if (conflicts[error.code]) return res.status(conflicts[error.code][0]).json({ success: false, message: conflicts[error.code][1] });
+    console.error("[teacher-assignment]", error.name, error.message, error.code, error.stack);
     return handleError(error, res, next);
   } finally { await session.endSession(); }
 };
@@ -150,10 +151,10 @@ export const updateTeacherAssignment = async (req, res, next) => {
     Object.keys(req.body).length !== 1 || !["active", "inactive"].includes(req.body.status)) {
     return invalid(res, "Only active or inactive status can be changed");
   }
-  await ClassSubject.init();
   const session = await mongoose.startSession();
   let updated;
   try {
+    await ClassSubject.init();
     await session.withTransaction(async () => {
       const assignment = await TeacherAssignment.findOne({ _id: req.params.assignmentId, tenantId: req.tenantId }).session(session);
       if (!assignment) { const error = new Error("Teacher assignment not found"); error.code = "ASSIGNMENT_NOT_FOUND"; throw error; }

@@ -142,12 +142,37 @@ export const listEnrollmentTransferHistory = async (req, res, next) => {
     if (!validId(req.params.enrollmentId)) return invalid(res, "Invalid enrollment ID");
     const enrollment = await Enrollment.findOne({ _id: req.params.enrollmentId, tenantId: req.tenantId }).select("_id studentId").lean();
     if (!enrollment) return res.status(404).json({ success: false, message: "Enrollment not found" });
-    const data = await EnrollmentTransferAudit.find({
+    const records = await EnrollmentTransferAudit.find({
       tenantId: req.tenantId, studentId: enrollment.studentId,
     }).populate("changedBy", "firstName lastName email")
       .populate("fromEnrollmentId", "enrollmentDate status")
       .populate("toEnrollmentId", "enrollmentDate status")
       .sort({ transferredAt: -1 }).lean();
+    const classIds = [...new Set(records.flatMap((item) => [
+      String(item.previousPlacement?.classId || ""), String(item.nextPlacement?.classId || ""),
+    ]).filter(Boolean))];
+    const sectionIds = [...new Set(records.flatMap((item) => [
+      String(item.previousPlacement?.sectionId || ""), String(item.nextPlacement?.sectionId || ""),
+    ]).filter((id) => id && id !== "null"))];
+    const [classes, sections] = await Promise.all([
+      classIds.length ? SchoolClass.find({ _id: { $in: classIds }, tenantId: req.tenantId }).select("name").lean() : [],
+      sectionIds.length ? Section.find({ _id: { $in: sectionIds }, tenantId: req.tenantId }).select("name").lean() : [],
+    ]);
+    const classNames = new Map(classes.map((item) => [String(item._id), item]));
+    const sectionNames = new Map(sections.map((item) => [String(item._id), item]));
+    const data = records.map((item) => ({
+      ...item,
+      previousPlacement: {
+        ...item.previousPlacement,
+        classId: classNames.get(String(item.previousPlacement.classId)) || item.previousPlacement.classId,
+        sectionId: item.previousPlacement.sectionId ? sectionNames.get(String(item.previousPlacement.sectionId)) || item.previousPlacement.sectionId : null,
+      },
+      nextPlacement: {
+        ...item.nextPlacement,
+        classId: classNames.get(String(item.nextPlacement.classId)) || item.nextPlacement.classId,
+        sectionId: item.nextPlacement.sectionId ? sectionNames.get(String(item.nextPlacement.sectionId)) || item.nextPlacement.sectionId : null,
+      },
+    }));
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };
