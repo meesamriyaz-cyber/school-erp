@@ -384,10 +384,8 @@ describe("Examination API integration", () => {
     expect(published.status).toBe(200);
     expect(published.body.data.status).toBe("published");
     const frozenExam = await Examination.findById(id).lean();
-    expect(frozenExam.gradingScaleSnapshot).toMatchObject({
-      gradingScaleId: originalScale._id,
-      name: "Original school scale",
-    });
+    expect(String(frozenExam.gradingScaleSnapshot.gradingScaleId)).toBe(String(originalScale._id));
+    expect(frozenExam.gradingScaleSnapshot.name).toBe("Original school scale");
     await GradingScale.updateOne({ _id: originalScale._id }, { $set: { status: "archived" } });
     const replacementScale = await GradingScale.create({
       tenantId: schoolA._id,
