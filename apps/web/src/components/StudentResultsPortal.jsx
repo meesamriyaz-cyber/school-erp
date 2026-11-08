@@ -192,11 +192,13 @@ export default function StudentResultsPortal() {
             <article className="report-card" key={String(item.examination._id) + String(item.result.enrollmentId)}>
               <div className="report-card-heading">
                 <div>
+                  <div className="report-school-name">{item.school?.name || "School"}</div>
+                  {item.school?.contactEmail && <p className="report-school-contact">{item.school.contactEmail}</p>}
                   <div className="report-kicker">OFFICIAL EXAMINATION RESULT</div>
                   <h2>{item.examination.name}</h2>
                   <p>{formatDate(item.examination.startDate)} – {formatDate(item.examination.endDate)}</p>
                 </div>
-                <div className="report-school-mark">S</div>
+                <div className="report-school-mark">{(item.school?.name || "S").slice(0, 1).toUpperCase()}</div>
               </div>
               <div className="report-student">
                 <div><span>Student</span><strong>{[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</strong></div>
