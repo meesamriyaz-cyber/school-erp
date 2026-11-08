@@ -47,7 +47,7 @@ describe("EditStudentForm", () => {
     expect(screen.getByLabelText("First Name")).toHaveValue("Ayaan");
     expect(screen.getByLabelText("Last Name")).toHaveValue("Khan");
     expect(screen.getByLabelText("Gender")).toHaveValue("male");
-    expect(screen.getByLabelText("Guardian Name")).toHaveValue("Imran Khan");
+    expect(screen.getByLabelText("Primary Guardian Name *")).toHaveValue("Imran Khan");
     expect(screen.getByLabelText("Student Photo URL (HTTPS)")).toHaveValue("https://cdn.example.test/ayaan.jpg");
     expect(screen.getByLabelText("Address Line 1")).toHaveValue("Lal Chowk");
     expect(screen.getByLabelText("City / Town")).toHaveValue("Srinagar");
@@ -187,7 +187,7 @@ it("uses defaults for missing student fields and invalid dates", () => {
   expect(screen.getByLabelText("Date of Birth")).toHaveValue("");
   expect(screen.getByLabelText("Gender")).toHaveValue("not_specified");
   expect(screen.getByLabelText("Admission Date")).toHaveValue("");
-  expect(screen.getByLabelText("Guardian Name")).toHaveValue("");
+  expect(screen.getByLabelText("Primary Guardian Name *")).toHaveValue("");
   expect(screen.getByLabelText("Guardian Phone")).toHaveValue("");
   expect(screen.getByLabelText("Guardian Email")).toHaveValue("");
   expect(screen.getByLabelText("Status")).toHaveValue("active");

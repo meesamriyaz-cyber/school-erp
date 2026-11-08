@@ -52,11 +52,9 @@ describe("legacy guardian normalization", () => {
     expect(guardianFind).not.toHaveBeenCalled();
   });
 
-  it("deactivates only legacy-derived links when legacy fields are cleared", async () => {
-    const link = { status: "active", save: vi.fn() };
-    linkFindOne.mockResolvedValue(link);
-    await syncLegacyStudentGuardian(student({ guardianName: "", guardianPhone: null, guardianEmail: null }));
-    expect(link.status).toBe("inactive");
-    expect(link.save).toHaveBeenCalled();
+  it("rejects clearing the required primary guardian details", async () => {
+    await expect(syncLegacyStudentGuardian(student({ guardianName: "", guardianPhone: null, guardianEmail: null })))
+      .rejects.toMatchObject({ code: "PRIMARY_GUARDIAN_REQUIRED" });
+    expect(linkFindOne).not.toHaveBeenCalled();
   });
 });

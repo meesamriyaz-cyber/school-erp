@@ -37,6 +37,8 @@ const studentPayload = (admissionNumber, firstName) => ({
   lastName: "Test",
   admissionDate: "2026-04-01",
   gender: "not_specified",
+  guardianName: "Primary Guardian",
+  guardianRelationship: "other",
 });
 
 const request = async (path, { token, ...options } = {}) => {

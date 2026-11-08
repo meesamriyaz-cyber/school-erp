@@ -36,7 +36,7 @@ describe("StudentForm", () => {
     expect(screen.getByLabelText(/Last name/i)).not.toBeRequired();
     expect(screen.getByLabelText(/Date of birth/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Gender/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Primary guardian name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Primary guardian name/i)).toBeRequired();
     expect(screen.getByLabelText(/Guardian phone/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Guardian email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Student photo URL/i)).toBeInTheDocument();
@@ -116,6 +116,7 @@ it("displays an API error and preserves entered form data", async () => {
 
   await user.type(admissionInput, "ADM-202");
   await user.type(firstNameInput, "Sara");
+  await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
   await user.click(screen.getByRole("button", { name: "Save student" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -208,6 +209,7 @@ it("displays a fallback message when the API error has no message", async () => 
     screen.getByLabelText(/First name/i),
     "Ayaan",
   );
+  await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
 
   await user.click(
     screen.getByRole("button", { name: "Save student" }),

@@ -29,7 +29,7 @@ describe("studentController error forwarding", () => {
   it("forwards unexpected student creation errors and closes the transaction session", async () => {
     const error = new Error("Unexpected database failure");
     create.mockRejectedValueOnce(error);
-    req.body = { admissionNumber: "ADM-001", firstName: "Amina" };
+    req.body = { admissionNumber: "ADM-001", firstName: "Amina", guardianName: "Amina Khan" };
 
     await createStudent(req, res, next);
 
