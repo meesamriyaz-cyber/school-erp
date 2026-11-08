@@ -71,6 +71,7 @@ export const listAcademicTerms = async (req, res, next) => {
 export const createAcademicTerm = async (req, res, next) => {
   const fields = validateBody(req.body, res, true);
   if (!fields) return;
+  await AcademicTerm.init();
   const session = await mongoose.startSession();
   let created;
   try {

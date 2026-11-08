@@ -108,6 +108,7 @@ export const saveAttendance = async (req, res, next) => {
     return invalid(res, "Each record needs a valid status and remarks of at most 300 characters");
   }
 
+  if (academicTermId) await AcademicTerm.init();
   const session = await mongoose.startSession();
   let saved = [];
   try {

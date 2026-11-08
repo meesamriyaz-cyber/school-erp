@@ -25,6 +25,7 @@ export const transferEnrollment = async (req, res, next) => {
     return invalid(res, "Provide a valid target class, optional target section, and transfer reason (maximum 500 characters)");
   }
 
+  await EnrollmentTransferAudit.init();
   const session = await mongoose.startSession();
   let result;
   try {
@@ -146,10 +147,6 @@ export const listEnrollmentTransferHistory = async (req, res, next) => {
     }).populate("changedBy", "firstName lastName email")
       .populate("fromEnrollmentId", "enrollmentDate status")
       .populate("toEnrollmentId", "enrollmentDate status")
-      .populate("previousPlacement.classId", "name")
-      .populate("previousPlacement.sectionId", "name")
-      .populate("nextPlacement.classId", "name")
-      .populate("nextPlacement.sectionId", "name")
       .sort({ transferredAt: -1 }).lean();
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }

@@ -4,6 +4,7 @@ import SchoolClass from "../models/SchoolClass.js";
 import AcademicYear from "../models/AcademicYear.js";
 import Enrollment from "../models/Enrollment.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const CREATE_FIELDS = ["classId", "name", "capacity", "status"];
 const UPDATE_FIELDS = ["name", "capacity", "status"];
@@ -166,6 +167,7 @@ export const updateSection = async (req, res, next) => {
       SECTION_PARENT_INACTIVE: [409, "A section cannot be activated while its class is inactive"],
       SECTION_YEAR_CLOSED: [409, "A section cannot be activated for a closed academic year"],
       SECTION_HAS_ACTIVE_ENROLLMENTS: [409, "End active student enrollments before deactivating this section"],
+      SECTION_HAS_ACTIVE_ASSIGNMENTS: [409, "Deactivate active teacher assignments before deactivating this section"],
       SECTION_HAS_ACTIVE_ASSIGNMENTS: [409, "Deactivate active teacher assignments before deactivating this section"],
       SECTION_CAPACITY_BELOW_ENROLLMENTS: [409, "Section capacity cannot be lower than its active enrollment count"],
     };

@@ -88,6 +88,8 @@ const userSchema = new mongoose.Schema(
     min: 0,
     },
 
+    timetableRevision: { type: Number, default: 0, min: 0, select: false },
+
 
     lastLoginAt: {
       type: Date,

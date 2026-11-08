@@ -4,6 +4,7 @@ import AcademicYear from "../models/AcademicYear.js";
 import Section from "../models/Section.js";
 import Enrollment from "../models/Enrollment.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const CREATE_FIELDS = ["academicYearId", "name", "sortOrder", "status"];
 const UPDATE_FIELDS = ["name", "sortOrder", "status"];
@@ -138,6 +139,7 @@ export const updateClass = async (req, res, next) => {
         if (activeSections) { const error = new Error("Deactivate this class's active sections before deactivating the class"); error.code = "CLASS_HAS_ACTIVE_SECTIONS"; throw error; }
         if (activeEnrollments) { const error = new Error("End active student enrollments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ENROLLMENTS"; throw error; }
         if (activeAssignments) { const error = new Error("Deactivate active teacher assignments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ASSIGNMENTS"; throw error; }
+        if (activeAssignments) { const error = new Error("Deactivate active teacher assignments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ASSIGNMENTS"; throw error; }
       }
       schoolClass.set(fields);
       await schoolClass.save({ session });
@@ -150,6 +152,7 @@ export const updateClass = async (req, res, next) => {
       CLASS_YEAR_CLOSED: [409, "A class cannot be activated for a closed academic year"],
       CLASS_HAS_ACTIVE_SECTIONS: [409, "Deactivate this class's active sections before deactivating the class"],
       CLASS_HAS_ACTIVE_ENROLLMENTS: [409, "End active student enrollments before deactivating this class"],
+      CLASS_HAS_ACTIVE_ASSIGNMENTS: [409, "Deactivate active teacher assignments before deactivating this class"],
       CLASS_HAS_ACTIVE_ASSIGNMENTS: [409, "Deactivate active teacher assignments before deactivating this class"],
     };
     if (conflicts[error.code]) return res.status(conflicts[error.code][0]).json({ success: false, message: conflicts[error.code][1] });

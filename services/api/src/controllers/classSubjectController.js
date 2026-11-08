@@ -37,6 +37,7 @@ export const saveClassSubject = async (req, res, next) => {
   if (fields.sortOrder !== undefined && (!Number.isInteger(fields.sortOrder) || fields.sortOrder < 0 || fields.sortOrder > 1000)) return invalid(res, "Sort order must be an integer from 0 to 1000");
   if (fields.status !== undefined && !["active", "inactive"].includes(fields.status)) return invalid(res, "Invalid curriculum status");
 
+  await ClassSubject.init();
   const session = await mongoose.startSession();
   let mappingId, created = false;
   try {

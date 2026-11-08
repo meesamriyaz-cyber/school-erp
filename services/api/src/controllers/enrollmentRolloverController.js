@@ -73,6 +73,7 @@ export const executeAcademicYearRollover = async (req, res, next) => {
     }
   }
 
+  await AcademicTerm.init();
   const session = await mongoose.startSession();
   let result;
   try {

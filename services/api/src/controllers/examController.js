@@ -97,6 +97,8 @@ export const createExamination = async (req, res, next) => {
   const startDateValue = new Date(startDate), endDateValue = new Date(endDate);
   if (!Number.isFinite(startDateValue.getTime()) || !Number.isFinite(endDateValue.getTime()) || endDateValue < startDateValue) return invalid(res, "Provide valid examination dates with the end date on or after the start date");
 
+  await ClassSubject.init();
+  if (academicTermId) await AcademicTerm.init();
   const session = await mongoose.startSession();
   let examinationId;
   try {
@@ -200,6 +202,7 @@ export const updateExaminationStatus = async (req, res, next) => {
 
 export const addExaminationSubject = async (req, res, next) => {
   try {
+    await ClassSubject.init();
     if (!validId(req.params.examinationId)) return invalid(res, "Invalid examination ID");
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body)) return invalid(res, "Provide examination subject details");

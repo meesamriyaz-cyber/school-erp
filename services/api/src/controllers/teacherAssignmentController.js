@@ -79,6 +79,7 @@ export const listTeacherAssignments = async (req, res, next) => {
 export const createTeacherAssignment = async (req, res, next) => {
   const fields = validateCreate(req.body, res);
   if (!fields) return;
+  await ClassSubject.init();
   const session = await mongoose.startSession();
   let assignmentId;
   try {
@@ -149,29 +150,32 @@ export const updateTeacherAssignment = async (req, res, next) => {
     Object.keys(req.body).length !== 1 || !["active", "inactive"].includes(req.body.status)) {
     return invalid(res, "Only active or inactive status can be changed");
   }
+  await ClassSubject.init();
   const session = await mongoose.startSession();
   let updated;
   try {
     await session.withTransaction(async () => {
       const assignment = await TeacherAssignment.findOne({ _id: req.params.assignmentId, tenantId: req.tenantId }).session(session);
       if (!assignment) { const error = new Error("Teacher assignment not found"); error.code = "ASSIGNMENT_NOT_FOUND"; throw error; }
+      const year = await AcademicYear.findOneAndUpdate(
+        { _id: assignment.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
+        { $inc: { lifecycleRevision: 1 } }, { new: true, session }
+      ).select("_id").lean();
+      const schoolClass = await SchoolClass.findOneAndUpdate(
+        { _id: assignment.classId, tenantId: req.tenantId, academicYearId: assignment.academicYearId, status: "active" },
+        { $inc: { placementRevision: 1 } }, { new: true, session }
+      ).select("_id").lean();
+      if (!year || !schoolClass) { const error = new Error("Assignment cannot be changed for a closed academic year or inactive class"); error.code = "ASSIGNMENT_DEPENDENCY_INACTIVE"; throw error; }
+
       if (req.body.status === "inactive") {
         const hasActivePeriods = await TimetableEntry.exists({ tenantId: req.tenantId, assignmentId: assignment._id, status: "active" }).session(session);
         if (hasActivePeriods) { const error = new Error("Deactivate linked timetable periods before deactivating this teacher assignment"); error.code = "ASSIGNMENT_HAS_PERIODS"; throw error; }
       } else {
-        const year = await AcademicYear.findOneAndUpdate(
-          { _id: assignment.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
-          { $inc: { lifecycleRevision: 1 } }, { new: true, session }
-        ).select("_id").lean();
-        const schoolClass = await SchoolClass.findOneAndUpdate(
-          { _id: assignment.classId, tenantId: req.tenantId, academicYearId: assignment.academicYearId, status: "active" },
-          { $inc: { placementRevision: 1 } }, { new: true, session }
-        ).select("_id").lean();
         const [teacher, subject] = await Promise.all([
           User.exists({ _id: assignment.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).session(session),
           Subject.exists({ _id: assignment.subjectId, tenantId: req.tenantId, status: "active" }).session(session),
         ]);
-        if (!teacher || !subject || !year || !schoolClass) { const error = new Error("Assignment cannot be activated while its teacher, subject, academic year or class is inactive"); error.code = "ASSIGNMENT_DEPENDENCY_INACTIVE"; throw error; }
+        if (!teacher || !subject) { const error = new Error("Assignment cannot be activated while its teacher or subject is inactive"); error.code = "ASSIGNMENT_DEPENDENCY_INACTIVE"; throw error; }
         const curriculumConfigured = await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, status: "active" }).session(session);
         const curriculumAllows = !curriculumConfigured || await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, subjectId: assignment.subjectId, status: "active" }).session(session);
         if (!curriculumAllows) { const error = new Error("Assignment cannot be activated because its subject is not in the active class curriculum"); error.code = "ASSIGNMENT_CURRICULUM_MISSING"; throw error; }
@@ -192,7 +196,7 @@ export const updateTeacherAssignment = async (req, res, next) => {
     const conflicts = {
       ASSIGNMENT_NOT_FOUND: [404, "Teacher assignment not found"],
       ASSIGNMENT_HAS_PERIODS: [409, "Deactivate linked timetable periods before deactivating this teacher assignment"],
-      ASSIGNMENT_DEPENDENCY_INACTIVE: [409, "Assignment cannot be activated while its teacher, subject, academic year or class is inactive"],
+      ASSIGNMENT_DEPENDENCY_INACTIVE: [409, "Assignment cannot be changed for a closed academic year or inactive class or teacher or subject"],
       ASSIGNMENT_CURRICULUM_MISSING: [409, "Assignment cannot be activated because its subject is not in the active class curriculum"],
       ASSIGNMENT_SECTION_INVALID: [409, "Assignment cannot be activated while its section is inactive"],
     };

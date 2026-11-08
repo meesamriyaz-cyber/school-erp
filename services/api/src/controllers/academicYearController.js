@@ -5,6 +5,8 @@ import Enrollment from "../models/Enrollment.js";
 import Attendance from "../models/Attendance.js";
 import Examination from "../models/Examination.js";
 import AcademicTerm from "../models/AcademicTerm.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
+import TimetableEntry from "../models/TimetableEntry.js";
 
 const CREATE_FIELDS = ["name", "startDate", "endDate", "status"];
 const UPDATE_FIELDS = CREATE_FIELDS;
@@ -203,6 +205,7 @@ export const updateAcademicYear = async (req, res, next) => {
     const fields = validateBody(req.body, res);
     if (!fields) return;
 
+    await AcademicTerm.init();
     session = await mongoose.startSession();
     let updatedAcademicYear;
 
@@ -344,6 +347,16 @@ export const updateAcademicYear = async (req, res, next) => {
         lockedYear.set("startDate", nextStartDate);
         lockedYear.set("endDate", nextEndDate);
         lockedYear.set(fields);
+        if (nextStatus === "closed") {
+          await TeacherAssignment.updateMany(
+            { tenantId: req.tenantId, academicYearId: lockedYear._id, status: "active" },
+            { $set: { status: "inactive" } }, { session }
+          );
+          await TimetableEntry.updateMany(
+            { tenantId: req.tenantId, academicYearId: lockedYear._id, status: "active" },
+            { $set: { status: "inactive" } }, { session }
+          );
+        }
         await lockedYear.save({ session });
         updatedAcademicYear = lockedYear;
       });
