@@ -3,8 +3,8 @@ import { buildExaminationAnalytics } from "../utils/examinationAnalytics.js";
 
 const bands = [
   { grade: "A", minPercentage: 80, maxPercentage: 100 },
-  { grade: "F", minPercentage: 0, maxPercentage: 40 },
-  { grade: "B", minPercentage: 40, maxPercentage: 80 },
+  { grade: "F", minPercentage: 0, maxPercentage: 50 },
+  { grade: "B", minPercentage: 50, maxPercentage: 80 },
 ];
 
 describe("examination performance analytics", () => {
