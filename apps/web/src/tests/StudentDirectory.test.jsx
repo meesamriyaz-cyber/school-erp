@@ -4,13 +4,14 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import StudentDirectory from "../components/StudentDirectory.jsx";
 import { fireEvent } from "@testing-library/react";
 import { apiRequest } from "../lib/api.js";
+import { useAuth } from "../context/authContext.js";
 
 vi.mock("../lib/api.js", () => ({
   apiRequest: vi.fn(),
 }));
 
 vi.mock("../context/authContext.js", () => ({
-  useAuth: () => ({ accessToken: "test-access-token" }),
+  useAuth: vi.fn(),
 }));
 
 vi.mock("../components/StudentForm.jsx", () => ({
@@ -54,6 +55,7 @@ vi.mock("../components/StudentDetails.jsx", () => ({
 describe("StudentDirectory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuth.mockReturnValue({ accessToken: "test-access-token", user: { role: "school_admin" } });
   });
 
   it("loads and displays student records", async () => {
@@ -99,6 +101,19 @@ describe("StudentDirectory", () => {
     );
   });
   
+it("hides student creation controls from teachers", async () => {
+  useAuth.mockReturnValue({ accessToken: "test-access-token", user: { role: "teacher" } });
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: [],
+    pagination: { total: 0 },
+  });
+
+  render(<StudentDirectory />);
+  expect(await screen.findByText("No records")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "+ Add student" })).not.toBeInTheDocument();
+});
+
 it("displays an error and a Retry button when loading students fails", async () => {
   apiRequest.mockRejectedValueOnce(
     new Error("Unable to load students."),
