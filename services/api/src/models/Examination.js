@@ -8,6 +8,7 @@ const examinationSchema = new mongoose.Schema(
       required: true,
       immutable: true,
     },
+    academicTermId: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicTerm", default: null },
     academicYearId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AcademicYear",

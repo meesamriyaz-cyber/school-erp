@@ -8,6 +8,8 @@ import { useAuth } from "./context/authContext.js";
 import LoginPage from "./components/LoginPage.jsx";
 import StudentDirectory from "./components/StudentDirectory.jsx";
 import AcademicYearManagement from "./components/AcademicYearManagement.jsx";
+import AcademicTermsManagement from "./components/AcademicTermsManagement.jsx";
+import ClassCurriculumManagement from "./components/ClassCurriculumManagement.jsx";
 import ClassesManagement from "./components/ClassesManagement.jsx";
 import SectionsManagement from "./components/SectionsManagement.jsx";
 import EnrollmentsManagement from "./components/EnrollmentsManagement.jsx";
@@ -31,12 +33,14 @@ const navigation = [
   { label: "Guardians", icon: "♧", section: "MAIN" },
   { label: "Teachers & Staff", icon: "♙", section: "MAIN" },
   { label: "Academic Years", icon: "▣", section: "ACADEMICS" },
+  { label: "Academic Terms", icon: "▤", section: "ACADEMICS" },
   { label: "Classes & Sections", icon: "▤", section: "ACADEMICS" },
   { label: "Sections", icon: "▧", section: "ACADEMICS" },
   { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
   { label: "Attendance Reports", icon: "▥", section: "ACADEMICS" },
   { label: "Subjects", icon: "▤", section: "ACADEMICS" },
+  { label: "Class Curriculum", icon: "▦", section: "ACADEMICS" },
   { label: "Teacher Assignments", icon: "♙", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
@@ -413,6 +417,10 @@ function DashboardApp() {
   <GuardianDirectory />
 ) : activePage === "Academic Years" ? (
   <AcademicYearManagement />
+) : activePage === "Academic Terms" ? (
+  <AcademicTermsManagement />
+) : activePage === "Class Curriculum" ? (
+  <ClassCurriculumManagement />
 ) : activePage === "Classes & Sections" ? (
   <ClassesManagement />
 ) : activePage === "Sections" ? (

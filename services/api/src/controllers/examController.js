@@ -137,6 +137,9 @@ export const updateExaminationStatus = async (req, res, next) => {
       in_progress: ["completed"], completed: [], published: [],
     };
     if (!allowed[exam.status]?.includes(req.body.status)) return res.status(409).json({ success: false, message: `Cannot change examination from ${exam.status} to ${req.body.status}` });
+    if (req.body.status === "scheduled" && exam.academicTermId && !await AcademicTerm.exists({ _id: exam.academicTermId, tenantId: req.tenantId, academicYearId: exam.academicYearId, status: "active" })) {
+      return res.status(409).json({ success: false, message: "The examination's academic term must be active before scheduling" });
+    }
     if (req.body.status === "scheduled" && !await ExamSubject.exists({ tenantId: req.tenantId, examinationId: exam._id })) {
       return res.status(409).json({ success: false, message: "Configure at least one subject before scheduling this examination" });
     }

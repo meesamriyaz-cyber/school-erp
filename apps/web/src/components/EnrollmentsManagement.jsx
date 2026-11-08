@@ -182,7 +182,7 @@ export default function EnrollmentsManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    if (!transferClassId) { setTransferSections([]); setTransferSectionId(""); return () => controller.abort(); }
+    if (!transferClassId) return () => controller.abort();
     apiRequest(`/sections?classId=${encodeURIComponent(transferClassId)}&status=active`, { accessToken, signal: controller.signal })
       .then((response) => { if (!controller.signal.aborted) setTransferSections(Array.isArray(response?.data) ? response.data : []); })
       .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load transfer sections."); });
@@ -308,7 +308,7 @@ export default function EnrollmentsManagement() {
 
     {pendingTransfer && <form className="enrollment-form" onSubmit={confirmTransfer}>
       <div><h3>Transfer {displayName(pendingTransfer.studentId)} within this school</h3><p>The current placement will be retained in history and a new active placement will be created atomically.</p></div>
-      <label>Target class<select required value={transferClassId} onChange={(event) => { setTransferClassId(event.target.value); setTransferSectionId(""); }}><option value="">Select class</option>{classes.filter((item) => item.status === "active").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Target class<select required value={transferClassId} onChange={(event) => { setTransferClassId(event.target.value); setTransferSectionId(""); setTransferSections([]); }}><option value="">Select class</option>{classes.filter((item) => item.status === "active").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Target section (optional)<select value={transferSectionId} onChange={(event) => setTransferSectionId(event.target.value)} disabled={!transferClassId}><option value="">No section</option>{transferSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Reason for transfer<textarea required maxLength={500} value={transferReason} onChange={(event) => setTransferReason(event.target.value)} placeholder="Record the reason for this class or section change." /></label>
       <div className="enrollment-form-actions"><button type="button" className="enrollment-button secondary" onClick={() => setPendingTransfer(null)} disabled={transferring}>Cancel</button><button type="submit" className="enrollment-button primary" disabled={transferring || !transferClassId || !transferReason.trim()}>{transferring ? "Transferring…" : "Confirm transfer"}</button></div>

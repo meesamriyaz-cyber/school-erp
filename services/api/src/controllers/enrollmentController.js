@@ -209,8 +209,7 @@ export const createEnrollment = async (req, res, next) => {
           if (error.code === "SECTION_NOT_ACTIVE") {
             return res.status(400).json({ success: false, message: error.message });
           }
-          if (error.code === "CLASS_NOT_ACTIVE") return res.status(400).json({ success: false, message: error.message });
-      if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
+          if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
             return res.status(400).json({ success: false, message: error.message });
           }
           if (error.code === "ENROLLMENT_DATE_OUT_OF_RANGE") {
@@ -267,6 +266,7 @@ export const createEnrollment = async (req, res, next) => {
         data = created[0];
       });
     } catch (error) {
+      if (error.code === "CLASS_NOT_ACTIVE") return res.status(400).json({ success: false, message: error.message });
       if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
         return res.status(400).json({ success: false, message: error.message });
       }

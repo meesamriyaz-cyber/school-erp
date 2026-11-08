@@ -6,6 +6,7 @@ const attendanceSchema = new mongoose.Schema(
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: "Student", required: true, immutable: true },
     enrollmentId: { type: mongoose.Schema.Types.ObjectId, ref: "Enrollment", required: true, immutable: true },
     academicYearId: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicYear", required: true, immutable: true },
+    academicTermId: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicTerm", default: null },
     classId: { type: mongoose.Schema.Types.ObjectId, ref: "SchoolClass", required: true, immutable: true },
     sectionId: { type: mongoose.Schema.Types.ObjectId, ref: "Section", default: null, immutable: true },
     date: { type: Date, required: true, immutable: true },

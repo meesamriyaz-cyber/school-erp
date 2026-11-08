@@ -295,9 +295,6 @@ export const updateAcademicYear = async (req, res, next) => {
             throw error;
           }
 
-          const startOfDayAfterLastDay = new Date(Date.UTC(
-            nextEndDate.getUTCFullYear(), nextEndDate.getUTCMonth(), nextEndDate.getUTCDate() + 1
-          ));
           const [outOfRangeAttendance, outOfRangeExamination, outOfRangeTerm] = await Promise.all([
             Attendance.exists({ tenantId: req.tenantId, academicYearId: lockedYear._id, $or: [{ date: { $lt: startOfFirstDay } }, { date: { $gte: startOfDayAfterLastDay } }] }).session(session),
             Examination.exists({ tenantId: req.tenantId, academicYearId: lockedYear._id, $or: [{ startDate: { $lt: startOfFirstDay } }, { endDate: { $gte: startOfDayAfterLastDay } }] }).session(session),

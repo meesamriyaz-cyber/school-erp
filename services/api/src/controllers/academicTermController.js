@@ -109,6 +109,9 @@ export const updateAcademicTerm = async (req, res, next) => {
       if (fields.status && fields.status !== term.status && !transitions[term.status]?.includes(fields.status)) {
         const error = new Error("Invalid academic-term lifecycle transition"); error.code = "TERM_LIFECYCLE"; throw error;
       }
+      if (fields.status === "active" && year.status !== "active") {
+        const error = new Error("An academic term can only be activated while its academic year is active"); error.code = "TERM_YEAR_CLOSED"; throw error;
+      }
       const nextStart = fields.startDate ?? term.startDate, nextEnd = fields.endDate ?? term.endDate;
       if (Object.hasOwn(fields, "startDate") || Object.hasOwn(fields, "endDate")) await checkRangeAndOverlap({
         tenantId: req.tenantId, year, startDate: nextStart, endDate: nextEnd, excludeId: term._id, session,

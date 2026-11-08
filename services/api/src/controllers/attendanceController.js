@@ -135,7 +135,7 @@ export const saveAttendance = async (req, res, next) => {
 
 export const getAttendanceReports = async (req, res, next) => {
   try {
-    const { academicYearId, from, to, classId } = req.query;
+    const { academicYearId, from, to, classId, academicTermId } = req.query;
     const start = parseDay(from);
     const end = parseDay(to);
     if (!validId(academicYearId)) return invalid(res, "A valid academic year is required");
@@ -147,6 +147,13 @@ export const getAttendanceReports = async (req, res, next) => {
     const yearStart = new Date(year.startDate); yearStart.setUTCHours(0, 0, 0, 0);
     const yearEnd = new Date(year.endDate); yearEnd.setUTCHours(0, 0, 0, 0);
     if (start < yearStart || end > yearEnd) return invalid(res, "Report dates must fall within the selected academic year");
+    let reportTermFilter = {};
+    if (academicTermId !== undefined) {
+      if (!validId(academicTermId)) return invalid(res, "Invalid academic term ID");
+      const term = await AcademicTerm.findOne({ _id: academicTermId, tenantId: req.tenantId, academicYearId }).select("startDate endDate").lean();
+      if (!term || start < new Date(term.startDate) || end > new Date(term.endDate)) return invalid(res, "Report dates must fall within the selected academic term");
+      reportTermFilter = { academicTermId: term._id };
+    }
 
     const enrollmentFilter = { tenantId: req.tenantId, academicYearId, status: "active" };
     if (classId) enrollmentFilter.classId = classId;
@@ -160,6 +167,7 @@ export const getAttendanceReports = async (req, res, next) => {
     const records = await Attendance.find({
       tenantId: req.tenantId, academicYearId,
       date: { $gte: start, $lte: end },
+      ...reportTermFilter,
       ...(classId ? { classId } : {}),
     }).select("studentId classId sectionId date status").lean();
 

@@ -56,6 +56,9 @@ export const saveClassSubject = async (req, res, next) => {
         ]);
         if (assignment || examSubject) return res.status(409).json({ success: false, message: "Deactivate dependent teacher assignments and finish examination use before removing this subject from the active curriculum" });
       }
+      existing.history.push({ category: existing.category, weeklyPeriods: existing.weeklyPeriods, sortOrder: existing.sortOrder, status: existing.status, changedBy: req.auth.userId, changedAt: new Date() });
+      if (existing.history.length > 50) existing.history.splice(0, existing.history.length - 50);
+      existing.revision += 1;
       existing.set({ ...fields, updatedBy: req.auth.userId });
       await existing.save();
       const data = await ClassSubject.findById(existing._id).populate("subjectId", "name code category status").lean();

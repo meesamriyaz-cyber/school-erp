@@ -53,6 +53,14 @@ export const transferEnrollment = async (req, res, next) => {
       ).select("_id academicYearId status").lean();
       if (!targetClass) { const error = new Error("Target class must be active and belong to the same academic year and school"); error.code = "TARGET_CLASS_INVALID"; throw error; }
 
+      if (String(source.classId) !== String(targetClass._id)) {
+        const sourceClass = await SchoolClass.findOneAndUpdate(
+          { _id: source.classId, tenantId: req.tenantId, academicYearId: source.academicYearId, status: "active" },
+          { $inc: { placementRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!sourceClass) { const error = new Error("The student's current class is no longer active"); error.code = "SOURCE_CLASS_INVALID"; throw error; }
+      }
+
       const targetSectionId = body.targetSectionId || null;
       let targetSection = null;
       if (targetSectionId) {
@@ -70,6 +78,14 @@ export const transferEnrollment = async (req, res, next) => {
       if (!withinYear(transferredAt, year)) {
         const error = new Error("The current date is outside the active academic year; transfer cannot be dated in this session"); error.code = "TRANSFER_DATE_OUT_OF_RANGE"; throw error;
       }
+      if (source.sectionId && String(source.sectionId) !== String(targetSectionId || "")) {
+        const sourceSection = await Section.findOneAndUpdate(
+          { _id: source.sectionId, tenantId: req.tenantId, classId: source.classId, status: "active" },
+          { $inc: { capacityRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!sourceSection) { const error = new Error("The student's current section is no longer active"); error.code = "SOURCE_SECTION_INVALID"; throw error; }
+      }
+
       if (targetSection?.capacity !== null && targetSection?.capacity !== undefined) {
         const count = await Enrollment.countDocuments({
           tenantId: req.tenantId, sectionId: targetSection._id, status: "active",
@@ -103,6 +119,8 @@ export const transferEnrollment = async (req, res, next) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     const conflicts = {
+      SOURCE_CLASS_INVALID: [409, "The student current class is no longer active"],
+      SOURCE_SECTION_INVALID: [409, "The student current section is no longer active"],
       SOURCE_ENROLLMENT_NOT_ACTIVE: [409, "Only an active enrollment can be transferred within the school"],
       STUDENT_NOT_ACTIVE: [409, "The student is not active in this school"],
       YEAR_NOT_ACTIVE: [409, "Within-school transfers require the active academic year"],
