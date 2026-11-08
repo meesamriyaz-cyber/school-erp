@@ -124,6 +124,6 @@ describe("StudentResultsPortal family overview", () => {
     expect(screen.getByText("Mathematics")).toBeTruthy();
     expect(screen.getByText("Good progress")).toBeTruthy();
     expect(screen.getByText("Grading scale: School bands 2026")).toBeTruthy();
-    expect(screen.getByText("B")).toBeTruthy();
+    expect(screen.getAllByText("B")).toHaveLength(2);
   });
 });
