@@ -763,6 +763,42 @@ describe("Guardian API integration tests", () => {
     expect(links.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
   });
 
+  it("restores the primary invariant when an active guardian relationship is reactivated", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linkResponse = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ guardianId: String(guardian._id), relationship: "aunt" }),
+    });
+    expect(linkResponse.status).toBe(201);
+
+    await StudentGuardian.updateMany(
+      { tenantId: schoolA._id, studentId: student._id, status: "active", isPrimary: true },
+      { $set: { isPrimary: false, status: "inactive" } },
+    );
+    await StudentGuardian.updateOne(
+      { _id: linkResponse.body.data._id, tenantId: schoolA._id },
+      { $set: { status: "inactive" } },
+    );
+
+    const reactivated = await request(
+      `/students/${student._id}/guardians/${linkResponse.body.data._id}`,
+      { method: "PATCH", token: adminA.token, body: { status: "active" } },
+    );
+    expect(reactivated.status).toBe(200);
+    expect(reactivated.body.data.status).toBe("active");
+    expect(reactivated.body.data.isPrimary).toBe(true);
+    expect(reactivated.body.data.auditTrail).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "reactivated",
+        changes: expect.arrayContaining([expect.objectContaining({ field: "isPrimary", from: false, to: true })]),
+      }),
+    ]));
+    const links = await request(`/students/${student._id}/guardians`, { token: adminA.token });
+    expect(links.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
+  });
+
   it("rejects an unsupported relationship type", async () => {
     const student = await createStudent(adminA.token);
     const guardian = await createGuardian(adminA.token);
