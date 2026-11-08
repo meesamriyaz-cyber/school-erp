@@ -13,6 +13,8 @@ import env from "../config/env.js";
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
+import StudentGuardian from "../models/StudentGuardian.js";
 import { createAccessToken } from "../utils/tokens.js";
 import jwt from "jsonwebtoken";
 const EXPECTED_TEST_DATABASE = "school-erp-test";
@@ -189,6 +191,8 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
     // Remove only records created by this test run.
     if (mongoose.connection.readyState === 1) {
       if (createdTenantIds.length) {
+        await StudentGuardian.deleteMany({ tenantId: { $in: createdTenantIds } });
+        await Guardian.deleteMany({ tenantId: { $in: createdTenantIds } });
         await Student.deleteMany({
           tenantId: { $in: createdTenantIds },
         });
