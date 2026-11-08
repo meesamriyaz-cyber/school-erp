@@ -262,7 +262,7 @@ export default function ExaminationManagement() {
           {selectedExam.subjects?.length > 0 && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Marks entry</h3><p>{enrollments.length} active students · {marksProgress.entered} of {marksProgress.total} student-subject records entered · {marksProgress.remaining} remaining</p></div></div>
             {canEnterMarks && enrollments.length ? <><div className="marks-table-wrap"><table className="marks-table"><thead><tr><th>Student</th>{selectedExam.subjects.map((subject) => <th key={subject._id}>{subject.subjectId?.name || "Subject"}<small> / {subject.maxMarks}</small></th>)}</tr></thead><tbody>{enrollments.map((enrollment) => <tr key={enrollment._id}><td><strong>{enrollment.studentId?.firstName} {enrollment.studentId?.lastName}</strong><small>{enrollment.studentId?.admissionNumber}</small></td>{selectedExam.subjects.map((subject) => { const key = `${enrollment._id}:${subject._id}`; const entry = marks[key] || { score: "", absent: false }; return <td key={subject._id}><input aria-label={`Marks for ${enrollment.studentId?.firstName} in ${subject.subjectId?.name}`} type="number" min="0" max={subject.maxMarks} disabled={entry.absent} value={entry.score} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, score: e.target.value } }))} /><label className="mark-absent"><input type="checkbox" checked={entry.absent} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, absent: e.target.checked, score: "" } }))} /> Absent</label></td>; })}</tr>)}</tbody></table></div><label className="mark-change-reason">Reason for corrections (required when changing a saved mark)<textarea maxLength={500} rows={2} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} placeholder="e.g. Corrected after answer-sheet rechecking" /></label><button className="examination-primary" disabled={saving || !enrollments.length} onClick={() => void saveMarks()}>Save entered marks ({marksProgress.entered})</button></> : <p className="examinations-empty">{canEnterMarks ? "No active enrollments found in this class scope." : "Marks are locked after publication."}</p>}
           </article>}
-          {results && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Consolidated results</h3><p>{results.length} students · subject performance and class summary</p></div></div>
+          {results && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Consolidated results</h3><p>{results.length} students · subject performance and class summary · Grade scale: {resultSummary?.gradingScaleName || "Not configured"}</p></div></div>
             {resultSummary && <div className="result-summary-grid">
               <div><span>Passed</span><strong>{resultSummary.passedCount ?? 0}</strong></div>
               <div><span>Failed</span><strong>{resultSummary.failedCount ?? 0}</strong></div>
@@ -273,11 +273,11 @@ export default function ExaminationManagement() {
             </div>}
             <div className="results-list">{results.map((result) => <div className="result-row result-row-detail" key={result.enrollmentId}>
               <span><strong>{result.student?.firstName} {result.student?.lastName}</strong><small>{result.student?.admissionNumber}</small></span>
-              <strong>{result.totalObtained} / {result.totalMaximum} ({result.percentage}%)</strong><em>{result.status}</em>
+              <strong>{result.totalObtained} / {result.totalMaximum} ({result.percentage}%) · Grade {result.grade || "—"}</strong><em>{result.status}</em>
               <details className="result-subject-details"><summary>Subject breakdown</summary>
                 <div className="result-subject-list">{result.subjects.map((subject) => <div key={subject.examSubjectId}>
                   <span>{subject.subject?.name || "Subject"}</span>
-                  <strong>{subject.absent ? "Absent" : subject.marksObtained ?? "Pending"} / {subject.maxMarks}</strong>
+                  <strong>{subject.absent ? "Absent" : subject.marksObtained ?? "Pending"} / {subject.maxMarks} · {subject.percentage === null || subject.percentage === undefined ? "—" : `${subject.percentage}%`} · Grade {subject.grade || "—"}</strong>
                   <em>{subject.status}</em>
                 </div>)}</div>
               </details>
