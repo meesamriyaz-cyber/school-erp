@@ -168,6 +168,7 @@ it("handles an unsuccessful API response", async () => {
     screen.getByLabelText(/First name/i),
     "Ayaan",
   );
+  await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
 
  await user.click(screen.getByRole("button", { name: "Save student" }));
 
