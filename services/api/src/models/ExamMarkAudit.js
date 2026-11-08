@@ -33,8 +33,8 @@ examMarkAuditSchema.index(
   { name: "exam_mark_audit_lookup" }
 );
 
-const immutableOperation = function rejectAuditMutation(next) {
-  next(new Error("Examination mark audit records are immutable"));
+const immutableOperation = function rejectAuditMutation() {
+  throw new Error("Examination mark audit records are immutable");
 };
 examMarkAuditSchema.pre("updateOne", immutableOperation);
 examMarkAuditSchema.pre("updateMany", immutableOperation);
