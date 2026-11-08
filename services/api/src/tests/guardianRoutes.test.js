@@ -814,7 +814,7 @@ describe("Guardian API integration tests", () => {
 
     const reactivated = await request(
       `/students/${student._id}/guardians/${linkResponse.body.data._id}`,
-      { method: "PATCH", token: adminA.token, body: { status: "active" } },
+      { method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "active" }) },
     );
     expect(reactivated.status).toBe(200);
     expect(reactivated.body.data.status).toBe("active");
