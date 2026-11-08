@@ -12,7 +12,7 @@ import { buildExaminationAnalytics } from "../utils/examinationAnalytics.js";
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
 
-export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrollments = false, gradingScale = null } = {}) => {
+export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrollments = false, gradingScale = null, includeAnalytics = false } = {}) => {
   const [subjects, enrollments] = await Promise.all([
     ExamSubject.find({ tenantId, examinationId: exam._id })
       .populate("subjectId", "name code")
@@ -117,13 +117,13 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
   const averagePercentage = percentages.length
     ? Number((percentages.reduce((total, value) => total + value, 0) / percentages.length).toFixed(2))
     : null;
-  const analytics = buildExaminationAnalytics({
+  const analytics = includeAnalytics ? buildExaminationAnalytics({
     subjects,
     enrollments,
     marks,
     results,
     gradingBands,
-  });
+  }) : {};
 
   return {
     subjects,
@@ -156,7 +156,7 @@ export const getExaminationResults = async (req, res, next) => {
     const gradingScale = exam.status === "completed"
       ? await GradingScale.findOne({ tenantId: req.tenantId, status: "active" }).lean()
       : null;
-    const context = await loadResultContext(req.tenantId, exam, { gradingScale });
+    const context = await loadResultContext(req.tenantId, exam, { gradingScale, includeAnalytics: true });
     return res.status(200).json({
       success: true,
       data: context.results,
