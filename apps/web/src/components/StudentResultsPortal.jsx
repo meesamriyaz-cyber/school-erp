@@ -197,6 +197,7 @@ export default function StudentResultsPortal() {
                   <div className="report-kicker">OFFICIAL EXAMINATION RESULT</div>
                   <h2>{item.examination.name}</h2>
                   <p>{formatDate(item.examination.startDate)} – {formatDate(item.examination.endDate)}</p>
+                  {item.examination.gradingScale && <p>Grading scale: {item.examination.gradingScale}</p>}
                 </div>
                 <div className="report-school-mark">{(item.school?.name || "S").slice(0, 1).toUpperCase()}</div>
               </div>
@@ -210,7 +211,7 @@ export default function StudentResultsPortal() {
               </div>
               <div className="report-table-wrap">
                 <table className="report-table">
-                  <thead><tr><th>Subject</th><th>Maximum</th><th>Pass mark</th><th>Marks obtained</th><th>Status</th><th>Remarks</th></tr></thead>
+                  <thead><tr><th>Subject</th><th>Maximum</th><th>Pass mark</th><th>Marks obtained</th><th>Grade</th><th>Status</th><th>Remarks</th></tr></thead>
                   <tbody>
                     {item.result.subjects.map((subject) => (
                       <tr key={String(subject.examSubjectId)}>
@@ -218,6 +219,7 @@ export default function StudentResultsPortal() {
                         <td>{subject.maxMarks}</td>
                         <td>{subject.passMarks}</td>
                         <td>{subject.absent ? "Absent" : subject.marksObtained ?? "—"}</td>
+                        <td>{subject.grade || "—"}</td>
                         <td><span className={"result-status status-" + subject.status}>{subject.status}</span></td>
                         <td>{subject.remarks || "—"}</td>
                       </tr>
@@ -228,6 +230,7 @@ export default function StudentResultsPortal() {
               <div className="report-summary">
                 <div><span>Total</span><strong>{item.result.totalObtained} / {item.result.totalMaximum}</strong></div>
                 <div><span>Percentage</span><strong>{item.result.percentage}%</strong></div>
+                <div><span>Grade</span><strong>{item.result.grade || "—"}</strong></div>
                 <div><span>Result</span><strong className={"overall-" + item.result.status}>{item.result.status.toUpperCase()}</strong></div>
               </div>
               <footer className="report-footer">This result is system-generated and reflects the published school record.</footer>
