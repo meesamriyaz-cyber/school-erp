@@ -61,7 +61,7 @@ const run = async () => {
         });
       }
 
-      if (relationship.status === "active" && guardian && guardian.status !== "active") {
+      if (relationship.status === "active" && studentTenantMatches && student.status === "active" && guardian && guardian.status !== "active") {
         exceptions.activeRelationshipsWithInactiveGuardian.push({
           relationshipId: String(relationship._id),
           studentId: String(relationship.studentId),
