@@ -124,6 +124,21 @@ describe("GradingScaleManagement", () => {
     }));
   });
 
+  it("archives the active scale through the lifecycle endpoint", async () => {
+    const active = { ...draft, status: "active" };
+    mocks.apiRequest
+      .mockResolvedValueOnce({ success: true, data: [active] })
+      .mockResolvedValueOnce({ success: true, data: { ...active, status: "archived" } })
+      .mockResolvedValueOnce({ success: true, data: [{ ...active, status: "archived" }] });
+    render(<GradingScaleManagement />);
+    fireEvent.click(await screen.findByRole("button", { name: "Archive active scale" }));
+    await waitFor(() => expect(mocks.apiRequest).toHaveBeenCalledWith("/grading-scales/scale-draft/status", {
+      method: "PATCH",
+      accessToken: "test-token",
+      body: { status: "archived" },
+    }));
+  });
+
   it("provides a read-only view to roles without scale-management permission", async () => {
     mocks.user = { role: "teacher" };
     render(<GradingScaleManagement />);
