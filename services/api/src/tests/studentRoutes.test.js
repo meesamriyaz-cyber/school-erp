@@ -843,4 +843,27 @@ it("rejects a student update when the request body is missing", async () => {
   });
 });
 
+
+it("persists extended student profile fields and rejects unsafe values", async () => {
+  const payload = { ...studentPayload(`PROFILE-${randomUUID()}`, "ProfileStudent"),
+    photoUrl: "https://cdn.example.test/students/profile.jpg",
+    address: { line1: "Lal Chowk", city: "Srinagar", district: "Srinagar", state: "Jammu and Kashmir", postalCode: "190001", country: "India", unexpectedField: "no" } };
+  const created = await request("/students", { method: "POST", token: adminA.token, body: JSON.stringify(payload) });
+  expect(created.status).toBe(201);
+  expect(created.body.data.photoUrl).toBe(payload.photoUrl);
+  expect(created.body.data.address).toMatchObject({ line1: "Lal Chowk", city: "Srinagar", district: "Srinagar", state: "Jammu and Kashmir", postalCode: "190001", country: "India" });
+  expect(created.body.data.address.unexpectedField).toBeUndefined();
+  const updated = await request(`/students/${created.body.data._id}`, { method: "PATCH", token: adminA.token,
+    body: JSON.stringify({ photoUrl: "https://cdn.example.test/students/updated.jpg", address: { line1: "Raj Bagh", city: "Srinagar" } }) });
+  expect(updated.status).toBe(200);
+  expect(updated.body.data.photoUrl).toBe("https://cdn.example.test/students/updated.jpg");
+  expect(updated.body.data.address).toMatchObject({ line1: "Raj Bagh", city: "Srinagar" });
+  const badPhoto = await request("/students", { method: "POST", token: adminA.token,
+    body: JSON.stringify({ ...studentPayload(`BAD-${randomUUID()}`, "BadPhoto"), photoUrl: "http://example.test/photo.jpg" }) });
+  expect(badPhoto.status).toBe(400);
+  const badAddress = await request("/students", { method: "POST", token: adminA.token,
+    body: JSON.stringify({ ...studentPayload(`BADADDR-${randomUUID()}`, "BadAddress"), address: ["invalid"] }) });
+  expect(badAddress.status).toBe(400);
+});
+
 });

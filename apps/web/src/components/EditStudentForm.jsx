@@ -19,7 +19,8 @@ function getInitialFields(student) {
     admissionNumber: student.admissionNumber || "",
     firstName: student.firstName || "",
     lastName: student.lastName || "",
-    dateOfBirth: toDateInput(student.dateOfBirth),
+    dateOfBirth: toDateInput(student.dateOfBirth), photoUrl: student.photoUrl || "",
+    address: { line1: student.address?.line1 || "", line2: student.address?.line2 || "", city: student.address?.city || "", district: student.address?.district || "", state: student.address?.state || "", postalCode: student.address?.postalCode || "", country: student.address?.country || "" },
     gender: student.gender || "not_specified",
     admissionDate: toDateInput(student.admissionDate),
     guardianName: student.guardianName || "",
@@ -43,11 +44,11 @@ export default function EditStudentForm({
  
   function handleChange(event) {
     const { name, value } = event.target;
-
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
+  }
+  function handleAddressChange(event) {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, address: { ...current.address, [name]: value } }));
   }
 
   async function handleSubmit(event) {
@@ -59,6 +60,8 @@ export default function EditStudentForm({
       ...form,
       dateOfBirth: form.dateOfBirth || null,
       admissionDate: form.admissionDate || null,
+      photoUrl: form.photoUrl.trim() || null,
+      address: Object.fromEntries(Object.entries(form.address).map(([key, value]) => [key, value.trim()])),
     };
 
     try {
@@ -160,6 +163,13 @@ export default function EditStudentForm({
           />
         </label>
 
+        <h3>Address & profile</h3>
+        <label>Student Photo URL (HTTPS)<input type="url" name="photoUrl" value={form.photoUrl} onChange={handleChange} maxLength={2048} placeholder="https://…" /></label>
+        {[
+          ["line1", "Address Line 1", 120], ["line2", "Address Line 2", 120], ["city", "City / Town", 80],
+          ["district", "District", 80], ["state", "State", 80], ["postalCode", "Postal Code", 12], ["country", "Country", 80],
+        ].map(([name, label, maxLength]) => <label key={name}>{label}<input name={name} value={form.address[name]} onChange={handleAddressChange} maxLength={maxLength} /></label>)}
+        <h3>Guardian Information</h3>
         <label>
           Guardian Name
           <input

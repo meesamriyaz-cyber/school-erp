@@ -7,7 +7,8 @@ const initialForm = {
   admissionNumber: "",
   firstName: "",
   lastName: "",
-  dateOfBirth: "",
+  dateOfBirth: "", photoUrl: "",
+  address: { line1: "", line2: "", city: "", district: "", state: "", postalCode: "", country: "" },
   gender: "not_specified",
   admissionDate: new Date().toISOString().slice(0, 10),
   guardianName: "",
@@ -25,6 +26,10 @@ export default function StudentForm({ onClose, onCreated }) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   }
+  function updateAddressField(event) {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, address: { ...current.address, [name]: value } }));
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -41,6 +46,8 @@ export default function StudentForm({ onClose, onCreated }) {
         guardianPhone: form.guardianPhone.trim(),
         guardianEmail: form.guardianEmail.trim(),
         dateOfBirth: form.dateOfBirth || null,
+        photoUrl: form.photoUrl.trim() || null,
+        address: Object.fromEntries(Object.entries(form.address).map(([key, value]) => [key, value.trim()])),
       };
 
       const response = await apiRequest("/students", {
@@ -163,6 +170,17 @@ export default function StudentForm({ onClose, onCreated }) {
               </label>
             </div>
 
+            <h3>Address & profile</h3>
+            <div className="student-form-grid">
+              <label className="student-form-full">Student photo URL (HTTPS)<input name="photoUrl" type="url" value={form.photoUrl} onChange={updateField} maxLength={2048} placeholder="https://…" /></label>
+              <label className="student-form-full">Address line 1<input name="line1" value={form.address.line1} onChange={updateAddressField} maxLength={120} /></label>
+              <label className="student-form-full">Address line 2<input name="line2" value={form.address.line2} onChange={updateAddressField} maxLength={120} /></label>
+              <label>City / Town<input name="city" value={form.address.city} onChange={updateAddressField} maxLength={80} /></label>
+              <label>District<input name="district" value={form.address.district} onChange={updateAddressField} maxLength={80} /></label>
+              <label>State<input name="state" value={form.address.state} onChange={updateAddressField} maxLength={80} /></label>
+              <label>Postal code<input name="postalCode" value={form.address.postalCode} onChange={updateAddressField} maxLength={12} /></label>
+              <label>Country<input name="country" value={form.address.country} onChange={updateAddressField} maxLength={80} /></label>
+            </div>
             <h3>Guardian information</h3>
 
             <div className="student-form-grid">

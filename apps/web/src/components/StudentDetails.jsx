@@ -159,6 +159,18 @@ export default function StudentDetails({ studentId, onBack }) {
       </div>
 
       <div className="student-details-card">
+        <h3>Address</h3>
+        <div className="student-details-grid">
+          <DetailItem label="Address Line 1" value={student.address?.line1} />
+          <DetailItem label="Address Line 2" value={student.address?.line2} />
+          <DetailItem label="City / Town" value={student.address?.city} />
+          <DetailItem label="District" value={student.address?.district} />
+          <DetailItem label="State" value={student.address?.state} />
+          <DetailItem label="Postal Code" value={student.address?.postalCode} />
+          <DetailItem label="Country" value={student.address?.country} />
+        </div>
+      </div>
+      <div className="student-details-card">
         <h3>Guardian Information</h3>
         <div className="student-details-grid">
           <DetailItem label="Guardian Name" value={student.guardianName} />

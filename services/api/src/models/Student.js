@@ -1,6 +1,13 @@
 
 import mongoose from "mongoose";
 
+const studentAddressSchema = new mongoose.Schema({
+  line1: { type: String, trim: true, default: "", maxlength: 120 }, line2: { type: String, trim: true, default: "", maxlength: 120 },
+  city: { type: String, trim: true, default: "", maxlength: 80 }, district: { type: String, trim: true, default: "", maxlength: 80 },
+  state: { type: String, trim: true, default: "", maxlength: 80 }, postalCode: { type: String, trim: true, default: "", maxlength: 12 },
+  country: { type: String, trim: true, default: "", maxlength: 80 },
+}, { _id: false, versionKey: false });
+
 const studentSchema = new mongoose.Schema(
   {
     // Assigned by the server from the authenticated user's school.
@@ -46,6 +53,18 @@ const studentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    photoUrl: {
+      type: String, trim: true, default: null, maxlength: 2048,
+      validate: {
+        validator(value) {
+          if (value === null || value === undefined || value === "") return true;
+          try { return new URL(value).protocol === "https:"; } catch { return false; }
+        },
+        message: "Student photo URL must be a valid HTTPS URL",
+      },
+    },
+    address: { type: studentAddressSchema, default: () => ({}) },
 
     gender: {
       type: String,

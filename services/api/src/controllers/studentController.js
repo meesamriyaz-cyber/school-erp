@@ -9,6 +9,8 @@ const CREATE_FIELDS = [
   "firstName",
   "lastName",
   "dateOfBirth",
+  "photoUrl",
+  "address",
   "gender",
   "admissionDate",
   "guardianName",
@@ -32,6 +34,10 @@ const pickFields = (source, allowedFields) => {
 
 const invalidRequest = (res, message) =>
   res.status(400).json({ success: false, message });
+
+const isHttpsUrl = (value) => {
+  try { return new URL(value).protocol === "https:"; } catch { return false; }
+};
 
 const handleStudentError = (error, res, next) => {
   if (error.code === 11000) {
@@ -146,6 +152,8 @@ export const createStudent = async (req, res, next) => {
     }
 
     const fields = pickFields(body, CREATE_FIELDS);
+    if (Object.hasOwn(fields, "address") && (!fields.address || typeof fields.address !== "object" || Array.isArray(fields.address))) return invalidRequest(res, "Address must be an object");
+    if (Object.hasOwn(fields, "photoUrl") && fields.photoUrl !== null && fields.photoUrl !== "" && (typeof fields.photoUrl !== "string" || !isHttpsUrl(fields.photoUrl.trim()))) return invalidRequest(res, "Student photo URL must be a valid HTTPS URL");
 
     if (
       typeof fields.admissionNumber !== "string" ||
@@ -224,6 +232,8 @@ export const updateStudent = async (req, res, next) => {
     }
 
     const updates = pickFields(body, UPDATE_FIELDS);
+    if (Object.hasOwn(updates, "address") && (!updates.address || typeof updates.address !== "object" || Array.isArray(updates.address))) return invalidRequest(res, "Address must be an object");
+    if (Object.hasOwn(updates, "photoUrl") && updates.photoUrl !== null && updates.photoUrl !== "" && (typeof updates.photoUrl !== "string" || !isHttpsUrl(updates.photoUrl.trim()))) return invalidRequest(res, "Student photo URL must be a valid HTTPS URL");
 
     if (Object.keys(updates).length === 0) {
       return invalidRequest(res, "No supported student fields provided");

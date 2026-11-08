@@ -39,6 +39,8 @@ describe("StudentForm", () => {
     expect(screen.getByLabelText(/Guardian name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Guardian phone/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Guardian email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Student photo URL/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Address line 1/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save student" }));
 
@@ -70,6 +72,9 @@ it("creates a student and trims text fields", async () => {
   await user.type(screen.getByLabelText(/Guardian name/i), "  Imran Khan  ");
   await user.type(screen.getByLabelText(/Guardian phone/i), "  9999999999  ");
   await user.type(screen.getByLabelText(/Guardian email/i), "  imran@example.com  ");
+  await user.type(screen.getByLabelText(/Student photo URL/i), "  https://cdn.example.test/ayaan.jpg  ");
+  await user.type(screen.getByLabelText(/Address line 1/i), "  Lal Chowk  ");
+  await user.type(screen.getByLabelText(/City \/ Town/i), "  Srinagar  ");
 
   await user.click(screen.getByRole("button", { name: "Save student" }));
 
@@ -90,6 +95,8 @@ it("creates a student and trims text fields", async () => {
         guardianPhone: "9999999999",
         guardianEmail: "imran@example.com",
         dateOfBirth: null,
+        photoUrl: "https://cdn.example.test/ayaan.jpg",
+        address: expect.objectContaining({ line1: "Lal Chowk", city: "Srinagar" }),
       }),
     }),
   );
