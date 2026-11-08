@@ -12,6 +12,7 @@ import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import Subject from "../models/Subject.js";
 import Examination from "../models/Examination.js";
+import GradingScale from "../models/GradingScale.js";
 import Homework from "../models/Homework.js";
 import HomeworkSubmission from "../models/HomeworkSubmission.js";
 import ExamSubject from "../models/ExamSubject.js";
@@ -65,7 +66,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), ExamMarkAudit.init(), TeacherAssignment.init(), Homework.init(), HomeworkSubmission.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), ExamMarkAudit.init(), GradingScale.init(), TeacherAssignment.init(), Homework.init(), HomeworkSubmission.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -96,6 +97,7 @@ describe("Examination API integration", () => {
         await Student.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamSubject.deleteMany({ tenantId: { $in: tenantIds } });
         await Examination.deleteMany({ tenantId: { $in: tenantIds } });
+        await GradingScale.deleteMany({ tenantId: { $in: tenantIds } });
         await Subject.deleteMany({ tenantId: { $in: tenantIds } });
         await Section.deleteMany({ tenantId: { $in: tenantIds } });
         await SchoolClass.deleteMany({ tenantId: { $in: tenantIds } });
@@ -347,9 +349,22 @@ describe("Examination API integration", () => {
     });
     expect(saved.status).toBe(200);
 
+    const originalScale = await GradingScale.create({
+      tenantId: schoolA._id,
+      name: "Original school scale",
+      bands: [
+        { grade: "A", minPercentage: 85, maxPercentage: 100 },
+        { grade: "F", minPercentage: 0, maxPercentage: 50 },
+        { grade: "B", minPercentage: 50, maxPercentage: 85 },
+      ],
+      status: "active",
+      createdBy: adminA.user._id,
+      updatedBy: adminA.user._id,
+    });
     const results = await request(`/examinations/${id}/results`, { token: adminA.token });
     expect(results.status).toBe(200);
     expect(results.body.summary.publishable).toBe(true);
+    expect(results.body.summary.gradingScaleName).toBe("Original school scale");
     expect(results.body.summary).toMatchObject({
       passedCount: 1,
       failedCount: 0,
@@ -360,13 +375,28 @@ describe("Examination API integration", () => {
     });
     expect(results.body.data).toHaveLength(1);
     expect(results.body.data[0]).toMatchObject({
-      totalObtained: 82, totalMaximum: 100, percentage: 82, status: "passed",
+      totalObtained: 82, totalMaximum: 100, percentage: 82, grade: "B", status: "passed",
     });
     expect(results.body.data[0].subjects[0].status).toBe("passed");
+    expect(results.body.data[0].subjects[0]).toMatchObject({ percentage: 82, grade: "B" });
 
     const published = await request(`/examinations/${id}/publish`, { method: "POST", token: adminA.token });
     expect(published.status).toBe(200);
     expect(published.body.data.status).toBe("published");
+    const frozenExam = await Examination.findById(id).lean();
+    expect(frozenExam.gradingScaleSnapshot).toMatchObject({
+      gradingScaleId: originalScale._id,
+      name: "Original school scale",
+    });
+    await GradingScale.updateOne({ _id: originalScale._id }, { $set: { status: "archived" } });
+    const replacementScale = await GradingScale.create({
+      tenantId: schoolA._id,
+      name: "Replacement school scale",
+      bands: [{ grade: "NEW", minPercentage: 0, maxPercentage: 100 }],
+      status: "active",
+      createdBy: adminA.user._id,
+      updatedBy: adminA.user._id,
+    });
     const studentAccount = await createUser(schoolA, "student");
     const parentAccount = await createUser(schoolA, "parent");
     const guardian = await Guardian.create({ tenantId: schoolA._id, firstName: "Parent", lastName: "Tester", email: parentAccount.user.email });
@@ -377,6 +407,9 @@ describe("Examination API integration", () => {
     expect(studentResults.status).toBe(200);
     expect(studentResults.body.data).toHaveLength(1);
     expect(studentResults.body.data[0].result.totalObtained).toBe(82);
+    expect(studentResults.body.data[0].result.grade).toBe("B");
+    expect(studentResults.body.data[0].result.subjects[0].grade).toBe("B");
+    expect(studentResults.body.data[0].examination.gradingScale).toBe("Original school scale");
     const parentResults = await request("/portal/results", { token: parentAccount.token });
     expect(parentResults.status).toBe(200);
     expect(parentResults.body.data).toHaveLength(1);
@@ -389,6 +422,7 @@ describe("Examination API integration", () => {
     expect(parentResults.body.data[0].school).toMatchObject({ name: schoolA.name });
     expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: studentAccount.token })).status).toBe(403);
     expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: parentAccount.token })).status).toBe(403);
+    await GradingScale.updateOne({ _id: replacementScale._id }, { $set: { status: "archived" } });
 
     const locked = await request(`/examinations/${id}/marks`, {
       method: "POST", token: adminA.token,
