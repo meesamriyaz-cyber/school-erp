@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import StudentGuardianManagement from "../components/StudentGuardianManagement.jsx";
 import { apiRequest } from "../lib/api.js";
@@ -101,6 +101,44 @@ describe("StudentGuardianManagement", () => {
         }),
       }),
     );
+  });
+
+  it("hides guardians already linked to the student and displays relationship history", async () => {
+    apiRequest.mockImplementation(async (path) => {
+      if (path === "/students/student-1/guardians") {
+        return {
+          success: true,
+          data: [{
+            ...link,
+            auditTrail: [{
+              action: "primary_demoted",
+              actorUserId: "user-1",
+              changedAt: "2026-11-08T10:00:00.000Z",
+              changes: [{ field: "isPrimary", from: true, to: false }],
+            }],
+          }],
+        };
+      }
+      if (path === "/guardians") {
+        return {
+          success: true,
+          data: [
+            guardian,
+            { _id: "guardian-2", firstName: "Sara", lastName: "Khan", status: "active" },
+          ],
+        };
+      }
+      return { success: true, data: [] };
+    });
+
+    render(<StudentGuardianManagement studentId="student-1" accessToken="test-token" canManage />);
+    expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
+    expect(screen.getByText("Relationship history (1)")).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Add guardian" }));
+    const guardianSelect = screen.getByLabelText("Guardian record");
+    expect(within(guardianSelect).queryByRole("option", { name: /Imran Khan/ })).not.toBeInTheDocument();
+    expect(within(guardianSelect).getByRole("option", { name: /Sara Khan/ })).toBeInTheDocument();
   });
 
   it("updates a guardian relationship and its permissions", async () => {
