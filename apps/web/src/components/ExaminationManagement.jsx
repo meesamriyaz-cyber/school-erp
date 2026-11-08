@@ -21,6 +21,7 @@ export default function ExaminationManagement() {
   const [marks, setMarks] = useState({});
   const [changeReason, setChangeReason] = useState("");
   const [results, setResults] = useState(null);
+  const [resultSummary, setResultSummary] = useState(null);
   const [auditHistory, setAuditHistory] = useState([]);
   const [examForm, setExamForm] = useState(emptyExam);
   const [subjectForm, setSubjectForm] = useState({ subjectId: "", examDate: today(), startTime: "", endTime: "", maxMarks: "100", passMarks: "35", durationMinutes: "" });
@@ -86,7 +87,7 @@ export default function ExaminationManagement() {
   }, [loadExams]);
 
   const loadExam = useCallback(async (id) => {
-    if (!id) { setSelectedExam(null); setEnrollments([]); setResults(null); setAuditHistory([]); return; }
+    if (!id) { setSelectedExam(null); setEnrollments([]); setResults(null); setResultSummary(null); setAuditHistory([]); return; }
     const response = await apiRequest(`/examinations/${id}`, { accessToken });
     if (!response?.success) throw new Error("Unable to load examination details.");
     setSelectedExam(response.data);
@@ -110,6 +111,7 @@ export default function ExaminationManagement() {
     }
     setMarks(savedMarks);
     setResults(resultResponse?.data || null);
+    setResultSummary(resultResponse?.summary || null);
     setAuditHistory(auditResponse?.success ? auditResponse.data || [] : []);
   }, [accessToken]);
 
@@ -117,7 +119,7 @@ export default function ExaminationManagement() {
     let cancelled = false;
     Promise.resolve().then(() => {
       if (selectedId) return loadExam(selectedId).catch((err) => { if (!cancelled) setError(errorMessage(err, "Unable to load examination.")); });
-      setSelectedExam(null); setEnrollments([]); setResults(null);
+      setSelectedExam(null); setEnrollments([]); setResults(null); setResultSummary(null);
       return undefined;
     });
     return () => { cancelled = true; };
@@ -260,7 +262,27 @@ export default function ExaminationManagement() {
           {selectedExam.subjects?.length > 0 && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Marks entry</h3><p>{enrollments.length} active students · {marksProgress.entered} of {marksProgress.total} student-subject records entered · {marksProgress.remaining} remaining</p></div></div>
             {canEnterMarks && enrollments.length ? <><div className="marks-table-wrap"><table className="marks-table"><thead><tr><th>Student</th>{selectedExam.subjects.map((subject) => <th key={subject._id}>{subject.subjectId?.name || "Subject"}<small> / {subject.maxMarks}</small></th>)}</tr></thead><tbody>{enrollments.map((enrollment) => <tr key={enrollment._id}><td><strong>{enrollment.studentId?.firstName} {enrollment.studentId?.lastName}</strong><small>{enrollment.studentId?.admissionNumber}</small></td>{selectedExam.subjects.map((subject) => { const key = `${enrollment._id}:${subject._id}`; const entry = marks[key] || { score: "", absent: false }; return <td key={subject._id}><input aria-label={`Marks for ${enrollment.studentId?.firstName} in ${subject.subjectId?.name}`} type="number" min="0" max={subject.maxMarks} disabled={entry.absent} value={entry.score} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, score: e.target.value } }))} /><label className="mark-absent"><input type="checkbox" checked={entry.absent} onChange={(e) => setMarks((v) => ({ ...v, [key]: { ...entry, absent: e.target.checked, score: "" } }))} /> Absent</label></td>; })}</tr>)}</tbody></table></div><label className="mark-change-reason">Reason for corrections (required when changing a saved mark)<textarea maxLength={500} rows={2} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} placeholder="e.g. Corrected after answer-sheet rechecking" /></label><button className="examination-primary" disabled={saving || !enrollments.length} onClick={() => void saveMarks()}>Save entered marks ({marksProgress.entered})</button></> : <p className="examinations-empty">{canEnterMarks ? "No active enrollments found in this class scope." : "Marks are locked after publication."}</p>}
           </article>}
-          {results && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Consolidated results</h3><p>{results.length} students · result percentage and status</p></div></div><div className="results-list">{results.map((result) => <div className="result-row" key={result.enrollmentId}><span><strong>{result.student?.firstName} {result.student?.lastName}</strong><small>{result.student?.admissionNumber}</small></span><strong>{result.totalObtained} / {result.totalMaximum} ({result.percentage}%)</strong><em>{result.status}</em></div>)}</div></article>}
+          {results && <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Consolidated results</h3><p>{results.length} students · subject performance and class summary</p></div></div>
+            {resultSummary && <div className="result-summary-grid">
+              <div><span>Passed</span><strong>{resultSummary.passedCount ?? 0}</strong></div>
+              <div><span>Failed</span><strong>{resultSummary.failedCount ?? 0}</strong></div>
+              <div><span>Incomplete</span><strong>{resultSummary.incompleteCount ?? 0}</strong></div>
+              <div><span>Class average</span><strong>{resultSummary.averagePercentage === null || resultSummary.averagePercentage === undefined ? "—" : `${resultSummary.averagePercentage}%`}</strong></div>
+              <div><span>Highest</span><strong>{resultSummary.highestPercentage === null || resultSummary.highestPercentage === undefined ? "—" : `${resultSummary.highestPercentage}%`}</strong></div>
+              <div><span>Lowest</span><strong>{resultSummary.lowestPercentage === null || resultSummary.lowestPercentage === undefined ? "—" : `${resultSummary.lowestPercentage}%`}</strong></div>
+            </div>}
+            <div className="results-list">{results.map((result) => <div className="result-row result-row-detail" key={result.enrollmentId}>
+              <span><strong>{result.student?.firstName} {result.student?.lastName}</strong><small>{result.student?.admissionNumber}</small></span>
+              <strong>{result.totalObtained} / {result.totalMaximum} ({result.percentage}%)</strong><em>{result.status}</em>
+              <details className="result-subject-details"><summary>Subject breakdown</summary>
+                <div className="result-subject-list">{result.subjects.map((subject) => <div key={subject.examSubjectId}>
+                  <span>{subject.subject?.name || "Subject"}</span>
+                  <strong>{subject.absent ? "Absent" : subject.marksObtained ?? "Pending"} / {subject.maxMarks}</strong>
+                  <em>{subject.status}</em>
+                </div>)}</div>
+              </details>
+            </div>)}</div>
+          </article>}
           <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Marks audit history</h3><p>{auditHistory.length} recent mark events · administrators and principals only</p></div></div>{auditHistory.length ? <div className="results-list">{auditHistory.map((entry) => <div className="result-row" key={entry._id}><span><strong>{entry.studentId?.firstName} {entry.studentId?.lastName} · {entry.examSubjectId?.subjectId?.name || "Subject"}</strong><small>{entry.action === "created" ? "Initial entry" : "Correction"} · {entry.changedBy?.firstName} {entry.changedBy?.lastName} · {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : ""}</small><small>{entry.previous ? `Previous: ${entry.previous.absent ? "Absent" : entry.previous.marksObtained} → ` : ""}Current: {entry.current.absent ? "Absent" : entry.current.marksObtained}</small>{entry.changeReason && <small>Reason: {entry.changeReason}</small>}</span></div>)}</div> : <p className="examinations-empty">No mark changes have been recorded yet.</p>}</article>
         </>}
       </aside>
