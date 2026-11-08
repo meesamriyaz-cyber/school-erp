@@ -100,7 +100,25 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
   });
 
   const incompleteCount = results.filter((result) => result.status === "incomplete").length;
-  return { subjects, enrollments, results, incompleteCount };
+  const completeResults = results.filter((result) => result.status !== "incomplete");
+  const passedCount = completeResults.filter((result) => result.status === "passed").length;
+  const failedCount = completeResults.filter((result) => result.status === "failed").length;
+  const percentages = completeResults.map((result) => result.percentage);
+  const averagePercentage = percentages.length
+    ? Number((percentages.reduce((total, value) => total + value, 0) / percentages.length).toFixed(2))
+    : null;
+
+  return {
+    subjects,
+    enrollments,
+    results,
+    incompleteCount,
+    passedCount,
+    failedCount,
+    averagePercentage,
+    highestPercentage: percentages.length ? Math.max(...percentages) : null,
+    lowestPercentage: percentages.length ? Math.min(...percentages) : null,
+  };
 };
 
 export const getExaminationResults = async (req, res, next) => {
@@ -127,6 +145,11 @@ export const getExaminationResults = async (req, res, next) => {
         studentCount: context.enrollments.length,
         subjectCount: context.subjects.length,
         incompleteCount: context.incompleteCount,
+        passedCount: context.passedCount,
+        failedCount: context.failedCount,
+        averagePercentage: context.averagePercentage,
+        highestPercentage: context.highestPercentage,
+        lowestPercentage: context.lowestPercentage,
         publishable: context.enrollments.length > 0 &&
           context.subjects.length > 0 &&
           context.incompleteCount === 0,
