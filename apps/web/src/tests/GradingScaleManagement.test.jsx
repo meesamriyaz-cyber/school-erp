@@ -84,13 +84,30 @@ describe("GradingScaleManagement", () => {
     expect(mocks.apiRequest).toHaveBeenCalledTimes(1);
   });
 
-  it("edits a draft but exposes no edit action for active scales", async () => {
+  it("edits a draft through the draft update endpoint", async () => {
+    mocks.apiRequest
+      .mockResolvedValueOnce({ success: true, data: [draft] })
+      .mockResolvedValueOnce({ success: true, data: { ...draft, name: "Updated grading" } })
+      .mockResolvedValueOnce({ success: true, data: [{ ...draft, name: "Updated grading" }] });
     render(<GradingScaleManagement />);
-    const edit = await screen.findByRole("button", { name: "Edit draft" });
-    fireEvent.click(edit);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit draft" }));
     expect(screen.getByDisplayValue("School grading")).toBeInTheDocument();
     expect(screen.getByDisplayValue("F")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Edit draft scale" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Scale name"), { target: { value: "Updated grading" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(mocks.apiRequest).toHaveBeenCalledWith("/grading-scales/scale-draft", expect.objectContaining({
+      method: "PATCH",
+      body: expect.objectContaining({ name: "Updated grading", bands }),
+    })));
+  });
+
+  it("does not offer draft editing or activation for an active scale", async () => {
+    mocks.apiRequest.mockResolvedValueOnce({ success: true, data: [{ ...draft, status: "active" }] });
+    render(<GradingScaleManagement />);
+    expect(await screen.findByText("School grading")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Activate scale" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive active scale" })).toBeInTheDocument();
   });
 
   it("activates a draft through the status endpoint", async () => {
