@@ -79,7 +79,7 @@ describe("Staff management API", () => {
     expect(response.status).toBe(201);
     expect(response.body.data.employeeType).toBe("non_teaching");
     expect(response.body.data.userId).toBeNull();
-    expect(response.body.data.employeeCode).toBe(payload.employeeCode);
+    expect(response.body.data.employeeCode).toBe(payload.employeeCode.toUpperCase());
   });
 
   it("requires teaching employees to link to an active teacher account", async () => {
