@@ -5,29 +5,15 @@ import Student from "../models/Student.js";
 
 const CREATE_FIELDS = ["firstName", "lastName", "phone", "email"];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
-
-const invalid = (res, message) =>
-  res.status(400).json({ success: false, message });
-
-const pick = (body, allowed) =>
-  Object.fromEntries(
-    allowed.filter((field) => Object.hasOwn(body, field))
-      .map((field) => [field, body[field]]),
-  );
-
+const invalid = (res, message) => res.status(400).json({ success: false, message });
+const pick = (body, allowed) => Object.fromEntries(
+  allowed.filter((field) => Object.hasOwn(body, field)).map((field) => [field, body[field]]),
+);
 const handleError = (error, res, next) => {
-  if (error.code === 11000) {
-    return res.status(409).json({
-      success: false,
-      message: "A matching guardian record already exists",
-    });
-  }
-  if (error.name === "ValidationError" || error.name === "CastError") {
-    return invalid(res, "One or more guardian fields are invalid");
-  }
+  if (error.code === 11000) return res.status(409).json({ success: false, message: "A matching guardian record already exists" });
+  if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more guardian fields are invalid");
   return next(error);
 };
-
 const validateBody = (body, res, allowedFields) => {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     invalid(res, "Provide guardian details");
@@ -46,109 +32,57 @@ const validateBody = (body, res, allowedFields) => {
 
 export const listGuardians = async (req, res, next) => {
   try {
-    const guardians = await Guardian.find({ tenantId: req.tenantId })
-      .sort({ firstName: 1, lastName: 1, _id: 1 })
-      .lean();
+    const guardians = await Guardian.find({ tenantId: req.tenantId }).sort({ firstName: 1, lastName: 1, _id: 1 }).lean();
     return res.status(200).json({ success: true, data: guardians });
-  } catch (error) {
-    return next(error);
-  }
+  } catch (error) { return next(error); }
 };
 
 export const createGuardian = async (req, res, next) => {
   try {
     const fields = validateBody(req.body, res, CREATE_FIELDS);
     if (!fields) return;
-    if (typeof fields.firstName !== "string" || !fields.firstName.trim()) {
-      return invalid(res, "Guardian first name is required");
-    }
+    if (typeof fields.firstName !== "string" || !fields.firstName.trim()) return invalid(res, "Guardian first name is required");
     for (const field of ["lastName", "phone", "email"]) {
-      if (fields[field] !== undefined && fields[field] !== null &&
-          typeof fields[field] !== "string") {
-        return invalid(res, `${field} must be a string`);
-      }
+      if (fields[field] !== undefined && fields[field] !== null && typeof fields[field] !== "string") return invalid(res, `${field} must be a string`);
     }
-    const guardian = await Guardian.create({
-      ...fields,
-      tenantId: req.tenantId,
-    });
+    const guardian = await Guardian.create({ ...fields, tenantId: req.tenantId });
     return res.status(201).json({ success: true, data: guardian });
-  } catch (error) {
-    return handleError(error, res, next);
-  }
+  } catch (error) { return handleError(error, res, next); }
 };
 
 export const getGuardian = async (req, res, next) => {
   try {
     const { guardianId } = req.params;
-    if (!mongoose.isValidObjectId(guardianId)) {
-      return invalid(res, "Invalid guardian ID");
-    }
-    const guardian = await Guardian.findOne({
-      _id: guardianId,
-      tenantId: req.tenantId,
-    }).lean();
-    if (!guardian) {
-      return res.status(404).json({ success: false, message: "Guardian not found" });
-    }
-    const relationships = await StudentGuardian.find({
-      tenantId: req.tenantId,
-      guardianId: guardian._id,
-    })
+    if (!mongoose.isValidObjectId(guardianId)) return invalid(res, "Invalid guardian ID");
+    const guardian = await Guardian.findOne({ _id: guardianId, tenantId: req.tenantId }).lean();
+    if (!guardian) return res.status(404).json({ success: false, message: "Guardian not found" });
+    const relationships = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id })
       .sort({ status: 1, createdAt: 1, _id: 1 })
-      .populate({
-        path: "studentId",
-        select: "firstName lastName admissionNumber status",
-        match: { tenantId: req.tenantId },
-      })
+      .populate({ path: "studentId", select: "firstName lastName admissionNumber status", match: { tenantId: req.tenantId } })
       .lean();
-
-    const linkedStudents = relationships
-      .filter((relationship) => relationship.studentId)
-      .map((relationship) => ({
-        _id: relationship._id,
-        relationship: relationship.relationship,
-        isPrimary: relationship.isPrimary,
-        isEmergencyContact: relationship.isEmergencyContact,
-        canPickup: relationship.canPickup,
-        receivesCommunication: relationship.receivesCommunication,
-        status: relationship.status,
-        student: relationship.studentId,
-      }));
-
-    return res.status(200).json({
-      success: true,
-      data: { ...guardian, linkedStudents },
-    });
-  } catch (error) {
-    return next(error);
-  }
+    const linkedStudents = relationships.filter((relationship) => relationship.studentId).map((relationship) => ({
+      _id: relationship._id, relationship: relationship.relationship, isPrimary: relationship.isPrimary,
+      isEmergencyContact: relationship.isEmergencyContact, canPickup: relationship.canPickup,
+      receivesCommunication: relationship.receivesCommunication, status: relationship.status, student: relationship.studentId,
+    }));
+    return res.status(200).json({ success: true, data: { ...guardian, linkedStudents } });
+  } catch (error) { return next(error); }
 };
 
 export const updateGuardian = async (req, res, next) => {
   try {
     const { guardianId } = req.params;
-    if (!mongoose.isValidObjectId(guardianId)) {
-      return invalid(res, "Invalid guardian ID");
-    }
+    if (!mongoose.isValidObjectId(guardianId)) return invalid(res, "Invalid guardian ID");
     const updates = validateBody(req.body, res, UPDATE_FIELDS);
     if (!updates) return;
-    if (Object.keys(updates).length === 0) {
-      return invalid(res, "Provide at least one guardian field to update");
-    }
-    if (Object.hasOwn(updates, "firstName") &&
-        (typeof updates.firstName !== "string" || !updates.firstName.trim())) {
-      return invalid(res, "Guardian first name cannot be empty");
-    }
+    if (Object.keys(updates).length === 0) return invalid(res, "Provide at least one guardian field to update");
+    if (Object.hasOwn(updates, "firstName") && (typeof updates.firstName !== "string" || !updates.firstName.trim())) return invalid(res, "Guardian first name cannot be empty");
     for (const field of ["lastName", "phone", "email"]) {
-      if (updates[field] !== undefined && updates[field] !== null &&
-          typeof updates[field] !== "string") {
-        return invalid(res, `${field} must be a string`);
-      }
+      if (updates[field] !== undefined && updates[field] !== null && typeof updates[field] !== "string") return invalid(res, `${field} must be a string`);
     }
+
     const session = await mongoose.startSession();
     let guardian;
-
     try {
       await session.withTransaction(async () => {
         guardian = await Guardian.findOneAndUpdate(
@@ -156,57 +90,29 @@ export const updateGuardian = async (req, res, next) => {
           { $set: updates },
           { new: true, runValidators: true, session },
         ).lean();
-
         if (!guardian) return;
 
-        const contactFieldsChanged = [
-          "firstName",
-          "lastName",
-          "phone",
-          "email",
-        ].some((field) => Object.hasOwn(updates, field));
-
+        const contactFieldsChanged = ["firstName", "lastName", "phone", "email"].some((field) => Object.hasOwn(updates, field));
         if (contactFieldsChanged) {
           const legacyLinks = await StudentGuardian.find({
             tenantId: req.tenantId,
             guardianId: guardian._id,
-            source: "legacy_student",
-          })
-            .select("studentId")
-            .session(session)
-            .lean();
+            source: { $in: ["legacy_student", "manual_and_legacy"] },
+          }).select("studentId").session(session).lean();
 
           if (legacyLinks.length) {
-            const guardianName = [guardian.firstName, guardian.lastName]
-              .filter(Boolean)
-              .join(" ");
-
+            const guardianName = [guardian.firstName, guardian.lastName].filter(Boolean).join(" ");
             await Student.updateMany(
-              {
-                tenantId: req.tenantId,
-                _id: { $in: legacyLinks.map((link) => link.studentId) },
-              },
-              {
-                $set: {
-                  guardianName,
-                  guardianPhone: guardian.phone || null,
-                  guardianEmail: guardian.email || null,
-                },
-              },
+              { tenantId: req.tenantId, _id: { $in: legacyLinks.map((link) => link.studentId) } },
+              { $set: { guardianName, guardianPhone: guardian.phone || null, guardianEmail: guardian.email || null } },
               { session },
             );
           }
         }
       });
-    } finally {
-      await session.endSession();
-    }
+    } finally { await session.endSession(); }
 
-    if (!guardian) {
-      return res.status(404).json({ success: false, message: "Guardian not found" });
-    }
+    if (!guardian) return res.status(404).json({ success: false, message: "Guardian not found" });
     return res.status(200).json({ success: true, data: guardian });
-  } catch (error) {
-    return handleError(error, res, next);
-  }
+  } catch (error) { return handleError(error, res, next); }
 };
