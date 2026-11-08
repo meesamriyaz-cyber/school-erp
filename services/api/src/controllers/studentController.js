@@ -82,7 +82,7 @@ export const createStudent = async (req, res, next) => {
     session = await mongoose.startSession();
     await session.withTransaction(async () => {
       [student] = await Student.create([{ ...fields, tenantId: req.tenantId }], { session });
-      await syncLegacyStudentGuardian(student, { session });
+      await syncLegacyStudentGuardian(student, { session, actorUserId: req.auth.userId });
     });
     return res.status(201).json({ success: true, data: student });
   } catch (error) { return handleStudentError(error, res, next); }
@@ -123,7 +123,7 @@ export const updateStudent = async (req, res, next) => {
           { returnDocument: "after", runValidators: true, session },
         );
         const guardianFieldsChanged = LEGACY_GUARDIAN_FIELDS.some((field) => Object.hasOwn(updates, field));
-        if (student && guardianFieldsChanged) await syncLegacyStudentGuardian(student, { session });
+        if (student && guardianFieldsChanged) await syncLegacyStudentGuardian(student, { session, actorUserId: req.auth.userId });
       });
     } finally { await session.endSession(); }
 
