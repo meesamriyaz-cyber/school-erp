@@ -280,7 +280,7 @@ export default function ExaminationManagement() {
               </div>)}</div>
             </section>}
             {resultSummary?.subjectAnalytics?.length > 0 && <section className="result-analytics-section">
-              <h4>Subject performance</h4>
+              <h4>Subject performance · averages and pass rates exclude absent and pending records</h4>
               <div className="subject-analytics-table-wrap"><table className="subject-analytics-table">
                 <thead><tr><th>Subject</th><th>Average</th><th>Highest</th><th>Lowest</th><th>Passed</th><th>Failed</th><th>Absent</th><th>Pending</th><th>Pass rate</th><th>Grades</th></tr></thead>
                 <tbody>{resultSummary.subjectAnalytics.map((item) => <tr key={item.examSubjectId}>
