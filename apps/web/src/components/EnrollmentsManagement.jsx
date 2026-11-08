@@ -48,6 +48,12 @@ export default function EnrollmentsManagement() {
   const [notice, setNotice] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [pendingEnrollment, setPendingEnrollment] = useState(null);
+  const [pendingTransfer, setPendingTransfer] = useState(null);
+  const [transferClassId, setTransferClassId] = useState("");
+  const [transferSections, setTransferSections] = useState([]);
+  const [transferSectionId, setTransferSectionId] = useState("");
+  const [transferReason, setTransferReason] = useState("");
+  const [transferring, setTransferring] = useState(false);
   const [endingEnrollment, setEndingEnrollment] = useState(false);
   const endingEnrollmentRef = useRef(false);
 
@@ -174,6 +180,15 @@ export default function EnrollmentsManagement() {
     return () => controller.abort();
   }, [loadEnrollments]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!transferClassId) { setTransferSections([]); setTransferSectionId(""); return () => controller.abort(); }
+    apiRequest(`/sections?classId=${encodeURIComponent(transferClassId)}&status=active`, { accessToken, signal: controller.signal })
+      .then((response) => { if (!controller.signal.aborted) setTransferSections(Array.isArray(response?.data) ? response.data : []); })
+      .catch((err) => { if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load transfer sections."); });
+    return () => controller.abort();
+  }, [accessToken, transferClassId]);
+
   const selectedYear = years.find((year) => year._id === selectedYearId) || null;
   const canCreate = canManage && selectedYear?.status === "active" && Boolean(selectedClassId) && students.some((student) => student._id === selectedStudentId && student.status === "active");
 
@@ -202,6 +217,23 @@ export default function EnrollmentsManagement() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const confirmTransfer = async (event) => {
+    event.preventDefault();
+    if (!pendingTransfer || !transferClassId || !transferReason.trim() || transferring) return;
+    setTransferring(true); setError(""); setNotice("");
+    try {
+      const response = await apiRequest(`/enrollments/${pendingTransfer._id}/transfer`, {
+        method: "PATCH", accessToken,
+        body: { targetClassId: transferClassId, targetSectionId: transferSectionId || null, reason: transferReason.trim() },
+      });
+      if (!response?.success) throw new Error(response?.message || "Unable to transfer student");
+      setNotice("Student transferred within the school. Previous enrollment retained in history.");
+      setPendingTransfer(null); setTransferReason(""); setTransferClassId(""); setTransferSectionId("");
+      await loadEnrollments();
+    } catch (err) { setError(err.message || "Unable to transfer student"); }
+    finally { setTransferring(false); }
   };
 
   const confirmEndEnrollment = async () => {
@@ -274,6 +306,14 @@ export default function EnrollmentsManagement() {
       <div className="enrollment-form-actions"><button className="enrollment-button secondary" type="button" onClick={() => setFormOpen(false)}>Cancel</button><button className="enrollment-button primary" type="submit" disabled={saving || !canCreate}>{saving ? "Saving…" : "Create enrollment"}</button></div>
     </form>}
 
+    {pendingTransfer && <form className="enrollment-form" onSubmit={confirmTransfer}>
+      <div><h3>Transfer {displayName(pendingTransfer.studentId)} within this school</h3><p>The current placement will be retained in history and a new active placement will be created atomically.</p></div>
+      <label>Target class<select required value={transferClassId} onChange={(event) => { setTransferClassId(event.target.value); setTransferSectionId(""); }}><option value="">Select class</option>{classes.filter((item) => item.status === "active").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Target section (optional)<select value={transferSectionId} onChange={(event) => setTransferSectionId(event.target.value)} disabled={!transferClassId}><option value="">No section</option>{transferSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Reason for transfer<textarea required maxLength={500} value={transferReason} onChange={(event) => setTransferReason(event.target.value)} placeholder="Record the reason for this class or section change." /></label>
+      <div className="enrollment-form-actions"><button type="button" className="enrollment-button secondary" onClick={() => setPendingTransfer(null)} disabled={transferring}>Cancel</button><button type="submit" className="enrollment-button primary" disabled={transferring || !transferClassId || !transferReason.trim()}>{transferring ? "Transferring…" : "Confirm transfer"}</button></div>
+    </form>}
+
     {pendingEnrollment && <div className="enrollment-confirm" role="alertdialog" aria-labelledby="enrollment-confirm-title">
       <div><h3 id="enrollment-confirm-title">{enrollmentEndCopy[pendingEnrollment.status].title}</h3><p>{enrollmentEndCopy[pendingEnrollment.status].description}</p></div>
       <div className="enrollment-form-actions"><button type="button" className="enrollment-button secondary" onClick={() => setPendingEnrollment(null)} disabled={endingEnrollment}>Cancel</button><button type="button" className="enrollment-button primary" onClick={() => void confirmEndEnrollment()} disabled={endingEnrollment}>{endingEnrollment ? "Updating…" : "Confirm"}</button></div>
@@ -290,7 +330,7 @@ export default function EnrollmentsManagement() {
                   <td><span className={`enrollment-status status-${item.status}`}>{item.status}</span></td>
                   {canManage && <td>{item.status === "active" ? <div className="enrollment-row-actions">
                     <button type="button" className="enrollment-text-button" onClick={() => setPendingEnrollment({ enrollment: item, status: "completed" })}>Complete</button>
-                    <button type="button" className="enrollment-text-button" onClick={() => setPendingEnrollment({ enrollment: item, status: "transferred" })}>Transfer</button>
+                    <button type="button" className="enrollment-text-button" onClick={() => { setPendingTransfer(item); setTransferClassId(item.classId?._id || ""); setTransferSectionId(""); setTransferReason(""); }}>Move class/section</button>
                     <button type="button" className="enrollment-text-button danger" onClick={() => setPendingEnrollment({ enrollment: item, status: "withdrawn" })}>Withdraw</button>
                   </div> : <span>—</span>}</td>}
                 </tr>)}

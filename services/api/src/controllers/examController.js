@@ -6,6 +6,7 @@ import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import Subject from "../models/Subject.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
+import ClassSubject from "../models/ClassSubject.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -102,9 +103,16 @@ export const createExamination = async (req, res, next) => {
     if (start < new Date(year.startDate) || end > new Date(year.endDate)) return invalid(res, "Examination dates must fall within the selected academic year");
     const selectedSection = sectionId || null;
     if (selectedSection && !await Section.exists({ _id: selectedSection, tenantId: req.tenantId, classId, status: "active" })) return invalid(res, "The selected section is not active in this class");
+    const curriculum = await ClassSubject.find({ tenantId: req.tenantId, academicYearId, classId, status: "active" })
+      .populate("subjectId", "name code category").sort({ sortOrder: 1, _id: 1 }).lean();
     const exam = await Examination.create({
       tenantId: req.tenantId, academicYearId, classId, sectionId: selectedSection,
       name: name.trim(), startDate: start, endDate: end, createdBy: req.auth.userId,
+      curriculumSnapshot: curriculum.map((item) => ({
+        subjectId: item.subjectId._id, subjectName: item.subjectId.name,
+        subjectCode: item.subjectId.code || "", category: item.category,
+        weeklyPeriods: item.weeklyPeriods, sortOrder: item.sortOrder,
+      })),
     });
     const data = await populatedExam(Examination.findOne({ _id: exam._id, tenantId: req.tenantId })).lean();
     return res.status(201).json({ success: true, data });
@@ -165,6 +173,13 @@ export const addExaminationSubject = async (req, res, next) => {
     if (date < new Date(exam.startDate) || date > new Date(exam.endDate)) return invalid(res, "Subject examination date must fall within the examination date range");
     const subject = await Subject.findOne({ _id: subjectId, tenantId: req.tenantId, status: "active" }).select("_id").lean();
     if (!subject) return invalid(res, "Select an active subject from this school");
+    const curriculumConfigured = exam.curriculumSnapshot?.length
+      ? true
+      : await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: exam.academicYearId, classId: exam.classId, status: "active" });
+    const curriculumAllowsSubject = exam.curriculumSnapshot?.length
+      ? exam.curriculumSnapshot.some((item) => String(item.subjectId) === String(subjectId))
+      : !curriculumConfigured || await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: exam.academicYearId, classId: exam.classId, subjectId, status: "active" });
+    if (!curriculumAllowsSubject) return res.status(409).json({ success: false, message: "This subject is not included in the class curriculum snapshot for this examination" });
     if (req.auth.role === "teacher" && !await TeacherAssignment.exists({
       tenantId: req.tenantId, teacherId: req.auth.userId, subjectId,
       academicYearId: exam.academicYearId, classId: exam.classId, status: "active",

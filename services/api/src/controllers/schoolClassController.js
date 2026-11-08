@@ -97,24 +97,43 @@ export const createClass = async (req, res, next) => {
 };
 
 export const updateClass = async (req, res, next) => {
+  if (!validId(req.params.classId)) return invalid(res, "Invalid class ID");
+  const fields = validateBody(req.body, res);
+  if (!fields) return;
+  const session = await mongoose.startSession();
+  let updated;
   try {
-    if (!validId(req.params.classId)) return invalid(res, "Invalid class ID");
-    const fields = validateBody(req.body, res);
-    if (!fields) return;
-    const schoolClass = await SchoolClass.findOne({ _id: req.params.classId, tenantId: req.tenantId });
-    if (!schoolClass) return res.status(404).json({ success: false, message: "Class not found" });
-    if (schoolClass.status === "inactive" && fields.status === "active") {
-      const year = await findUsableAcademicYear(schoolClass.academicYearId, req.tenantId);
-      if (!year) return res.status(409).json({ success: false, message: "A class cannot be activated for a closed academic year" });
-    }
-    if (fields.status === "inactive") {
-      const activeSections = await Section.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" });
-      if (activeSections) return res.status(409).json({ success: false, message: "Deactivate this class's active sections before deactivating the class" });
-      const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" });
-      if (activeEnrollments) return res.status(409).json({ success: false, message: "End active student enrollments before deactivating this class" });
-    }
-    schoolClass.set(fields);
-    await schoolClass.save();
-    return res.status(200).json({ success: true, data: schoolClass });
-  } catch (error) { return handleError(error, res, next); }
+    await session.withTransaction(async () => {
+      const schoolClass = await SchoolClass.findOneAndUpdate(
+        { _id: req.params.classId, tenantId: req.tenantId },
+        { $inc: { placementRevision: 1 } }, { new: true, session }
+      );
+      if (!schoolClass) { const error = new Error("Class not found"); error.code = "CLASS_NOT_FOUND"; throw error; }
+      if (schoolClass.status === "inactive" && fields.status === "active") {
+        const year = await AcademicYear.findOne({ _id: schoolClass.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).session(session).select("_id").lean();
+        if (!year) { const error = new Error("A class cannot be activated for a closed academic year"); error.code = "CLASS_YEAR_CLOSED"; throw error; }
+      }
+      if (fields.status === "inactive") {
+        const [activeSections, activeEnrollments] = await Promise.all([
+          Section.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
+          Enrollment.exists({ tenantId: req.tenantId, classId: schoolClass._id, status: "active" }).session(session),
+        ]);
+        if (activeSections) { const error = new Error("Deactivate this class's active sections before deactivating the class"); error.code = "CLASS_HAS_ACTIVE_SECTIONS"; throw error; }
+        if (activeEnrollments) { const error = new Error("End active student enrollments before deactivating this class"); error.code = "CLASS_HAS_ACTIVE_ENROLLMENTS"; throw error; }
+      }
+      schoolClass.set(fields);
+      await schoolClass.save({ session });
+      updated = schoolClass;
+    });
+    return res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    const conflicts = {
+      CLASS_NOT_FOUND: [404, "Class not found"],
+      CLASS_YEAR_CLOSED: [409, "A class cannot be activated for a closed academic year"],
+      CLASS_HAS_ACTIVE_SECTIONS: [409, "Deactivate this class's active sections before deactivating the class"],
+      CLASS_HAS_ACTIVE_ENROLLMENTS: [409, "End active student enrollments before deactivating this class"],
+    };
+    if (conflicts[error.code]) return res.status(conflicts[error.code][0]).json({ success: false, message: conflicts[error.code][1] });
+    return handleError(error, res, next);
+  } finally { await session.endSession(); }
 };

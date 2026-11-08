@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "./lib/api.js";
 import "./App.css";
+import "./components/Phase7Management.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { useAuth } from "./context/authContext.js";
 import LoginPage from "./components/LoginPage.jsx";

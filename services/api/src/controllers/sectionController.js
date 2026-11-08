@@ -85,13 +85,26 @@ export const createSection = async (req, res, next) => {
   try {
     const fields = validateBody(req.body, res, true);
     if (!fields) return;
-    const parent = await SchoolClass.findOne({ _id: fields.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").lean();
-    if (!parent) return res.status(400).json({ success: false, message: "Class was not found in this school or is inactive" });
-    const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").lean();
-    if (!academicYear) return res.status(400).json({ success: false, message: "Sections cannot be created for a closed academic year" });
-    const data = await Section.create({ ...fields, tenantId: req.tenantId });
+    const session = await mongoose.startSession();
+    let data;
+    try {
+      await session.withTransaction(async () => {
+        const parent = await SchoolClass.findOneAndUpdate(
+          { _id: fields.classId, tenantId: req.tenantId, status: "active" },
+          { $inc: { placementRevision: 1 } }, { new: true, session }
+        ).select("_id academicYearId").lean();
+        if (!parent) { const error = new Error("Class was not found in this school or is inactive"); error.code = "SECTION_CLASS_INACTIVE"; throw error; }
+        const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").session(session).lean();
+        if (!academicYear) { const error = new Error("Sections cannot be created for a closed academic year"); error.code = "SECTION_YEAR_CLOSED"; throw error; }
+        [data] = await Section.create([{ ...fields, tenantId: req.tenantId }], { session });
+      });
+    } finally { await session.endSession(); }
     return res.status(201).json({ success: true, data });
-  } catch (error) { return handleError(error, res, next); }
+  } catch (error) {
+    if (error.code === "SECTION_CLASS_INACTIVE") return res.status(400).json({ success: false, message: "Class was not found in this school or is inactive" });
+    if (error.code === "SECTION_YEAR_CLOSED") return res.status(400).json({ success: false, message: "Sections cannot be created for a closed academic year" });
+    return handleError(error, res, next);
+  }
 };
 
 export const updateSection = async (req, res, next) => {
@@ -99,69 +112,44 @@ export const updateSection = async (req, res, next) => {
     if (!validId(req.params.sectionId)) return invalid(res, "Invalid section ID");
     const fields = validateBody(req.body, res);
     if (!fields) return;
-    const section = await Section.findOne({ _id: req.params.sectionId, tenantId: req.tenantId });
-    if (!section) return res.status(404).json({ success: false, message: "Section not found" });
-    if (fields.status === "active") {
-      const parent = await SchoolClass.findOne({ _id: section.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").lean();
-      if (!parent) return res.status(409).json({ success: false, message: "A section cannot be activated while its class is inactive" });
-      const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").lean();
-      if (!academicYear) return res.status(409).json({ success: false, message: "A section cannot be activated for a closed academic year" });
-    }
-    if (fields.status === "inactive") {
-      const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" });
-      if (activeEnrollments) return res.status(409).json({ success: false, message: "End active student enrollments before deactivating this section" });
-    }
-    if (Object.hasOwn(fields, "capacity")) {
-      const session = await mongoose.startSession();
-      let updatedSection;
-      try {
-        await session.withTransaction(async () => {
-          // Capacity updates share the section write used by capacity-limited enrollments.
-          // A conflicting transaction retries and rechecks the committed enrollment count.
-          const lockedSection = await Section.findOneAndUpdate(
-            { _id: section._id, tenantId: req.tenantId },
-            { $inc: { capacityRevision: 1 } },
-            { new: true, session }
-          );
-          if (!lockedSection) {
-            const error = new Error("Section not found");
-            error.code = "SECTION_NOT_FOUND";
-            throw error;
-          }
-
-          if (fields.capacity !== null) {
-            const activeEnrollments = await Enrollment.countDocuments({
-              tenantId: req.tenantId,
-              sectionId: lockedSection._id,
-              status: "active",
-            }).session(session);
-            if (activeEnrollments > fields.capacity) {
-              const error = new Error("Section capacity cannot be lower than its active enrollment count");
-              error.code = "SECTION_CAPACITY_BELOW_ENROLLMENTS";
-              throw error;
-            }
-          }
-
-          lockedSection.set(fields);
-          await lockedSection.save({ session });
-          updatedSection = lockedSection;
-        });
-      } catch (error) {
-        if (error.code === "SECTION_CAPACITY_BELOW_ENROLLMENTS") {
-          return res.status(409).json({ success: false, message: error.message });
+    const session = await mongoose.startSession();
+    let updated;
+    try {
+      await session.withTransaction(async () => {
+        const section = await Section.findOneAndUpdate(
+          { _id: req.params.sectionId, tenantId: req.tenantId },
+          { $inc: { capacityRevision: 1 } }, { new: true, session }
+        );
+        if (!section) { const error = new Error("Section not found"); error.code = "SECTION_NOT_FOUND"; throw error; }
+        if (fields.status === "active") {
+          const parent = await SchoolClass.findOne({ _id: section.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").session(session).lean();
+          if (!parent) { const error = new Error("A section cannot be activated while its class is inactive"); error.code = "SECTION_PARENT_INACTIVE"; throw error; }
+          const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").session(session).lean();
+          if (!academicYear) { const error = new Error("A section cannot be activated for a closed academic year"); error.code = "SECTION_YEAR_CLOSED"; throw error; }
         }
-        if (error.code === "SECTION_NOT_FOUND") {
-          return res.status(404).json({ success: false, message: error.message });
+        if (fields.status === "inactive") {
+          const activeEnrollments = await Enrollment.exists({ tenantId: req.tenantId, sectionId: section._id, status: "active" }).session(session);
+          if (activeEnrollments) { const error = new Error("End active student enrollments before deactivating this section"); error.code = "SECTION_HAS_ACTIVE_ENROLLMENTS"; throw error; }
         }
-        throw error;
-      } finally {
-        await session.endSession();
-      }
-      return res.status(200).json({ success: true, data: updatedSection });
-    }
-
-    section.set(fields);
-    await section.save();
-    return res.status(200).json({ success: true, data: section });
+        if (Object.hasOwn(fields, "capacity") && fields.capacity !== null) {
+          const activeCount = await Enrollment.countDocuments({ tenantId: req.tenantId, sectionId: section._id, status: "active" }).session(session);
+          if (activeCount > fields.capacity) { const error = new Error("Section capacity cannot be lower than its active enrollment count"); error.code = "SECTION_CAPACITY_BELOW_ENROLLMENTS"; throw error; }
+        }
+        section.set(fields);
+        await section.save({ session });
+        updated = section;
+      });
+      return res.status(200).json({ success: true, data: updated });
+    } catch (error) {
+      const conflicts = {
+        SECTION_NOT_FOUND: [404, "Section not found"],
+        SECTION_PARENT_INACTIVE: [409, "A section cannot be activated while its class is inactive"],
+        SECTION_YEAR_CLOSED: [409, "A section cannot be activated for a closed academic year"],
+        SECTION_HAS_ACTIVE_ENROLLMENTS: [409, "End active student enrollments before deactivating this section"],
+        SECTION_CAPACITY_BELOW_ENROLLMENTS: [409, "Section capacity cannot be lower than its active enrollment count"],
+      };
+      if (conflicts[error.code]) return res.status(conflicts[error.code][0]).json({ success: false, message: conflicts[error.code][1] });
+      throw error;
+    } finally { await session.endSession(); }
   } catch (error) { return handleError(error, res, next); }
 };

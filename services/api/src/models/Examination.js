@@ -53,6 +53,14 @@ const examinationSchema = new mongoose.Schema(
       default: "draft",
       required: true,
     },
+    curriculumSnapshot: [{
+      subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true },
+      subjectName: { type: String, required: true, trim: true, maxlength: 100 },
+      subjectCode: { type: String, trim: true, default: "", maxlength: 20 },
+      category: { type: String, enum: ["compulsory", "elective"], required: true },
+      weeklyPeriods: { type: Number, min: 0, max: 60, default: 0 },
+      sortOrder: { type: Number, min: 0, max: 1000, default: 0 },
+    }],
     // Frozen at publication so later school grading-scale changes cannot alter report cards.
     gradingScaleSnapshot: {
       type: new mongoose.Schema({

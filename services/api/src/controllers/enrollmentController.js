@@ -132,7 +132,7 @@ export const createEnrollment = async (req, res, next) => {
       }).select("_id capacity").lean();
       if (!section) return res.status(400).json({ success: false, message: "Active section was not found in the selected class and school" });
 
-      if (section.capacity !== null) {
+      if (section) {
         const session = await mongoose.startSession();
         let data;
         try {
@@ -156,7 +156,17 @@ export const createEnrollment = async (req, res, next) => {
               throw error;
             }
 
-            // All capacity-limited placements update this same section document first.
+            const lockedClass = await SchoolClass.findOneAndUpdate(
+              { _id: schoolClass._id, tenantId: req.tenantId, academicYearId: fields.academicYearId, status: "active" },
+              { $inc: { placementRevision: 1 } }, { new: true, session }
+            ).select("_id").lean();
+            if (!lockedClass) {
+              const error = new Error("Active class was not found in the selected academic year and school");
+              error.code = "CLASS_NOT_ACTIVE";
+              throw error;
+            }
+
+            // All placements serialize on the section document, even when capacity is unlimited.
             // MongoDB retries write-conflicting transactions, so each retry sees the latest count.
             const lockedSection = await Section.findOneAndUpdate(
               { _id: section._id, tenantId: req.tenantId, classId: schoolClass._id, status: "active" },
@@ -195,10 +205,12 @@ export const createEnrollment = async (req, res, next) => {
           if (error.code === "SECTION_CAPACITY") {
             return res.status(409).json({ success: false, message: error.message });
           }
+          if (error.code === "CLASS_NOT_ACTIVE") return res.status(400).json({ success: false, message: error.message });
           if (error.code === "SECTION_NOT_ACTIVE") {
             return res.status(400).json({ success: false, message: error.message });
           }
-          if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
+          if (error.code === "CLASS_NOT_ACTIVE") return res.status(400).json({ success: false, message: error.message });
+      if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
             return res.status(400).json({ success: false, message: error.message });
           }
           if (error.code === "ENROLLMENT_DATE_OUT_OF_RANGE") {
@@ -232,6 +244,16 @@ export const createEnrollment = async (req, res, next) => {
         if (!isEnrollmentDateWithinYear(enrollmentDate, lockedYear)) {
           const error = new Error("Enrollment date must fall within the selected academic year");
           error.code = "ENROLLMENT_DATE_OUT_OF_RANGE";
+          throw error;
+        }
+
+        const lockedClass = await SchoolClass.findOneAndUpdate(
+          { _id: schoolClass._id, tenantId: req.tenantId, academicYearId: fields.academicYearId, status: "active" },
+          { $inc: { placementRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!lockedClass) {
+          const error = new Error("Active class was not found in the selected academic year and school");
+          error.code = "CLASS_NOT_ACTIVE";
           throw error;
         }
 

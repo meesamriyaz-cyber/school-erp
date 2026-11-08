@@ -4,6 +4,7 @@ import Student from "../models/Student.js";
 import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
+import AcademicTerm from "../models/AcademicTerm.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -86,6 +87,11 @@ export const executeAcademicYearRollover = async (req, res, next) => {
       if (!source || !target) throw fail("YEAR_STATE", "Rollover requires an active source year and a draft target year");
       if (new Date(target.startDate) <= new Date(source.endDate)) throw fail("YEAR_DATES", "The target academic year must start after the source academic year ends");
 
+      const unfinishedSourceTerms = await AcademicTerm.exists({
+        tenantId: req.tenantId, academicYearId: source._id, status: { $in: ["draft", "active"] },
+      }).session(session);
+      if (unfinishedSourceTerms) throw fail("SOURCE_TERMS", "Complete or cancel all source-year academic terms before rollover");
+
       const targetActiveCount = await Enrollment.countDocuments({ tenantId: req.tenantId, academicYearId: target._id, status: "active" }).session(session);
       if (targetActiveCount) throw fail("TARGET_NOT_EMPTY", "The draft target year already contains active enrollments; resolve them before rollover");
       const active = await Enrollment.find({
@@ -100,6 +106,15 @@ export const executeAcademicYearRollover = async (req, res, next) => {
         _id: { $in: classIds }, tenantId: req.tenantId, academicYearId: target._id, status: "active",
       }).session(session).lean();
       if (classes.length !== classIds.length) throw fail("TARGET_CLASS", "One or more target classes are inactive or do not belong to the target academic year");
+
+      // Serialize rollover placements with class deactivation and concurrent admissions.
+      for (const classId of classIds) {
+        const lockedClass = await SchoolClass.findOneAndUpdate(
+          { _id: classId, tenantId: req.tenantId, academicYearId: target._id, status: "active" },
+          { $inc: { placementRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!lockedClass) throw fail("TARGET_CLASS", "A target class is no longer active");
+      }
 
       const sectionIds = [...new Set(body.placements.filter((item) => item.sectionId).map((item) => item.sectionId))];
       const sections = sectionIds.length ? await Section.find({
@@ -178,8 +193,8 @@ export const executeAcademicYearRollover = async (req, res, next) => {
     });
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
-    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY", "TARGET_NOT_EMPTY"].includes(error.code)) {
-      return res.status(error.code === "YEAR_STATE" ? 409 : ["SECTION_CAPACITY", "TARGET_NOT_EMPTY"].includes(error.code) ? 409 : 400)
+    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS"].includes(error.code)) {
+      return res.status(error.code === "YEAR_STATE" ? 409 : ["SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS"].includes(error.code) ? 409 : 400)
         .json({ success: false, message: error.message });
     }
     if (error.code === 11000) return res.status(409).json({ success: false, message: "A student already has an active enrollment or a target placement conflicts with existing data" });

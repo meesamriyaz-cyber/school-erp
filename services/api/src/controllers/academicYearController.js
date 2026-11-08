@@ -2,6 +2,9 @@
 import mongoose from "mongoose";
 import AcademicYear from "../models/AcademicYear.js";
 import Enrollment from "../models/Enrollment.js";
+import Attendance from "../models/Attendance.js";
+import Examination from "../models/Examination.js";
+import AcademicTerm from "../models/AcademicTerm.js";
 
 const CREATE_FIELDS = ["name", "startDate", "endDate", "status"];
 const UPDATE_FIELDS = CREATE_FIELDS;
@@ -291,9 +294,31 @@ export const updateAcademicYear = async (req, res, next) => {
             error.code = "ACADEMIC_YEAR_ENROLLMENTS_OUT_OF_RANGE";
             throw error;
           }
+
+          const startOfDayAfterLastDay = new Date(Date.UTC(
+            nextEndDate.getUTCFullYear(), nextEndDate.getUTCMonth(), nextEndDate.getUTCDate() + 1
+          ));
+          const [outOfRangeAttendance, outOfRangeExamination, outOfRangeTerm] = await Promise.all([
+            Attendance.exists({ tenantId: req.tenantId, academicYearId: lockedYear._id, $or: [{ date: { $lt: startOfFirstDay } }, { date: { $gte: startOfDayAfterLastDay } }] }).session(session),
+            Examination.exists({ tenantId: req.tenantId, academicYearId: lockedYear._id, $or: [{ startDate: { $lt: startOfFirstDay } }, { endDate: { $gte: startOfDayAfterLastDay } }] }).session(session),
+            AcademicTerm.exists({ tenantId: req.tenantId, academicYearId: lockedYear._id, $or: [{ startDate: { $lt: startOfFirstDay } }, { endDate: { $gte: startOfDayAfterLastDay } }] }).session(session),
+          ]);
+          if (outOfRangeAttendance || outOfRangeExamination || outOfRangeTerm) {
+            const error = new Error("Academic-year dates cannot exclude existing attendance, examination, or academic-term dates");
+            error.code = "ACADEMIC_YEAR_DEPENDENCIES_OUT_OF_RANGE";
+            throw error;
+          }
         }
 
         if (lockedYear.status === "active" && nextStatus === "closed") {
+          const unfinishedTerms = await AcademicTerm.exists({
+            tenantId: req.tenantId, academicYearId: lockedYear._id, status: { $in: ["draft", "active"] },
+          }).session(session);
+          if (unfinishedTerms) {
+            const error = new Error("Complete or cancel all academic terms before closing this academic year");
+            error.code = "ACADEMIC_YEAR_HAS_UNFINISHED_TERMS";
+            throw error;
+          }
           const activeEnrollments = await Enrollment.exists({
             tenantId: req.tenantId,
             academicYearId: lockedYear._id,
@@ -323,6 +348,8 @@ export const updateAcademicYear = async (req, res, next) => {
         ACADEMIC_YEAR_TRANSITION: 409,
         ACADEMIC_YEAR_ENROLLMENTS_OUT_OF_RANGE: 409,
         ACADEMIC_YEAR_HAS_ACTIVE_ENROLLMENTS: 409,
+      ACADEMIC_YEAR_DEPENDENCIES_OUT_OF_RANGE: 409,
+      ACADEMIC_YEAR_HAS_UNFINISHED_TERMS: 409,
         ACADEMIC_YEAR_INVALID_DATE_RANGE: 400,
         ACADEMIC_YEAR_NOT_FOUND: 404,
       };

@@ -6,6 +6,7 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import TimetableEntry from "../models/TimetableEntry.js";
+import ClassSubject from "../models/ClassSubject.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -91,6 +92,10 @@ export const createTeacherAssignment = async (req, res, next) => {
     if (!schoolClass || String(schoolClass.academicYearId) !== String(fields.academicYearId)) {
       return res.status(400).json({ success: false, message: "The selected class does not belong to this academic year and school" });
     }
+    const curriculumConfigured = await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: fields.academicYearId, classId: schoolClass._id, status: "active" });
+    if (curriculumConfigured && !await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: fields.academicYearId, classId: schoolClass._id, subjectId: fields.subjectId, status: "active" })) {
+      return res.status(409).json({ success: false, message: "Map this subject to the class curriculum before assigning a teacher" });
+    }
     if (fields.sectionId) {
       const section = await Section.findOne({
         _id: fields.sectionId, tenantId: req.tenantId, classId: schoolClass._id, status: "active",
@@ -140,6 +145,9 @@ export const updateTeacherAssignment = async (req, res, next) => {
         SchoolClass.exists({ _id: assignment.classId, tenantId: req.tenantId, status: "active" }),
       ]);
       if (!teacher || !subject || !year || !schoolClass) return res.status(409).json({ success: false, message: "Assignment cannot be activated while its teacher, subject, academic year or class is inactive" });
+      const curriculumConfigured = await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, status: "active" });
+      const curriculumAllows = !curriculumConfigured || await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, subjectId: assignment.subjectId, status: "active" });
+      if (!curriculumAllows) return res.status(409).json({ success: false, message: "Assignment cannot be activated because its subject is not in the active class curriculum" });
       if (assignment.sectionId && !await Section.exists({ _id: assignment.sectionId, tenantId: req.tenantId, status: "active" })) {
         return res.status(409).json({ success: false, message: "Assignment cannot be activated while its section is inactive" });
       }

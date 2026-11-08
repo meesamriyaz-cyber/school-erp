@@ -30,6 +30,9 @@ const schoolClassSchema = new mongoose.Schema(
       default: 0,
     },
 
+    // Placement writes share this revision with class deactivation and transfers.
+    placementRevision: { type: Number, default: 0, select: false },
+
     status: {
       type: String,
       enum: ["active", "inactive"],
