@@ -29,6 +29,7 @@ function enrollmentName(enrollment) {
 
 export default function StudentDetails({ studentId, onBack }) {
   const { accessToken, user } = useAuth();
+  const canManageStudent = ["school_admin", "principal"].includes(user?.role);
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -141,7 +142,7 @@ export default function StudentDetails({ studentId, onBack }) {
           </div>
           <div className="student-details-actions">
             <span className={`student-status student-status-${student.status}`}>{student.status}</span>
-            <button type="button" onClick={() => setIsEditing(true)}>Edit Student</button>
+            {canManageStudent && <button type="button" onClick={() => setIsEditing(true)}>Edit Student</button>}
           </div>
         </div>
       </header>
