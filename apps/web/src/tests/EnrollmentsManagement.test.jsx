@@ -54,7 +54,7 @@ describe("EnrollmentsManagement", () => {
     await user.click(screen.getByRole("button", { name: "Create enrollment" }));
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith("/enrollments", expect.objectContaining({
       method: "POST",
-      body: { studentId: "student-a", academicYearId: "year-a", classId: "class-a", sectionId: "section-a" },
+      body: { studentId: "student-a", academicYearId: "year-a", classId: "class-a", sectionId: "section-a", reAdmissionReason: "" },
     })));
     expect(await screen.findByRole("status")).toHaveTextContent("Student enrolled successfully.");
   });
@@ -73,7 +73,7 @@ describe("EnrollmentsManagement", () => {
     await screen.findByText("Ayaan Khan");
     expect(screen.getByText("You have read-only access to enrollments.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Enroll student/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Transfer" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move class/section" })).not.toBeInTheDocument();
   });
 
   it("shows duplicate active enrollment conflicts and keeps the form open", async () => {
@@ -136,7 +136,6 @@ describe("EnrollmentsManagement", () => {
 
     const cases = [
       ["Complete", "Mark this enrollment as completed?"],
-      ["Transfer", "Mark this enrollment as transferred?"],
       ["Withdraw", "Withdraw this student from the enrollment?"],
     ];
 
@@ -163,16 +162,16 @@ describe("EnrollmentsManagement", () => {
 
     render(<EnrollmentsManagement />);
     await screen.findByText("Ayaan Khan");
-    await user.click(screen.getByRole("button", { name: "Transfer" }));
+    await user.click(screen.getByRole("button", { name: "Withdraw" }));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Only active enrollments can be ended");
     expect(screen.getByRole("row", { name: /Ayaan Khan ADM-1 Class 1 A/ })).toHaveTextContent("active");
-    expect(screen.getByRole("button", { name: "Transfer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Move class/section" })).toBeInTheDocument();
   });
 
-  it("refreshes enrollment history after a successful terminal transition", async () => {
+  it("refreshes enrollment history after a successful completion", async () => {
     const user = userEvent.setup();
     let ended = false;
     apiRequest.mockImplementation(async (path, options = {}) => {
@@ -180,32 +179,53 @@ describe("EnrollmentsManagement", () => {
       if (path === "/students?limit=100") return { success: true, data: [student] };
       if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass] };
       if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
-      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [ended ? { ...enrollment, status: "transferred" } : enrollment] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [ended ? { ...enrollment, status: "completed" } : enrollment] };
       if (path === "/enrollments/enrollment-a" && options.method === "PATCH") {
         ended = true;
-        return { success: true, data: { ...enrollment, status: "transferred" } };
+        return { success: true, data: { ...enrollment, status: "completed" } };
       }
       return { success: true, data: [] };
     });
 
     render(<EnrollmentsManagement />);
     await screen.findByText("Ayaan Khan");
-    await user.click(screen.getByRole("button", { name: "Transfer" }));
+    await user.click(screen.getByRole("button", { name: "Complete" }));
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
-    await waitFor(() => expect(screen.getByText("transferred")).toBeInTheDocument());
-    expect(screen.queryByRole("button", { name: "Transfer" })).not.toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Enroll a student" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Student")).toHaveValue("student-a");
-    expect(screen.getByLabelText("Class")).toHaveValue("");
-    expect(screen.getByLabelText("Section (optional)")).toHaveValue("");
-    expect(screen.getByRole("status")).toHaveTextContent("Select the student’s new class and section to complete the transfer.");
+    await waitFor(() => expect(screen.getByText("completed")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Complete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move class/section" })).not.toBeInTheDocument();
     expect(apiRequest).toHaveBeenCalledWith("/enrollments/enrollment-a", expect.objectContaining({
-      method: "PATCH",
-      body: { status: "transferred" },
+      method: "PATCH", body: { status: "completed" },
     }));
   });
 
+
+  it("submits a within-school class transfer with a reason", async () => {
+    const user = userEvent.setup();
+    const targetClass = { _id: "class-b", name: "Class 2", status: "active" };
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years") return { success: true, data: [year] };
+      if (path === "/students?limit=100") return { success: true, data: [student] };
+      if (path === "/classes?academicYearId=year-a") return { success: true, data: [schoolClass, targetClass] };
+      if (path === "/sections?classId=class-a&status=active") return { success: true, data: [section] };
+      if (path === "/sections?classId=class-b&status=active") return { success: true, data: [] };
+      if (path === "/enrollments?academicYearId=year-a") return { success: true, data: [enrollment] };
+      if (path === "/enrollments/enrollment-a/transfer" && options.method === "PATCH") return { success: true, data: { ...enrollment, classId: targetClass, sectionId: null, admissionType: "transfer" } };
+      return { success: true, data: [] };
+    });
+    render(<EnrollmentsManagement />);
+    await screen.findByText("Ayaan Khan");
+    await user.click(screen.getByRole("button", { name: "Move class/section" }));
+    await user.selectOptions(await screen.findByLabelText("Target class"), "class-b");
+    await user.type(screen.getByLabelText("Reason for transfer"), "Approved academic reassignment");
+    await user.click(screen.getByRole("button", { name: "Confirm transfer" }));
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith("/enrollments/enrollment-a/transfer", expect.objectContaining({
+      method: "PATCH",
+      body: { targetClassId: "class-b", targetSectionId: null, reason: "Approved academic reassignment" },
+    })));
+    expect(await screen.findByRole("status")).toHaveTextContent("Student transferred within the school.");
+  });
 
   it("prevents duplicate termination requests while one is pending", async () => {
     const user = userEvent.setup();
@@ -223,14 +243,14 @@ describe("EnrollmentsManagement", () => {
 
     render(<EnrollmentsManagement />);
     await screen.findByText("Ayaan Khan");
-    await user.click(screen.getByRole("button", { name: "Transfer" }));
+    await user.click(screen.getByRole("button", { name: "Withdraw" }));
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     expect(await screen.findByRole("button", { name: "Updating…" })).toBeDisabled();
     expect(apiRequest.mock.calls.filter(([path, options]) => path === "/enrollments/enrollment-a" && options?.method === "PATCH")).toHaveLength(1);
 
-    resolveTermination({ success: true, data: { ...enrollment, status: "transferred" } });
-    await screen.findByText("Enrollment marked as transferred. Select the student’s new class and section to complete the transfer.");
+    resolveTermination({ success: true, data: { ...enrollment, status: "withdrawn" } });
+    await screen.findByText("Enrollment marked as withdrawn.");
   });
 
 });

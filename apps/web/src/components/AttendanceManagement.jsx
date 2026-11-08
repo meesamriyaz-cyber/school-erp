@@ -17,6 +17,8 @@ const STATUSES = [
 export default function AttendanceManagement() {
   const { accessToken } = useAuth();
   const [years, setYears] = useState([]);
+  const [terms, setTerms] = useState([]);
+  const [termId, setTermId] = useState("");
   const [yearId, setYearId] = useState("");
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState("");
@@ -47,6 +49,17 @@ export default function AttendanceManagement() {
     void load();
     return () => controller.abort();
   }, [accessToken]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.resolve().then(() => {
+      if (!yearId) { setTerms([]); return undefined; }
+      return apiRequest(`/academic-terms?academicYearId=${encodeURIComponent(yearId)}&status=active`, { accessToken, signal: controller.signal })
+        .then((response) => { if (!controller.signal.aborted) setTerms(Array.isArray(response?.data) ? response.data : []); })
+        .catch((err) => { if (err.name !== "AbortError") setError(err.message || "Unable to load academic terms."); });
+    });
+    return () => controller.abort();
+  }, [accessToken, yearId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -85,6 +98,7 @@ export default function AttendanceManagement() {
     try {
       const params = new URLSearchParams({ date, academicYearId: yearId, classId });
       if (sectionId) params.set("sectionId", sectionId);
+      if (termId) params.set("academicTermId", termId);
       const response = await apiRequest(`/attendance?${params}`, { accessToken, signal });
       if (!response?.success || !Array.isArray(response.data)) throw new Error("Unable to load the attendance register.");
       setRoster(response.data.map((item) => ({
@@ -100,7 +114,7 @@ export default function AttendanceManagement() {
     } finally {
       if (!signal?.aborted) setLoadingRoster(false);
     }
-  }, [accessToken, yearId, classId, sectionId, date]);
+  }, [accessToken, yearId, classId, sectionId, date, termId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -130,7 +144,7 @@ export default function AttendanceManagement() {
     try {
       const response = await apiRequest("/attendance", {
         method: "PUT", accessToken,
-        body: { date, academicYearId: yearId, classId, ...(sectionId ? { sectionId } : {}),
+        body: { date, academicYearId: yearId, ...(termId ? { academicTermId: termId } : {}), classId, ...(sectionId ? { sectionId } : {}),
           records: roster.map(({ studentId, status, remarks }) => ({ studentId, status, remarks })) },
       });
       if (!response?.success) throw new Error("Attendance could not be saved.");
@@ -152,7 +166,8 @@ export default function AttendanceManagement() {
     {error && <p className="attendance-alert" role="alert">{error}</p>}
     {notice && <p className="attendance-notice" role="status">{notice}</p>}
     <div className="attendance-filters">
-      <label>Academic year<select value={yearId} disabled={loadingSetup} onChange={(e) => setYearId(e.target.value)}><option value="">Select year</option>{years.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Academic year<select value={yearId} disabled={loadingSetup} onChange={(e) => { setYearId(e.target.value); setTermId(""); }}><option value="">Select year</option>{years.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Academic term<select value={termId} onChange={(e) => setTermId(e.target.value)}><option value="">Entire academic year</option>{terms.map((term) => <option key={term._id} value={term._id}>{term.name}</option>)}</select></label>
       <label>Class<select value={classId} onChange={(e) => setClassId(e.target.value)}><option value="">Select class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Section<select value={sectionId} onChange={(e) => setSectionId(e.target.value)}><option value="">All sections</option>{sections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
       <label>Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>

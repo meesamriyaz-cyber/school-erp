@@ -101,6 +101,24 @@ export const executeAcademicYearRollover = async (req, res, next) => {
         throw fail("PLACEMENT_SET", "The preview is out of date. Refresh it and provide a decision for every active student exactly once");
       }
 
+      // Lock every source placement scope so rollover serializes with class/section deactivation.
+      const sourceClassIds = [...new Set(active.map((item) => String(item.classId)))];
+      for (const classId of sourceClassIds) {
+        const lockedSourceClass = await SchoolClass.findOneAndUpdate(
+          { _id: classId, tenantId: req.tenantId, academicYearId: source._id, status: "active" },
+          { $inc: { placementRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!lockedSourceClass) throw fail("SOURCE_CLASS", "A source class is no longer active; refresh the rollover preview");
+      }
+      const sourceSectionIds = [...new Set(active.filter((item) => item.sectionId).map((item) => String(item.sectionId)))];
+      for (const sectionId of sourceSectionIds) {
+        const lockedSourceSection = await Section.findOneAndUpdate(
+          { _id: sectionId, tenantId: req.tenantId, status: "active" },
+          { $inc: { capacityRevision: 1 } }, { new: true, session }
+        ).select("_id").lean();
+        if (!lockedSourceSection) throw fail("SOURCE_SECTION", "A source section is no longer active; refresh the rollover preview");
+      }
+
       const classIds = [...new Set(body.placements.filter((item) => ["promote", "retain"].includes(item.outcome)).map((item) => item.classId))];
       const classes = await SchoolClass.find({
         _id: { $in: classIds }, tenantId: req.tenantId, academicYearId: target._id, status: "active",
@@ -161,6 +179,7 @@ export const executeAcademicYearRollover = async (req, res, next) => {
             tenantId: req.tenantId, studentId: enrollment.studentId,
             academicYearId: target._id, classId: decision.classId,
             sectionId: decision.sectionId || null, enrollmentDate: target.startDate,
+            admissionType: "continuing", previousEnrollmentId: enrollment._id,
             status: "active",
             notes: decision.outcome === "retain" ? "Retained from previous academic year" : "Promoted from previous academic year",
           }], { session });
@@ -193,8 +212,8 @@ export const executeAcademicYearRollover = async (req, res, next) => {
     });
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
-    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS"].includes(error.code)) {
-      return res.status(error.code === "YEAR_STATE" ? 409 : ["SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS"].includes(error.code) ? 409 : 400)
+    if (["YEAR_STATE", "YEAR_DATES", "PLACEMENT_SET", "TARGET_CLASS", "TARGET_SECTION", "SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS", "SOURCE_CLASS", "SOURCE_SECTION"].includes(error.code)) {
+      return res.status(error.code === "YEAR_STATE" ? 409 : ["SECTION_CAPACITY", "TARGET_NOT_EMPTY", "SOURCE_TERMS", "SOURCE_CLASS", "SOURCE_SECTION"].includes(error.code) ? 409 : 400)
         .json({ success: false, message: error.message });
     }
     if (error.code === 11000) return res.status(409).json({ success: false, message: "A student already has an active enrollment or a target placement conflicts with existing data" });

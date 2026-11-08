@@ -151,4 +151,37 @@ describe("Phase 7 academic structure and placement lifecycle", () => {
     }) });
     expect(crossTenant.status).toBe(404);
   });
+  it("requires a reason and preserves lineage when re-admitting a withdrawn student", async () => {
+    const returningStudent = await Student.create({
+      tenantId: school._id, admissionNumber: `READMIT-${randomUUID().slice(0, 6)}`,
+      firstName: "Returning", lastName: "Learner", status: "active",
+      admissionDate: new Date("2026-04-01"),
+    });
+    const prior = await Enrollment.create({
+      tenantId: school._id, studentId: returningStudent._id, academicYearId: year._id,
+      classId: classA._id, enrollmentDate: new Date("2026-04-01"), status: "active",
+    });
+    const withdrawn = await request(`/enrollments/${prior._id}`, {
+      token: admin.token, method: "PATCH", body: JSON.stringify({ status: "withdrawn" }),
+    });
+    expect(withdrawn.status).toBe(200);
+    expect((await Student.findById(returningStudent._id).lean()).status).toBe("withdrawn");
+    await Student.updateOne({ _id: returningStudent._id, tenantId: school._id }, { $set: { status: "active" } });
+
+    const missingReason = await request("/enrollments", { token: admin.token, method: "POST", body: JSON.stringify({
+      studentId: String(returningStudent._id), academicYearId: String(year._id), classId: String(classA._id),
+    }) });
+    expect(missingReason.status).toBe(400);
+    expect(missingReason.body.message).toMatch(/reason is required to re-admit/i);
+
+    const readmitted = await request("/enrollments", { token: admin.token, method: "POST", body: JSON.stringify({
+      studentId: String(returningStudent._id), academicYearId: String(year._id), classId: String(classA._id),
+      reAdmissionReason: "Returning after family relocation",
+    }) });
+    expect(readmitted.status).toBe(201);
+    expect(readmitted.body.data.admissionType).toBe("readmission");
+    expect(String(readmitted.body.data.previousEnrollmentId)).toBe(String(prior._id));
+    expect(readmitted.body.data.reAdmissionReason).toBe("Returning after family relocation");
+  });
+
 });

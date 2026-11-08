@@ -5,12 +5,13 @@ import { useAuth } from "../context/authContext.js";
 import "./ExaminationManagement.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const emptyExam = () => ({ name: "", academicYearId: "", classId: "", sectionId: "", startDate: today(), endDate: today() });
+const emptyExam = () => ({ name: "", academicYearId: "", academicTermId: "", classId: "", sectionId: "", startDate: today(), endDate: today() });
 const errorMessage = (error, fallback) => error?.message || fallback;
 
 export default function ExaminationManagement() {
   const { accessToken } = useAuth();
   const [years, setYears] = useState([]);
+  const [terms, setTerms] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -48,6 +49,19 @@ export default function ExaminationManagement() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [loadSetup]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.resolve().then(() => {
+      if (!examForm.academicYearId) { setTerms([]); return undefined; }
+      return apiRequest(`/academic-terms?academicYearId=${encodeURIComponent(examForm.academicYearId)}`, { accessToken, signal: controller.signal })
+        .then((response) => {
+          if (!controller.signal.aborted) setTerms(Array.isArray(response?.data) ? response.data.filter((term) => term.status !== "cancelled") : []);
+        })
+        .catch((err) => { if (err.name !== "AbortError") setError(errorMessage(err, "Unable to load academic terms.")); });
+    });
+    return () => controller.abort();
+  }, [accessToken, examForm.academicYearId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -128,7 +142,7 @@ export default function ExaminationManagement() {
   const createExam = async (event) => {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
     try {
-      const response = await apiRequest("/examinations", { method: "POST", accessToken, body: { ...examForm, sectionId: examForm.sectionId || null } });
+      const response = await apiRequest("/examinations", { method: "POST", accessToken, body: { ...examForm, academicTermId: examForm.academicTermId || null, sectionId: examForm.sectionId || null } });
       setNotice("Examination created. Configure its subjects to continue.");
       await loadExams();
       setSelectedId(response.data._id);
@@ -237,7 +251,8 @@ export default function ExaminationManagement() {
         <article className="examinations-card"><div className="examinations-card-heading"><div><h3>Create examination</h3><p>Choose the academic year and class scope.</p></div></div>
           <form className="examinations-form" onSubmit={createExam}>
             <label>Examination name<input required maxLength={100} value={examForm.name} onChange={(e) => setExamForm((v) => ({ ...v, name: e.target.value }))} placeholder="e.g. Mid Term Examination" /></label>
-            <label>Academic year<select required value={examForm.academicYearId} onChange={(e) => setExamForm((v) => ({ ...v, academicYearId: e.target.value }))}><option value="">Select year</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}</select></label>
+            <label>Academic year<select required value={examForm.academicYearId} onChange={(e) => setExamForm((v) => ({ ...v, academicYearId: e.target.value, academicTermId: "" }))}><option value="">Select year</option>{years.map((year) => <option key={year._id} value={year._id}>{year.name}</option>)}</select></label>
+            <label>Academic term (optional)<select value={examForm.academicTermId} onChange={(e) => setExamForm((v) => ({ ...v, academicTermId: e.target.value }))}><option value="">Entire academic year</option>{terms.map((term) => <option key={term._id} value={term._id}>{term.name} · {term.status}</option>)}</select></label>
             <label>Class<select required value={examForm.classId} onChange={(e) => setExamForm((v) => ({ ...v, classId: e.target.value }))}><option value="">Select class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
             <label>Section scope<select value={examForm.sectionId} onChange={(e) => setExamForm((v) => ({ ...v, sectionId: e.target.value }))}><option value="">All sections</option>{sections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
             <label>Start date<input type="date" required value={examForm.startDate} onChange={(e) => setExamForm((v) => ({ ...v, startDate: e.target.value }))} /></label>

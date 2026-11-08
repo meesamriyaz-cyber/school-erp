@@ -30,13 +30,10 @@ export const transferEnrollment = async (req, res, next) => {
   try {
     await session.withTransaction(async () => {
       const source = await Enrollment.findOne({
-        _id: req.params.enrollmentId, tenantId: req.tenantId, status: "active",
+        _id: req.params.enrollmentId, tenantId: req.tenantId,
       }).session(session);
-      if (!source) {
-        const error = new Error("Only an active enrollment can be transferred within the school");
-        error.code = "SOURCE_ENROLLMENT_NOT_ACTIVE";
-        throw error;
-      }
+      if (!source) { const error = new Error("Enrollment not found"); error.code = "ENROLLMENT_NOT_FOUND"; throw error; }
+      if (source.status !== "active") { const error = new Error("Only an active enrollment can be transferred within the school"); error.code = "SOURCE_ENROLLMENT_NOT_ACTIVE"; throw error; }
       const [student, year] = await Promise.all([
         Student.findOne({ _id: source.studentId, tenantId: req.tenantId, status: "active" }).select("_id").session(session).lean(),
         AcademicYear.findOneAndUpdate(
@@ -100,7 +97,8 @@ export const transferEnrollment = async (req, res, next) => {
       const [created] = await Enrollment.create([{
         tenantId: req.tenantId, studentId: source.studentId, academicYearId: source.academicYearId,
         classId: targetClass._id, sectionId: targetSection?._id || null,
-        enrollmentDate: transferredAt, status: "active", notes: source.notes,
+        enrollmentDate: transferredAt, admissionType: "transfer", previousEnrollmentId: source._id,
+        status: "active", notes: source.notes,
       }], { session });
       await EnrollmentTransferAudit.create([{
         tenantId: req.tenantId, studentId: source.studentId,
@@ -119,6 +117,7 @@ export const transferEnrollment = async (req, res, next) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     const conflicts = {
+      ENROLLMENT_NOT_FOUND: [404, "Enrollment not found"],
       SOURCE_CLASS_INVALID: [409, "The student current class is no longer active"],
       SOURCE_SECTION_INVALID: [409, "The student current section is no longer active"],
       SOURCE_ENROLLMENT_NOT_ACTIVE: [409, "Only an active enrollment can be transferred within the school"],

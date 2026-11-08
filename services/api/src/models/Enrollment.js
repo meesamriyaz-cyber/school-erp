@@ -38,6 +38,9 @@ const enrollmentSchema = new mongoose.Schema(
       required: [true, "Enrollment date is required"],
       default: Date.now,
     },
+    admissionType: { type: String, enum: ["initial", "continuing", "readmission", "transfer"], default: "initial", required: true, immutable: true },
+    previousEnrollmentId: { type: mongoose.Schema.Types.ObjectId, ref: "Enrollment", default: null, immutable: true },
+    reAdmissionReason: { type: String, trim: true, default: "", maxlength: 500, immutable: true },
     status: {
       type: String,
       enum: ["active", "completed", "transferred", "withdrawn"],

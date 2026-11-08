@@ -39,6 +39,7 @@ export default function EnrollmentsManagement() {
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [enrollments, setEnrollments] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [reAdmissionReason, setReAdmissionReason] = useState("");
   const [loadingSetup, setLoadingSetup] = useState(true);
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [loadingSections, setLoadingSections] = useState(false);
@@ -206,10 +207,12 @@ export default function EnrollmentsManagement() {
           academicYearId: selectedYearId,
           classId: selectedClassId,
           sectionId: selectedSectionId || null,
+          reAdmissionReason: reAdmissionReason.trim(),
         },
       });
       if (!response?.success || !response.data) throw new Error("Unable to create enrollment.");
       setNotice("Student enrolled successfully.");
+      setReAdmissionReason("");
       setFormOpen(false);
       await loadEnrollments();
     } catch (err) {
@@ -298,6 +301,7 @@ export default function EnrollmentsManagement() {
       <label>Class<select required value={selectedClassId} onChange={(event) => { setSelectedClassId(event.target.value); setSelectedSectionId(""); }} disabled={loadingClasses || !classes.some((item) => item.status === "active")}>
         <option value="">Select class</option>{classes.filter((item) => item.status === "active").map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
       </select></label>
+      <label>Re-admission reason (if applicable)<textarea maxLength={500} value={reAdmissionReason} onChange={(event) => setReAdmissionReason(event.target.value)} placeholder="Required if this student is returning after a withdrawal or transfer." /></label>
       <label>Section (optional)<select value={selectedSectionId} onChange={(event) => setSelectedSectionId(event.target.value)} disabled={loadingSections || !selectedClassId}>
         <option value="">No section</option>{sections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}
       </select></label>

@@ -122,7 +122,10 @@ export const updateSection = async (req, res, next) => {
         );
         if (!section) { const error = new Error("Section not found"); error.code = "SECTION_NOT_FOUND"; throw error; }
         if (fields.status === "active") {
-          const parent = await SchoolClass.findOne({ _id: section.classId, tenantId: req.tenantId, status: "active" }).select("_id academicYearId").session(session).lean();
+          const parent = await SchoolClass.findOneAndUpdate(
+            { _id: section.classId, tenantId: req.tenantId, status: "active" },
+            { $inc: { placementRevision: 1 } }, { new: true, session }
+          ).select("_id academicYearId").lean();
           if (!parent) { const error = new Error("A section cannot be activated while its class is inactive"); error.code = "SECTION_PARENT_INACTIVE"; throw error; }
           const academicYear = await AcademicYear.findOne({ _id: parent.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } }).select("_id").session(session).lean();
           if (!academicYear) { const error = new Error("A section cannot be activated for a closed academic year"); error.code = "SECTION_YEAR_CLOSED"; throw error; }

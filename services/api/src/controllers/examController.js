@@ -7,11 +7,13 @@ import Section from "../models/Section.js";
 import Subject from "../models/Subject.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import ClassSubject from "../models/ClassSubject.js";
+import AcademicTerm from "../models/AcademicTerm.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const populatedExam = (query) => query
   .populate("academicYearId", "name startDate endDate")
+  .populate("academicTermId", "name startDate endDate status")
   .populate("classId", "name")
   .populate("sectionId", "name");
 
@@ -88,8 +90,9 @@ export const createExamination = async (req, res, next) => {
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body)) return invalid(res, "Provide examination details");
     if (["tenantId", "createdBy", "status"].some((key) => Object.hasOwn(body, key))) return invalid(res, "School, creator and initial status are determined by the server");
-    const { academicYearId, classId, sectionId = null, name, startDate, endDate } = body;
+    const { academicYearId, academicTermId = null, classId, sectionId = null, name, startDate, endDate } = body;
     if (!validId(academicYearId) || !validId(classId)) return invalid(res, "A valid academic year and class are required");
+    if (academicTermId !== null && !validId(academicTermId)) return invalid(res, "Invalid academic term ID");
     if (sectionId !== null && sectionId !== "" && !validId(sectionId)) return invalid(res, "Invalid section ID");
     if (typeof name !== "string" || !name.trim() || name.trim().length > 100) return invalid(res, "Examination name is required and must be 100 characters or fewer");
     const start = new Date(startDate), end = new Date(endDate);
@@ -101,12 +104,18 @@ export const createExamination = async (req, res, next) => {
     if (!year) return invalid(res, "Select an open academic year from this school");
     if (!schoolClass || String(schoolClass.academicYearId) !== String(academicYearId)) return invalid(res, "The selected class does not belong to this academic year and school");
     if (start < new Date(year.startDate) || end > new Date(year.endDate)) return invalid(res, "Examination dates must fall within the selected academic year");
+    let selectedTerm = null;
+    if (academicTermId) {
+      selectedTerm = await AcademicTerm.findOne({ _id: academicTermId, tenantId: req.tenantId, academicYearId, status: { $ne: "cancelled" } }).select("_id startDate endDate").lean();
+      if (!selectedTerm) return invalid(res, "Select a valid term belonging to the selected academic year");
+      if (start < new Date(selectedTerm.startDate) || end > new Date(selectedTerm.endDate)) return invalid(res, "Examination dates must fall within the selected academic term");
+    }
     const selectedSection = sectionId || null;
     if (selectedSection && !await Section.exists({ _id: selectedSection, tenantId: req.tenantId, classId, status: "active" })) return invalid(res, "The selected section is not active in this class");
     const curriculum = await ClassSubject.find({ tenantId: req.tenantId, academicYearId, classId, status: "active" })
       .populate("subjectId", "name code category").sort({ sortOrder: 1, _id: 1 }).lean();
     const exam = await Examination.create({
-      tenantId: req.tenantId, academicYearId, classId, sectionId: selectedSection,
+      tenantId: req.tenantId, academicYearId, academicTermId: selectedTerm?._id || null, classId, sectionId: selectedSection,
       name: name.trim(), startDate: start, endDate: end, createdBy: req.auth.userId,
       curriculumSnapshot: curriculum.map((item) => ({
         subjectId: item.subjectId._id, subjectName: item.subjectId.name,
@@ -139,6 +148,9 @@ export const updateExaminationStatus = async (req, res, next) => {
     if (!allowed[exam.status]?.includes(req.body.status)) return res.status(409).json({ success: false, message: `Cannot change examination from ${exam.status} to ${req.body.status}` });
     if (req.body.status === "scheduled" && exam.academicTermId && !await AcademicTerm.exists({ _id: exam.academicTermId, tenantId: req.tenantId, academicYearId: exam.academicYearId, status: "active" })) {
       return res.status(409).json({ success: false, message: "The examination's academic term must be active before scheduling" });
+    }
+    if (req.body.status === "scheduled" && exam.academicTermId && !await AcademicTerm.exists({ _id: exam.academicTermId, tenantId: req.tenantId, academicYearId: exam.academicYearId, status: "active" })) {
+      return res.status(409).json({ success: false, message: "The examination term must be active before scheduling" });
     }
     if (req.body.status === "scheduled" && !await ExamSubject.exists({ tenantId: req.tenantId, examinationId: exam._id })) {
       return res.status(409).json({ success: false, message: "Configure at least one subject before scheduling this examination" });

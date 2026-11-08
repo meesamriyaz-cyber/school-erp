@@ -35,7 +35,7 @@ const validateBody = (body, res, creating = false) => {
     return null;
   }
   const fields = pick(body, creating
-    ? ["studentId", "academicYearId", "classId", "sectionId", "enrollmentDate", "notes"]
+    ? ["studentId", "academicYearId", "classId", "sectionId", "enrollmentDate", "notes", "reAdmissionReason"]
     : ["status", "endedAt"]);
   if (creating) {
     for (const key of ["studentId", "academicYearId", "classId"]) {
@@ -46,6 +46,10 @@ const validateBody = (body, res, creating = false) => {
     }
     if (Object.hasOwn(fields, "sectionId") && fields.sectionId !== null && !validId(fields.sectionId)) {
       invalid(res, "Invalid section ID");
+      return null;
+    }
+    if (Object.hasOwn(fields, "reAdmissionReason") && (typeof fields.reAdmissionReason !== "string" || fields.reAdmissionReason.trim().length > 500)) {
+      invalid(res, "Re-admission reason must be a string of at most 500 characters");
       return null;
     }
     if (Object.hasOwn(fields, "notes") && (typeof fields.notes !== "string" || fields.notes.trim().length > 500)) {
@@ -86,6 +90,7 @@ export const listEnrollments = async (req, res, next) => {
       .populate("academicYearId", "name startDate endDate status")
       .populate("classId", "name sortOrder status")
       .populate("sectionId", "name status")
+      .populate("previousEnrollmentId", "enrollmentDate status admissionType")
       .sort({ enrollmentDate: -1, _id: -1 })
       .lean();
     return res.status(200).json({ success: true, data });
@@ -100,6 +105,7 @@ export const getEnrollment = async (req, res, next) => {
       .populate("academicYearId", "name startDate endDate status")
       .populate("classId", "name sortOrder status")
       .populate("sectionId", "name status")
+      .populate("previousEnrollmentId", "enrollmentDate status admissionType")
       .lean();
     if (!data) return res.status(404).json({ success: false, message: "Enrollment not found" });
     return res.status(200).json({ success: true, data });
@@ -122,6 +128,21 @@ export const createEnrollment = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Enrollment date must fall within the selected academic year" });
     }
     if (!schoolClass) return res.status(400).json({ success: false, message: "Active class was not found in the selected academic year and school" });
+    const previousEnrollment = await Enrollment.findOne({
+      tenantId: req.tenantId, studentId: fields.studentId, status: { $in: TERMINAL_STATUSES },
+    }).sort({ endedAt: -1, createdAt: -1 }).select("_id status").lean();
+    const isReadmission = ["withdrawn", "transferred"].includes(previousEnrollment?.status);
+    if (isReadmission && !fields.reAdmissionReason?.trim()) {
+      return invalid(res, "A reason is required to re-admit a previously withdrawn or transferred student");
+    }
+    if (!isReadmission && fields.reAdmissionReason?.trim()) {
+      return invalid(res, "A re-admission reason is only accepted when the student has a previous withdrawn or transferred enrollment");
+    }
+    const admissionMetadata = {
+      admissionType: isReadmission ? "readmission" : previousEnrollment ? "continuing" : "initial",
+      previousEnrollmentId: previousEnrollment?._id || null,
+      reAdmissionReason: isReadmission ? fields.reAdmissionReason.trim() : "",
+    };
 
     if (fields.sectionId) {
       const section = await Section.findOne({
@@ -194,6 +215,7 @@ export const createEnrollment = async (req, res, next) => {
 
             const created = await Enrollment.create([{
               ...fields,
+              ...admissionMetadata,
               enrollmentDate,
               tenantId: req.tenantId,
               sectionId: fields.sectionId,
@@ -258,6 +280,7 @@ export const createEnrollment = async (req, res, next) => {
 
         const created = await Enrollment.create([{
           ...fields,
+          ...admissionMetadata,
           enrollmentDate,
           tenantId: req.tenantId,
           sectionId: fields.sectionId || null,
@@ -282,16 +305,36 @@ export const createEnrollment = async (req, res, next) => {
 };
 
 export const endEnrollment = async (req, res, next) => {
+  if (!validId(req.params.enrollmentId)) return invalid(res, "Invalid enrollment ID");
+  const fields = validateBody(req.body, res);
+  if (!fields) return;
+  const session = await mongoose.startSession();
+  let updated;
   try {
-    if (!validId(req.params.enrollmentId)) return invalid(res, "Invalid enrollment ID");
-    const fields = validateBody(req.body, res);
-    if (!fields) return;
-    const enrollment = await Enrollment.findOne({ _id: req.params.enrollmentId, tenantId: req.tenantId });
-    if (!enrollment) return res.status(404).json({ success: false, message: "Enrollment not found" });
-    if (enrollment.status !== "active") return res.status(409).json({ success: false, message: "Only active enrollments can be ended" });
-    enrollment.status = fields.status;
-    enrollment.endedAt = new Date();
-    await enrollment.save();
-    return res.status(200).json({ success: true, data: enrollment });
-  } catch (error) { return handleError(error, res, next); }
+    await session.withTransaction(async () => {
+      const enrollment = await Enrollment.findOne({
+        _id: req.params.enrollmentId, tenantId: req.tenantId, status: "active",
+      }).session(session);
+      if (!enrollment) {
+        const error = new Error("Only active enrollments can be ended");
+        error.code = "ENROLLMENT_NOT_ACTIVE";
+        throw error;
+      }
+      enrollment.status = fields.status;
+      enrollment.endedAt = new Date();
+      await enrollment.save({ session });
+      if (fields.status === "withdrawn" || fields.status === "transferred") {
+        await Student.updateOne(
+          { _id: enrollment.studentId, tenantId: req.tenantId },
+          { $set: { status: fields.status === "withdrawn" ? "withdrawn" : "inactive" } },
+          { session }
+        );
+      }
+      updated = enrollment;
+    });
+    return res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    if (error.code === "ENROLLMENT_NOT_ACTIVE") return res.status(409).json({ success: false, message: error.message });
+    return handleError(error, res, next);
+  } finally { await session.endSession(); }
 };

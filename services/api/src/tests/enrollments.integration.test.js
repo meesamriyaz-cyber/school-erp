@@ -156,8 +156,10 @@ describe("Student Enrollment API", () => {
     expect(ended.body.data.status).toBe("transferred");
     expect(ended.body.data.endedAt).toBeTruthy();
 
+    await Student.updateOne({ _id: student._id, tenantId: schoolA._id }, { $set: { status: "active" } });
     const second = await post("/enrollments", adminA.token, {
       studentId: String(student._id), academicYearId: String(yearA._id), classId: String(classA._id),
+      reAdmissionReason: "Returning after an external transfer",
     });
     expect(second.status).toBe(201);
     enrollmentIds.push(second.body.data._id);
@@ -431,10 +433,14 @@ describe("Student Enrollment API", () => {
       expect(history.body.data[0].status).toBe(status);
       expect(history.body.data[0].endedAt).toBeTruthy();
 
+      if (status === "transferred" || status === "withdrawn") {
+        await Student.updateOne({ _id: student._id, tenantId: schoolA._id }, { $set: { status: "active" } });
+      }
       const newPlacement = await post("/enrollments", adminA.token, {
         studentId: String(student._id),
         academicYearId: String(yearA._id),
         classId: String(classA._id),
+        ...(["transferred", "withdrawn"].includes(status) ? { reAdmissionReason: "Approved return to school" } : {}),
       });
       expect(newPlacement.status).toBe(201);
       enrollmentIds.push(newPlacement.body.data._id);
