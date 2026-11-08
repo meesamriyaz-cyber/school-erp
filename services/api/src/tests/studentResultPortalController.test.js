@@ -94,7 +94,7 @@ describe("student and parent portal results and homework access", () => {
     };
     const result = { enrollmentId: "enrollment-a", percentage: 85 };
     mocks.enrollmentFind.mockReturnValue(query([enrollment], ["select"]));
-    mocks.examinationFind.mockReturnValue(query([exam], ["sort"]));
+    mocks.examinationFind.mockReturnValue(query([exam], ["populate", "sort"]));
     mocks.loadResultContext.mockResolvedValue({ results: [result] });
 
     await getMyPublishedResults(req, res, next);
