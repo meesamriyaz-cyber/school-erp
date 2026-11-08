@@ -373,6 +373,25 @@ describe("Examination API integration", () => {
       highestPercentage: 82,
       lowestPercentage: 82,
     });
+    expect(results.body.summary.classPassRate).toBe(100);
+    expect(results.body.summary.gradeDistribution).toContainEqual({
+      grade: "B", count: 1, percentage: 100,
+    });
+    expect(results.body.summary.subjectAnalytics).toHaveLength(1);
+    expect(results.body.summary.subjectAnalytics[0]).toMatchObject({
+      subject: { name: subjectA.name },
+      enrolledCount: 1,
+      recordedCount: 1,
+      scoredCount: 1,
+      absentCount: 0,
+      pendingCount: 0,
+      passedCount: 1,
+      failedCount: 0,
+      passRate: 100,
+      averagePercentage: 82,
+      highestPercentage: 82,
+      lowestPercentage: 82,
+    });
     expect(results.body.data).toHaveLength(1);
     expect(results.body.data[0]).toMatchObject({
       totalObtained: 82, totalMaximum: 100, percentage: 82, grade: "B", status: "passed",
