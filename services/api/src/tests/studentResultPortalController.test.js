@@ -127,6 +127,7 @@ describe("student and parent portal results and homework access", () => {
       success: true,
       data: [{
         examination: expect.objectContaining({ name: "Term 1" }),
+        school: { name: "Test School", contactEmail: "office@example.com" },
         student: expect.objectContaining({ _id: "student-a" }),
         result,
       }],
