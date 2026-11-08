@@ -386,6 +386,7 @@ describe("Examination API integration", () => {
       class: { name: classA.name },
     });
     expect(parentResults.body.data[0].examination.section).toBeNull();
+    expect(parentResults.body.data[0].school).toMatchObject({ name: schoolA.name });
     expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: studentAccount.token })).status).toBe(403);
     expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: parentAccount.token })).status).toBe(403);
 
