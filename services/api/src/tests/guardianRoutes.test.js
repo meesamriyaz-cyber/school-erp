@@ -728,7 +728,6 @@ describe("Guardian API integration tests", () => {
     expect(second.status).toBe(201);
     expect(first.body.data.auditTrail).toEqual(expect.arrayContaining([
       expect.objectContaining({ action: "created", actorUserId: String(adminA.user._id) }),
-      expect.objectContaining({ action: "primary_demoted", actorUserId: String(adminA.user._id) }),
     ]));
     expect(second.body.data.auditTrail).toEqual(expect.arrayContaining([
       expect.objectContaining({ action: "created", actorUserId: String(adminA.user._id) }),
@@ -736,6 +735,8 @@ describe("Guardian API integration tests", () => {
     const relationships = await request(`/students/${student._id}/guardians`, { token: adminA.token });
     expect(relationships.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
     expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianTwo._id)).isPrimary).toBe(true);
+    expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianOne._id)).auditTrail)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ action: "primary_demoted", actorUserId: String(adminA.user._id) })]));
   });
 
   it("restores a missing primary when a new active guardian relationship is added", async () => {
