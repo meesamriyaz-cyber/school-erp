@@ -5,11 +5,13 @@ import Examination from "../models/Examination.js";
 import ExamSubject from "../models/ExamSubject.js";
 import ExamMark from "../models/ExamMark.js";
 import Enrollment from "../models/Enrollment.js";
+import GradingScale from "../models/GradingScale.js";
+import { getGradeForPercentage } from "../utils/grading.js";
 
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
 
-export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrollments = false } = {}) => {
+export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrollments = false, gradingScale = null } = {}) => {
   const [subjects, enrollments] = await Promise.all([
     ExamSubject.find({ tenantId, examinationId: exam._id })
       .populate("subjectId", "name code")
@@ -36,6 +38,7 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
     }).lean()
     : [];
 
+  const gradingBands = exam.gradingScaleSnapshot?.bands || gradingScale?.bands || [];
   const markMap = new Map(
     marks.map((mark) => [`${mark.enrollmentId}:${mark.examSubjectId}`, mark])
   );
@@ -68,6 +71,9 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
       totalObtained += score;
       const subjectPassed = !mark.absent && score >= subject.passMarks;
       if (!subjectPassed) passed = false;
+      const subjectPercentage = mark.absent
+        ? null
+        : Number(((score / subject.maxMarks) * 100).toFixed(2));
 
       return {
         examSubjectId: subject._id,
@@ -75,6 +81,8 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
         maxMarks: subject.maxMarks,
         passMarks: subject.passMarks,
         marksObtained: mark.absent ? null : score,
+        percentage: subjectPercentage,
+        grade: subjectPercentage === null ? null : getGradeForPercentage(subjectPercentage, gradingBands),
         absent: mark.absent,
         status: mark.absent ? "absent" : subjectPassed ? "passed" : "failed",
         remarks: mark.remarks,
@@ -93,6 +101,7 @@ export const loadResultContext = async (tenantId, exam, { includeHistoricalEnrol
       totalObtained,
       totalMaximum,
       percentage,
+      grade: complete ? getGradeForPercentage(percentage, gradingBands) : null,
       status: !complete ? "incomplete" : passed ? "passed" : "failed",
       completedSubjects,
       totalSubjects: subjects.length,
@@ -135,13 +144,17 @@ export const getExaminationResults = async (req, res, next) => {
       return res.status(409).json({ success: false, message: "Results are available after the examination is completed" });
     }
 
-    const context = await loadResultContext(req.tenantId, exam);
+    const gradingScale = exam.status === "completed"
+      ? await GradingScale.findOne({ tenantId: req.tenantId, status: "active" }).lean()
+      : null;
+    const context = await loadResultContext(req.tenantId, exam, { gradingScale });
     return res.status(200).json({
       success: true,
       data: context.results,
       summary: {
         examinationId: exam._id,
         status: exam.status,
+        gradingScaleName: exam.gradingScaleSnapshot?.name || gradingScale?.name || null,
         studentCount: context.enrollments.length,
         subjectCount: context.subjects.length,
         incompleteCount: context.incompleteCount,
@@ -207,6 +220,18 @@ export const publishExaminationResults = async (req, res, next) => {
       });
     }
 
+    const gradingScale = await GradingScale.findOne({
+      tenantId: req.tenantId,
+      status: "active",
+    }).lean();
+    const gradingScaleSnapshot = gradingScale ? {
+      gradingScaleId: gradingScale._id,
+      name: gradingScale.name,
+      bands: gradingScale.bands.map(({ grade, minPercentage, maxPercentage, description }) => ({
+        grade, minPercentage, maxPercentage, description: description || "",
+      })),
+    } : null;
+
     const published = await Examination.findOneAndUpdate(
       {
         _id: exam._id,
@@ -215,7 +240,7 @@ export const publishExaminationResults = async (req, res, next) => {
         resultLockToken: lockToken,
       },
       {
-        $set: { status: "published" },
+        $set: { status: "published", gradingScaleSnapshot },
         $unset: { resultLockToken: 1, resultLockExpiresAt: 1 },
       },
       { new: true, runValidators: true }
