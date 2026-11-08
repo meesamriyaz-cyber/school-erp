@@ -267,9 +267,9 @@ export default function ExaminationManagement() {
               <div><span>Passed</span><strong>{resultSummary.passedCount ?? 0}</strong></div>
               <div><span>Failed</span><strong>{resultSummary.failedCount ?? 0}</strong></div>
               <div><span>Incomplete</span><strong>{resultSummary.incompleteCount ?? 0}</strong></div>
-              <div><span>Class average</span><strong>{resultSummary.averagePercentage === null || resultSummary.averagePercentage === undefined ? "—" : `${resultSummary.averagePercentage}%`}</strong></div>
-              <div><span>Highest</span><strong>{resultSummary.highestPercentage === null || resultSummary.highestPercentage === undefined ? "—" : `${resultSummary.highestPercentage}%`}</strong></div>
-              <div><span>Lowest</span><strong>{resultSummary.lowestPercentage === null || resultSummary.lowestPercentage === undefined ? "—" : `${resultSummary.lowestPercentage}%`}</strong></div>
+              <div><span>Average · complete only</span><strong>{resultSummary.averagePercentage === null || resultSummary.averagePercentage === undefined ? "—" : `${resultSummary.averagePercentage}%`}</strong></div>
+              <div><span>Highest · complete only</span><strong>{resultSummary.highestPercentage === null || resultSummary.highestPercentage === undefined ? "—" : `${resultSummary.highestPercentage}%`}</strong></div>
+              <div><span>Lowest · complete only</span><strong>{resultSummary.lowestPercentage === null || resultSummary.lowestPercentage === undefined ? "—" : `${resultSummary.lowestPercentage}%`}</strong></div>
             </div>}
             <div className="results-list">{results.map((result) => <div className="result-row result-row-detail" key={result.enrollmentId}>
               <span><strong>{result.student?.firstName} {result.student?.lastName}</strong><small>{result.student?.admissionNumber}</small></span>
