@@ -19,6 +19,7 @@ import SubjectManagement from "./components/SubjectManagement.jsx";
 import TeacherAssignments from "./components/TeacherAssignments.jsx";
 import TimetableManagement from "./components/TimetableManagement.jsx";
 import ExaminationManagement from "./components/ExaminationManagement.jsx";
+import GradingScaleManagement from "./components/GradingScaleManagement.jsx";
 import StudentResultsPortal from "./components/StudentResultsPortal.jsx";
 import HomeworkManagement from "./components/HomeworkManagement.jsx";
 import FeeManagement from "./components/FeeManagement.jsx";
@@ -38,6 +39,7 @@ const navigation = [
   { label: "Teacher Assignments", icon: "♙", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
+  { label: "Grading Scales", icon: "▧", section: "ACADEMICS" },
   { label: "Homework & Classwork", icon: "✎", section: "ACADEMICS" },
   { label: "Fees & Payments", icon: "₹", section: "FINANCE" },
   { label: "Reports", icon: "▥", section: "FINANCE" },
@@ -428,6 +430,8 @@ function DashboardApp() {
   <TimetableManagement />
  ) : activePage === "Examinations" ? (
   <ExaminationManagement />
+) : activePage === "Grading Scales" ? (
+  <GradingScaleManagement />
 ) : activePage === "Homework & Classwork" ? (
   <HomeworkManagement />
 ) : activePage === "Fees & Payments" ? (
