@@ -74,4 +74,47 @@ describe("StudentResultsPortal family overview", () => {
       expect(screen.queryByText("Bilal")).toBeNull();
     });
   });
+
+  it("renders academic context and subject remarks on a published report card", async () => {
+    mocks.apiRequest.mockImplementation((path) => Promise.resolve({
+      data: path === "/portal/results" ? [{
+        examination: {
+          _id: "exam-a",
+          name: "Mid Term",
+          startDate: "2026-09-01",
+          endDate: "2026-09-10",
+          academicYear: { name: "2026-27" },
+          class: { name: "Class 5" },
+          section: { name: "A" },
+        },
+        student: { _id: "student-a", firstName: "Amina", lastName: "Khan", admissionNumber: "A-01" },
+        result: {
+          enrollmentId: "enroll-a",
+          subjects: [{
+            examSubjectId: "subject-a",
+            subject: { name: "Mathematics" },
+            maxMarks: 100,
+            passMarks: 35,
+            marksObtained: 82,
+            absent: false,
+            status: "passed",
+            remarks: "Good progress",
+          }],
+          totalObtained: 82,
+          totalMaximum: 100,
+          percentage: 82,
+          status: "passed",
+        },
+      }] : [],
+    }));
+
+    render(<StudentResultsPortal />);
+
+    expect(await screen.findByText("Mid Term")).toBeTruthy();
+    expect(screen.getByText("2026-27")).toBeTruthy();
+    expect(screen.getByText("Class 5")).toBeTruthy();
+    expect(screen.getByText("A")).toBeTruthy();
+    expect(screen.getByText("Mathematics")).toBeTruthy();
+    expect(screen.getByText("Good progress")).toBeTruthy();
+  });
 });
