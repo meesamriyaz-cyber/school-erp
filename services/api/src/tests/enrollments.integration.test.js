@@ -540,4 +540,131 @@ describe("Student Enrollment API", () => {
     expect(await Enrollment.countDocuments({ tenantId: school._id, academicYearId: targetYear._id })).toBe(0);
   }, 30000);
 
+
+  it("validates the complete date range when only one academic-year boundary is patched", async () => {
+    const year = await AcademicYear.create({
+      tenantId: schoolA._id,
+      name: `AY-partial-${randomUUID().slice(0, 6)}`,
+      startDate: "2026-04-01",
+      endDate: "2027-03-31",
+      status: "draft",
+    });
+
+    const invalidStart = await request(`/academic-years/${year._id}`, {
+      token: adminA.token,
+      method: "PATCH",
+      body: JSON.stringify({ startDate: "2027-04-01" }),
+    });
+    expect(invalidStart.status).toBe(400);
+    expect(invalidStart.body.message).toMatch(/end date must be after its start date/i);
+    expect((await AcademicYear.findById(year._id).lean()).startDate.toISOString().slice(0, 10)).toBe("2026-04-01");
+
+    const invalidEnd = await request(`/academic-years/${year._id}`, {
+      token: adminA.token,
+      method: "PATCH",
+      body: JSON.stringify({ endDate: "2026-03-31" }),
+    });
+    expect(invalidEnd.status).toBe(400);
+    expect(invalidEnd.body.message).toMatch(/end date must be after its start date/i);
+
+    const validStart = await request(`/academic-years/${year._id}`, {
+      token: adminA.token,
+      method: "PATCH",
+      body: JSON.stringify({ startDate: "2026-05-01" }),
+    });
+    expect(validStart.status).toBe(200);
+    expect(new Date(validStart.body.data.startDate).toISOString().slice(0, 10)).toBe("2026-05-01");
+  });
+
+  it("prevents academic-year date changes from excluding existing historical enrollments", async () => {
+    const year = await AcademicYear.create({
+      tenantId: schoolA._id,
+      name: `AY-history-${randomUUID().slice(0, 6)}`,
+      startDate: "2026-04-01",
+      endDate: "2027-03-31",
+      status: "active",
+    });
+    const schoolClass = await SchoolClass.create({
+      tenantId: schoolA._id,
+      academicYearId: year._id,
+      name: `History class ${randomUUID().slice(0, 5)}`,
+    });
+    const student = await makeStudent(schoolA, `history-${randomUUID().slice(0, 5)}`);
+    const created = await post("/enrollments", adminA.token, {
+      studentId: String(student._id),
+      academicYearId: String(year._id),
+      classId: String(schoolClass._id),
+      enrollmentDate: "2026-04-01",
+    });
+    expect(created.status).toBe(201);
+    enrollmentIds.push(created.body.data._id);
+
+    const ended = await request(`/enrollments/${created.body.data._id}`, {
+      token: adminA.token,
+      method: "PATCH",
+      body: JSON.stringify({ status: "completed" }),
+    });
+    expect(ended.status).toBe(200);
+
+    const changed = await request(`/academic-years/${year._id}`, {
+      token: adminA.token,
+      method: "PATCH",
+      body: JSON.stringify({ startDate: "2026-04-02" }),
+    });
+    expect(changed.status).toBe(409);
+    expect(changed.body.message).toMatch(/cannot exclude existing enrollment dates/i);
+    expect((await AcademicYear.findById(year._id).lean()).startDate.toISOString().slice(0, 10)).toBe("2026-04-01");
+  }, 20000);
+
+  it("serializes academic-year date changes with enrollment creation", async () => {
+    const school = await makeSchool("date-race");
+    const admin = await makeUser(school, "school_admin");
+    const year = await AcademicYear.create({
+      tenantId: school._id,
+      name: `AY-date-race-${randomUUID().slice(0, 5)}`,
+      startDate: "2026-04-01",
+      endDate: "2027-03-31",
+      status: "active",
+    });
+    const schoolClass = await SchoolClass.create({
+      tenantId: school._id,
+      academicYearId: year._id,
+      name: "Date Race Class",
+    });
+    const student = await makeStudent(school, `date-race-${randomUUID().slice(0, 5)}`);
+
+    const [dateChange, placement] = await Promise.all([
+      request(`/academic-years/${year._id}`, {
+        token: admin.token,
+        method: "PATCH",
+        body: JSON.stringify({ startDate: "2026-04-02" }),
+      }),
+      post("/enrollments", admin.token, {
+        studentId: String(student._id),
+        academicYearId: String(year._id),
+        classId: String(schoolClass._id),
+        enrollmentDate: "2026-04-01",
+      }),
+    ]);
+
+    expect(
+      (dateChange.status === 200 && placement.status === 400) ||
+      (dateChange.status === 409 && placement.status === 201)
+    ).toBe(true);
+    if (placement.status === 201) enrollmentIds.push(placement.body.data._id);
+
+    const [finalYear, history] = await Promise.all([
+      AcademicYear.findById(year._id).lean(),
+      Enrollment.find({ tenantId: school._id, academicYearId: year._id }).lean(),
+    ]);
+    if (finalYear.startDate.toISOString().slice(0, 10) === "2026-04-02") {
+      expect(history).toHaveLength(0);
+    } else {
+      expect(finalYear.startDate.toISOString().slice(0, 10)).toBe("2026-04-01");
+      expect(history).toHaveLength(1);
+      expect(history[0].enrollmentDate.toISOString().slice(0, 10)).toBe("2026-04-01");
+    }
+  }, 20000);
+
+
 });

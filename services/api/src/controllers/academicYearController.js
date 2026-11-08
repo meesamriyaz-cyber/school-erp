@@ -189,6 +189,7 @@ export const createAcademicYear = async (req, res, next) => {
 
 // PATCH /api/v1/academic-years/:academicYearId
 export const updateAcademicYear = async (req, res, next) => {
+  let session;
   try {
     const { academicYearId } = req.params;
 
@@ -199,115 +200,149 @@ export const updateAcademicYear = async (req, res, next) => {
     const fields = validateBody(req.body, res);
     if (!fields) return;
 
-    const academicYear = await AcademicYear.findOne({
-      _id: academicYearId,
-      tenantId: req.tenantId,
-    });
+    session = await mongoose.startSession();
+    let updatedAcademicYear;
 
-    if (!academicYear) {
-      return res.status(404).json({
-        success: false,
-        message: "Academic year not found",
-      });
-    }
+    try {
+      await session.withTransaction(async () => {
+        // This is the shared lifecycle lock used by enrollment creation.
+        // Date edits therefore serialize with new placements and year closure.
+        const lockedYear = await AcademicYear.findOneAndUpdate(
+          { _id: academicYearId, tenantId: req.tenantId },
+          { $inc: { lifecycleRevision: 1 } },
+          { new: true, session }
+        );
 
-    // Closed academic years are historical records and cannot be changed.
-    if (academicYear.status === "closed") {
-      return res.status(409).json({
-        success: false,
-        message: "A closed academic year cannot be modified",
-      });
-    }
+        if (!lockedYear) {
+          const error = new Error("Academic year not found");
+          error.code = "ACADEMIC_YEAR_NOT_FOUND";
+          throw error;
+        }
 
-    const nextStatus = fields.status ?? academicYear.status;
+        if (lockedYear.status === "closed") {
+          const error = new Error("A closed academic year cannot be modified");
+          error.code = "ACADEMIC_YEAR_CLOSED";
+          throw error;
+        }
 
-    // Allowed lifecycle: draft -> active, draft -> closed,
-    // active -> closed. Closed years are terminal.
-    const allowedTransitions = {
-      draft: ["draft", "active", "closed"],
-      active: ["active", "closed"],
-      closed: [],
-    };
+        const nextStatus = fields.status ?? lockedYear.status;
+        const allowedTransitions = {
+          draft: ["draft", "active", "closed"],
+          active: ["active", "closed"],
+          closed: [],
+        };
 
-    if (!allowedTransitions[academicYear.status].includes(nextStatus)) {
-      return res.status(409).json({
-        success: false,
-        message: `Cannot change academic year from ${academicYear.status} to ${nextStatus}`,
-      });
-    }
-
-    if (academicYear.status === "active" && nextStatus === "closed") {
-      const session = await mongoose.startSession();
-      let updatedAcademicYear;
-      try {
-        await session.withTransaction(async () => {
-          // Enrollment creation increments this same year document in its transaction.
-          // A write conflict forces either operation to recheck the committed state.
-          const lockedYear = await AcademicYear.findOneAndUpdate(
-            { _id: academicYear._id, tenantId: req.tenantId },
-            { $inc: { lifecycleRevision: 1 } },
-            { new: true, session }
+        if (!allowedTransitions[lockedYear.status].includes(nextStatus)) {
+          const error = new Error(
+            `Cannot change academic year from ${lockedYear.status} to ${nextStatus}`
           );
-          if (!lockedYear) {
-            const error = new Error("Academic year not found");
-            error.code = "ACADEMIC_YEAR_NOT_FOUND";
-            throw error;
-          }
-          if (lockedYear.status === "closed") {
-            const error = new Error("A closed academic year cannot be modified");
-            error.code = "ACADEMIC_YEAR_CLOSED";
-            throw error;
-          }
-          if (lockedYear.status !== "active") {
-            const error = new Error(`Cannot change academic year from ${lockedYear.status} to closed`);
-            error.code = "ACADEMIC_YEAR_TRANSITION";
-            throw error;
-          }
+          error.code = "ACADEMIC_YEAR_TRANSITION";
+          throw error;
+        }
 
+        const nextStartDate = Object.hasOwn(fields, "startDate")
+          ? new Date(fields.startDate)
+          : lockedYear.startDate;
+        const nextEndDate = Object.hasOwn(fields, "endDate")
+          ? new Date(fields.endDate)
+          : lockedYear.endDate;
+
+        if (
+          !Number.isFinite(nextStartDate.getTime()) ||
+          !Number.isFinite(nextEndDate.getTime()) ||
+          nextEndDate <= nextStartDate
+        ) {
+          const error = new Error(
+            "Academic year end date must be after its start date"
+          );
+          error.code = "ACADEMIC_YEAR_INVALID_DATE_RANGE";
+          throw error;
+        }
+
+        const datesChanged =
+          Object.hasOwn(fields, "startDate") ||
+          Object.hasOwn(fields, "endDate");
+
+        if (datesChanged) {
+          const startOfFirstDay = new Date(Date.UTC(
+            nextStartDate.getUTCFullYear(),
+            nextStartDate.getUTCMonth(),
+            nextStartDate.getUTCDate()
+          ));
+          const startOfDayAfterLastDay = new Date(Date.UTC(
+            nextEndDate.getUTCFullYear(),
+            nextEndDate.getUTCMonth(),
+            nextEndDate.getUTCDate() + 1
+          ));
+
+          const outOfRangeEnrollment = await Enrollment.exists({
+            tenantId: req.tenantId,
+            academicYearId: lockedYear._id,
+            $or: [
+              { enrollmentDate: { $lt: startOfFirstDay } },
+              { enrollmentDate: { $gte: startOfDayAfterLastDay } },
+            ],
+          }).session(session);
+
+          if (outOfRangeEnrollment) {
+            const error = new Error(
+              "Academic-year dates cannot exclude existing enrollment dates"
+            );
+            error.code = "ACADEMIC_YEAR_ENROLLMENTS_OUT_OF_RANGE";
+            throw error;
+          }
+        }
+
+        if (lockedYear.status === "active" && nextStatus === "closed") {
           const activeEnrollments = await Enrollment.exists({
             tenantId: req.tenantId,
             academicYearId: lockedYear._id,
             status: "active",
           }).session(session);
+
           if (activeEnrollments) {
-            const error = new Error("Complete, transfer, or withdraw active student enrollments before closing this academic year");
+            const error = new Error(
+              "Complete, transfer, or withdraw active student enrollments before closing this academic year"
+            );
             error.code = "ACADEMIC_YEAR_HAS_ACTIVE_ENROLLMENTS";
             throw error;
           }
+        }
 
-          lockedYear.set(fields);
-          await lockedYear.save({ session });
-          updatedAcademicYear = lockedYear;
+        // Mark both date paths modified so cross-field validation also runs
+        // when the client PATCHes only one boundary.
+        lockedYear.set("startDate", nextStartDate);
+        lockedYear.set("endDate", nextEndDate);
+        lockedYear.set(fields);
+        await lockedYear.save({ session });
+        updatedAcademicYear = lockedYear;
+      });
+    } catch (error) {
+      const conflicts = {
+        ACADEMIC_YEAR_CLOSED: 409,
+        ACADEMIC_YEAR_TRANSITION: 409,
+        ACADEMIC_YEAR_ENROLLMENTS_OUT_OF_RANGE: 409,
+        ACADEMIC_YEAR_HAS_ACTIVE_ENROLLMENTS: 409,
+        ACADEMIC_YEAR_INVALID_DATE_RANGE: 400,
+        ACADEMIC_YEAR_NOT_FOUND: 404,
+      };
+
+      if (conflicts[error.code]) {
+        return res.status(conflicts[error.code]).json({
+          success: false,
+          message: error.message,
         });
-      } catch (error) {
-        if (error.code === "ACADEMIC_YEAR_HAS_ACTIVE_ENROLLMENTS") {
-          return res.status(409).json({ success: false, message: error.message });
-        }
-        if (error.code === "ACADEMIC_YEAR_CLOSED") {
-          return res.status(409).json({ success: false, message: error.message });
-        }
-        if (error.code === "ACADEMIC_YEAR_TRANSITION") {
-          return res.status(409).json({ success: false, message: error.message });
-        }
-        if (error.code === "ACADEMIC_YEAR_NOT_FOUND") {
-          return res.status(404).json({ success: false, message: error.message });
-        }
-        throw error;
-      } finally {
-        await session.endSession();
       }
-
-      return res.status(200).json({ success: true, data: updatedAcademicYear });
+      throw error;
     }
-
-    academicYear.set(fields);
-    await academicYear.save();
 
     return res.status(200).json({
       success: true,
-      data: academicYear,
+      data: updatedAcademicYear,
     });
   } catch (error) {
     return handleAcademicYearError(error, res, next);
+  } finally {
+    if (session) await session.endSession();
   }
 };

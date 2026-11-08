@@ -12,6 +12,11 @@ const calendarDay = (value) => {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 };
 const invalid = (res, message) => res.status(400).json({ success: false, message });
+const isEnrollmentDateWithinYear = (date, year) => {
+  const enrollmentDay = calendarDay(date);
+  return enrollmentDay >= calendarDay(year.startDate) &&
+    enrollmentDay <= calendarDay(year.endDate);
+};
 const pick = (body, fields) => Object.fromEntries(fields.filter((field) => Object.hasOwn(body, field)).map((field) => [field, body[field]]));
 
 const handleError = (error, res, next) => {
@@ -113,7 +118,7 @@ export const createEnrollment = async (req, res, next) => {
     if (!student) return res.status(400).json({ success: false, message: "Active student was not found in this school" });
     if (!year) return res.status(400).json({ success: false, message: "Enrollments can only be created for this school's active academic year" });
     const enrollmentDate = fields.enrollmentDate ? new Date(fields.enrollmentDate) : new Date();
-    if (calendarDay(enrollmentDate) < calendarDay(year.startDate) || calendarDay(enrollmentDate) > calendarDay(year.endDate)) {
+    if (!isEnrollmentDateWithinYear(enrollmentDate, year)) {
       return res.status(400).json({ success: false, message: "Enrollment date must fall within the selected academic year" });
     }
     if (!schoolClass) return res.status(400).json({ success: false, message: "Active class was not found in the selected academic year and school" });
@@ -137,11 +142,17 @@ export const createEnrollment = async (req, res, next) => {
               { _id: fields.academicYearId, tenantId: req.tenantId, status: "active" },
               { $inc: { lifecycleRevision: 1 } },
               { new: true, session }
-            ).select("_id status").lean();
+            ).select("_id status startDate endDate").lean();
 
             if (!lockedYear) {
               const error = new Error("Enrollments can only be created for this school's active academic year");
               error.code = "ACADEMIC_YEAR_NOT_ACTIVE";
+              throw error;
+            }
+
+            if (!isEnrollmentDateWithinYear(enrollmentDate, lockedYear)) {
+              const error = new Error("Enrollment date must fall within the selected academic year");
+              error.code = "ENROLLMENT_DATE_OUT_OF_RANGE";
               throw error;
             }
 
@@ -173,6 +184,7 @@ export const createEnrollment = async (req, res, next) => {
 
             const created = await Enrollment.create([{
               ...fields,
+              enrollmentDate,
               tenantId: req.tenantId,
               sectionId: fields.sectionId,
               status: "active",
@@ -187,6 +199,9 @@ export const createEnrollment = async (req, res, next) => {
             return res.status(400).json({ success: false, message: error.message });
           }
           if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
+            return res.status(400).json({ success: false, message: error.message });
+          }
+          if (error.code === "ENROLLMENT_DATE_OUT_OF_RANGE") {
             return res.status(400).json({ success: false, message: error.message });
           }
           throw error;
@@ -206,7 +221,7 @@ export const createEnrollment = async (req, res, next) => {
           { _id: fields.academicYearId, tenantId: req.tenantId, status: "active" },
           { $inc: { lifecycleRevision: 1 } },
           { new: true, session }
-        ).select("_id status").lean();
+        ).select("_id status startDate endDate").lean();
 
         if (!lockedYear) {
           const error = new Error("Enrollments can only be created for this school's active academic year");
@@ -214,8 +229,15 @@ export const createEnrollment = async (req, res, next) => {
           throw error;
         }
 
+        if (!isEnrollmentDateWithinYear(enrollmentDate, lockedYear)) {
+          const error = new Error("Enrollment date must fall within the selected academic year");
+          error.code = "ENROLLMENT_DATE_OUT_OF_RANGE";
+          throw error;
+        }
+
         const created = await Enrollment.create([{
           ...fields,
+          enrollmentDate,
           tenantId: req.tenantId,
           sectionId: fields.sectionId || null,
           status: "active",
@@ -224,6 +246,9 @@ export const createEnrollment = async (req, res, next) => {
       });
     } catch (error) {
       if (error.code === "ACADEMIC_YEAR_NOT_ACTIVE") {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      if (error.code === "ENROLLMENT_DATE_OUT_OF_RANGE") {
         return res.status(400).json({ success: false, message: error.message });
       }
       throw error;
