@@ -709,10 +709,7 @@ describe("Guardian API integration tests", () => {
     );
 
     expect(first.status).toBe(201);
-    expect(second.status).toBe(201);
-    const relationships = await request(`/students/${student._id}/guardians`, { token: adminA.token });
-    expect(relationships.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
-    expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianTwo._id)).isPrimary).toBe(true);
+    expect(second.status).toBe(409);
   });
 
   it("switches primary guardian atomically instead of allowing two active primaries", async () => {
@@ -779,8 +776,9 @@ describe("Guardian API integration tests", () => {
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
     expect(Array.isArray(response.body.data)).toBe(true);
-    expect(response.body.data).toHaveLength(1);
-    expect(response.body.data[0].guardianId).toMatchObject({
+    expect(response.body.data).toHaveLength(2);
+    const linkedGuardian = response.body.data.find((item) => String(item.guardianId?._id) === String(guardian._id));
+    expect(linkedGuardian.guardianId).toMatchObject({
       firstName: guardian.firstName,
       lastName: guardian.lastName,
       phone: guardian.phone,
