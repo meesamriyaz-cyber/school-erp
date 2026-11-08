@@ -32,7 +32,7 @@ describe("TeacherExaminations", () => {
     await user.click(screen.getByRole("button", { name: "Save marks" }));
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith("/examinations/exam/marks", expect.objectContaining({
       method: "POST",
-      body: { marks: [{ enrollmentId: "enroll", examSubjectId: "config", absent: false, marksObtained: 78 }] },
+      body: { marks: [{ enrollmentId: "enroll", examSubjectId: "config", absent: false, marksObtained: 78 }], changeReason: "" },
     })));
   });
 
