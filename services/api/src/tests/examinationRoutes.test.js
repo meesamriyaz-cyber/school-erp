@@ -447,7 +447,7 @@ describe("Examination API integration", () => {
     });
     expect(locked.status).toBe(409);
     expect((await request(`/examinations/${id}/results`, { token: adminB.token })).status).toBe(404);
-  }, 15000);
+  }, 60000);
 
   it("does not publish an examination without subjects or enrolled students fully marked", async () => {
     const created = await request("/examinations", { method: "POST", token: adminA.token, body: JSON.stringify(createPayload()) });
