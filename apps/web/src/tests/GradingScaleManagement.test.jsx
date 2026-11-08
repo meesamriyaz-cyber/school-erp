@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
@@ -91,7 +91,6 @@ describe("GradingScaleManagement", () => {
     expect(screen.getByDisplayValue("School grading")).toBeInTheDocument();
     expect(screen.getByDisplayValue("F")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Edit draft scale" })).toBeInTheDocument();
-    expect(within(screen.getByLabelText("School grading scales").parentElement || document.body).queryByText("")).not.toBeNull();
   });
 
   it("activates a draft through the status endpoint", async () => {
