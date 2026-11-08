@@ -577,20 +577,22 @@ describe("Student Enrollment API", () => {
   });
 
   it("prevents academic-year date changes from excluding existing historical enrollments", async () => {
+    const school = await makeSchool("history-date");
+    const admin = await makeUser(school, "school_admin");
     const year = await AcademicYear.create({
-      tenantId: schoolA._id,
+      tenantId: school._id,
       name: `AY-history-${randomUUID().slice(0, 6)}`,
       startDate: "2026-04-01",
       endDate: "2027-03-31",
       status: "active",
     });
     const schoolClass = await SchoolClass.create({
-      tenantId: schoolA._id,
+      tenantId: school._id,
       academicYearId: year._id,
       name: `History class ${randomUUID().slice(0, 5)}`,
     });
-    const student = await makeStudent(schoolA, `history-${randomUUID().slice(0, 5)}`);
-    const created = await post("/enrollments", adminA.token, {
+    const student = await makeStudent(school, `history-${randomUUID().slice(0, 5)}`);
+    const created = await post("/enrollments", admin.token, {
       studentId: String(student._id),
       academicYearId: String(year._id),
       classId: String(schoolClass._id),
@@ -600,14 +602,14 @@ describe("Student Enrollment API", () => {
     enrollmentIds.push(created.body.data._id);
 
     const ended = await request(`/enrollments/${created.body.data._id}`, {
-      token: adminA.token,
+      token: admin.token,
       method: "PATCH",
       body: JSON.stringify({ status: "completed" }),
     });
     expect(ended.status).toBe(200);
 
     const changed = await request(`/academic-years/${year._id}`, {
-      token: adminA.token,
+      token: admin.token,
       method: "PATCH",
       body: JSON.stringify({ startDate: "2026-04-02" }),
     });
