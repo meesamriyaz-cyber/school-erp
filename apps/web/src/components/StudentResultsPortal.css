@@ -56,3 +56,12 @@
 .portal-receipts b{white-space:nowrap;color:#172b4d}
 .portal-timetable-list{display:grid;gap:12px}
 @media(max-width:650px){.portal-child-overview-heading{align-items:flex-start;flex-direction:column}.portal-data-heading,.portal-fee-heading{align-items:flex-start;flex-direction:column}.portal-fee-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-receipts div{align-items:flex-start;flex-direction:column;gap:3px}}
+
+.report-student{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){.report-student{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{
+  .report-card{break-inside:avoid;page-break-inside:avoid}
+  .report-student{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .report-table{min-width:0!important;font-size:10px}
+  .report-table th,.report-table td{padding:7px 5px;white-space:normal}
+}
