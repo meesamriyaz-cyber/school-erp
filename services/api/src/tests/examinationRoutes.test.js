@@ -343,6 +343,14 @@ describe("Examination API integration", () => {
     const results = await request(`/examinations/${id}/results`, { token: adminA.token });
     expect(results.status).toBe(200);
     expect(results.body.summary.publishable).toBe(true);
+    expect(results.body.summary).toMatchObject({
+      passedCount: 1,
+      failedCount: 0,
+      incompleteCount: 0,
+      averagePercentage: 82,
+      highestPercentage: 82,
+      lowestPercentage: 82,
+    });
     expect(results.body.data).toHaveLength(1);
     expect(results.body.data[0]).toMatchObject({
       totalObtained: 82, totalMaximum: 100, percentage: 82, status: "passed",
@@ -366,6 +374,11 @@ describe("Examination API integration", () => {
     expect(parentResults.status).toBe(200);
     expect(parentResults.body.data).toHaveLength(1);
     expect(String(parentResults.body.data[0].student._id)).toBe(String(studentA._id));
+    expect(parentResults.body.data[0].examination).toMatchObject({
+      academicYear: { name: yearA.name },
+      class: { name: classA.name },
+    });
+    expect(parentResults.body.data[0].examination.section).toBeNull();
     expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: studentAccount.token })).status).toBe(403);
     expect((await request("/portal/results?studentId=" + new mongoose.Types.ObjectId(), { token: parentAccount.token })).status).toBe(403);
 
