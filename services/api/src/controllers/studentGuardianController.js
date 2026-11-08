@@ -16,6 +16,36 @@ const findStudent = async (studentId, tenantId) => {
   return { student };
 };
 
+const auditChanges = (record, updates) => Object.entries(updates)
+  .filter(([field, value]) => JSON.stringify(record[field] ?? null) !== JSON.stringify(value ?? null))
+  .map(([field, value]) => ({ field, from: record[field] ?? null, to: value ?? null }));
+
+const appendAudit = (record, { action, actorUserId, changes = [] }) => {
+  record.auditTrail.push({
+    action,
+    actorUserId: mongoose.isValidObjectId(actorUserId) ? actorUserId : null,
+    changes,
+    changedAt: new Date(),
+  });
+  // Keep the most recent 50 events on each relationship to bound document growth.
+  if (record.auditTrail.length > 50) record.auditTrail.splice(0, record.auditTrail.length - 50);
+};
+
+const demotePrimaryRelationships = async ({ tenantId, studentId, exceptId = null, actorUserId, session }) => {
+  const filter = { tenantId, studentId, status: "active", isPrimary: true };
+  if (exceptId) filter._id = { $ne: exceptId };
+  const previousPrimaries = await StudentGuardian.find(filter).session(session);
+  for (const previous of previousPrimaries) {
+    previous.isPrimary = false;
+    appendAudit(previous, {
+      action: "primary_demoted",
+      actorUserId,
+      changes: [{ field: "isPrimary", from: true, to: false }],
+    });
+    await previous.save({ session });
+  }
+};
+
 export const listStudentGuardians = async (req, res, next) => {
   try {
     const result = await findStudent(req.params.studentId, req.tenantId);
@@ -51,19 +81,36 @@ export const createStudentGuardian = async (req, res, next) => {
         error.code = "GUARDIAN_NOT_FOUND";
         throw error;
       }
-      const isPrimary = body.isPrimary === true;
+
+      const currentPrimary = await StudentGuardian.findOne({
+        tenantId: req.tenantId, studentId: result.student._id, status: "active", isPrimary: true,
+      }).session(session).select("_id").lean();
+      // Repair a missing primary deterministically when adding the first available active relationship.
+      const isPrimary = body.isPrimary === true || !currentPrimary;
       if (isPrimary) {
-        await StudentGuardian.updateMany(
-          { tenantId: req.tenantId, studentId: result.student._id, status: "active", isPrimary: true },
-          { $set: { isPrimary: false } },
-          { session },
-        );
+        await demotePrimaryRelationships({
+          tenantId: req.tenantId, studentId: result.student._id, actorUserId: req.auth.userId, session,
+        });
       }
-      [link] = await StudentGuardian.create([{
-        tenantId: req.tenantId, studentId: result.student._id, guardianId: guardian._id,
+
+      const fields = {
+        tenantId: req.tenantId,
+        studentId: result.student._id,
+        guardianId: guardian._id,
         relationship: body.relationship,
-        ...Object.fromEntries(BOOLEAN_FIELDS.filter((field) => body[field] !== undefined).map((field) => [field, body[field]])),
-      }], { session });
+        ...Object.fromEntries(BOOLEAN_FIELDS.filter((field) => body[field] !== undefined && field !== "isPrimary").map((field) => [field, body[field]])),
+        isPrimary,
+      };
+      [link] = await StudentGuardian.create([fields], { session });
+      appendAudit(link, {
+        action: "created",
+        actorUserId: req.auth.userId,
+        changes: [
+          { field: "relationship", from: null, to: body.relationship },
+          { field: "isPrimary", from: null, to: isPrimary },
+        ],
+      });
+      await link.save({ session });
     });
     return res.status(201).json({ success: true, data: link });
   } catch (error) {
@@ -114,13 +161,24 @@ export const updateStudentGuardian = async (req, res, next) => {
           lifecycleError = "An inactive guardian cannot be promoted to primary";
           return;
         }
-        await StudentGuardian.updateMany(
-          { tenantId: req.tenantId, studentId: result.student._id, status: "active", isPrimary: true, _id: { $ne: current._id } },
-          { $set: { isPrimary: false } },
-          { session },
-        );
+        await demotePrimaryRelationships({
+          tenantId: req.tenantId,
+          studentId: result.student._id,
+          exceptId: current._id,
+          actorUserId: req.auth.userId,
+          session,
+        });
       }
+
+      const changes = auditChanges(current, body);
       Object.assign(current, body);
+      if (changes.length) {
+        let action = "updated";
+        if (body.isPrimary === true && !current.$locals.wasPrimary) action = "primary_promoted";
+        else if (body.status === "inactive") action = "deactivated";
+        else if (body.status === "active") action = "reactivated";
+        appendAudit(current, { action, actorUserId: req.auth.userId, changes });
+      }
       await current.save({ session });
       link = current.toObject();
     });
