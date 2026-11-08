@@ -136,6 +136,7 @@ export const getMyPublishedResults = async (req, res, next) => {
             academicYear: exam.academicYearId,
             class: exam.classId,
             section: exam.sectionId,
+            gradingScale: exam.gradingScaleSnapshot?.name || null,
           },
           school: school ? { name: school.name, contactEmail: school.contactEmail } : null,
           student,
