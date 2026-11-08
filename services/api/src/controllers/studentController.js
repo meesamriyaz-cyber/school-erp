@@ -8,6 +8,7 @@ const CREATE_FIELDS = [
   "gender", "admissionDate", "guardianName", "guardianPhone", "guardianEmail",
 ];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
+const LEGACY_GUARDIAN_FIELDS = ["guardianName", "guardianPhone", "guardianEmail"];
 
 const pickFields = (source, allowedFields) => Object.fromEntries(
   allowedFields.filter((field) => Object.hasOwn(source, field)).map((field) => [field, source[field]]),
@@ -113,7 +114,8 @@ export const updateStudent = async (req, res, next) => {
           { $set: updates },
           { returnDocument: "after", runValidators: true, session },
         );
-        if (student) await syncLegacyStudentGuardian(student, { session });
+        const guardianFieldsChanged = LEGACY_GUARDIAN_FIELDS.some((field) => Object.hasOwn(updates, field));
+        if (student && guardianFieldsChanged) await syncLegacyStudentGuardian(student, { session });
       });
     } finally { await session.endSession(); }
 
