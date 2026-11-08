@@ -109,11 +109,17 @@ export const getMyPublishedResults = async (req, res, next) => {
 
     const data = [];
     for (const exam of exams) {
-      const context = await loadResultContext(req.tenantId, exam, { includeHistoricalEnrollments: true });
+      const examScope = {
+        ...exam,
+        academicYearId: exam.academicYearId?._id || exam.academicYearId,
+        classId: exam.classId?._id || exam.classId,
+        sectionId: exam.sectionId?._id || exam.sectionId || null,
+      };
+      const context = await loadResultContext(req.tenantId, examScope, { includeHistoricalEnrollments: true });
       for (const enrollment of enrollments) {
-        if (String(enrollment.academicYearId) !== String(exam.academicYearId) ||
-            String(enrollment.classId) !== String(exam.classId) ||
-            (exam.sectionId && String(enrollment.sectionId) !== String(exam.sectionId))) continue;
+        if (String(enrollment.academicYearId) !== String(examScope.academicYearId) ||
+            String(enrollment.classId) !== String(examScope.classId) ||
+            (examScope.sectionId && String(enrollment.sectionId) !== String(examScope.sectionId))) continue;
         const result = context.results.find((item) => String(item.enrollmentId) === String(enrollment._id));
         if (!result) continue;
         const student = students.find((item) => String(item._id) === String(enrollment.studentId));
