@@ -267,10 +267,33 @@ export default function ExaminationManagement() {
               <div><span>Passed</span><strong>{resultSummary.passedCount ?? 0}</strong></div>
               <div><span>Failed</span><strong>{resultSummary.failedCount ?? 0}</strong></div>
               <div><span>Incomplete</span><strong>{resultSummary.incompleteCount ?? 0}</strong></div>
+              <div><span>Pass rate · complete only</span><strong>{resultSummary.classPassRate === null || resultSummary.classPassRate === undefined ? "—" : `${resultSummary.classPassRate}%`}</strong></div>
               <div><span>Average · complete only</span><strong>{resultSummary.averagePercentage === null || resultSummary.averagePercentage === undefined ? "—" : `${resultSummary.averagePercentage}%`}</strong></div>
               <div><span>Highest · complete only</span><strong>{resultSummary.highestPercentage === null || resultSummary.highestPercentage === undefined ? "—" : `${resultSummary.highestPercentage}%`}</strong></div>
               <div><span>Lowest · complete only</span><strong>{resultSummary.lowestPercentage === null || resultSummary.lowestPercentage === undefined ? "—" : `${resultSummary.lowestPercentage}%`}</strong></div>
             </div>}
+            {resultSummary?.gradeDistribution?.some((item) => item.count > 0) && <section className="result-analytics-section">
+              <h4>Overall grade distribution</h4>
+              <div className="grade-distribution-list">{resultSummary.gradeDistribution.map((item) => <div key={item.grade}>
+                <span><strong>{item.grade}</strong><small>{item.count} student{item.count === 1 ? "" : "s"}</small></span>
+                <strong>{item.percentage}%</strong>
+              </div>)}</div>
+            </section>}
+            {resultSummary?.subjectAnalytics?.length > 0 && <section className="result-analytics-section">
+              <h4>Subject performance</h4>
+              <div className="subject-analytics-table-wrap"><table className="subject-analytics-table">
+                <thead><tr><th>Subject</th><th>Average</th><th>Highest</th><th>Lowest</th><th>Passed</th><th>Failed</th><th>Absent</th><th>Pending</th><th>Pass rate</th><th>Grades</th></tr></thead>
+                <tbody>{resultSummary.subjectAnalytics.map((item) => <tr key={item.examSubjectId}>
+                  <td><strong>{item.subject?.name || "Subject"}</strong><small>Pass mark: {item.passMarks}/{item.maxMarks}</small></td>
+                  <td>{item.averagePercentage === null ? "—" : `${item.averagePercentage}%`}</td>
+                  <td>{item.highestPercentage === null ? "—" : `${item.highestPercentage}%`}</td>
+                  <td>{item.lowestPercentage === null ? "—" : `${item.lowestPercentage}%`}</td>
+                  <td>{item.passedCount}</td><td>{item.failedCount}</td><td>{item.absentCount}</td><td>{item.pendingCount}</td>
+                  <td>{item.passRate === null ? "—" : `${item.passRate}%`}</td>
+                  <td>{item.gradeDistribution.filter((grade) => grade.count > 0).map((grade) => `${grade.grade}: ${grade.count}`).join(" · ") || "—"}</td>
+                </tr>)}</tbody>
+              </table></div>
+            </section>}
             <div className="results-list">{results.map((result) => <div className="result-row result-row-detail" key={result.enrollmentId}>
               <span><strong>{result.student?.firstName} {result.student?.lastName}</strong><small>{result.student?.admissionNumber}</small></span>
               <strong>{result.totalObtained} / {result.totalMaximum} ({result.percentage}%) · Grade {result.grade || "—"}</strong><em>{result.status}</em>
