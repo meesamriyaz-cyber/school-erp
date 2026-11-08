@@ -170,11 +170,12 @@ export const updateStudentGuardian = async (req, res, next) => {
         });
       }
 
+      const wasPrimary = current.isPrimary;
       const changes = auditChanges(current, body);
       Object.assign(current, body);
       if (changes.length) {
         let action = "updated";
-        if (body.isPrimary === true && !current.$locals.wasPrimary) action = "primary_promoted";
+        if (body.isPrimary === true && !wasPrimary) action = "primary_promoted";
         else if (body.status === "inactive") action = "deactivated";
         else if (body.status === "active") action = "reactivated";
         appendAudit(current, { action, actorUserId: req.auth.userId, changes });
