@@ -54,7 +54,10 @@ export const listStudentGuardians = async (req, res, next) => {
     const links = await StudentGuardian.find({ tenantId: req.tenantId, studentId: result.student._id })
       .sort({ isPrimary: -1, createdAt: 1, _id: 1 })
       .populate({ path: "guardianId", select: "firstName lastName phone email status", match: { tenantId: req.tenantId } }).lean();
-    return res.status(200).json({ success: true, data: links });
+    const data = req.auth.role === "teacher"
+      ? links.map(({ auditTrail, ...relationship }) => relationship)
+      : links;
+    return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };
 
