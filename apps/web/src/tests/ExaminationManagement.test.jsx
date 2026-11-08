@@ -101,7 +101,7 @@ describe("ExaminationManagement result analytics", () => {
   });
 
   it("renders class grade distribution and subject analytics with absent and pending counts", async () => {
-    const user = (await import("@testing-library/user-event")).default.setup();
+    const user = userEvent.setup();
     render(<ExaminationManagement />);
 
     await user.click(await screen.findByRole("button", { name: /Mid Term/ }));
@@ -110,6 +110,10 @@ describe("ExaminationManagement result analytics", () => {
     expect(screen.getByText("Pass rate · complete only").parentElement).toHaveTextContent("100%");
     expect(screen.getByText("Average · complete only").parentElement).toHaveTextContent("82%");
     expect(screen.getByText("Overall grade distribution")).toBeInTheDocument();
+    const classDistribution = document.querySelector(".grade-distribution-list");
+    expect(classDistribution).toHaveTextContent("B");
+    expect(classDistribution).toHaveTextContent("1 student");
+    expect(classDistribution).toHaveTextContent("100%");
 
     const analyticsTable = document.querySelector(".subject-analytics-table");
     expect(analyticsTable).not.toBeNull();
@@ -145,7 +149,7 @@ describe("ExaminationManagement result analytics", () => {
     });
     render(<ExaminationManagement />);
 
-    const user = (await import("@testing-library/user-event")).default.setup();
+    const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /Mid Term/ }));
 
     await waitFor(() => expect(screen.getByText("Pass rate · complete only").parentElement).toHaveTextContent("—"));
