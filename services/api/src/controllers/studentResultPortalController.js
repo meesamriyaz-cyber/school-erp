@@ -100,7 +100,12 @@ export const getMyPublishedResults = async (req, res, next) => {
         classId: enrollment.classId,
         $or: [{ sectionId: null }, { sectionId: enrollment.sectionId }],
       })),
-    }).sort({ endDate: -1, _id: -1 }).lean();
+    })
+      .populate("academicYearId", "name startDate endDate")
+      .populate("classId", "name")
+      .populate("sectionId", "name")
+      .sort({ endDate: -1, _id: -1 })
+      .lean();
 
     const data = [];
     for (const exam of exams) {
@@ -113,7 +118,15 @@ export const getMyPublishedResults = async (req, res, next) => {
         if (!result) continue;
         const student = students.find((item) => String(item._id) === String(enrollment.studentId));
         data.push({
-          examination: { _id: exam._id, name: exam.name, startDate: exam.startDate, endDate: exam.endDate },
+          examination: {
+            _id: exam._id,
+            name: exam.name,
+            startDate: exam.startDate,
+            endDate: exam.endDate,
+            academicYear: exam.academicYearId,
+            class: exam.classId,
+            section: exam.sectionId,
+          },
           student,
           result,
         });
