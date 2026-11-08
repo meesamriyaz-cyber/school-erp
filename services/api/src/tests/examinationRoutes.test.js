@@ -312,6 +312,13 @@ describe("Examination API integration", () => {
     expect(result.status).toBe(200);
     expect(result.body.summary.publishable).toBe(false);
     expect(result.body.summary.incompleteCount).toBe(2);
+    expect(result.body.summary).toMatchObject({
+      passedCount: 0,
+      failedCount: 0,
+      averagePercentage: null,
+      highestPercentage: null,
+      lowestPercentage: null,
+    });
     const publish = await request(`/examinations/${examId}/publish`, { method: "POST", token: adminA.token });
     expect(publish.status).toBe(409);
     await Enrollment.deleteOne({ _id: secondEnrollment._id, tenantId: schoolA._id });
