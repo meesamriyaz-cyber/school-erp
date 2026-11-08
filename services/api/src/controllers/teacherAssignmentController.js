@@ -7,6 +7,7 @@ import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import TimetableEntry from "../models/TimetableEntry.js";
 import ClassSubject from "../models/ClassSubject.js";
+import Staff from "../models/Staff.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -87,6 +88,8 @@ export const createTeacherAssignment = async (req, res, next) => {
       const teacher = await User.findOne({ _id: fields.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).select("_id").session(session).lean();
       const subject = await Subject.findOne({ _id: fields.subjectId, tenantId: req.tenantId, status: "active" }).select("_id").session(session).lean();
       if (!teacher) { const error = new Error("Select an active teacher account from this school"); error.code = "ASSIGNMENT_TEACHER_INVALID"; throw error; }
+      const staffProfile = await Staff.findOne({ tenantId: req.tenantId, userId: teacher._id }).select("employmentStatus").session(session).lean();
+      if (staffProfile && staffProfile.employmentStatus !== "active") { const error = new Error("Teacher staff profile must be active before creating a teaching assignment"); error.code = "ASSIGNMENT_STAFF_INACTIVE"; throw error; }
       if (!subject) { const error = new Error("Select an active subject from this school"); error.code = "ASSIGNMENT_SUBJECT_INVALID"; throw error; }
       const year = await AcademicYear.findOneAndUpdate(
         { _id: fields.academicYearId, tenantId: req.tenantId, status: { $ne: "closed" } },
@@ -131,6 +134,7 @@ export const createTeacherAssignment = async (req, res, next) => {
   } catch (error) {
     const conflicts = {
       ASSIGNMENT_TEACHER_INVALID: [400, "Select an active teacher account from this school"],
+      ASSIGNMENT_STAFF_INACTIVE: [409, "Teacher staff profile must be active before creating a teaching assignment"],
       ASSIGNMENT_SUBJECT_INVALID: [400, "Select an active subject from this school"],
       ASSIGNMENT_YEAR_INVALID: [400, "Select an open academic year from this school"],
       ASSIGNMENT_CLASS_INVALID: [400, "The selected class does not belong to this academic year and school or is inactive"],
@@ -170,8 +174,9 @@ export const updateTeacherAssignment = async (req, res, next) => {
         if (hasActivePeriods) { const error = new Error("Deactivate linked timetable periods before deactivating this teacher assignment"); error.code = "ASSIGNMENT_HAS_PERIODS"; throw error; }
       } else {
         const teacher = await User.exists({ _id: assignment.teacherId, tenantId: req.tenantId, role: "teacher", status: "active" }).session(session);
+        const staffProfile = await Staff.findOne({ tenantId: req.tenantId, userId: assignment.teacherId }).select("employmentStatus").session(session).lean();
         const subject = await Subject.exists({ _id: assignment.subjectId, tenantId: req.tenantId, status: "active" }).session(session);
-        if (!teacher || !subject) { const error = new Error("Assignment cannot be activated while its teacher or subject is inactive"); error.code = "ASSIGNMENT_DEPENDENCY_INACTIVE"; throw error; }
+        if (!teacher || !subject || (staffProfile && staffProfile.employmentStatus !== "active")) { const error = new Error("Assignment cannot be activated while its teacher, staff profile or subject is inactive"); error.code = "ASSIGNMENT_DEPENDENCY_INACTIVE"; throw error; }
         const curriculumConfigured = await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, status: "active" }).session(session);
         const curriculumAllows = !curriculumConfigured || await ClassSubject.exists({ tenantId: req.tenantId, academicYearId: assignment.academicYearId, classId: assignment.classId, subjectId: assignment.subjectId, status: "active" }).session(session);
         if (!curriculumAllows) { const error = new Error("Assignment cannot be activated because its subject is not in the active class curriculum"); error.code = "ASSIGNMENT_CURRICULUM_MISSING"; throw error; }

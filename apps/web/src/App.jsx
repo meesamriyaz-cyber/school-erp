@@ -26,6 +26,7 @@ import GradingScaleManagement from "./components/GradingScaleManagement.jsx";
 import StudentResultsPortal from "./components/StudentResultsPortal.jsx";
 import HomeworkManagement from "./components/HomeworkManagement.jsx";
 import FeeManagement from "./components/FeeManagement.jsx";
+import StaffManagement from "./components/StaffManagement.jsx";
 import TeacherTimetablePortal from "./components/TeacherTimetablePortal.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
@@ -415,7 +416,7 @@ function DashboardApp() {
   <StudentDirectory />
 ) : activePage === "Guardians" ? (
   <GuardianDirectory />
-) : activePage === "Academic Years" ? (
+) : activePage === "Teachers & Staff" ? (\n  <StaffManagement />\n) : activePage === "Academic Years" ? (
   <AcademicYearManagement />
 ) : activePage === "Academic Terms" ? (
   <AcademicTermsManagement />

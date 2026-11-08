@@ -25,6 +25,7 @@ import portalRoutes from "./portalRoutes.js";
 import homeworkRoutes from "./homeworkRoutes.js";
 import homeworkSubmissionRoutes from "./homeworkSubmissionRoutes.js";
 import feeRoutes from "./feeRoutes.js";
+import staffRoutes from "./staffRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -61,4 +62,5 @@ router.use("/portal", portalRoutes);
 router.use("/homework", homeworkRoutes);
 router.use("/homework", homeworkSubmissionRoutes);
 router.use("/fees", feeRoutes);
+router.use("/staff", staffRoutes);
 export default router;
