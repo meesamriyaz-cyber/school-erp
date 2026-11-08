@@ -10,6 +10,7 @@ const pick = (body, allowed) => Object.fromEntries(
   allowed.filter((field) => Object.hasOwn(body, field)).map((field) => [field, body[field]]),
 );
 const handleError = (error, res, next) => {
+  if (error.code === "PRIMARY_GUARDIAN_IN_USE") return res.status(409).json({ success: false, message: error.message });
   if (error.code === 11000) return res.status(409).json({ success: false, message: "A matching guardian record already exists" });
   if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more guardian fields are invalid");
   return next(error);
@@ -91,6 +92,15 @@ export const updateGuardian = async (req, res, next) => {
           { new: true, runValidators: true, session },
         ).lean();
         if (!guardian) return;
+        if (updates.status === "inactive") {
+          const activePrimary = await StudentGuardian.exists({ tenantId: req.tenantId, guardianId: guardian._id, status: "active", isPrimary: true }).session(session);
+          if (activePrimary) {
+            const error = new Error("This guardian is the primary guardian for an active student relationship. Promote a replacement first.");
+            error.code = "PRIMARY_GUARDIAN_IN_USE";
+            throw error;
+          }
+          await StudentGuardian.updateMany({ tenantId: req.tenantId, guardianId: guardian._id, status: "active" }, { $set: { status: "inactive" } }, { session });
+        }
 
         const contactFieldsChanged = ["firstName", "lastName", "phone", "email"].some((field) => Object.hasOwn(updates, field));
         if (contactFieldsChanged) {

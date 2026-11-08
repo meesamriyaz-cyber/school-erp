@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const RELATIONSHIPS = [
-  "mother", "father", "legal_guardian", "grandparent", "step_parent", "sibling", "other",
+  "mother", "father", "uncle", "aunt", "legal_guardian", "grandparent", "step_parent", "sibling", "other",
 ];
 
 const studentGuardianSchema = new mongoose.Schema(

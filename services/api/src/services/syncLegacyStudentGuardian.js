@@ -7,12 +7,12 @@ const splitGuardianName = (value = "") => {
 };
 
 export const hasLegacyGuardianDetails = (student) =>
-  Boolean(student.guardianName?.trim() || student.guardianPhone?.trim() || student.guardianEmail?.trim());
+  Boolean(student.guardianName?.trim());
 
 const buildDetails = (student) => {
   const name = splitGuardianName(student.guardianName || "");
   return {
-    firstName: name.firstName || "Guardian",
+    firstName: name.firstName,
     lastName: name.lastName,
     phone: student.guardianPhone?.trim() || null,
     email: student.guardianEmail?.trim().toLowerCase() || null,
@@ -57,48 +57,35 @@ export const previewLegacyStudentGuardian = async (student) => {
   try {
     let guardian = await resolveIdentity(student.tenantId, details);
     if (!guardian && !details.phone && !details.email) {
-      const link = await StudentGuardian.findOne({
-        tenantId: student.tenantId,
-        studentId: student._id,
-        source: { $in: ["legacy_student", "manual_and_legacy"] },
-      });
-      if (link) guardian = await Guardian.findOne({ _id: link.guardianId, tenantId: student.tenantId }).lean();
+      const existingLink = await StudentGuardian.findOne({ tenantId: student.tenantId, studentId: student._id, source: { $in: ["legacy_student", "manual_and_legacy"] } });
+      if (existingLink) guardian = await Guardian.findOne({ _id: existingLink.guardianId, tenantId: student.tenantId }).lean();
     }
     return { status: guardian ? "matched" : "new_guardian", guardianId: guardian?._id || null };
   } catch (error) {
-    if (error.code === "GUARDIAN_IDENTITY_CONFLICT") {
-      return { status: "ambiguous", reason: error.message };
-    }
+    if (error.code === "GUARDIAN_IDENTITY_CONFLICT") return { status: "ambiguous", reason: error.message };
     throw error;
   }
 };
 
 /**
- * Synchronizes legacy student contact fields with normalized guardian records.
- * The caller supplies a transaction session so the student and relationship
- * writes can commit or roll back together.
+ * Synchronizes the guardian captured on the student profile as the active primary
+ * guardian. Caller must pass a transaction session.
  */
 export const syncLegacyStudentGuardian = async (student, { session } = {}) => {
+  if (!hasLegacyGuardianDetails(student)) {
+    const error = new Error("A primary guardian name is required for every student");
+    error.code = "PRIMARY_GUARDIAN_REQUIRED";
+    throw error;
+  }
   const tenantId = student.tenantId;
   const studentId = student._id;
-  let existingQuery = StudentGuardian.findOne({
-    tenantId, studentId, source: { $in: ["legacy_student", "manual_and_legacy"] },
-  });
-  if (session) existingQuery = existingQuery.session(session);
-  const existingLink = await existingQuery;
-
-  if (!hasLegacyGuardianDetails(student)) {
-    if (existingLink?.status === "active") {
-      existingLink.status = "inactive";
-      await existingLink.save({ session });
-    }
-    return null;
-  }
-
   const details = buildDetails(student);
   let guardian = await resolveIdentity(tenantId, details, session);
-  if (!guardian && !details.phone && !details.email && existingLink) {
-    let linkedGuardianQuery = Guardian.findOne({ _id: existingLink.guardianId, tenantId });
+  let existingLegacyQuery = StudentGuardian.findOne({ tenantId, studentId, source: { $in: ["legacy_student", "manual_and_legacy"] } });
+  if (session) existingLegacyQuery = existingLegacyQuery.session(session);
+  const existingLegacyLink = await existingLegacyQuery;
+  if (!guardian && !details.phone && !details.email && existingLegacyLink) {
+    let linkedGuardianQuery = Guardian.findOne({ _id: existingLegacyLink.guardianId, tenantId });
     if (session) linkedGuardianQuery = linkedGuardianQuery.session(session);
     guardian = await linkedGuardianQuery;
   }
@@ -106,39 +93,36 @@ export const syncLegacyStudentGuardian = async (student, { session } = {}) => {
     const [created] = await Guardian.create([{ tenantId, ...details }], { session });
     guardian = created;
   }
-
-  if (existingLink && String(existingLink.guardianId) === String(guardian._id)) {
-    existingLink.relationship = "other";
-    existingLink.status = "active";
-    await existingLink.save({ session });
-    return { guardian, relationship: existingLink };
+  if (guardian.status !== "active") {
+    const error = new Error("The selected primary guardian is inactive");
+    error.code = "PRIMARY_GUARDIAN_INACTIVE";
+    throw error;
   }
 
-  if (existingLink?.status === "active") {
-    existingLink.status = "inactive";
-    await existingLink.save({ session });
-  }
-
+  const relationshipType = student.guardianRelationship || "other";
   let pairQuery = StudentGuardian.findOne({ tenantId, studentId, guardianId: guardian._id });
   if (session) pairQuery = pairQuery.session(session);
   const existingPair = await pairQuery;
+
+  // Demote any previous primary before promoting/reaffirming this guardian.
+  await StudentGuardian.updateMany(
+    { tenantId, studentId, status: "active", isPrimary: true, ...(existingPair ? { _id: { $ne: existingPair._id } } : {}) },
+    { $set: { isPrimary: false } },
+    { session },
+  );
+
   if (existingPair) {
+    existingPair.relationship = relationshipType;
     existingPair.status = "active";
+    existingPair.isPrimary = true;
     if (existingPair.source === "manual") existingPair.source = "manual_and_legacy";
     await existingPair.save({ session });
     return { guardian, relationship: existingPair };
   }
 
-  let primaryQuery = StudentGuardian.exists({
-    tenantId, studentId, status: "active", isPrimary: true,
-  });
-  if (session) primaryQuery = primaryQuery.session(session);
-  const activePrimary = await primaryQuery;
-
   const [relationship] = await StudentGuardian.create([{
-    tenantId, studentId, guardianId: guardian._id, relationship: "other",
-    source: "legacy_student", isPrimary: !activePrimary, receivesCommunication: true,
+    tenantId, studentId, guardianId: guardian._id, relationship: relationshipType,
+    source: "legacy_student", isPrimary: true, receivesCommunication: true,
   }], { session });
-
   return { guardian, relationship };
 };

@@ -707,10 +707,13 @@ describe("Guardian API integration tests", () => {
     );
 
     expect(first.status).toBe(201);
-    expect(second.status).toBe(409);
+    expect(second.status).toBe(201);
+    const relationships = await request(`/students/${student._id}/guardians`, { token: adminA.token });
+    expect(relationships.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
+    expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianTwo._id)).isPrimary).toBe(true);
   });
 
-  it("rejects a second active primary guardian for the same student", async () => {
+  it("switches primary guardian atomically instead of allowing two active primaries", async () => {
     const student = await createStudent(adminA.token);
     const guardianOne = await createGuardian(adminA.token);
     const guardianTwo = await createGuardian(adminA.token);
@@ -998,6 +1001,7 @@ describe("Guardian API integration tests", () => {
         lastName: "Student",
         admissionDate: "2026-04-01",
         guardianName: "Shahnawaz Chachoo",
+        guardianRelationship: "uncle",
         guardianPhone: "919149410572",
         guardianEmail: "shahnawaz@example.test",
       }),
@@ -1022,7 +1026,8 @@ describe("Guardian API integration tests", () => {
     expect(String(details.body.data.linkedStudents[0].student._id)).toBe(
       String(student._id),
     );
-    expect(details.body.data.linkedStudents[0].relationship).toBe("other");
+    expect(details.body.data.linkedStudents[0].relationship).toBe("uncle");
+    expect(details.body.data.linkedStudents[0].isPrimary).toBe(true);
   });
 
 });

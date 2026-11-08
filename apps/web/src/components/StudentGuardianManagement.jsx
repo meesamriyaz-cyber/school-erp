@@ -4,6 +4,8 @@ import { apiRequest } from "../lib/api.js";
 const RELATIONSHIPS = [
   ["mother", "Mother"],
   ["father", "Father"],
+  ["uncle", "Uncle"],
+  ["aunt", "Aunt"],
   ["legal_guardian", "Legal guardian"],
   ["grandparent", "Grandparent"],
   ["step_parent", "Step-parent"],
@@ -48,7 +50,7 @@ export default function StudentGuardianManagement({
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedGuardianId, setSelectedGuardianId] = useState("__new__");
   const [guardianForm, setGuardianForm] = useState(EMPTY_GUARDIAN);
-  const [relationship, setRelationship] = useState("father");
+  const [relationship, setRelationship] = useState("other");
   const [flags, setFlags] = useState(EMPTY_FLAGS);
   const [saving, setSaving] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState("");
@@ -145,7 +147,7 @@ export default function StudentGuardianManagement({
       setShowAddForm(false);
       setGuardianForm(EMPTY_GUARDIAN);
       setSelectedGuardianId("__new__");
-      setRelationship("father");
+      setRelationship("other");
       setFlags(EMPTY_FLAGS);
       setNotice("Guardian linked successfully.");
       refresh();

@@ -287,6 +287,15 @@ it("rejects a student without an admission number", async () => {
   expect(response.body.success).toBe(false);
 });
 
+it("requires a primary guardian during student registration", async () => {
+  const response = await request("/students", {
+    method: "POST", token: adminA.token,
+    body: JSON.stringify({ ...studentPayload(`NO-GUARD-${randomUUID()}`, "No Guardian"), guardianName: " " }),
+  });
+  expect(response.status).toBe(400);
+  expect(response.body.message).toMatch(/primary guardian name is required/i);
+});
+
 it("rejects duplicate admission numbers within the same school", async () => {
   const admissionNumber = `DUP-${randomUUID()}`;
 

@@ -12,6 +12,7 @@ const initialForm = {
   gender: "not_specified",
   admissionDate: new Date().toISOString().slice(0, 10),
   guardianName: "",
+  guardianRelationship: "other",
   guardianPhone: "",
   guardianEmail: "",
 };
@@ -185,15 +186,22 @@ export default function StudentForm({ onClose, onCreated }) {
 
             <div className="student-form-grid">
               <label>
-                Guardian name
+                Primary guardian name *
                 <input
                   name="guardianName"
                   value={form.guardianName}
+                  required
                   onChange={updateField}
                   maxLength={160}
                 />
               </label>
 
+              <label>
+                Relationship to student
+                <select name="guardianRelationship" value={form.guardianRelationship} onChange={updateField} required>
+                  <option value="mother">Mother</option><option value="father">Father</option><option value="uncle">Uncle</option><option value="aunt">Aunt</option><option value="grandparent">Grandparent</option><option value="step_parent">Step-parent</option><option value="sibling">Brother / Sister</option><option value="legal_guardian">Legal guardian</option><option value="other">Other</option>
+                </select>
+              </label>
               <label>
                 Guardian phone
                 <input

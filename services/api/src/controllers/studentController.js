@@ -5,10 +5,10 @@ import { syncLegacyStudentGuardian } from "../services/syncLegacyStudentGuardian
 
 const CREATE_FIELDS = [
   "admissionNumber", "firstName", "lastName", "dateOfBirth", "photoUrl", "address",
-  "gender", "admissionDate", "guardianName", "guardianPhone", "guardianEmail",
+  "gender", "admissionDate", "guardianName", "guardianRelationship", "guardianPhone", "guardianEmail",
 ];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
-const LEGACY_GUARDIAN_FIELDS = ["guardianName", "guardianPhone", "guardianEmail"];
+const LEGACY_GUARDIAN_FIELDS = ["guardianName", "guardianRelationship", "guardianPhone", "guardianEmail"];
 
 const pickFields = (source, allowedFields) => Object.fromEntries(
   allowedFields.filter((field) => Object.hasOwn(source, field)).map((field) => [field, source[field]]),
@@ -22,7 +22,7 @@ const handleStudentError = (error, res, next) => {
   if (error.name === "ValidationError" || error.name === "CastError") {
     return res.status(400).json({ success: false, message: "One or more student fields are invalid" });
   }
-  if (error.code === "GUARDIAN_IDENTITY_CONFLICT") {
+  if (["GUARDIAN_IDENTITY_CONFLICT", "PRIMARY_GUARDIAN_REQUIRED", "PRIMARY_GUARDIAN_INACTIVE"].includes(error.code)) {
     return res.status(409).json({ success: false, message: error.message, code: error.code });
   }
   return next(error);
@@ -69,6 +69,12 @@ export const createStudent = async (req, res, next) => {
   if (typeof fields.admissionNumber !== "string" || !fields.admissionNumber.trim() || typeof fields.firstName !== "string" || !fields.firstName.trim()) {
     return invalidRequest(res, "Admission number and first name are required");
   }
+  if (typeof fields.guardianName !== "string" || !fields.guardianName.trim()) {
+    return invalidRequest(res, "Primary guardian name is required");
+  }
+  if (fields.guardianRelationship !== undefined && !["mother", "father", "uncle", "aunt", "legal_guardian", "grandparent", "step_parent", "sibling", "other"].includes(fields.guardianRelationship)) {
+    return invalidRequest(res, "Invalid primary guardian relationship");
+  }
 
   let session;
   let student;
@@ -102,6 +108,8 @@ export const updateStudent = async (req, res, next) => {
     if (Object.hasOwn(body, "tenantId")) return invalidRequest(res, "School assignment cannot be changed");
     const updates = pickFields(body, UPDATE_FIELDS);
     if (Object.hasOwn(updates, "address") && (!updates.address || typeof updates.address !== "object" || Array.isArray(updates.address))) return invalidRequest(res, "Address must be an object");
+    if (Object.hasOwn(updates, "guardianName") && (typeof updates.guardianName !== "string" || !updates.guardianName.trim())) return invalidRequest(res, "Primary guardian name cannot be empty");
+    if (Object.hasOwn(updates, "guardianRelationship") && !["mother", "father", "uncle", "aunt", "legal_guardian", "grandparent", "step_parent", "sibling", "other"].includes(updates.guardianRelationship)) return invalidRequest(res, "Invalid primary guardian relationship");
     if (Object.hasOwn(updates, "photoUrl") && updates.photoUrl !== null && updates.photoUrl !== "" && (typeof updates.photoUrl !== "string" || !isHttpsUrl(updates.photoUrl.trim()))) return invalidRequest(res, "Student photo URL must be a valid HTTPS URL");
     if (Object.keys(updates).length === 0) return invalidRequest(res, "No supported student fields provided");
 

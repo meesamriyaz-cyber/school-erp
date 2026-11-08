@@ -78,6 +78,8 @@ const studentSchema = new mongoose.Schema(
       default: Date.now,
     },
 
+    guardianRelationship: { type: String, enum: ["mother", "father", "uncle", "aunt", "legal_guardian", "grandparent", "step_parent", "sibling", "other"], default: "other" },
+
     guardianName: {
       type: String,
       trim: true,

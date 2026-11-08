@@ -24,6 +24,7 @@ function getInitialFields(student) {
     gender: student.gender || "not_specified",
     admissionDate: toDateInput(student.admissionDate),
     guardianName: student.guardianName || "",
+    guardianRelationship: student.guardianRelationship || "other",
     guardianPhone: student.guardianPhone || "",
     guardianEmail: student.guardianEmail || "",
     status: student.status || "active",
@@ -171,14 +172,21 @@ export default function EditStudentForm({
         ].map(([name, label, maxLength]) => <label key={name}>{label}<input name={name} value={form.address[name]} onChange={handleAddressChange} maxLength={maxLength} /></label>)}
         <h3>Guardian Information</h3>
         <label>
-          Guardian Name
+          Primary Guardian Name *
           <input
             name="guardianName"
             value={form.guardianName}
+            required
             onChange={handleChange}
           />
         </label>
 
+        <label>
+          Relationship to Student
+          <select name="guardianRelationship" value={form.guardianRelationship} onChange={handleChange} required>
+            <option value="mother">Mother</option><option value="father">Father</option><option value="uncle">Uncle</option><option value="aunt">Aunt</option><option value="grandparent">Grandparent</option><option value="step_parent">Step-parent</option><option value="sibling">Brother / Sister</option><option value="legal_guardian">Legal guardian</option><option value="other">Other</option>
+          </select>
+        </label>
         <label>
           Guardian Phone
           <input

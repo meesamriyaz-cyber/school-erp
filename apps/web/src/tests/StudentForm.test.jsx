@@ -36,7 +36,7 @@ describe("StudentForm", () => {
     expect(screen.getByLabelText(/Last name/i)).not.toBeRequired();
     expect(screen.getByLabelText(/Date of birth/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Gender/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Guardian name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Primary guardian name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Guardian phone/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Guardian email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Student photo URL/i)).toBeInTheDocument();
