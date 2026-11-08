@@ -416,7 +416,9 @@ function DashboardApp() {
   <StudentDirectory />
 ) : activePage === "Guardians" ? (
   <GuardianDirectory />
-) : activePage === "Teachers & Staff" ? (\n  <StaffManagement />\n) : activePage === "Academic Years" ? (
+) : activePage === "Teachers & Staff" ? (
+  <StaffManagement />
+ ) : activePage === "Academic Years" ? (
   <AcademicYearManagement />
 ) : activePage === "Academic Terms" ? (
   <AcademicTermsManagement />

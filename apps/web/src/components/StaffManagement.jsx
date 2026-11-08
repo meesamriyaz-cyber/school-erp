@@ -57,7 +57,7 @@ export default function StaffManagement() {
   const startCreate = () => { setEditingId(null); setForm(EMPTY); setShowForm(true); setNotice(""); setError(""); };
   const startEdit = (record) => {
     setEditingId(record.id);
-    setForm({ ...EMPTY, ...record, userId: record.userId || "", joiningDate: record.joiningDate ? new Date(record.joiningDate).toISOString().slice(0, 10) : "", experienceYears: String(record.experienceYears ?? 0) });
+    setForm({ ...EMPTY, userId: record.userId || "", employeeCode: record.employeeCode || "", firstName: record.firstName || "", lastName: record.lastName || "", email: record.email || "", phone: record.phone || "", employeeType: record.employeeType, designation: record.designation || "", department: record.department || "", employmentType: record.employmentType, joiningDate: record.joiningDate ? new Date(record.joiningDate).toISOString().slice(0, 10) : "", qualification: record.qualification || "", experienceYears: String(record.experienceYears ?? 0) });
     setShowForm(true); setNotice(""); setError("");
   };
   const submit = async (event) => {
