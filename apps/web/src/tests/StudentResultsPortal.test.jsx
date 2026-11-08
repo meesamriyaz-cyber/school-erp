@@ -87,6 +87,7 @@ describe("StudentResultsPortal family overview", () => {
           academicYear: { name: "2026-27" },
           class: { name: "Class 5" },
           section: { name: "A" },
+          gradingScale: "School bands 2026",
         },
         student: { _id: "student-a", firstName: "Amina", lastName: "Khan", admissionNumber: "A-01" },
         result: {
@@ -97,6 +98,8 @@ describe("StudentResultsPortal family overview", () => {
             maxMarks: 100,
             passMarks: 35,
             marksObtained: 82,
+            percentage: 82,
+            grade: "B",
             absent: false,
             status: "passed",
             remarks: "Good progress",
@@ -104,6 +107,7 @@ describe("StudentResultsPortal family overview", () => {
           totalObtained: 82,
           totalMaximum: 100,
           percentage: 82,
+          grade: "B",
           status: "passed",
         },
       }] : [],
@@ -119,5 +123,7 @@ describe("StudentResultsPortal family overview", () => {
     expect(screen.getByText("A", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Mathematics")).toBeTruthy();
     expect(screen.getByText("Good progress")).toBeTruthy();
+    expect(screen.getByText("Grading scale: School bands 2026")).toBeTruthy();
+    expect(screen.getByText("B")).toBeTruthy();
   });
 });
