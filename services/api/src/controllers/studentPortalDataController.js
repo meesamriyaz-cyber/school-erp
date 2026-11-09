@@ -92,9 +92,13 @@ const parseDay = (value) => {
     : date;
 };
 
-const profileFields = [
+const studentProfileFields = [
   studentFields,
-  "dateOfBirth photoUrl address gender admissionDate guardianName guardianRelationship guardianPhone guardianEmail",
+  "dateOfBirth photoUrl address gender admissionDate",
+].join(" ");
+const parentProfileFields = [
+  studentProfileFields,
+  "guardianName guardianRelationship guardianPhone guardianEmail",
 ].join(" ");
 
 /**
@@ -104,7 +108,8 @@ const profileFields = [
  */
 export const getMyProfile = async (req, res, next) => {
   try {
-    const children = await selectAuthorizedChildren(req, res, profileFields);
+    const fields = req.auth.role === "parent" ? parentProfileFields : studentProfileFields;
+    const children = await selectAuthorizedChildren(req, res, fields);
     if (!children) return;
     if (!children.length) return res.status(200).json({ success: true, data: [] });
 
