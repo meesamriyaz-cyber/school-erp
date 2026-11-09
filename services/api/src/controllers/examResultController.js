@@ -8,6 +8,7 @@ import Enrollment from "../models/Enrollment.js";
 import GradingScale from "../models/GradingScale.js";
 import { getGradeForPercentage } from "../utils/grading.js";
 import { buildExaminationAnalytics } from "../utils/examinationAnalytics.js";
+import { enqueueStudentScopedNotification } from "../services/notificationEnqueueService.js";
 
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
@@ -244,19 +245,34 @@ export const publishExaminationResults = async (req, res, next) => {
       })),
     } : null;
 
-    const published = await Examination.findOneAndUpdate(
-      {
-        _id: exam._id,
-        tenantId: req.tenantId,
-        status: "completed",
-        resultLockToken: lockToken,
-      },
-      {
-        $set: { status: "published", gradingScaleSnapshot },
-        $unset: { resultLockToken: 1, resultLockExpiresAt: 1 },
-      },
-      { new: true, runValidators: true }
-    );
+    const session = await mongoose.startSession();
+    let published;
+    try {
+      await session.withTransaction(async () => {
+        published = await Examination.findOneAndUpdate(
+          {
+            _id: exam._id, tenantId: req.tenantId,
+            status: "completed", resultLockToken: lockToken,
+          },
+          {
+            $set: { status: "published", gradingScaleSnapshot },
+            $unset: { resultLockToken: 1, resultLockExpiresAt: 1 },
+          },
+          { new: true, runValidators: true, session }
+        );
+        if (!published) return;
+        await enqueueStudentScopedNotification({
+          tenantId: req.tenantId,
+          enrollmentIds: context.enrollments.map((item) => item._id),
+          eventType: "examination_results_published", sourceType: "Examination",
+          sourceId: published._id,
+          eventKey: `examination:${published._id}:results-published`,
+          title: `Results published: ${published.name}`,
+          body: `Results are now available for ${published.name}.`,
+          link: "/portal?tab=results", session,
+        });
+      });
+    } finally { await session.endSession(); }
 
     if (!published) {
       return res.status(409).json({ success: false, message: "The examination changed during publication; refresh and try again" });
