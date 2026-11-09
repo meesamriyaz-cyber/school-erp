@@ -150,7 +150,7 @@ export default function StudentResultsPortal() {
                 <div><span>Address</span><strong>{[student.address?.line1, student.address?.line2, student.address?.city, student.address?.district, student.address?.state, student.address?.postalCode].filter(Boolean).join(", ") || "—"}</strong></div>
               </div>
               <div className="portal-profile-section"><h3>Current academic placement</h3><p>{currentEnrollment ? [currentEnrollment.classId?.name, currentEnrollment.sectionId?.name, currentEnrollment.academicYearId?.name].filter(Boolean).join(" · ") : "No active enrollment"}</p></div>
-              <div className="portal-profile-section"><h3>Primary guardian details</h3><p><strong>{student.guardianName || "—"}</strong>{student.guardianRelationship ? ` · ${student.guardianRelationship.replaceAll("_", " ")}` : ""}</p><p>{student.guardianPhone || "No phone number recorded"}{student.guardianEmail ? ` · ${student.guardianEmail}` : ""}</p></div>
+              {(student.guardianName || student.guardianPhone || student.guardianEmail) && <div className="portal-profile-section"><h3>Primary guardian details</h3><p><strong>{student.guardianName || "—"}</strong>{student.guardianRelationship ? ` · ${student.guardianRelationship.replaceAll("_", " ")}` : ""}</p><p>{student.guardianPhone || "No phone number recorded"}{student.guardianEmail ? ` · ${student.guardianEmail}` : ""}</p></div>}
             </article>
           ))}</section>
         )
