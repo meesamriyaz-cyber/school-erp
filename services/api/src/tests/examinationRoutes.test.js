@@ -23,6 +23,7 @@ import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
+import Notification from "../models/Notification.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 const EXPECTED_TEST_DATABASE = "school-erp-test";
@@ -66,7 +67,7 @@ describe("Examination API integration", () => {
       await mongoose.disconnect();
       throw new Error(`Safety stop: connected to unexpected database ${mongoose.connection.name}`);
     }
-    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), ExamMarkAudit.init(), GradingScale.init(), TeacherAssignment.init(), Homework.init(), HomeworkSubmission.init()]);
+    await Promise.all([Tenant.init(), User.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Subject.init(), Student.init(), Guardian.init(), StudentGuardian.init(), Enrollment.init(), Examination.init(), ExamSubject.init(), ExamMark.init(), ExamMarkAudit.init(), GradingScale.init(), TeacherAssignment.init(), Homework.init(), HomeworkSubmission.init(), Notification.init()]);
     schoolA = await createSchool("alpha");
     schoolB = await createSchool("beta");
     [adminA, teacherA, adminB] = await Promise.all([
@@ -86,6 +87,7 @@ describe("Examination API integration", () => {
     if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
+        await Notification.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamMarkAudit.collection.deleteMany({ tenantId: { $in: tenantIds } });
         await ExamMark.deleteMany({ tenantId: { $in: tenantIds } });
         await HomeworkSubmission.deleteMany({ tenantId: { $in: tenantIds } });
@@ -130,6 +132,49 @@ describe("Examination API integration", () => {
     expect(listed.body.data.some((item) => item.title === payload.title)).toBe(true);
     const hidden = await request("/homework", { token: adminB.token });
     expect(hidden.body.data).toHaveLength(0);
+  });
+
+  it("notifies an active student when homework moves from draft to published exactly once", async () => {
+    const studentAccount = await createUser(schoolA, "student");
+    const notificationStudent = await Student.create({
+      tenantId: schoolA._id, userId: studentAccount.user._id,
+      admissionNumber: `N-HW-${randomUUID().slice(0, 8)}`, firstName: "Notification Student",
+    });
+    const notificationEnrollment = await Enrollment.create({
+      tenantId: schoolA._id, studentId: notificationStudent._id, academicYearId: yearA._id,
+      classId: classA._id, status: "active",
+    });
+    const created = await request("/homework", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        academicYearId: String(yearA._id), classId: String(classA._id), subjectId: String(subjectA._id),
+        title: "Draft notification test", instructions: "Complete the assigned questions.",
+        assignedDate: "2026-09-02", dueDate: "2026-09-10", status: "draft",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const homeworkId = created.body.data._id;
+    expect(await Notification.countDocuments({ tenantId: schoolA._id, eventType: "homework_published" })).toBe(0);
+    const published = await request(`/homework/${homeworkId}/status`, {
+      method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "published" }),
+    });
+    expect(published.status).toBe(200);
+    const notice = await Notification.findOne({
+      tenantId: schoolA._id, recipientUserId: studentAccount.user._id,
+      eventType: "homework_published", sourceId: homeworkId,
+    }).lean();
+    expect(notice).toMatchObject({ recipientRole: "student", deliveryStatus: "pending", link: "/portal?tab=homework" });
+    const repeated = await request(`/homework/${homeworkId}/status`, {
+      method: "PATCH", token: adminA.token, body: JSON.stringify({ status: "published" }),
+    });
+    expect(repeated.status).toBe(200);
+    expect(await Notification.countDocuments({
+      tenantId: schoolA._id, recipientUserId: studentAccount.user._id,
+      eventType: "homework_published", sourceId: homeworkId,
+    })).toBe(1);
+    await Enrollment.deleteOne({ _id: notificationEnrollment._id });
+    await Student.deleteOne({ _id: notificationStudent._id });
+    await User.deleteOne({ _id: studentAccount.user._id });
   });
 
   it("rejects invalid homework dates and unassigned teacher creation", async () => {
