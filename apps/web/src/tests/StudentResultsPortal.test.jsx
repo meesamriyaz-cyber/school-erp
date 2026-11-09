@@ -73,6 +73,7 @@ describe("StudentResultsPortal family overview", () => {
         "/portal/fees": { data: [] },
         "/portal/timetable": { data: [] },
         "/portal/announcements": { data: [] },
+        "/portal/notifications": { data: [], unreadCount: 0 },
       };
       return Promise.resolve(responses[path] || { data: [] });
     });
@@ -209,4 +210,34 @@ describe("StudentResultsPortal family overview", () => {
     expect(screen.getByText("Grading scale: School bands 2026")).toBeTruthy();
     expect(screen.getAllByText("B")).toHaveLength(2);
   });
+  it("shows delivered notifications and marks an individual notification read", async () => {
+    mocks.apiRequest.mockImplementation((path) => {
+      if (path === "/portal/notifications") return Promise.resolve({
+        data: [{
+          _id: "notification-a", title: "Parent meeting",
+          body: "Please attend the meeting on Friday.",
+          createdAt: "2026-11-09T09:00:00.000Z", readAt: null,
+          relatedStudentIds: ["student-a"],
+        }],
+        unreadCount: 1,
+      });
+      if (path === "/portal/notifications/notification-a/read") {
+        return Promise.resolve({ success: true, data: { readAt: "2026-11-09T10:00:00.000Z" } });
+      }
+      if (path === "/portal/notifications/read-all") return Promise.resolve({ success: true, data: { modifiedCount: 0 } });
+      return Promise.resolve({ success: true, data: [] });
+    });
+
+    render(<StudentResultsPortal />);
+    expect(await screen.findByText("Family learning overview")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/ }));
+    expect(await screen.findByText("Parent meeting")).toBeTruthy();
+    expect(screen.getByText("1 unread")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mark as read" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Mark as read" })).toBeNull());
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/portal/notifications/notification-a/read", {
+      method: "PATCH", accessToken: "access-token",
+    });
+  });
+
 });
