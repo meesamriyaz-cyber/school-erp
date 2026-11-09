@@ -236,6 +236,9 @@ describe("student portal read-only academic data", () => {
     expect(mocks.studentFind.mock.results[0].value.select).toHaveBeenCalledWith(
       expect.stringContaining("dateOfBirth photoUrl address gender admissionDate"),
     );
+    expect(mocks.studentFind.mock.results[0].value.select).toHaveBeenCalledWith(
+      expect.stringContaining("guardianName guardianRelationship guardianPhone guardianEmail"),
+    );
     expect(mocks.enrollmentFind).toHaveBeenCalledWith({
       tenantId: "tenant-a",
       studentId: { $in: ["student-a"] },
@@ -281,6 +284,12 @@ describe("student portal read-only academic data", () => {
       userId: "parent-a",
       status: "active",
     });
+    expect(mocks.studentFindOne.mock.results[0].value.select).toHaveBeenCalledWith(
+      expect.stringContaining("dateOfBirth photoUrl address gender admissionDate"),
+    );
+    expect(mocks.studentFindOne.mock.results[0].value.select).not.toHaveBeenCalledWith(
+      expect.stringContaining("guardianPhone"),
+    );
     expect(mocks.guardianFindOne).not.toHaveBeenCalled();
     expect(mocks.relationshipFind).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
