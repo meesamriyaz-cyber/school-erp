@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(), countDocuments: vi.fn(), findOneAndUpdate: vi.fn(), updateMany: vi.fn(),
-  studentFindOne: vi.fn(), guardianFindOne: vi.fn(), relationshipFind: vi.fn(),
+  studentFindOne: vi.fn(), studentFind: vi.fn(), guardianFindOne: vi.fn(), relationshipFind: vi.fn(),
 }));
-vi.mock("../models/Student.js", () => ({ default: { findOne: mocks.studentFindOne } }));
+vi.mock("../models/Student.js", () => ({ default: { findOne: mocks.studentFindOne, find: mocks.studentFind } }));
 vi.mock("../models/Guardian.js", () => ({ default: { findOne: mocks.guardianFindOne } }));
 vi.mock("../models/StudentGuardian.js", () => ({ default: { find: mocks.relationshipFind } }));
 vi.mock("../models/Notification.js", () => ({ default: {
@@ -35,6 +35,7 @@ describe("notification inbox and delivery history", () => {
     res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     next = vi.fn();
     mocks.guardianFindOne.mockReturnValue(chain({ _id: "dddddddddddddddddddddddd" }));
+    mocks.studentFind.mockReturnValue(chain([{ _id: "eeeeeeeeeeeeeeeeeeeeeeee" }]));
     mocks.relationshipFind.mockReturnValue(chain([{ studentId: "eeeeeeeeeeeeeeeeeeeeeeee" }]));
     mocks.find.mockReturnValue(chain([{ _id: "notice-a", deliveryStatus: "delivered", relatedStudentIds: ["eeeeeeeeeeeeeeeeeeeeeeee"] }]));
     mocks.countDocuments.mockResolvedValue(2);
@@ -131,6 +132,15 @@ describe("notification inbox and delivery history", () => {
         relatedStudentIds: ["eeeeeeeeeeeeeeeeeeeeeeee"],
       })],
     }));
+  });
+
+  it("does not expose notifications for inactive student profiles linked to a guardian", async () => {
+    mocks.studentFind.mockReturnValue(chain([]));
+    await listMyNotifications(req, res, next);
+    expect(mocks.find).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      success: true, data: [], unreadCount: 0, nextCursor: null,
+    });
   });
 
 });
