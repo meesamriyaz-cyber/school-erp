@@ -28,7 +28,13 @@ const getAuthorizedStudentIds = async (req) => {
     receivesCommunication: true,
     ...guardianPortalAccessFilter(),
   }).select("studentId").lean();
-  return { ids: [...new Set(links.map((link) => String(link.studentId)))] };
+  if (!links.length) return { ids: [] };
+  const activeStudents = await Student.find({
+    tenantId: req.tenantId,
+    _id: { $in: [...new Set(links.map((link) => link.studentId))] },
+    status: "active",
+  }).select("_id").lean();
+  return { ids: activeStudents.map((student) => String(student._id)) };
 };
 
 export const listMyNotifications = async (req, res, next) => {
