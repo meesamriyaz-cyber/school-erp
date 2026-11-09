@@ -30,7 +30,7 @@ describe("announcement notification enqueue", () => {
     });
 
     expect(mocks.resolveRecipients).toHaveBeenCalledWith({
-      tenantId: "eeeeeeeeeeeeeeeeeeeeeeee", announcement, session: undefined,
+      tenantId: "eeeeeeeeeeeeeeeeeeeeeeee", announcement, session: null,
     });
     const [operations, options] = mocks.bulkWrite.mock.calls[0];
     expect(operations).toHaveLength(2);
