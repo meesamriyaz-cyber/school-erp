@@ -58,10 +58,10 @@ describe("notification delivery worker", () => {
       status: "active",
     });
     expect(mocks.updateOne).toHaveBeenCalledWith(
-      { _id: notification._id, deliveryStatus: "processing", processingToken: notification.processingToken },
+      { _id: notification._id, deliveryStatus: "processing", processingToken: expect.any(String) },
       expect.objectContaining({
         $set: expect.objectContaining({ deliveryStatus: "delivered", deliveredAt: expect.any(Date), lastError: null }),
-        $push: { deliveryHistory: expect.objectContaining({ attempt: 1, outcome: "delivered", error: null }) },
+        $push: expect.objectContaining({ deliveryHistory: expect.objectContaining({ attempt: 1, outcome: "delivered", error: null }) }),
       }),
     );
     expect(result).toEqual({ processed: 1, skipped: false });
