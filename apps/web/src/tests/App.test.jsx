@@ -23,7 +23,8 @@ vi.mock("../components/TeacherAssignments.jsx", () => ({ default: () => <h2>Teac
 vi.mock("../components/TimetableManagement.jsx", () => ({ default: () => <h2>Timetable management displayed</h2> }));
 vi.mock("../components/GradingScaleManagement.jsx", () => ({ default: () => <h2>Grading scale management displayed</h2> }));
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>Platform Administrator workspace displayed</h1> }));
-vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));\nvi.mock("../components/AnnouncementManagement.jsx", () => ({ default: () => <h2>Announcement management displayed</h2> }));
+vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));
+vi.mock("../components/AnnouncementManagement.jsx", () => ({ default: () => <h2>Announcement management displayed</h2> }));
 
 const schoolAdmin = (overrides = {}) => ({
   status: "authenticated",
