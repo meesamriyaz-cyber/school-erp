@@ -6,6 +6,7 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Enrollment from "../models/Enrollment.js";
 import Section from "../models/Section.js";
+import { enqueueStudentScopedNotification } from "../services/notificationEnqueueService.js";
 
 const validId = mongoose.isValidObjectId;
 const fail = (res, status, message) => res.status(status).json({ success: false, message });
@@ -125,12 +126,26 @@ export const createFeeInvoice = async (req, res, next) => {
     const structure = await FeeStructure.findOne({ _id: feeStructureId, tenantId: req.tenantId, academicYearId: enrollment.academicYearId, classId: enrollment.classId, status: "active" }).lean();
     if (!structure) return fail(res, 400, "An active fee structure for this enrollment's class and academic year is required");
     const totalAmount = structure.items.reduce((sum, item) => sum + item.amount, 0);
-    const data = await FeeInvoice.create({
-      tenantId: req.tenantId, enrollmentId: enrollment._id, studentId: enrollment.studentId,
-      academicYearId: enrollment.academicYearId, feeStructureId: structure._id,
-      invoiceNumber: invoiceNumber.trim(), items: structure.items.map(({ name, amount, frequency }) => ({ name, amount, frequency })),
-      totalAmount: Math.round(totalAmount * 100) / 100, dueDate: new Date(dueDate), status: "unpaid",
-    });
+    const session = await mongoose.startSession();
+    let data;
+    try {
+      await session.withTransaction(async () => {
+        [data] = await FeeInvoice.create([{
+          tenantId: req.tenantId, enrollmentId: enrollment._id, studentId: enrollment.studentId,
+          academicYearId: enrollment.academicYearId, feeStructureId: structure._id,
+          invoiceNumber: invoiceNumber.trim(), items: structure.items.map(({ name, amount, frequency }) => ({ name, amount, frequency })),
+          totalAmount: Math.round(totalAmount * 100) / 100, dueDate: new Date(dueDate), status: "unpaid",
+        }], { session });
+        await enqueueStudentScopedNotification({
+          tenantId: req.tenantId, enrollmentIds: [enrollment._id],
+          eventType: "fee_invoice_created", sourceType: "FeeInvoice", sourceId: data._id,
+          eventKey: `fee-invoice:${data._id}:created`,
+          title: `Fee invoice created: ${data.invoiceNumber}`,
+          body: `A fee invoice of ${data.totalAmount.toFixed(2)} is due on ${new Date(data.dueDate).toISOString().slice(0, 10)}.`,
+          link: "/portal?tab=fees", session,
+        });
+      });
+    } finally { await session.endSession(); }
     return res.status(201).json({ success: true, data });
   } catch (error) {
     if (error.code === 11000) return fail(res, 409, "Invoice number already exists");
@@ -241,6 +256,14 @@ export const recordFeePayment = async (req, res, next) => {
       invoice.paidAmount = Math.round((invoice.paidAmount + rounded) * 100) / 100;
       invoice.status = invoice.paidAmount >= invoice.totalAmount ? "paid" : "partial";
       await invoice.save({ session });
+      await enqueueStudentScopedNotification({
+        tenantId: req.tenantId, enrollmentIds: [invoice.enrollmentId],
+        eventType: "fee_payment_received", sourceType: "FeePayment", sourceId: created._id,
+        eventKey: `fee-payment:${created._id}:received`,
+        title: `Payment received: ${created.receiptNumber}`,
+        body: `A payment of ${created.amount.toFixed(2)} has been recorded against invoice ${invoice.invoiceNumber}.`,
+        link: "/portal?tab=fees", session,
+      });
       payment = created;
     });
     if (failure) return fail(res, failure[0], failure[1]);
@@ -279,6 +302,14 @@ export const reverseFeePayment = async (req, res, next) => {
       payment.reversedBy = req.auth.userId;
       payment.reversalReason = reason.trim();
       await Promise.all([invoice.save({ session }), payment.save({ session })]);
+      await enqueueStudentScopedNotification({
+        tenantId: req.tenantId, enrollmentIds: [invoice.enrollmentId],
+        eventType: "fee_payment_reversed", sourceType: "FeePayment", sourceId: payment._id,
+        eventKey: `fee-payment:${payment._id}:reversed:${payment.reversedAt.toISOString()}`,
+        title: `Payment reversed: ${payment.receiptNumber}`,
+        body: `A payment of ${payment.amount.toFixed(2)} against invoice ${invoice.invoiceNumber} was reversed.`,
+        link: "/portal?tab=fees", session,
+      });
       reversed = payment;
     });
     if (failure) return fail(res, failure[0], failure[1]);
