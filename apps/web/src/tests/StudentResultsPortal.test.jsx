@@ -71,7 +71,8 @@ describe("StudentResultsPortal family overview", () => {
           ],
         },
         "/portal/fees": { data: [] },
-        "/portal/timetable": { data: [] },\n        "/portal/announcements": { data: [] },
+        "/portal/timetable": { data: [] },
+        "/portal/announcements": { data: [] },
       };
       return Promise.resolve(responses[path] || { data: [] });
     });
