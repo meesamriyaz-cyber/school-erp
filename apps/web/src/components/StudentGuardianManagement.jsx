@@ -377,7 +377,7 @@ export default function StudentGuardianManagement({
                   {link.isEmergencyContact && <span>Emergency contact</span>}
                   {link.canPickup && <span>Pickup permitted</span>}
                   {link.receivesCommunication && <span>Receives communication</span>}
-                  {link.canAccessPortal && <span>Academic portal access</span>}
+                  {(link.canAccessPortal ?? link.isPrimary) && <span>Academic portal access</span>}
                 </div>
 
                 {isEditing && canManage && editForm && (
