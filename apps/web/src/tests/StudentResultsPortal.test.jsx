@@ -25,6 +25,30 @@ describe("StudentResultsPortal family overview", () => {
     mocks.user = { role: "parent", firstName: "Parent", lastName: "Account" };
     mocks.apiRequest.mockImplementation((path) => {
       const responses = {
+        "/portal/profile": {
+          data: [
+            {
+              student: {
+                _id: "student-a", firstName: "Amina", lastName: "Khan",
+                admissionNumber: "A-01", dateOfBirth: "2015-04-12",
+                admissionDate: "2022-03-01", gender: "female", status: "active",
+                address: { city: "Srinagar", district: "Srinagar", state: "Jammu and Kashmir" },
+                guardianName: "Parent One", guardianRelationship: "mother",
+                guardianPhone: "9999999999", guardianEmail: "parent@example.test",
+              },
+              currentEnrollment: { classId: { name: "Class 5" }, sectionId: { name: "A" }, academicYearId: { name: "2026–27" } },
+            },
+            {
+              student: {
+                _id: "student-b", firstName: "Bilal", lastName: "Khan",
+                admissionNumber: "B-01", dateOfBirth: "2018-06-15",
+                admissionDate: "2024-03-01", gender: "male", status: "active",
+                guardianName: "Parent One", guardianRelationship: "father",
+              },
+              currentEnrollment: { classId: { name: "Class 2" }, sectionId: { name: "B" }, academicYearId: { name: "2026–27" } },
+            },
+          ],
+        },
         "/portal/children": {
           data: [
             {
@@ -72,6 +96,27 @@ describe("StudentResultsPortal family overview", () => {
     await waitFor(() => {
       expect(screen.getByText("Amina")).toBeTruthy();
       expect(screen.queryByText("Bilal")).toBeNull();
+    });
+  });
+
+  it("shows the authorized student profile and filters it by the selected child", async () => {
+    render(<StudentResultsPortal />);
+
+    expect(await screen.findByText("Family learning overview")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
+
+    expect(await screen.findByText("STUDENT PROFILE")).toBeTruthy();
+    expect(screen.getByText("Srinagar, Srinagar, Jammu and Kashmir")).toBeTruthy();
+    expect(screen.getByText("9999999999 · parent@example.test")).toBeTruthy();
+    expect(screen.getByText("Class 5 · A · 2026–27")).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Select child" }), {
+      target: { value: "student-b" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Bilal Khan")).toBeTruthy();
+      expect(screen.queryByText("Srinagar, Srinagar, Jammu and Kashmir")).toBeNull();
     });
   });
 
