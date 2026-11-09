@@ -28,7 +28,7 @@ const announcementSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, minlength: 3, maxlength: 160 },
   body: { type: String, required: true, trim: true, minlength: 1, maxlength: 10000 },
   category: { type: String, enum: ANNOUNCEMENT_CATEGORIES, default: "general", required: true },
-  audienceType: { type: String, enum: ANNOUNCEMENT_AUDIENCES, required: true },
+  audienceType: { type: String, enum: ANNOUNCEMENT_AUDIENCES, required: true, immutable: true },
   academicYearId: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicYear", required: true, immutable: true },
   classId: { type: mongoose.Schema.Types.ObjectId, ref: "SchoolClass", default: null, immutable: true },
   sectionId: { type: mongoose.Schema.Types.ObjectId, ref: "Section", default: null, immutable: true },
@@ -45,7 +45,7 @@ const announcementSchema = new mongoose.Schema({
   strict: "throw",
 });
 
-announcementSchema.pre("validate", function validateAudience(next) {
+announcementSchema.pre("validate", function validateAudience() {
   if (this.audienceType === "SCHOOL" && (this.classId || this.sectionId)) {
     this.invalidate("classId", "School-wide announcements cannot target a class or section");
   }
@@ -58,7 +58,6 @@ announcementSchema.pre("validate", function validateAudience(next) {
   if (this.expiresAt && this.publishedAt && this.expiresAt <= this.publishedAt) {
     this.invalidate("expiresAt", "Expiry must be after publication");
   }
-  next();
 });
 
 announcementSchema.index({ tenantId: 1, status: 1, publishedAt: -1 });
