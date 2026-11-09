@@ -17,7 +17,7 @@ export default function AnnouncementManagement() {
   const [items, setItems] = useState([]);
   const [years, setYears] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [sections, setSections] = useState([]);
+  const [sections, setSections] = useState([]);\n  const [assignments, setAssignments] = useState([]);
   const [form, setForm] = useState(null);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -46,7 +46,7 @@ export default function AnnouncementManagement() {
     ]).then(([yearResponse, announcementResponse]) => {
       if (controller.signal.aborted) return;
       if (yearResponse?.success && Array.isArray(yearResponse.data)) setYears(yearResponse.data);
-      if (announcementResponse?.success && Array.isArray(announcementResponse.data)) setItems(announcementResponse.data);
+      if (announcementResponse?.success && Array.isArray(announcementResponse.data)) setItems(announcementResponse.data);\n      if (assignmentResponse?.success && Array.isArray(assignmentResponse.data)) setAssignments(assignmentResponse.data);
       setLoading(false);
     }).catch((err) => {
       if (err.name !== "AbortError" && !controller.signal.aborted) {
@@ -80,7 +80,7 @@ export default function AnnouncementManagement() {
   }, [accessToken, form?.classId, form?.audienceType]);
 
   const activeYears = useMemo(() => years.filter((year) => year.status === "active"), [years]);
-  const visibleItems = items.filter((item) => filter === "all" || item.status === filter);
+  const visibleItems = items.filter((item) => filter === "all" || item.status === filter);\n  const assignedClassIds = new Set(assignments.map((item) => String(item.classId?._id || item.classId)));\n  const visibleClasses = isTeacher ? classes.filter((item) => assignedClassIds.has(String(item._id))) : classes;\n  const classWideAssignments = assignments.filter((item) => !item.sectionId);\n  const sectionAssignments = assignments.filter((item) => item.sectionId);\n  const canTargetClass = !isTeacher || classWideAssignments.length > 0;\n  const canTargetSection = !isTeacher || assignments.length > 0;\n  const visibleSections = isTeacher && sectionAssignments.length > 0 && !classWideAssignments.some((item) => String(item.classId?._id || item.classId) === String(form?.classId))\n    ? sections.filter((item) => sectionAssignments.some((assignment) => String(assignment.sectionId?._id || assignment.sectionId) === String(item._id)))\n    : sections;
   const startCreate = () => {
     const year = activeYears[0] || years.find((item) => item.status !== "closed");
     setError(""); setNotice("");
@@ -134,7 +134,7 @@ export default function AnnouncementManagement() {
   return <section className="announcement-page" aria-labelledby="announcement-title">
     <div className="announcement-intro">
       <div><p className="announcement-eyebrow">{isTeacher ? "TEACHER WORKSPACE" : "SCHOOL COMMUNICATION"}</p><h2 id="announcement-title">Announcements & notices</h2><p>Publish important information for the school community, classes or sections.</p></div>
-      <button type="button" className="announcement-primary" onClick={startCreate}>+ New announcement</button>
+      <button type="button" className="announcement-primary" onClick={startCreate} disabled={loading || years.length === 0}>+ New announcement</button>
     </div>
     {notice && <p className="announcement-success" role="status">{notice}</p>}
     {error && <p className="announcement-error" role="alert">{error}</p>}
@@ -148,10 +148,10 @@ export default function AnnouncementManagement() {
       <label>Message<textarea value={form.body} maxLength={10000} rows={5} required onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))} /></label>
       <div className="announcement-fields">
         <label>Category<select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        {!form._id && <label>Audience<select value={form.audienceType} onChange={(event) => { setForm((current) => ({ ...current, audienceType: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}>{!isTeacher && <option value="SCHOOL">Entire school</option>}<option value="CLASS">A class</option><option value="SECTION">A section</option></select></label>}
+        {!form._id && <label>Audience<select value={form.audienceType} onChange={(event) => { setForm((current) => ({ ...current, audienceType: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}>{!isTeacher && <option value="SCHOOL">Entire school</option>}{canTargetClass && <option value="CLASS">A class</option>}{canTargetSection && <option value="SECTION">A section</option>}</select></label>}
         {!form._id && <label>Academic year<select value={form.academicYearId} required onChange={(event) => { setForm((current) => ({ ...current, academicYearId: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}><option value="">Select academic year</option>{years.filter((year) => year.status !== "closed").map((year) => <option key={year._id} value={year._id}>{year.name} · {year.status}</option>)}</select></label>}
-        {!form._id && form.audienceType !== "SCHOOL" && <label>Class<select value={form.classId} required onChange={(event) => { setForm((current) => ({ ...current, classId: event.target.value, sectionId: "" })); setSections([]); }}><option value="">Select class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
-        {!form._id && form.audienceType === "SECTION" && <label>Section<select value={form.sectionId} required onChange={(event) => setForm((current) => ({ ...current, sectionId: event.target.value }))}><option value="">Select section</option>{sections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
+        {!form._id && form.audienceType !== "SCHOOL" && <label>Class<select value={form.classId} required onChange={(event) => { setForm((current) => ({ ...current, classId: event.target.value, sectionId: "" })); setSections([]); }}><option value="">Select class</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
+        {!form._id && form.audienceType === "SECTION" && <label>Section<select value={form.sectionId} required onChange={(event) => setForm((current) => ({ ...current, sectionId: event.target.value }))}><option value="">Select section</option>{visibleSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
         <label>Expiry (optional)<input type="datetime-local" value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} /></label>
       </div>
       <div className="announcement-form-actions"><button type="button" className="announcement-secondary" onClick={() => setForm(null)}>Cancel</button><button type="submit" className="announcement-primary" disabled={saving || (!form._id && (!form.academicYearId || (form.audienceType !== "SCHOOL" && !form.classId) || (form.audienceType === "SECTION" && !form.sectionId)))}>{saving ? "Saving…" : "Save draft"}</button></div>
