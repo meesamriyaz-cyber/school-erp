@@ -117,7 +117,7 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
   if (session) previousPrimariesQuery = previousPrimariesQuery.session(session);
   const previousPrimaries = await previousPrimariesQuery;
   for (const previous of previousPrimaries) {
-    const hadPortalAccess = previous.canAccessPortal === true;
+    const hadPortalAccess = previous.canAccessPortal !== false;
     previous.isPrimary = false;
     previous.canAccessPortal = false;
     appendRelationshipAudit(previous, {
