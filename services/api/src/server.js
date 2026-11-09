@@ -37,6 +37,7 @@ const shutdown = async (signal) => {
 
     // All request handlers have completed; now stop polling and drain the active worker cycle.
     await stopAuditOutboxWorker();
+    await stopNotificationDeliveryWorker();
     await disconnectDatabase();
     process.exitCode = 0;
   } catch (error) {
