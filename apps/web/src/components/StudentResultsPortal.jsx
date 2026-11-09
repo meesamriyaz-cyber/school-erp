@@ -20,7 +20,7 @@ export default function StudentResultsPortal() {
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState("");
   const [homeworkNotice, setHomeworkNotice] = useState("");
-  const [activeTab, setActiveTab] = useState("results");
+  const [activeTab, setActiveTab] = useState("overview");
   const [selectedStudent, setSelectedStudent] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -92,6 +92,18 @@ export default function StudentResultsPortal() {
     : profiles.filter((item) => String(item.student?._id) === selectedStudent),
   [profiles, selectedStudent]);
 
+  const attendanceConsidered = visibleAttendance.filter((record) =>
+    ["present", "late", "absent"].includes(record.status),
+  );
+  const attendanceRate = attendanceConsidered.length
+    ? Math.round((attendanceConsidered.filter((record) => ["present", "late"].includes(record.status)).length / attendanceConsidered.length) * 1000) / 10
+    : null;
+  const pendingHomeworkCount = visibleHomework.filter((item) => !visibleSubmissions.some((submission) =>
+    String(submission.homeworkId?._id || submission.homeworkId) === String(item.homework?._id) &&
+    String(submission.studentId?._id || submission.studentId) === String(item.student?._id),
+  )).length;
+  const outstandingFees = visibleFees.reduce((total, invoice) => total + Number(invoice.balance || 0), 0);
+
   const isParent = user?.role === "parent";
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
 
@@ -110,6 +122,7 @@ export default function StudentResultsPortal() {
       </header>
 
       <nav className="portal-tabs no-print" aria-label="Student portal sections">
+        <button type="button" className={activeTab === "overview" ? "active" : ""} aria-pressed={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</button>
         <button type="button" className={activeTab === "profile" ? "active" : ""} aria-pressed={activeTab === "profile"} onClick={() => setActiveTab("profile")}>Profile</button>
         <button type="button" className={activeTab === "results" ? "active" : ""} aria-pressed={activeTab === "results"} onClick={() => setActiveTab("results")}>Results</button>
         <button type="button" className={activeTab === "attendance" ? "active" : ""} aria-pressed={activeTab === "attendance"} onClick={() => setActiveTab("attendance")}>Attendance</button>
@@ -134,7 +147,20 @@ export default function StudentResultsPortal() {
           </div>
         </section>
       )}
-      {activeTab === "profile" ? (
+      {activeTab === "overview" ? (
+        loading ? <div className="portal-state">Loading your school overview…</div> : (
+          <section className="portal-overview">
+            <div className="portal-overview-heading"><div><span>AT A GLANCE</span><h2>Portal overview</h2></div><p>{isParent ? (selectedStudent === "all" ? "Combined view of your linked children" : "Selected child's academic snapshot") : "Your academic snapshot"}</p></div>
+            <div className="portal-overview-metrics">
+              <article><span>Attendance rate</span><strong>{attendanceRate === null ? "—" : `${attendanceRate}%`}</strong><small>{attendanceConsidered.length} attendance records considered</small></article>
+              <article><span>Pending homework</span><strong>{pendingHomeworkCount}</strong><small>Published assignments awaiting submission</small></article>
+              <article><span>Published results</span><strong>{visibleResults.length}</strong><small>Available examination report cards</small></article>
+              <article><span>Outstanding fees</span><strong>₹{outstandingFees.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong><small>Balance across visible fee invoices</small></article>
+            </div>
+            <div className="portal-overview-note"><strong>Keep track of school progress</strong><p>Use the sections above to review detailed attendance, homework, examination results, fee statements and the class timetable.</p></div>
+          </section>
+        )
+      ) : activeTab === "profile" ? (
         loading ? <div className="portal-state">Loading student profile…</div> : visibleProfiles.length === 0 ? <div className="portal-empty"><h2>Student profile unavailable</h2><p>Your school has not linked an active student profile to this account.</p></div> : (
           <section className="portal-profile-list">{visibleProfiles.map(({ student, currentEnrollment }) => (
             <article className="portal-profile-card" key={student._id}>
