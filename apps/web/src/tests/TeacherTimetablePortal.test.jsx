@@ -47,4 +47,11 @@ describe("TeacherTimetablePortal", () => {
     expect(screen.getByText("Tuesday")).toBeInTheDocument();
     expect(screen.getByText("Lab 2")).toBeInTheDocument();
   });
+  it("opens the announcements workspace from the teacher navigation", async () => {
+    render(<TeacherTimetablePortal />);
+    fireEvent.click(await screen.findByRole("button", { name: "Announcements" }));
+    expect(await screen.findByRole("heading", { name: "Announcements & notices" })).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenCalledWith("/announcements", { accessToken: "teacher-token", signal: expect.any(AbortSignal) });
+  });
+
 });
