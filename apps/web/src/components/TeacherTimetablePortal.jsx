@@ -7,6 +7,7 @@ import HomeworkManagement from "./HomeworkManagement.jsx";
 import TeacherExaminations from "./TeacherExaminations.jsx";
 import TeacherRosterPortal from "./TeacherRosterPortal.jsx";
 import TeacherReportsPortal from "./TeacherReportsPortal.jsx";
+import AnnouncementManagement from "./AnnouncementManagement.jsx";
 
 const DAYS = [
   { value: 1, label: "Monday" },
@@ -82,7 +83,7 @@ export default function TeacherTimetablePortal() {
         <button type="button" className={activeView === "classes" ? "active" : ""} onClick={() => setActiveView("classes")}>My classes</button>
         <button type="button" className={activeView === "students" ? "active" : ""} onClick={() => setActiveView("students")}>My students</button>
         <button type="button" className={activeView === "reports" ? "active" : ""} onClick={() => setActiveView("reports")}>Reports</button>
-        <button type="button" className={activeView === "exams" ? "active" : ""} onClick={() => setActiveView("exams")}>Examination marks</button>
+        <button type="button" className={activeView === "exams" ? "active" : ""} onClick={() => setActiveView("exams")}>Examination marks</button>\n        <button type="button" className={activeView === "announcements" ? "active" : ""} onClick={() => setActiveView("announcements")}>Announcements</button>
       </nav>
       {activeView === "overview" ? <section className="teacher-overview">
         <div className="teacher-overview-cards">
@@ -151,7 +152,7 @@ export default function TeacherTimetablePortal() {
           </div>
         )}
         </div>
-      </> : activeView === "attendance" ? <TeacherAttendancePortal /> : activeView === "homework" ? <HomeworkManagement /> : activeView === "exams" ? <TeacherExaminations /> : activeView === "classes" ? <section className="teacher-classes"><h2>My assigned classes and subjects</h2><p>Assignments are managed by your school administrator.</p>{assignments.length ? <div className="teacher-classes-grid">{assignments.map((item) => <article key={item._id}><h3>{item.classId?.name || "Class"}{item.sectionId?.name ? ` · ${item.sectionId.name}` : " · All sections"}</h3><p><strong>{item.subjectId?.name || "Subject"}</strong></p><small>{item.academicYearId?.name || "Academic year"}</small></article>)}</div> : <p>No active teaching assignments found.</p>}</section> : <>
+      </> : activeView === "attendance" ? <TeacherAttendancePortal /> : activeView === "homework" ? <HomeworkManagement /> : activeView === "exams" ? <TeacherExaminations /> : activeView === "announcements" ? <AnnouncementManagement /> : activeView === "classes" ? <section className="teacher-classes"><h2>My assigned classes and subjects</h2><p>Assignments are managed by your school administrator.</p>{assignments.length ? <div className="teacher-classes-grid">{assignments.map((item) => <article key={item._id}><h3>{item.classId?.name || "Class"}{item.sectionId?.name ? ` · ${item.sectionId.name}` : " · All sections"}</h3><p><strong>{item.subjectId?.name || "Subject"}</strong></p><small>{item.academicYearId?.name || "Academic year"}</small></article>)}</div> : <p>No active teaching assignments found.</p>}</section> : <>
         {error && <p className="teacher-timetable-error" role="alert">{error}</p>}
         {!loading && !error && entries.length > 0 && (
           <section className="teacher-timetable-summary" aria-label="Timetable summary">
