@@ -177,6 +177,8 @@ describe("StudentResultsPortal family overview", () => {
 
     render(<StudentResultsPortal />);
 
+    expect(await screen.findByText("Portal overview")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Results" }));
     expect(await screen.findByText("Mid Term")).toBeTruthy();
     expect(screen.getByText("Green Valley School")).toBeTruthy();
     expect(screen.getByText("office@example.test")).toBeTruthy();
