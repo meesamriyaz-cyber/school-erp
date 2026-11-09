@@ -118,10 +118,12 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
   const previousPrimaries = await previousPrimariesQuery;
   for (const previous of previousPrimaries) {
     previous.isPrimary = false;
+    previous.canAccessPortal = false;
     appendRelationshipAudit(previous, {
       action: "primary_demoted",
       actorUserId,
-      changes: [{ field: "isPrimary", from: true, to: false }],
+      changes: [{ field: "isPrimary", from: true, to: false },
+        { field: "canAccessPortal", from: true, to: false }],
     });
     await previous.save({ session });
   }
@@ -140,6 +142,7 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
     existingPair.relationship = relationshipType;
     existingPair.status = "active";
     existingPair.isPrimary = true;
+    existingPair.canAccessPortal = true;
     if (existingPair.source === "manual") existingPair.source = "manual_and_legacy";
     if (changes.length) {
       appendRelationshipAudit(existingPair, {
@@ -154,13 +157,14 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
 
   const [relationship] = await StudentGuardian.create([{
     tenantId, studentId, guardianId: guardian._id, relationship: relationshipType,
-    source: "legacy_student", isPrimary: true, receivesCommunication: true,
+    source: "legacy_student", isPrimary: true, canAccessPortal: true, receivesCommunication: true,
     auditTrail: [{
       action: "created",
       actorUserId,
       changes: [
         { field: "relationship", from: null, to: relationshipType },
         { field: "isPrimary", from: null, to: true },
+        { field: "canAccessPortal", from: null, to: true },
       ],
       changedAt: new Date(),
     }],
