@@ -23,7 +23,7 @@ vi.mock("../components/TeacherAssignments.jsx", () => ({ default: () => <h2>Teac
 vi.mock("../components/TimetableManagement.jsx", () => ({ default: () => <h2>Timetable management displayed</h2> }));
 vi.mock("../components/GradingScaleManagement.jsx", () => ({ default: () => <h2>Grading scale management displayed</h2> }));
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>Platform Administrator workspace displayed</h1> }));
-vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));
+vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));\nvi.mock("../components/AnnouncementManagement.jsx", () => ({ default: () => <h2>Announcement management displayed</h2> }));
 
 const schoolAdmin = (overrides = {}) => ({
   status: "authenticated",
@@ -264,7 +264,15 @@ it("does not expose the school administration dashboard to students", () => {
   ).not.toBeInTheDocument();
 });
 
-it("opens the school user directory from the administration navigation", async () => {
+it("opens announcements from the school administration navigation", async () => {
+  useAuth.mockReturnValue(schoolAdmin());
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(screen.getByRole("button", { name: "Announcements" }));
+  expect(screen.getByRole("heading", { name: "Announcement management displayed" })).toBeInTheDocument();
+});
+
+  it("opens the school user directory from the administration navigation", async () => {
   useAuth.mockReturnValue(schoolAdmin());
   const user = userEvent.setup();
   render(<App />);
