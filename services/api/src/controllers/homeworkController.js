@@ -5,6 +5,8 @@ import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import Subject from "../models/Subject.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
+import Enrollment from "../models/Enrollment.js";
+import { enqueueStudentScopedNotification } from "../services/notificationEnqueueService.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -64,12 +66,32 @@ export const createHomework = async (req, res, next) => {
     if (year.status !== "active") return res.status(409).json({ success: false, message: "Homework can only be created for the active academic year" });
     if (assigned < new Date(year.startDate) || due > new Date(year.endDate)) return invalid(res, "Homework dates must fall within the academic year");
     if (!await teacherCanTeach(req, { academicYearId, classId, sectionId, subjectId })) return res.status(403).json({ success: false, message: "You are not assigned to this subject and class or section" });
-    const data = await Homework.create({
-      tenantId: req.tenantId, academicYearId, classId, sectionId, subjectId,
-      teacherId: req.auth.userId, title: title.trim(), instructions: instructions.trim(),
-      assignedDate: assigned, dueDate: due, status,
-    });
-    const populated = await Homework.findOne({ _id: data._id, tenantId: req.tenantId })
+    const session = await mongoose.startSession();
+    let homeworkId;
+    try {
+      await session.withTransaction(async () => {
+        const [data] = await Homework.create([{
+          tenantId: req.tenantId, academicYearId, classId, sectionId, subjectId,
+          teacherId: req.auth.userId, title: title.trim(), instructions: instructions.trim(),
+          assignedDate: assigned, dueDate: due, status,
+        }], { session });
+        homeworkId = data._id;
+        if (status === "published") {
+          const enrollmentFilter = {
+            tenantId: req.tenantId, academicYearId, classId, status: "active",
+            ...(sectionId ? { sectionId } : {}),
+          };
+          const enrollments = await Enrollment.find(enrollmentFilter).select("_id").session(session).lean();
+          await enqueueStudentScopedNotification({
+            tenantId: req.tenantId, enrollmentIds: enrollments.map((item) => item._id),
+            eventType: "homework_published", sourceType: "Homework", sourceId: data._id,
+            eventKey: `homework:${data._id}:published`, title: `New homework: ${data.title}`,
+            body: data.instructions, link: "/portal?tab=homework", session,
+          });
+        }
+      });
+    } finally { await session.endSession(); }
+    const populated = await Homework.findOne({ _id: homeworkId, tenantId: req.tenantId })
       .populate("classId", "name").populate("sectionId", "name")
       .populate("subjectId", "name code").populate("teacherId", "firstName lastName").lean();
     return res.status(201).json({ success: true, data: populated });
@@ -89,7 +111,32 @@ export const updateHomeworkStatus = async (req, res, next) => {
     if (!existing || !(await teacherCanTeach(req, existing))) {
       return res.status(404).json({ success: false, message: "Homework not found" });
     }
-    const data = await Homework.findOneAndUpdate(filter, { $set: { status: req.body.status } }, { new: true, runValidators: true });
+    const session = await mongoose.startSession();
+    let data;
+    try {
+      await session.withTransaction(async () => {
+        data = await Homework.findOneAndUpdate(
+          { ...filter, status: existing.status },
+          { $set: { status: req.body.status } },
+          { new: true, runValidators: true, session },
+        );
+        if (!data) return;
+        if (existing.status === "draft" && req.body.status === "published") {
+          const enrollmentFilter = {
+            tenantId: req.tenantId, academicYearId: data.academicYearId,
+            classId: data.classId, status: "active",
+            ...(data.sectionId ? { sectionId: data.sectionId } : {}),
+          };
+          const enrollments = await Enrollment.find(enrollmentFilter).select("_id").session(session).lean();
+          await enqueueStudentScopedNotification({
+            tenantId: req.tenantId, enrollmentIds: enrollments.map((item) => item._id),
+            eventType: "homework_published", sourceType: "Homework", sourceId: data._id,
+            eventKey: `homework:${data._id}:published`, title: `New homework: ${data.title}`,
+            body: data.instructions, link: "/portal?tab=homework", session,
+          });
+        }
+      });
+    } finally { await session.endSession(); }
     if (!data) return res.status(404).json({ success: false, message: "Homework not found" });
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
