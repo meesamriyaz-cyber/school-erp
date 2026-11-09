@@ -16,7 +16,8 @@ vi.mock("../routes/studentRoutes.js", () => ({ default: express.Router() }));
 vi.mock("../routes/attendanceRoutes.js", () => ({ default: express.Router() }));
 vi.mock("../routes/subjectRoutes.js", () => ({ default: express.Router() }));
 vi.mock("../routes/teacherAssignmentRoutes.js", () => ({ default: express.Router() }));
-vi.mock("../routes/timetableRoutes.js", () => ({ default: express.Router() }));\nvi.mock("../routes/announcementRoutes.js", () => ({ default: express.Router() }));
+vi.mock("../routes/timetableRoutes.js", () => ({ default: express.Router() }));
+vi.mock("../routes/announcementRoutes.js", () => ({ default: express.Router() }));
 
 import router from "../routes/index.js";
 
