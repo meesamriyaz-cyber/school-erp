@@ -9,6 +9,7 @@ import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
+import { publishAnnouncementWithNotifications } from "../services/announcementPublicationService.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -193,11 +194,22 @@ export const publishAnnouncement = async (req, res, next) => {
     }
     if (existing.expiresAt && new Date(existing.expiresAt) <= new Date()) return invalid(res, "Expiry must be in the future before publication");
     const now = new Date();
-    const data = await Announcement.findOneAndUpdate(filter, {
-      $set: { status: "published", publishedAt: now, updatedBy: req.auth.userId },
-      $push: { auditTrail: auditEntry(req, "published") },
-    }, { new: true, runValidators: true });
-    if (!data) return res.status(409).json({ success: false, message: "Announcement changed; reload and try again" });
+    let data;
+    try {
+      data = await publishAnnouncementWithNotifications({
+        filter,
+        tenantId: req.tenantId,
+        update: {
+          $set: { status: "published", publishedAt: now, updatedBy: req.auth.userId },
+          $push: { auditTrail: auditEntry(req, "published") },
+        },
+      });
+    } catch (error) {
+      if (error.code === "ANNOUNCEMENT_CONFLICT") {
+        return res.status(409).json({ success: false, message: "Announcement changed; reload and try again" });
+      }
+      throw error;
+    }
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };
