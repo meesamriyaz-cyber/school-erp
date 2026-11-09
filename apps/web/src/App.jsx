@@ -28,11 +28,13 @@ import HomeworkManagement from "./components/HomeworkManagement.jsx";
 import FeeManagement from "./components/FeeManagement.jsx";
 import StaffManagement from "./components/StaffManagement.jsx";
 import TeacherTimetablePortal from "./components/TeacherTimetablePortal.jsx";
+import AnnouncementManagement from "./components/AnnouncementManagement.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
   { label: "Guardians", icon: "♧", section: "MAIN" },
   { label: "Teachers & Staff", icon: "♙", section: "MAIN" },
+  { label: "Announcements", icon: "▤", section: "MAIN" },
   { label: "Academic Years", icon: "▣", section: "ACADEMICS" },
   { label: "Academic Terms", icon: "▤", section: "ACADEMICS" },
   { label: "Classes & Sections", icon: "▤", section: "ACADEMICS" },
@@ -446,7 +448,7 @@ function DashboardApp() {
   <GradingScaleManagement />
 ) : activePage === "Homework & Classwork" ? (
   <HomeworkManagement />
-) : activePage === "Fees & Payments" ? (
+) : activePage === "Announcements" ? (\n  <AnnouncementManagement />\n) : activePage === "Fees & Payments" ? (
   <FeeManagement />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
