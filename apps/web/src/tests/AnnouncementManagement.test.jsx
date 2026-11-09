@@ -41,7 +41,8 @@ describe("AnnouncementManagement", () => {
   it("restricts teacher audience choices to class or section", async () => {
     mocks.role = "teacher";
     render(<AnnouncementManagement />);
-    fireEvent.click(await screen.findByRole("button", { name: /New announcement/ }));
+    await waitFor(() => expect(screen.queryByText("Loading announcements…")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: /New announcement/ }));
     const audience = screen.getByLabelText("Audience");
     expect(Array.from(audience.options).map((option) => option.value)).toEqual(["CLASS", "SECTION"]);
     expect(screen.queryByRole("option", { name: "Entire school" })).toBeNull();
