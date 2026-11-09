@@ -205,12 +205,26 @@ export const createBulkFeeInvoices = async (req, res, next) => {
       const admissionSuffix = String(student.admissionNumber).replace(/[^A-Za-z0-9-]/g, "").slice(0, 20);
       const invoiceNumber = `${invoiceNumberPrefix.trim()}-${admissionSuffix}`.slice(0, 40);
       try {
-        const [created] = await FeeInvoice.create([{
-          tenantId: req.tenantId, enrollmentId: enrollment._id, studentId: student._id,
-          academicYearId, feeStructureId: structure._id, invoiceNumber,
-          items: structure.items.map(({ name, amount, frequency }) => ({ name, amount, frequency })),
-          totalAmount, dueDate: normalizedDueDate, status: "unpaid",
-        }]);
+        const invoiceSession = await mongoose.startSession();
+        let created;
+        try {
+          await invoiceSession.withTransaction(async () => {
+            [created] = await FeeInvoice.create([{
+              tenantId: req.tenantId, enrollmentId: enrollment._id, studentId: student._id,
+              academicYearId, feeStructureId: structure._id, invoiceNumber,
+              items: structure.items.map(({ name, amount, frequency }) => ({ name, amount, frequency })),
+              totalAmount, dueDate: normalizedDueDate, status: "unpaid",
+            }], { session: invoiceSession });
+            await enqueueStudentScopedNotification({
+              tenantId: req.tenantId, enrollmentIds: [enrollment._id],
+              eventType: "fee_invoice_created", sourceType: "FeeInvoice", sourceId: created._id,
+              eventKey: `fee-invoice:${created._id}:created`,
+              title: `Fee invoice created: ${created.invoiceNumber}`,
+              body: `A fee invoice of ${created.totalAmount.toFixed(2)} is due on ${normalizedDueDate.toISOString().slice(0, 10)}.`,
+              link: "/portal?tab=fees", session: invoiceSession,
+            });
+          });
+        } finally { await invoiceSession.endSession(); }
         results.push({ enrollmentId: String(enrollment._id), invoiceId: String(created._id), invoiceNumber, studentName: [student.firstName, student.lastName].filter(Boolean).join(" "), admissionNumber: student.admissionNumber, status: "created" });
       } catch (error) {
         if (error.code === 11000) results.push({ enrollmentId: String(enrollment._id), studentName: [student.firstName, student.lastName].filter(Boolean).join(" "), admissionNumber: student.admissionNumber, status: "skipped", reason: "Invoice number already exists" });
