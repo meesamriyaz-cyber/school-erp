@@ -24,10 +24,9 @@ export async function processPendingNotifications({ batchSize = 50, notification
       const notification = await Notification.findOneAndUpdate(
         {
           ...(notificationId ? { _id: notificationId } : {}),
-          attempts: { $lt: MAX_ATTEMPTS },
           $or: [
-            { deliveryStatus: "pending", nextAttemptAt: { $lte: now } },
-            { deliveryStatus: "processing", processingStartedAt: { $lte: new Date(now.getTime() - PROCESSING_LEASE_MS) } },
+            { deliveryStatus: "pending", attempts: { $lt: MAX_ATTEMPTS }, nextAttemptAt: { $lte: now } },
+            { deliveryStatus: "processing", attempts: { $lte: MAX_ATTEMPTS }, processingStartedAt: { $lte: new Date(now.getTime() - PROCESSING_LEASE_MS) } },
           ],
         },
         {
@@ -43,6 +42,18 @@ export async function processPendingNotifications({ batchSize = 50, notification
         startedAt: now,
         finishedAt: new Date(),
       };
+      if (notification.attempts > MAX_ATTEMPTS) {
+        await Notification.updateOne(
+          { _id: notification._id, deliveryStatus: "processing", processingToken },
+          {
+            $set: { deliveryStatus: "failed", lastError: "Delivery lease expired after the final attempt" },
+            $unset: { processingStartedAt: 1, processingToken: 1 },
+            $push: { deliveryHistory: { ...attempt, outcome: "failed", error: "Delivery lease expired after the final attempt" } },
+          },
+        );
+        processed += 1;
+        continue;
+      }
       try {
         const recipient = await User.findOne({
           _id: notification.recipientUserId,
