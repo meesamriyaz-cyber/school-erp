@@ -74,6 +74,7 @@ describe("notification inbox and delivery history", () => {
       tenantId: req.tenantId,
       recipientUserId: req.auth.userId,
       deliveryStatus: "delivered",
+      relatedStudentIds: { $in: ["eeeeeeeeeeeeeeeeeeeeeeee"] },
     }, { $set: { readAt: expect.any(Date) } }, { new: true });
     expect(res.status).toHaveBeenCalledWith(200);
   });
