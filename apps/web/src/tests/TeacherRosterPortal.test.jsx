@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import TeacherRosterPortal from "../components/TeacherRosterPortal.jsx";
 import { apiRequest } from "../lib/api.js";
 vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
 
 describe("TeacherRosterPortal", () => {
+  beforeEach(() => vi.resetAllMocks());
   it("loads a roster using only the selected assignment scope", async () => {
     apiRequest.mockResolvedValue({ success: true, data: [{
       _id: "enrollment-1", status: "active", enrollmentDate: "2026-04-01",

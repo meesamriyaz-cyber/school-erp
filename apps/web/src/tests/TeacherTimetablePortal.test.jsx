@@ -21,7 +21,7 @@ describe("TeacherTimetablePortal", () => {
     render(<TeacherTimetablePortal />);
     expect(await screen.findByRole("heading", { name: "Teacher workspace" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "My timetable" }));
-    expect(screen.getByRole("heading", { name: "Monday" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Monday/ })).toBeInTheDocument();
     expect(screen.getAllByText("No periods assigned")).toHaveLength(5);
     expect(screen.getByText("Weekly periods")).toBeInTheDocument();
     expect(screen.getByText("Classes assigned")).toBeInTheDocument();

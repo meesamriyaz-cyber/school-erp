@@ -738,7 +738,12 @@ describe("Student Enrollment API", () => {
     expect(new Set(studentList.body.data.map((item) => String(item._id)))).toEqual(new Set([
       String(studentA._id), String(wideStudentA._id), String(wideStudentB._id),
     ]));
-    expect((await request(`/students/${studentA._id}`, { token: teacherA.token })).status).toBe(200);
+    expect(studentList.body.data[0]).not.toHaveProperty("guardianPhone");
+    expect(studentList.body.data[0]).not.toHaveProperty("address");
+    const assignedStudentRead = await request(`/students/${studentA._id}`, { token: teacherA.token });
+    expect(assignedStudentRead.status).toBe(200);
+    expect(assignedStudentRead.body.data).not.toHaveProperty("guardianPhone");
+    expect(assignedStudentRead.body.data).not.toHaveProperty("address");
     expect((await request(`/students/${siblingStudent._id}`, { token: teacherA.token })).status).toBe(404);
 
     await TeacherAssignment.updateOne({ _id: sectionAssignment._id }, { $set: { status: "inactive" } });

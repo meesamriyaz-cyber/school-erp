@@ -62,8 +62,13 @@ export const listStudents = async (req, res, next) => {
       if (!assignedStudentIds.length) return res.status(200).json({ success: true, data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
       filter._id = { $in: assignedStudentIds };
     }
+    let studentQuery = Student.find(filter).sort({ admissionNumber: 1, _id: 1 }).skip((page - 1) * limit).limit(limit);
+    if (req.auth.role === "teacher") {
+      // Teachers need roster identity only, not guardian contacts or home addresses.
+      studentQuery = studentQuery.select("admissionNumber firstName lastName status photoUrl");
+    }
     const [students, total] = await Promise.all([
-      Student.find(filter).sort({ admissionNumber: 1, _id: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+      studentQuery.lean(),
       Student.countDocuments(filter),
     ]);
     return res.status(200).json({ success: true, data: students, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
@@ -104,7 +109,11 @@ export const getStudent = async (req, res, next) => {
   try {
     const { studentId } = req.params;
     if (!mongoose.isValidObjectId(studentId)) return invalidRequest(res, "Invalid student ID");
-    const student = await Student.findOne({ _id: studentId, tenantId: req.tenantId }).lean();
+    let studentQuery = Student.findOne({ _id: studentId, tenantId: req.tenantId });
+    if (req.auth.role === "teacher") {
+      studentQuery = studentQuery.select("admissionNumber firstName lastName status photoUrl");
+    }
+    const student = await studentQuery.lean();
     if (!student) return res.status(404).json({ success: false, message: "Student not found" });
     if (req.auth.role === "teacher") {
       const enrollment = await Enrollment.findOne({
