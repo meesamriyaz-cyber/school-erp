@@ -8,6 +8,7 @@ import Enrollment from "../models/Enrollment.js";
 import Examination from "../models/Examination.js";
 import Homework from "../models/Homework.js";
 import { loadResultContext } from "./examResultController.js";
+import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
 
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const validId = (value) => mongoose.isValidObjectId(value);
@@ -73,7 +74,7 @@ export const getMyPublishedResults = async (req, res, next) => {
       const guardian = await Guardian.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" }).select("_id").lean();
       if (!guardian) return res.status(409).json({ success: false, message: "Your parent account has not been linked by the school" });
       const links = await StudentGuardian.find({
-        tenantId: req.tenantId, guardianId: guardian._id, status: "active",
+        tenantId: req.tenantId, guardianId: guardian._id, status: "active", ...guardianPortalAccessFilter(),
       }).select("studentId").lean();
       const studentIds = links.map((link) => link.studentId);
       if (req.query.studentId && !validId(req.query.studentId)) return invalid(res, "Invalid studentId");
@@ -165,7 +166,7 @@ export const getMyHomework = async (req, res, next) => {
     } else {
       const guardian = await Guardian.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" }).select("_id").lean();
       if (!guardian) return res.status(409).json({ success: false, message: "Your parent account has not been linked by the school" });
-      const links = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id, status: "active" }).select("studentId").lean();
+      const links = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id, status: "active", ...guardianPortalAccessFilter() }).select("studentId").lean();
       const linkedStudentIds = links.map((item) => item.studentId);
       if (req.query.studentId && !validId(req.query.studentId)) return invalid(res, "Invalid studentId");
       if (req.query.studentId && !linkedStudentIds.some((id) => String(id) === String(req.query.studentId))) {

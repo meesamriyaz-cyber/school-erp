@@ -3,7 +3,7 @@ import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian, { RELATIONSHIPS } from "../models/StudentGuardian.js";
 
-const BOOLEAN_FIELDS = ["isPrimary", "isEmergencyContact", "canPickup", "receivesCommunication"];
+const BOOLEAN_FIELDS = ["isPrimary", "isEmergencyContact", "canPickup", "receivesCommunication", "canAccessPortal"];
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const handleError = (error, res, next) => {
   if (error.code === 11000) return res.status(409).json({ success: false, message: "This student-guardian relationship already exists or conflicts with the primary guardian" });
@@ -36,11 +36,16 @@ const demotePrimaryRelationships = async ({ tenantId, studentId, exceptId = null
   if (exceptId) filter._id = { $ne: exceptId };
   const previousPrimaries = await StudentGuardian.find(filter).session(session);
   for (const previous of previousPrimaries) {
+    const hadPortalAccess = previous.canAccessPortal !== false;
     previous.isPrimary = false;
+    previous.canAccessPortal = false;
     appendAudit(previous, {
       action: "primary_demoted",
       actorUserId,
-      changes: [{ field: "isPrimary", from: true, to: false }],
+      changes: [
+        { field: "isPrimary", from: true, to: false },
+        ...(hadPortalAccess ? [{ field: "canAccessPortal", from: true, to: false }] : []),
+      ],
     });
     await previous.save({ session });
   }
@@ -103,6 +108,7 @@ export const createStudentGuardian = async (req, res, next) => {
         relationship: body.relationship,
         ...Object.fromEntries(BOOLEAN_FIELDS.filter((field) => body[field] !== undefined && field !== "isPrimary").map((field) => [field, body[field]])),
         isPrimary,
+        canAccessPortal: typeof body.canAccessPortal === "boolean" ? body.canAccessPortal : isPrimary,
       };
       [link] = await StudentGuardian.create([fields], { session });
       appendAudit(link, {
@@ -111,6 +117,7 @@ export const createStudentGuardian = async (req, res, next) => {
         changes: [
           { field: "relationship", from: null, to: body.relationship },
           { field: "isPrimary", from: null, to: isPrimary },
+          { field: "canAccessPortal", from: null, to: fields.canAccessPortal },
         ],
       });
       await link.save({ session });
@@ -175,6 +182,9 @@ export const updateStudentGuardian = async (req, res, next) => {
         }).session(session).select("_id").lean();
         if (!activePrimary && !current.isPrimary) updates.isPrimary = true;
       }
+
+      if (updates.isPrimary === true && !Object.hasOwn(updates, "canAccessPortal")) updates.canAccessPortal = true;
+      if (updates.isPrimary === false && !Object.hasOwn(updates, "canAccessPortal")) updates.canAccessPortal = false;
 
       if (updates.isPrimary === true) {
         await demotePrimaryRelationships({

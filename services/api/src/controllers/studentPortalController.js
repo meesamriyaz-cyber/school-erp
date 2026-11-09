@@ -2,6 +2,7 @@ import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 import Enrollment from "../models/Enrollment.js";
+import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
 
 const linkedStudentFields = "_id admissionNumber firstName lastName status";
 
@@ -40,6 +41,7 @@ const getStudentChildren = async (req) => {
     tenantId: req.tenantId,
     guardianId: guardian._id,
     status: "active",
+    ...guardianPortalAccessFilter(),
   })
     .select("studentId relationship isPrimary")
     .lean();

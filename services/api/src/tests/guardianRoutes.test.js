@@ -765,6 +765,8 @@ describe("Guardian API integration tests", () => {
     const relationships = await request(`/students/${student._id}/guardians`, { token: adminA.token });
     expect(relationships.body.data.filter((item) => item.status === "active" && item.isPrimary)).toHaveLength(1);
     expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianTwo._id)).isPrimary).toBe(true);
+    expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianTwo._id)).canAccessPortal).toBe(true);
+    expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianOne._id)).canAccessPortal).toBe(false);
     expect(relationships.body.data.find((item) => String(item.guardianId?._id || item.guardianId) === String(guardianOne._id)).auditTrail)
       .toEqual(expect.arrayContaining([expect.objectContaining({ action: "primary_demoted", actorUserId: String(adminA.user._id) })]));
   });
@@ -949,6 +951,48 @@ describe("Guardian API integration tests", () => {
     expect(response.body.data.receivesCommunication).toBe(false);
   });
 
+
+  it("keeps secondary portal access disabled by default and lets administrators grant it independently", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linked = await request(`/students/${student._id}/guardians`, {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({
+        guardianId: String(guardian._id),
+        relationship: "uncle",
+        isEmergencyContact: true,
+        canPickup: true,
+      }),
+    });
+
+    expect(linked.status).toBe(201);
+    expect(linked.body.data.isPrimary).toBe(false);
+    expect(linked.body.data.isEmergencyContact).toBe(true);
+    expect(linked.body.data.canPickup).toBe(true);
+    expect(linked.body.data.canAccessPortal).toBe(false);
+
+    const granted = await request(`/students/${student._id}/guardians/${linked.body.data._id}`, {
+      method: "PATCH",
+      token: adminA.token,
+      body: JSON.stringify({ canAccessPortal: true }),
+    });
+    expect(granted.status).toBe(200);
+    expect(granted.body.data.canAccessPortal).toBe(true);
+    expect(granted.body.data.isEmergencyContact).toBe(true);
+    expect(granted.body.data.canPickup).toBe(true);
+
+    const revoked = await request(`/students/${student._id}/guardians/${linked.body.data._id}`, {
+      method: "PATCH",
+      token: adminA.token,
+      body: JSON.stringify({ canAccessPortal: false }),
+    });
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.data.canAccessPortal).toBe(false);
+    expect(revoked.body.data.isEmergencyContact).toBe(true);
+    expect(revoked.body.data.canPickup).toBe(true);
+  });
+
   it("prevents a teacher from updating a student-guardian relationship", async () => {
     const student = await createStudent(adminA.token);
     const guardian = await createGuardian(adminA.token);
@@ -1073,6 +1117,7 @@ describe("Guardian API integration tests", () => {
     expect(details.body.data.linkedStudents[0].relationship).toBe("uncle");
     expect(details.body.data.linkedStudents[0].isPrimary).toBe(true);
     const studentLinks = await request(`/students/${student._id}/guardians`, { token: adminA.token });
+    expect(studentLinks.body.data[0].canAccessPortal).toBe(true);
     expect(studentLinks.body.data[0].auditTrail).toEqual(expect.arrayContaining([
       expect.objectContaining({
         action: "created",

@@ -117,11 +117,16 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
   if (session) previousPrimariesQuery = previousPrimariesQuery.session(session);
   const previousPrimaries = await previousPrimariesQuery;
   for (const previous of previousPrimaries) {
+    const hadPortalAccess = previous.canAccessPortal !== false;
     previous.isPrimary = false;
+    previous.canAccessPortal = false;
     appendRelationshipAudit(previous, {
       action: "primary_demoted",
       actorUserId,
-      changes: [{ field: "isPrimary", from: true, to: false }],
+      changes: [
+        { field: "isPrimary", from: true, to: false },
+        ...(hadPortalAccess ? [{ field: "canAccessPortal", from: true, to: false }] : []),
+      ],
     });
     await previous.save({ session });
   }
@@ -134,12 +139,19 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
     if (existingPair.status !== "active") {
       changes.push({ field: "status", from: existingPair.status, to: "active" });
     }
-    if (!existingPair.isPrimary) {
+    const wasPrimary = existingPair.isPrimary === true;
+    if (!wasPrimary) {
       changes.push({ field: "isPrimary", from: false, to: true });
+    }
+    if (!wasPrimary && existingPair.canAccessPortal !== true) {
+      changes.push({ field: "canAccessPortal", from: existingPair.canAccessPortal ?? false, to: true });
+    } else if (wasPrimary && existingPair.canAccessPortal == null) {
+      changes.push({ field: "canAccessPortal", from: null, to: true });
     }
     existingPair.relationship = relationshipType;
     existingPair.status = "active";
     existingPair.isPrimary = true;
+    if (!wasPrimary || existingPair.canAccessPortal == null) existingPair.canAccessPortal = true;
     if (existingPair.source === "manual") existingPair.source = "manual_and_legacy";
     if (changes.length) {
       appendRelationshipAudit(existingPair, {
@@ -154,13 +166,14 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
 
   const [relationship] = await StudentGuardian.create([{
     tenantId, studentId, guardianId: guardian._id, relationship: relationshipType,
-    source: "legacy_student", isPrimary: true, receivesCommunication: true,
+    source: "legacy_student", isPrimary: true, canAccessPortal: true, receivesCommunication: true,
     auditTrail: [{
       action: "created",
       actorUserId,
       changes: [
         { field: "relationship", from: null, to: relationshipType },
         { field: "isPrimary", from: null, to: true },
+        { field: "canAccessPortal", from: null, to: true },
       ],
       changedAt: new Date(),
     }],

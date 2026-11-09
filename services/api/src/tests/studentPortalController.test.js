@@ -77,6 +77,10 @@ describe("student portal linked children", () => {
       tenantId: "tenant-a",
       guardianId,
       status: "active",
+      $or: [
+        { canAccessPortal: true },
+        { isPrimary: true, canAccessPortal: { $exists: false } },
+      ],
     });
     expect(mocks.studentFind).toHaveBeenCalledWith(expect.objectContaining({
       tenantId: "tenant-a",

@@ -6,6 +6,7 @@ import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
+import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -125,7 +126,7 @@ export const getMyHomeworkSubmissions = async (req, res, next) => {
     } else {
       const guardian = await Guardian.findOne({ tenantId: req.tenantId, userId: req.auth.userId, status: "active" }).select("_id").lean();
       if (!guardian) return res.status(409).json({ success: false, message: "Your parent account has not been linked by the school" });
-      const links = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id, status: "active" }).select("studentId").lean();
+      const links = await StudentGuardian.find({ tenantId: req.tenantId, guardianId: guardian._id, status: "active", ...guardianPortalAccessFilter() }).select("studentId").lean();
       studentIds = links.map((item) => item.studentId);
       if (req.query.studentId && !validId(req.query.studentId)) return invalid(res, "Invalid studentId");
       if (req.query.studentId && !studentIds.some((id) => String(id) === String(req.query.studentId))) {

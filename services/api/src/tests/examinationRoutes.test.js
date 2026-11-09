@@ -426,7 +426,7 @@ describe("Examination API integration", () => {
     const studentAccount = await createUser(schoolA, "student");
     const parentAccount = await createUser(schoolA, "parent");
     const guardian = await Guardian.create({ tenantId: schoolA._id, firstName: "Parent", lastName: "Tester", email: parentAccount.user.email });
-    await StudentGuardian.create({ tenantId: schoolA._id, studentId: studentA._id, guardianId: guardian._id, relationship: "father", status: "active" });
+    await StudentGuardian.create({ tenantId: schoolA._id, studentId: studentA._id, guardianId: guardian._id, relationship: "father", status: "active", canAccessPortal: true });
     expect((await request("/students/" + studentA._id + "/account", { method: "POST", token: adminA.token, body: JSON.stringify({ userId: String(studentAccount.user._id) }) })).status).toBe(200);
     expect((await request("/guardians/" + guardian._id + "/account", { method: "POST", token: adminA.token, body: JSON.stringify({ userId: String(parentAccount.user._id) }) })).status).toBe(200);
     const studentResults = await request("/portal/results", { token: studentAccount.token });

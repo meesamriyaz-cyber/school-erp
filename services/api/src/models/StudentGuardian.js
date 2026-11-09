@@ -29,6 +29,8 @@ const studentGuardianSchema = new mongoose.Schema(
     relationship: { type: String, enum: RELATIONSHIPS, required: true },
     source: { type: String, enum: ["manual", "legacy_student", "manual_and_legacy"], default: "manual" },
     isPrimary: { type: Boolean, default: false },
+    // Independent of emergency-contact, pickup, and communication permissions.
+    canAccessPortal: { type: Boolean },
     isEmergencyContact: { type: Boolean, default: false },
     canPickup: { type: Boolean, default: false },
     receivesCommunication: { type: Boolean, default: true },

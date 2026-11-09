@@ -73,7 +73,8 @@ export const getGuardian = async (req, res, next) => {
     const linkedStudents = relationships.filter((relationship) => relationship.studentId).map((relationship) => ({
       _id: relationship._id, relationship: relationship.relationship, isPrimary: relationship.isPrimary,
       isEmergencyContact: relationship.isEmergencyContact, canPickup: relationship.canPickup,
-      receivesCommunication: relationship.receivesCommunication, status: relationship.status, student: relationship.studentId,
+      receivesCommunication: relationship.receivesCommunication, canAccessPortal: relationship.canAccessPortal,
+      status: relationship.status, student: relationship.studentId,
     }));
     return res.status(200).json({ success: true, data: { ...guardian, linkedStudents } });
   } catch (error) { return next(error); }
