@@ -207,21 +207,35 @@ export const getAttendanceReports = async (req, res, next) => {
       reportTermFilter = { academicTermId: term._id };
     }
 
+    let teacherReportClauses = null;
+    if (req.auth?.role === "teacher") {
+      const assignments = await TeacherAssignment.find({
+        tenantId: req.tenantId, teacherId: req.auth.userId, academicYearId, status: "active",
+        ...(classId ? { classId } : {}),
+      }).select("classId sectionId").lean();
+      if (!assignments.length) return res.status(403).json({ success: false, message: "You are not assigned to this class or academic year" });
+      teacherReportClauses = assignments.map((item) => ({
+        classId: item.classId,
+        ...(item.sectionId ? { sectionId: item.sectionId } : {}),
+      }));
+    }
     const enrollmentFilter = { tenantId: req.tenantId, academicYearId, status: "active" };
     if (classId) enrollmentFilter.classId = classId;
+    if (teacherReportClauses) enrollmentFilter.$or = teacherReportClauses;
     const enrollments = await Enrollment.find(enrollmentFilter)
       .populate("studentId", "admissionNumber firstName lastName status")
       .populate("classId", "name")
       .populate("sectionId", "name")
       .lean();
     const activeEnrollments = enrollments.filter((item) => item.studentId?.status === "active");
-    const classIds = [...new Set(activeEnrollments.map((item) => String(item.classId?._id)).filter(Boolean))];
-    const records = await Attendance.find({
+    const recordsFilter = {
       tenantId: req.tenantId, academicYearId,
       date: { $gte: start, $lte: end },
       ...reportTermFilter,
       ...(classId ? { classId } : {}),
-    }).select("studentId classId sectionId date status").lean();
+      ...(teacherReportClauses ? { $or: teacherReportClauses } : {}),
+    };
+    const records = await Attendance.find(recordsFilter).select("studentId classId sectionId date status").lean();
 
     const tally = (items) => {
       const counts = { present: 0, absent: 0, late: 0, excused: 0 };

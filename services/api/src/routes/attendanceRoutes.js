@@ -6,7 +6,7 @@ import { getAttendanceRoster, getAttendanceReports, saveAttendance } from "../co
 
 const router = Router();
 router.use(authenticate, requireActiveTenant);
-router.get("/reports", authorizeRoles("school_admin", "principal"), getAttendanceReports);
+router.get("/reports", authorizeRoles("school_admin", "principal", "teacher"), getAttendanceReports);
 router.get("/", authorizeRoles("school_admin", "principal", "teacher"), getAttendanceRoster);
 router.put("/", authorizeRoles("school_admin", "principal", "teacher"), saveAttendance);
 export default router;

@@ -12,6 +12,7 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import Enrollment from "../models/Enrollment.js";
+import Attendance from "../models/Attendance.js";
 import Subject from "../models/Subject.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import { createAccessToken } from "../utils/tokens.js";
@@ -47,7 +48,7 @@ describe("Student Enrollment API", () => {
     if (!match || decodeURIComponent(match[1]) !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== "school-erp-test") throw new Error("Safety stop: unexpected database.");
-    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Enrollment.init(), Subject.init(), TeacherAssignment.init()]);
+    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Enrollment.init(), Attendance.init(), Subject.init(), TeacherAssignment.init()]);
     schoolA = await makeSchool("a"); schoolB = await makeSchool("b");
     adminA = await makeUser(schoolA, "school_admin");
     teacherA = await makeUser(schoolA, "teacher");
@@ -69,6 +70,7 @@ describe("Student Enrollment API", () => {
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
         await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
+        await Attendance.deleteMany({ tenantId: { $in: tenantIds } });
         await TeacherAssignment.deleteMany({ tenantId: { $in: tenantIds } });
         await Subject.deleteMany({ tenantId: { $in: tenantIds } });
         await Section.deleteMany({ tenantId: { $in: tenantIds } });
@@ -718,6 +720,30 @@ describe("Student Enrollment API", () => {
       academicYearId: yearA._id, classId: classWide._id, sectionId: null,
       assignedBy: adminA.user._id,
     });
+    const attendanceStatuses = ["present", "absent", "late", "excused"];
+    for (let index = 0; index < placements.length; index += 1) {
+      const [student, schoolClass, section] = placements[index];
+      const enrollmentId = placementIds[String(student._id)];
+      await Attendance.create({
+        tenantId: schoolA._id, studentId: student._id, enrollmentId,
+        academicYearId: yearA._id, classId: schoolClass._id, sectionId: section._id,
+        date: new Date("2026-04-10T00:00:00.000Z"), status: attendanceStatuses[index],
+        markedBy: teacherA.user._id,
+      });
+    }
+
+    const report = await request(`/attendance/reports?academicYearId=${yearA._id}&from=2026-04-01&to=2026-04-30`, { token: teacherA.token });
+    expect(report.status).toBe(200);
+    expect(report.body.summary.students).toBe(3);
+    expect(new Set(report.body.students.map((item) => String(item.studentId)))).toEqual(new Set([
+      String(assignedStudent._id), String(wideStudentA._id), String(wideStudentB._id),
+    ]));
+    expect(report.body.summary.absent).toBe(0);
+    const classReport = await request(`/attendance/reports?academicYearId=${yearA._id}&from=2026-04-01&to=2026-04-30&classId=${scopedClass._id}`, { token: teacherA.token });
+    expect(classReport.status).toBe(200);
+    expect(classReport.body.summary.students).toBe(1);
+    const deniedReport = await request(`/attendance/reports?academicYearId=${yearA._id}&from=2026-04-01&to=2026-04-30&classId=${classA._id}`, { token: teacherA.token });
+    expect(deniedReport.status).toBe(403);
 
     const list = await request("/enrollments", { token: teacherA.token });
     expect(list.status).toBe(200);
@@ -749,6 +775,9 @@ describe("Student Enrollment API", () => {
     const afterRevocation = await request(`/enrollments?classId=${scopedClass._id}`, { token: teacherA.token });
     expect(afterRevocation.body.data).toHaveLength(0);
     expect((await request(`/students/${assignedStudent._id}`, { token: teacherA.token })).status).toBe(404);
+    const reportAfterRevocation = await request(`/attendance/reports?academicYearId=${yearA._id}&from=2026-04-01&to=2026-04-30`, { token: teacherA.token });
+    expect(reportAfterRevocation.status).toBe(200);
+    expect(reportAfterRevocation.body.summary.students).toBe(2);
   });
 
 });

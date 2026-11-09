@@ -6,6 +6,7 @@ import TeacherAttendancePortal from "./TeacherAttendancePortal.jsx";
 import HomeworkManagement from "./HomeworkManagement.jsx";
 import TeacherExaminations from "./TeacherExaminations.jsx";
 import TeacherRosterPortal from "./TeacherRosterPortal.jsx";
+import TeacherReportsPortal from "./TeacherReportsPortal.jsx";
 
 const DAYS = [
   { value: 1, label: "Monday" },
@@ -80,6 +81,7 @@ export default function TeacherTimetablePortal() {
         <button type="button" className={activeView === "homework" ? "active" : ""} onClick={() => setActiveView("homework")}>Homework & classwork</button>
         <button type="button" className={activeView === "classes" ? "active" : ""} onClick={() => setActiveView("classes")}>My classes</button>
         <button type="button" className={activeView === "students" ? "active" : ""} onClick={() => setActiveView("students")}>My students</button>
+        <button type="button" className={activeView === "reports" ? "active" : ""} onClick={() => setActiveView("reports")}>Reports</button>
         <button type="button" className={activeView === "exams" ? "active" : ""} onClick={() => setActiveView("exams")}>Examination marks</button>
       </nav>
       {activeView === "overview" ? <section className="teacher-overview">
@@ -100,7 +102,7 @@ export default function TeacherTimetablePortal() {
           <button type="button" onClick={() => setActiveView("homework")}>Manage homework</button>
           <button type="button" onClick={() => setActiveView("exams")}>Enter examination marks</button>
         </div>
-      </section> : activeView === "students" ? <TeacherRosterPortal accessToken={accessToken} assignments={assignments} /> : activeView === "timetable" ? <>
+      </section> : activeView === "students" ? <TeacherRosterPortal accessToken={accessToken} assignments={assignments} /> : activeView === "reports" ? <TeacherReportsPortal accessToken={accessToken} assignments={assignments} /> : activeView === "timetable" ? <>
         {error && <p className="teacher-timetable-error" role="alert">{error}</p>}
         {!loading && !error && entries.length > 0 && (
           <section className="teacher-timetable-summary" aria-label="Timetable summary">

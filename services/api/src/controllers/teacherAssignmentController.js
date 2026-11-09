@@ -69,7 +69,7 @@ export const listTeacherAssignments = async (req, res, next) => {
     const data = await TeacherAssignment.find(filter)
       .populate("teacherId", "firstName lastName email")
       .populate("subjectId", "name code category")
-      .populate("academicYearId", "name")
+      .populate("academicYearId", "name startDate endDate")
       .populate("classId", "name")
       .populate("sectionId", "name")
       .sort({ createdAt: -1, _id: -1 }).lean();
