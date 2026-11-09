@@ -36,7 +36,7 @@ describe("notification inbox and delivery history", () => {
     next = vi.fn();
     mocks.guardianFindOne.mockReturnValue(chain({ _id: "dddddddddddddddddddddddd" }));
     mocks.relationshipFind.mockReturnValue(chain([{ studentId: "eeeeeeeeeeeeeeeeeeeeeeee" }]));
-    mocks.find.mockReturnValue(chain([{ _id: "notice-a", deliveryStatus: "delivered" }]));
+    mocks.find.mockReturnValue(chain([{ _id: "notice-a", deliveryStatus: "delivered", relatedStudentIds: ["eeeeeeeeeeeeeeeeeeeeeeee"] }]));
     mocks.countDocuments.mockResolvedValue(2);
     mocks.findOneAndUpdate.mockReturnValue(chain({ _id: "notice-a", readAt: new Date() }));
     mocks.updateMany.mockResolvedValue({ modifiedCount: 2 });
@@ -55,7 +55,7 @@ describe("notification inbox and delivery history", () => {
       deliveryStatus: "delivered", relatedStudentIds: { $in: ["eeeeeeeeeeeeeeeeeeeeeeee"] }, readAt: null,
     });
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      success: true, data: [{ _id: "notice-a", deliveryStatus: "delivered" }], unreadCount: 2,
+      success: true, data: [{ _id: "notice-a", deliveryStatus: "delivered", relatedStudentIds: ["eeeeeeeeeeeeeeeeeeeeeeee"] }], unreadCount: 2,
     }));
   });
 
