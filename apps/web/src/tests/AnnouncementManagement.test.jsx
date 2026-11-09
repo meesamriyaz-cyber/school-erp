@@ -24,7 +24,8 @@ describe("AnnouncementManagement", () => {
 
   it("creates a school-wide announcement as a draft", async () => {
     render(<AnnouncementManagement />);
-    fireEvent.click(await screen.findByRole("button", { name: /New announcement/ }));
+    await waitFor(() => expect(screen.queryByText("Loading announcements…")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: /New announcement/ }));
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "School holiday" } });
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "The school will remain closed on Friday." } });
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
