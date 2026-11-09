@@ -27,6 +27,7 @@ import homeworkSubmissionRoutes from "./homeworkSubmissionRoutes.js";
 import feeRoutes from "./feeRoutes.js";
 import staffRoutes from "./staffRoutes.js";
 import announcementRoutes from "./announcementRoutes.js";
+import notificationRoutes from "./notificationRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -61,6 +62,7 @@ router.use("/examinations", examMarkRoutes);
 router.use("/grading-scales", gradingScaleRoutes);
 router.use("/portal", portalRoutes);
 router.use("/announcements", announcementRoutes);
+router.use("/notifications", notificationRoutes);
 router.use("/homework", homeworkRoutes);
 router.use("/homework", homeworkSubmissionRoutes);
 router.use("/fees", feeRoutes);
