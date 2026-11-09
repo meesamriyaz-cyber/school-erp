@@ -60,6 +60,7 @@ describe("announcement notification enqueue", () => {
 
   it("enqueues a scoped lifecycle event idempotently using the resolved active recipients", async () => {
     const session = { id: "transaction" };
+    mocks.bulkWrite.mockResolvedValue({ upsertedCount: 1 });
     const result = await enqueueStudentScopedNotification({
       tenantId: "eeeeeeeeeeeeeeeeeeeeeeee",
       enrollmentIds: ["ffffffffffffffffffffffff"],
@@ -95,7 +96,7 @@ describe("announcement notification enqueue", () => {
         upsert: true,
       }},
     ], { ordered: false, session });
-    expect(result).toEqual({ recipientCount: 1, queuedCount: 2 });
+    expect(result).toEqual({ recipientCount: 1, queuedCount: 1 });
   });
 
   it("does not write anything when no eligible recipients exist", async () => {
