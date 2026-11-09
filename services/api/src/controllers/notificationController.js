@@ -1,9 +1,35 @@
 import mongoose from "mongoose";
 import Notification from "../models/Notification.js";
+import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
+import StudentGuardian from "../models/StudentGuardian.js";
+import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
 
 const validId = mongoose.isValidObjectId;
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const PAGE_SIZE = 100;
+
+const getAuthorizedStudentIds = async (req) => {
+  if (req.auth.role === "student") {
+    const student = await Student.findOne({
+      tenantId: req.tenantId, userId: req.auth.userId, status: "active",
+    }).select("_id").lean();
+    if (!student) return { error: [409, "Your student account has not been linked by the school"] };
+    return { ids: [student._id] };
+  }
+  const guardian = await Guardian.findOne({
+    tenantId: req.tenantId, userId: req.auth.userId, status: "active",
+  }).select("_id").lean();
+  if (!guardian) return { error: [409, "Your parent account has not been linked by the school"] };
+  const links = await StudentGuardian.find({
+    tenantId: req.tenantId,
+    guardianId: guardian._id,
+    status: "active",
+    receivesCommunication: true,
+    ...guardianPortalAccessFilter(),
+  }).select("studentId").lean();
+  return { ids: [...new Set(links.map((link) => String(link.studentId)))] };
+};
 
 export const listMyNotifications = async (req, res, next) => {
   try {
@@ -11,10 +37,14 @@ export const listMyNotifications = async (req, res, next) => {
     if (!Number.isInteger(limitValue) || limitValue < 1 || limitValue > PAGE_SIZE) {
       return invalid(res, "Notification limit must be between 1 and 100");
     }
+    const authorization = await getAuthorizedStudentIds(req);
+    if (authorization.error) return res.status(authorization.error[0]).json({ success: false, message: authorization.error[1] });
+    if (!authorization.ids.length) return res.status(200).json({ success: true, data: [], unreadCount: 0, nextCursor: null });
     const filter = {
       tenantId: req.tenantId,
       recipientUserId: req.auth.userId,
       deliveryStatus: "delivered",
+      relatedStudentIds: { $in: authorization.ids },
     };
     if (req.query.unread !== undefined) {
       if (!["true", "false"].includes(req.query.unread)) return invalid(res, "Invalid unread filter");
@@ -33,6 +63,7 @@ export const listMyNotifications = async (req, res, next) => {
         tenantId: req.tenantId,
         recipientUserId: req.auth.userId,
         deliveryStatus: "delivered",
+        relatedStudentIds: { $in: authorization.ids },
         readAt: null,
       }),
     ]);
@@ -48,12 +79,16 @@ export const listMyNotifications = async (req, res, next) => {
 export const markNotificationRead = async (req, res, next) => {
   try {
     if (!validId(req.params.notificationId)) return invalid(res, "Invalid notification ID");
+    const authorization = await getAuthorizedStudentIds(req);
+    if (authorization.error) return res.status(authorization.error[0]).json({ success: false, message: authorization.error[1] });
+    if (!authorization.ids.length) return res.status(404).json({ success: false, message: "Notification not found" });
     const data = await Notification.findOneAndUpdate(
       {
         _id: req.params.notificationId,
         tenantId: req.tenantId,
         recipientUserId: req.auth.userId,
         deliveryStatus: "delivered",
+        relatedStudentIds: { $in: authorization.ids },
       },
       { $set: { readAt: new Date() } },
       { new: true },
@@ -66,11 +101,15 @@ export const markNotificationRead = async (req, res, next) => {
 export const markAllNotificationsRead = async (req, res, next) => {
   try {
     if (req.body && Object.keys(req.body).length) return invalid(res, "Marking notifications read does not accept a request body");
+    const authorization = await getAuthorizedStudentIds(req);
+    if (authorization.error) return res.status(authorization.error[0]).json({ success: false, message: authorization.error[1] });
+    if (!authorization.ids.length) return res.status(200).json({ success: true, data: { modifiedCount: 0 } });
     const result = await Notification.updateMany(
       {
         tenantId: req.tenantId,
         recipientUserId: req.auth.userId,
         deliveryStatus: "delivered",
+        relatedStudentIds: { $in: authorization.ids },
         readAt: null,
       },
       { $set: { readAt: new Date() } },
