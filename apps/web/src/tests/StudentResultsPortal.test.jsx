@@ -71,7 +71,7 @@ describe("StudentResultsPortal family overview", () => {
           ],
         },
         "/portal/fees": { data: [] },
-        "/portal/timetable": { data: [] },
+        "/portal/timetable": { data: [] },\n        "/portal/announcements": { data: [] },
       };
       return Promise.resolve(responses[path] || { data: [] });
     });
@@ -134,6 +134,24 @@ describe("StudentResultsPortal family overview", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Bilal Khan").length).toBeGreaterThan(0);
       expect(screen.queryByText("Srinagar, Srinagar, Jammu and Kashmir")).toBeNull();
+    });
+  });
+
+  it("renders published notices returned by the authorized portal endpoint", async () => {
+    mocks.apiRequest.mockImplementation((path) => Promise.resolve({
+      data: path === "/portal/announcements" ? [{
+        _id: "notice-1", title: "Parent meeting", body: "Please attend the meeting on Friday.",
+        category: "event", publishedAt: "2026-11-08T09:00:00.000Z",
+        expiresAt: "2026-11-15T09:00:00.000Z",
+      }] : [],
+    }));
+    render(<StudentResultsPortal />);
+    expect(await screen.findByText("Family learning overview")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Notices/ }));
+    expect(await screen.findByText("Parent meeting")).toBeTruthy();
+    expect(screen.getByText("Please attend the meeting on Friday.")).toBeTruthy();
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/portal/announcements", {
+      accessToken: "access-token", signal: expect.any(AbortSignal),
     });
   });
 
