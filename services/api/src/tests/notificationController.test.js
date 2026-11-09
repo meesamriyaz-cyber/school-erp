@@ -102,4 +102,21 @@ describe("notification inbox and delivery history", () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(mocks.find).not.toHaveBeenCalled();
   });
+  it("revokes access to stored notifications when the guardian relationship is no longer authorized", async () => {
+    mocks.relationshipFind.mockReturnValue(chain([]));
+    await listMyNotifications(req, res, next);
+    expect(mocks.find).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      success: true, data: [], unreadCount: 0, nextCursor: null,
+    });
+  });
+
+  it("does not allow a guardian to mark a notification read after communication access is revoked", async () => {
+    mocks.relationshipFind.mockReturnValue(chain([]));
+    req.params.notificationId = "cccccccccccccccccccccccc";
+    await markNotificationRead(req, res, next);
+    expect(mocks.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
 });
