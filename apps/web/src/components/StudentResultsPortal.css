@@ -68,3 +68,21 @@
 
 .report-school-name{font-size:15px;font-weight:800;color:#172b4d;letter-spacing:.01em}
 .report-school-contact{margin:3px 0 8px!important;font-size:10px!important;color:#64748b!important}
+
+
+.portal-profile-list{display:grid;gap:14px}
+.portal-profile-card{background:#fff;border:1px solid #dbe2ea;border-radius:12px;padding:20px;margin-bottom:14px}
+.portal-profile-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-bottom:16px;border-bottom:1px solid #e2e8f0}
+.portal-profile-heading>div{display:grid;gap:5px}
+.portal-profile-heading>div>span{font-size:10px;font-weight:800;letter-spacing:.1em;color:#64748b}
+.portal-profile-heading h2{margin:0;color:#172b4d;font-size:20px}
+.portal-profile-heading small{font-size:11px;color:#64748b}
+.portal-profile-heading img{width:64px;height:64px;object-fit:cover;border-radius:50%;border:1px solid #e2e8f0}
+.portal-profile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:18px 0}
+.portal-profile-grid>div{display:grid;gap:5px;min-width:0}
+.portal-profile-grid span{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+.portal-profile-grid strong{font-size:13px;color:#172b4d;overflow-wrap:anywhere}
+.portal-profile-section{padding:14px 0;border-top:1px solid #e2e8f0}
+.portal-profile-section h3{margin:0 0 8px;color:#172b4d;font-size:13px}
+.portal-profile-section p{margin:4px 0;color:#475569;font-size:13px;line-height:1.5}
+@media(max-width:700px){.portal-profile-card{padding:15px}.portal-profile-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}}
