@@ -17,6 +17,9 @@ export default function StudentResultsPortal() {
   const [fees, setFees] = useState([]);
   const [timetable, setTimetable] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationBusy, setNotificationBusy] = useState(false);
   const [submissions, setSubmissions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState("");
@@ -39,7 +42,8 @@ export default function StudentResultsPortal() {
       apiRequest("/portal/fees", { accessToken, signal: controller.signal }),
       apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),
       apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
-    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse]) => {
+      apiRequest("/portal/notifications", { accessToken, signal: controller.signal }),
+    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse, notificationResponse]) => {
       if (controller.signal.aborted) return;
       setError("");
       if (childrenResponse.status === "fulfilled") setChildren(Array.isArray(childrenResponse.value?.data) ? childrenResponse.value.data : []);
@@ -54,11 +58,42 @@ export default function StudentResultsPortal() {
       if (feesResponse.status === "fulfilled") setFees(Array.isArray(feesResponse.value?.data) ? feesResponse.value.data : []);
       if (timetableResponse.status === "fulfilled") setTimetable(Array.isArray(timetableResponse.value?.data) ? timetableResponse.value.data : []);
       if (announcementResponse.status === "fulfilled") setAnnouncements(Array.isArray(announcementResponse.value?.data) ? announcementResponse.value.data : []);
+      if (notificationResponse.status === "fulfilled") {
+        setNotifications(Array.isArray(notificationResponse.value?.data) ? notificationResponse.value.data : []);
+        setUnreadCount(Number(notificationResponse.value?.unreadCount || 0));
+      }
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
   }, [accessToken]);
+
+  const visibleNotifications = useMemo(() => selectedStudent === "all" || !isParent
+    ? notifications
+    : notifications.filter((item) => item.relatedStudentIds?.some((id) => String(id) === selectedStudent)), [notifications, selectedStudent, isParent]);
+
+  const markNotificationRead = async (notificationId) => {
+    setNotificationBusy(true);
+    try {
+      const response = await apiRequest(`/portal/notifications/${notificationId}/read`, { method: "PATCH", accessToken });
+      if (!response?.success) throw new Error("Unable to update this notification.");
+      setNotifications((current) => current.map((item) => item._id === notificationId ? { ...item, readAt: response.data?.readAt || new Date().toISOString() } : item));
+      setUnreadCount((current) => Math.max(0, current - 1));
+    } catch (err) { setError(err.message || "Unable to update this notification."); }
+    finally { setNotificationBusy(false); }
+  };
+
+  const markAllNotificationsRead = async () => {
+    setNotificationBusy(true);
+    try {
+      const response = await apiRequest("/portal/notifications/read-all", { method: "PATCH", accessToken, body: {} });
+      if (!response?.success) throw new Error("Unable to mark notifications as read.");
+      const now = new Date().toISOString();
+      setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt || now })));
+      setUnreadCount(0);
+    } catch (err) { setError(err.message || "Unable to update notifications."); }
+    finally { setNotificationBusy(false); }
+  };
 
   const visibleResults = useMemo(() => selectedStudent === "all"
     ? results
@@ -133,6 +168,7 @@ export default function StudentResultsPortal() {
         <button type="button" className={activeTab === "fees" ? "active" : ""} aria-pressed={activeTab === "fees"} onClick={() => setActiveTab("fees")}>Fees</button>
         <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
         <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
+        <button type="button" className={activeTab === "notifications" ? "active" : ""} aria-pressed={activeTab === "notifications"} onClick={() => setActiveTab("notifications")}>Notifications {unreadCount > 0 ? `(${unreadCount})` : ""}</button>
       </nav>
       {isParent && children.length > 0 && (
         <section className="portal-child-overview" aria-label="Linked children">
@@ -207,6 +243,21 @@ export default function StudentResultsPortal() {
             </article>)}
           </section>
         )
+      ) : activeTab === "notifications" ? (
+        <section className="portal-notification-panel" aria-label="Notifications">
+          <div className="portal-data-heading"><div><h2>Notifications</h2><span>{unreadCount} unread</span></div>
+            {unreadCount > 0 && <button type="button" className="portal-notification-action" disabled={notificationBusy} onClick={() => void markAllNotificationsRead()}>Mark all as read</button>}
+          </div>
+          {visibleNotifications.length === 0 ? <div className="portal-empty"><h2>No notifications</h2><p>New school updates will appear here.</p></div> : (
+            <div className="portal-notification-list">
+              {visibleNotifications.map((item) => <article className={"portal-notification-card" + (item.readAt ? "" : " unread")} key={item._id}>
+                <div className="portal-notification-card-heading"><strong>{item.title}</strong><time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time></div>
+                <p>{item.body}</p>
+                {!item.readAt && <button type="button" className="portal-notification-action" disabled={notificationBusy} onClick={() => void markNotificationRead(item._id)}>Mark as read</button>}
+              </article>)}
+            </div>
+          )}
+        </section>
       ) : activeTab === "homework" ? (
         loading ? <div className="portal-state">Loading homework…</div> : visibleHomework.length === 0 ? <div className="portal-empty"><h2>No published homework</h2><p>Assignments shared by your school will appear here.</p></div> : (
           <>
