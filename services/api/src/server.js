@@ -1,6 +1,7 @@
 import app from "./app.js";
 import env from "./config/env.js";
 import { startAuditOutboxWorker, stopAuditOutboxWorker } from "./services/auditLogService.js";
+import { startNotificationDeliveryWorker, stopNotificationDeliveryWorker } from "./services/notificationDeliveryService.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -11,6 +12,7 @@ let server;
 const startServer = async () => {
   await connectDatabase();
   startAuditOutboxWorker();
+  startNotificationDeliveryWorker();
 
   server = app.listen(env.port, () => {
     console.log(
