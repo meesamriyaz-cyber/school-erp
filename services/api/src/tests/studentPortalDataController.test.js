@@ -26,6 +26,7 @@ vi.mock("../models/TimetableEntry.js", () => ({ default: { find: mocks.timetable
 import {
   getMyAttendance,
   getMyFees,
+  getMyProfile,
   getMyTimetable,
 } from "../controllers/studentPortalDataController.js";
 
@@ -201,4 +202,94 @@ describe("student portal read-only academic data", () => {
     });
     expect(next).not.toHaveBeenCalled();
   });
+
+  it("returns profile details and current enrollment for every actively linked child", async () => {
+    const profile = {
+      _id: "student-a",
+      firstName: "Amina",
+      lastName: "Khan",
+      admissionNumber: "A-01",
+      dateOfBirth: new Date("2015-04-12T00:00:00.000Z"),
+      gender: "female",
+      address: { city: "Srinagar" },
+      guardianName: "Parent One",
+      guardianRelationship: "mother",
+      guardianPhone: "9999999999",
+    };
+    const enrollment = {
+      _id: "enrollment-a",
+      studentId: "student-a",
+      academicYearId: { _id: "year-a", name: "2026–27" },
+      classId: { _id: "class-a", name: "Class 5" },
+      sectionId: { _id: "section-a", name: "A" },
+    };
+    mocks.studentFind.mockReturnValue(query([profile], ["select", "sort"]));
+    mocks.enrollmentFind.mockReturnValue(query([enrollment], ["populate", "populate", "populate"]));
+
+    await getMyProfile(req, res, next);
+
+    expect(mocks.studentFind).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: "tenant-a",
+      _id: { $in: ["student-a"] },
+      status: "active",
+    }));
+    expect(mocks.studentFind.mock.results[0].value.select).toHaveBeenCalledWith(
+      expect.stringContaining("dateOfBirth photoUrl address gender admissionDate"),
+    );
+    expect(mocks.enrollmentFind).toHaveBeenCalledWith({
+      tenantId: "tenant-a",
+      studentId: { $in: ["student-a"] },
+      status: "active",
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      data: [{ student: profile, currentEnrollment: enrollment }],
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("does not return a profile when a parent requests an unlinked student", async () => {
+    req.query.studentId = "507f1f77bcf86cd799439099";
+
+    await getMyProfile(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: "This student is not linked to your parent account",
+    });
+    expect(mocks.enrollmentFind).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("returns only the authenticated student's own profile", async () => {
+    req.auth.role = "student";
+    const profile = {
+      _id: "student-a",
+      firstName: "Amina",
+      lastName: "Khan",
+      dateOfBirth: new Date("2015-04-12T00:00:00.000Z"),
+    };
+    mocks.studentFindOne.mockReturnValue(query(profile, ["select"]));
+    mocks.enrollmentFind.mockReturnValue(query([], ["populate", "populate", "populate"]));
+
+    await getMyProfile(req, res, next);
+
+    expect(mocks.studentFindOne).toHaveBeenCalledWith({
+      tenantId: "tenant-a",
+      userId: "parent-a",
+      status: "active",
+    });
+    expect(mocks.guardianFindOne).not.toHaveBeenCalled();
+    expect(mocks.relationshipFind).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      data: [{ student: profile, currentEnrollment: null }],
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+
 });
