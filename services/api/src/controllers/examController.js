@@ -8,6 +8,8 @@ import Subject from "../models/Subject.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import ClassSubject from "../models/ClassSubject.js";
 import AcademicTerm from "../models/AcademicTerm.js";
+import Enrollment from "../models/Enrollment.js";
+import { enqueueStudentScopedNotification } from "../services/notificationEnqueueService.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -169,35 +171,65 @@ export const createExamination = async (req, res, next) => {
 };
 
 export const updateExaminationStatus = async (req, res, next) => {
+  if (!validId(req.params.examinationId)) return invalid(res, "Invalid examination ID");
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) ||
+    Object.keys(req.body).length !== 1 || !["draft", "scheduled", "in_progress", "completed"].includes(req.body.status)) {
+    return invalid(res, "Provide one valid examination lifecycle status");
+  }
+  const session = await mongoose.startSession();
+  let exam;
+  let failure;
   try {
-    if (!validId(req.params.examinationId)) return invalid(res, "Invalid examination ID");
-    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) ||
-      Object.keys(req.body).length !== 1 || !["draft", "scheduled", "in_progress", "completed"].includes(req.body.status)) {
-      return invalid(res, "Provide one valid examination lifecycle status");
-    }
-    const exam = await Examination.findOne({ _id: req.params.examinationId, tenantId: req.tenantId });
-    if (!exam) return res.status(404).json({ success: false, message: "Examination not found" });
-    const allowed = {
-      draft: ["scheduled"], scheduled: ["in_progress", "completed"],
-      in_progress: ["completed"], completed: [], published: [],
-    };
-    if (!allowed[exam.status]?.includes(req.body.status)) return res.status(409).json({ success: false, message: `Cannot change examination from ${exam.status} to ${req.body.status}` });
-    if (req.body.status === "scheduled" && exam.academicTermId && !await AcademicTerm.exists({ _id: exam.academicTermId, tenantId: req.tenantId, academicYearId: exam.academicYearId, status: "active" })) {
-      return res.status(409).json({ success: false, message: "The examination's academic term must be active before scheduling" });
-    }
-    if (req.body.status === "scheduled" && exam.academicTermId && !await AcademicTerm.exists({ _id: exam.academicTermId, tenantId: req.tenantId, academicYearId: exam.academicYearId, status: "active" })) {
-      return res.status(409).json({ success: false, message: "The examination term must be active before scheduling" });
-    }
-    if (req.body.status === "scheduled" && !await ExamSubject.exists({ tenantId: req.tenantId, examinationId: exam._id })) {
-      return res.status(409).json({ success: false, message: "Configure at least one subject before scheduling this examination" });
-    }
-    exam.status = req.body.status;
-    await exam.save();
+    await session.withTransaction(async () => {
+      exam = await Examination.findOne({ _id: req.params.examinationId, tenantId: req.tenantId }).session(session);
+      if (!exam) { failure = [404, "Examination not found"]; return; }
+      const previousStatus = exam.status;
+      const allowed = {
+        draft: ["scheduled"], scheduled: ["in_progress", "completed"],
+        in_progress: ["completed"], completed: [], published: [],
+      };
+      if (!allowed[previousStatus]?.includes(req.body.status)) {
+        failure = [409, `Cannot change examination from ${previousStatus} to ${req.body.status}`];
+        return;
+      }
+      if (req.body.status === "scheduled" && exam.academicTermId && !await AcademicTerm.exists({
+        _id: exam.academicTermId, tenantId: req.tenantId,
+        academicYearId: exam.academicYearId, status: "active",
+      }).session(session)) {
+        failure = [409, "The examination's academic term must be active before scheduling"];
+        return;
+      }
+      if (req.body.status === "scheduled" && !await ExamSubject.exists({
+        tenantId: req.tenantId, examinationId: exam._id,
+      }).session(session)) {
+        failure = [409, "Configure at least one subject before scheduling this examination"];
+        return;
+      }
+      exam.status = req.body.status;
+      await exam.save({ session });
+      if (previousStatus === "draft" && req.body.status === "scheduled") {
+        const enrollmentFilter = {
+          tenantId: req.tenantId, academicYearId: exam.academicYearId,
+          classId: exam.classId, status: "active",
+          ...(exam.sectionId ? { sectionId: exam.sectionId } : {}),
+        };
+        const enrollments = await Enrollment.find(enrollmentFilter).select("_id").session(session).lean();
+        await enqueueStudentScopedNotification({
+          tenantId: req.tenantId, enrollmentIds: enrollments.map((item) => item._id),
+          eventType: "examination_scheduled", sourceType: "Examination", sourceId: exam._id,
+          eventKey: `examination:${exam._id}:scheduled`,
+          title: `Examination scheduled: ${exam.name}`,
+          body: `The examination is scheduled from ${new Date(exam.startDate).toISOString().slice(0, 10)} to ${new Date(exam.endDate).toISOString().slice(0, 10)}.`,
+          link: "/portal?tab=examinations", session,
+        });
+      }
+    });
+    if (failure) return res.status(failure[0]).json({ success: false, message: failure[1] });
     return res.status(200).json({ success: true, data: exam });
   } catch (error) {
     if (error.name === "ValidationError") return invalid(res, "Invalid examination status");
     return next(error);
-  }
+  } finally { await session.endSession(); }
 };
 
 export const addExaminationSubject = async (req, res, next) => {
