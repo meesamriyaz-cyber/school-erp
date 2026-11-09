@@ -40,21 +40,25 @@ export default function AnnouncementManagement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void Promise.all([
+    Promise.all([
       apiRequest("/academic-years", { accessToken, signal: controller.signal }),
-      loadItems(controller.signal),
-    ]).then(([yearResponse]) => {
-      if (!controller.signal.aborted && yearResponse?.success) {
-        setYears(Array.isArray(yearResponse.data) ? yearResponse.data : []);
-      }
+      apiRequest("/announcements", { accessToken, signal: controller.signal }),
+    ]).then(([yearResponse, announcementResponse]) => {
+      if (controller.signal.aborted) return;
+      if (yearResponse?.success && Array.isArray(yearResponse.data)) setYears(yearResponse.data);
+      if (announcementResponse?.success && Array.isArray(announcementResponse.data)) setItems(announcementResponse.data);
+      setLoading(false);
     }).catch((err) => {
-      if (err.name !== "AbortError" && !controller.signal.aborted) setError(err.message || "Unable to load school setup.");
+      if (err.name !== "AbortError" && !controller.signal.aborted) {
+        setError(err.message || "Unable to load announcements.");
+        setLoading(false);
+      }
     });
     return () => controller.abort();
-  }, [accessToken, loadItems]);
+  }, [accessToken]);
 
   useEffect(() => {
-    if (!form?.academicYearId) { setClasses([]); return undefined; }
+    if (!form?.academicYearId) return undefined;
     const controller = new AbortController();
     apiRequest(`/classes?academicYearId=${encodeURIComponent(form.academicYearId)}`, { accessToken, signal: controller.signal })
       .then((response) => {
@@ -65,7 +69,7 @@ export default function AnnouncementManagement() {
   }, [accessToken, form?.academicYearId]);
 
   useEffect(() => {
-    if (!form?.classId || form.audienceType !== "SECTION") { setSections([]); return undefined; }
+    if (!form?.classId || form.audienceType !== "SECTION") return undefined;
     const controller = new AbortController();
     apiRequest(`/sections?classId=${encodeURIComponent(form.classId)}`, { accessToken, signal: controller.signal })
       .then((response) => {
@@ -144,9 +148,9 @@ export default function AnnouncementManagement() {
       <label>Message<textarea value={form.body} maxLength={10000} rows={5} required onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))} /></label>
       <div className="announcement-fields">
         <label>Category<select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        {!form._id && <label>Audience<select value={form.audienceType} onChange={(event) => setForm((current) => ({ ...current, audienceType: event.target.value, classId: "", sectionId: "" }))}>{!isTeacher && <option value="SCHOOL">Entire school</option>}<option value="CLASS">A class</option><option value="SECTION">A section</option></select></label>}
-        {!form._id && <label>Academic year<select value={form.academicYearId} required onChange={(event) => setForm((current) => ({ ...current, academicYearId: event.target.value, classId: "", sectionId: "" }))}><option value="">Select academic year</option>{years.filter((year) => year.status !== "closed").map((year) => <option key={year._id} value={year._id}>{year.name} · {year.status}</option>)}</select></label>}
-        {!form._id && form.audienceType !== "SCHOOL" && <label>Class<select value={form.classId} required onChange={(event) => setForm((current) => ({ ...current, classId: event.target.value, sectionId: "" }))}><option value="">Select class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
+        {!form._id && <label>Audience<select value={form.audienceType} onChange={(event) => setForm((current) => ({ ...current, audienceType: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([])}>{!isTeacher && <option value="SCHOOL">Entire school</option>}<option value="CLASS">A class</option><option value="SECTION">A section</option></select></label>}
+        {!form._id && <label>Academic year<select value={form.academicYearId} required onChange={(event) => setForm((current) => ({ ...current, academicYearId: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([])}><option value="">Select academic year</option>{years.filter((year) => year.status !== "closed").map((year) => <option key={year._id} value={year._id}>{year.name} · {year.status}</option>)}</select></label>}
+        {!form._id && form.audienceType !== "SCHOOL" && <label>Class<select value={form.classId} required onChange={(event) => setForm((current) => ({ ...current, classId: event.target.value, sectionId: "" })); setSections([])}><option value="">Select class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
         {!form._id && form.audienceType === "SECTION" && <label>Section<select value={form.sectionId} required onChange={(event) => setForm((current) => ({ ...current, sectionId: event.target.value }))}><option value="">Select section</option>{sections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
         <label>Expiry (optional)<input type="datetime-local" value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} /></label>
       </div>
