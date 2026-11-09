@@ -4,6 +4,7 @@ import Student from "../models/Student.js";
 import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
+import { getTeacherEnrollmentScope, teacherCanAccessEnrollment } from "../utils/teacherAssignmentScope.js";
 
 const TERMINAL_STATUSES = ["completed", "transferred", "withdrawn"];
 const validId = (value) => mongoose.isValidObjectId(value);
@@ -85,6 +86,11 @@ export const listEnrollments = async (req, res, next) => {
       if (!["active", ...TERMINAL_STATUSES].includes(req.query.status)) return invalid(res, "Invalid enrollment status filter");
       filter.status = req.query.status;
     }
+    if (req.auth.role === "teacher") {
+      const scopes = await getTeacherEnrollmentScope(req);
+      if (!scopes.length) return res.status(200).json({ success: true, data: [] });
+      filter.$and = [{ $or: scopes }];
+    }
     const data = await Enrollment.find(filter)
       .populate("studentId", "admissionNumber firstName lastName status")
       .populate("academicYearId", "name startDate endDate status")
@@ -100,14 +106,17 @@ export const listEnrollments = async (req, res, next) => {
 export const getEnrollment = async (req, res, next) => {
   try {
     if (!validId(req.params.enrollmentId)) return invalid(res, "Invalid enrollment ID");
-    const data = await Enrollment.findOne({ _id: req.params.enrollmentId, tenantId: req.tenantId })
+    const enrollment = await Enrollment.findOne({ _id: req.params.enrollmentId, tenantId: req.tenantId }).lean();
+    if (!enrollment || !(await teacherCanAccessEnrollment(req, enrollment))) {
+      return res.status(404).json({ success: false, message: "Enrollment not found" });
+    }
+    const data = await Enrollment.findOne({ _id: enrollment._id, tenantId: req.tenantId })
       .populate("studentId", "admissionNumber firstName lastName status")
       .populate("academicYearId", "name startDate endDate status")
       .populate("classId", "name sortOrder status")
       .populate("sectionId", "name status")
       .populate("previousEnrollmentId", "enrollmentDate status admissionType")
       .lean();
-    if (!data) return res.status(404).json({ success: false, message: "Enrollment not found" });
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };

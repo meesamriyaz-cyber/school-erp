@@ -12,6 +12,8 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Section from "../models/Section.js";
 import Enrollment from "../models/Enrollment.js";
+import Subject from "../models/Subject.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 let server, baseUrl, schoolA, schoolB, adminA, teacherA, adminB, yearA, yearB, classA, classB, sectionA, sectionB, studentA;
@@ -30,7 +32,7 @@ const makeSchool = async (label) => {
 };
 const makeUser = async (tenant, role) => {
   const doc = await User.create({ tenantId: tenant._id, firstName: "Test", lastName: "User", email: `enrollment-test-${randomUUID()}@example.test`, passwordHash: "test-only", role, status: "active", authVersion: 0 });
-  userIds.push(doc._id); return { token: createAccessToken(doc) };
+  userIds.push(doc._id); return { user: doc, token: createAccessToken(doc) };
 };
 const makeStudent = async (tenant, label = randomUUID().slice(0, 8)) => {
   const doc = await Student.create({ tenantId: tenant._id, admissionNumber: `ADM-${label}`, firstName: "Test", lastName: "Student", admissionDate: new Date("2026-04-01") });
@@ -45,7 +47,7 @@ describe("Student Enrollment API", () => {
     if (!match || decodeURIComponent(match[1]) !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== "school-erp-test") throw new Error("Safety stop: unexpected database.");
-    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Enrollment.init()]);
+    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Section.init(), Enrollment.init(), Subject.init(), TeacherAssignment.init()]);
     schoolA = await makeSchool("a"); schoolB = await makeSchool("b");
     adminA = await makeUser(schoolA, "school_admin");
     teacherA = await makeUser(schoolA, "teacher");
@@ -67,6 +69,8 @@ describe("Student Enrollment API", () => {
     if (mongoose.connection.readyState === 1) {
       if (tenantIds.length) {
         await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
+        await TeacherAssignment.deleteMany({ tenantId: { $in: tenantIds } });
+        await Subject.deleteMany({ tenantId: { $in: tenantIds } });
         await Section.deleteMany({ tenantId: { $in: tenantIds } });
         await SchoolClass.deleteMany({ tenantId: { $in: tenantIds } });
         await AcademicYear.deleteMany({ tenantId: { $in: tenantIds } });
@@ -674,5 +678,73 @@ describe("Student Enrollment API", () => {
     }
   }, 20000);
 
+
+
+  it("limits teacher enrollment and student reads to active assigned sections and class-wide assignments", async () => {
+    const siblingSection = await Section.create({ tenantId: schoolA._id, classId: classA._id, name: "B" });
+    const classWide = await SchoolClass.create({ tenantId: schoolA._id, academicYearId: yearA._id, name: "Class 2" });
+    const wideSectionA = await Section.create({ tenantId: schoolA._id, classId: classWide._id, name: "A" });
+    const wideSectionB = await Section.create({ tenantId: schoolA._id, classId: classWide._id, name: "B" });
+    const siblingStudent = await makeStudent(schoolA, "teacher-sibling");
+    const wideStudentA = await makeStudent(schoolA, "teacher-wide-a");
+    const wideStudentB = await makeStudent(schoolA, "teacher-wide-b");
+    const existingAssignedEnrollment = await Enrollment.findOne({
+      tenantId: schoolA._id, studentId: studentA._id, academicYearId: yearA._id,
+      classId: classA._id, sectionId: sectionA._id, status: "active",
+    }).lean();
+    expect(existingAssignedEnrollment).toBeTruthy();
+    const placements = [
+      [siblingStudent, classA, siblingSection],
+      [wideStudentA, classWide, wideSectionA],
+      [wideStudentB, classWide, wideSectionB],
+    ];
+    const placementIds = { [String(studentA._id)]: String(existingAssignedEnrollment._id) };
+    for (const [student, schoolClass, section] of placements) {
+      const response = await post("/enrollments", adminA.token, {
+        studentId: String(student._id), academicYearId: String(yearA._id),
+        classId: String(schoolClass._id), sectionId: String(section._id),
+      });
+      expect(response.status).toBe(201);
+      placementIds[String(student._id)] = response.body.data._id;
+      enrollmentIds.push(response.body.data._id);
+    }
+    const subject = await Subject.create({ tenantId: schoolA._id, name: `Teacher Scope ${randomUUID().slice(0, 6)}` });
+    const sectionAssignment = await TeacherAssignment.create({
+      tenantId: schoolA._id, teacherId: teacherA.user._id, subjectId: subject._id,
+      academicYearId: yearA._id, classId: classA._id, sectionId: sectionA._id,
+      assignedBy: adminA.user._id,
+    });
+    await TeacherAssignment.create({
+      tenantId: schoolA._id, teacherId: teacherA.user._id, subjectId: subject._id,
+      academicYearId: yearA._id, classId: classWide._id, sectionId: null,
+      assignedBy: adminA.user._id,
+    });
+
+    const list = await request("/enrollments", { token: teacherA.token });
+    expect(list.status).toBe(200);
+    expect(new Set(list.body.data.map((item) => String(item.studentId._id)))).toEqual(new Set([
+      String(studentA._id), String(wideStudentA._id), String(wideStudentB._id),
+    ]));
+    const narrowed = await request(`/enrollments?classId=${classA._id}`, { token: teacherA.token });
+    expect(narrowed.body.data.map((item) => String(item.studentId._id))).toEqual([String(studentA._id)]);
+    const siblingQuery = await request(`/enrollments?sectionId=${siblingSection._id}`, { token: teacherA.token });
+    expect(siblingQuery.body.data).toHaveLength(0);
+    expect((await request(`/enrollments/${placementIds[String(studentA._id)]}`, { token: teacherA.token })).status).toBe(200);
+    expect((await request(`/enrollments/${placementIds[String(siblingStudent._id)]}`, { token: teacherA.token })).status).toBe(404);
+    expect((await request(`/enrollments/${placementIds[String(wideStudentB._id)]}`, { token: teacherA.token })).status).toBe(200);
+
+    const studentList = await request("/students?limit=100", { token: teacherA.token });
+    expect(studentList.status).toBe(200);
+    expect(new Set(studentList.body.data.map((item) => String(item._id)))).toEqual(new Set([
+      String(studentA._id), String(wideStudentA._id), String(wideStudentB._id),
+    ]));
+    expect((await request(`/students/${studentA._id}`, { token: teacherA.token })).status).toBe(200);
+    expect((await request(`/students/${siblingStudent._id}`, { token: teacherA.token })).status).toBe(404);
+
+    await TeacherAssignment.updateOne({ _id: sectionAssignment._id }, { $set: { status: "inactive" } });
+    const afterRevocation = await request(`/enrollments?classId=${classA._id}`, { token: teacherA.token });
+    expect(afterRevocation.body.data).toHaveLength(0);
+    expect((await request(`/students/${studentA._id}`, { token: teacherA.token })).status).toBe(404);
+  });
 
 });

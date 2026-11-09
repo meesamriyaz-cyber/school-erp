@@ -19,7 +19,8 @@ describe("TeacherTimetablePortal", () => {
     }] });
 
     render(<TeacherTimetablePortal />);
-    expect(await screen.findByRole("heading", { name: "My weekly timetable" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Teacher workspace" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "My timetable" }));
     expect(screen.getByRole("heading", { name: "Monday" })).toBeInTheDocument();
     expect(screen.getAllByText("No periods assigned")).toHaveLength(5);
     expect(screen.getByText("Weekly periods")).toBeInTheDocument();
@@ -37,6 +38,8 @@ describe("TeacherTimetablePortal", () => {
     }] });
 
     render(<TeacherTimetablePortal />);
+    expect(await screen.findByRole("heading", { name: "Teacher workspace" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "My timetable" }));
     expect(await screen.findByText("Science")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Print timetable" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "List view" }));

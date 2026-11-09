@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 
 import Student from "../models/Student.js";
+import Enrollment from "../models/Enrollment.js";
+import { getTeacherEnrollmentScope, teacherCanAccessEnrollment } from "../utils/teacherAssignmentScope.js";
 import { syncLegacyStudentGuardian } from "../services/syncLegacyStudentGuardian.js";
 
 const CREATE_FIELDS = [
@@ -51,6 +53,15 @@ export const listStudents = async (req, res, next) => {
         filter.$or = [{ admissionNumber: pattern }, { firstName: pattern }, { lastName: pattern }];
       }
     }
+    if (req.auth.role === "teacher") {
+      const scopes = await getTeacherEnrollmentScope(req);
+      if (!scopes.length) return res.status(200).json({ success: true, data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
+      const assignedStudentIds = await Enrollment.find({
+        tenantId: req.tenantId, status: "active", $or: scopes,
+      }).distinct("studentId");
+      if (!assignedStudentIds.length) return res.status(200).json({ success: true, data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
+      filter._id = { $in: assignedStudentIds };
+    }
     const [students, total] = await Promise.all([
       Student.find(filter).sort({ admissionNumber: 1, _id: 1 }).skip((page - 1) * limit).limit(limit).lean(),
       Student.countDocuments(filter),
@@ -95,6 +106,14 @@ export const getStudent = async (req, res, next) => {
     if (!mongoose.isValidObjectId(studentId)) return invalidRequest(res, "Invalid student ID");
     const student = await Student.findOne({ _id: studentId, tenantId: req.tenantId }).lean();
     if (!student) return res.status(404).json({ success: false, message: "Student not found" });
+    if (req.auth.role === "teacher") {
+      const enrollment = await Enrollment.findOne({
+        tenantId: req.tenantId, studentId: student._id, status: "active",
+      }).select("academicYearId classId sectionId").lean();
+      if (!enrollment || !(await teacherCanAccessEnrollment(req, enrollment))) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+    }
     return res.status(200).json({ success: true, data: student });
   } catch (error) { return next(error); }
 };
