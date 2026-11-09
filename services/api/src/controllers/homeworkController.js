@@ -85,6 +85,10 @@ export const updateHomeworkStatus = async (req, res, next) => {
     if (!req.body || Object.keys(req.body).length !== 1 || !["draft", "published"].includes(req.body.status)) return invalid(res, "Provide a valid draft or published status");
     const filter = { _id: req.params.homeworkId, tenantId: req.tenantId };
     if (req.auth.role === "teacher") filter.teacherId = req.auth.userId;
+    const existing = await Homework.findOne(filter).lean();
+    if (!existing || !(await teacherCanTeach(req, existing))) {
+      return res.status(404).json({ success: false, message: "Homework not found" });
+    }
     const data = await Homework.findOneAndUpdate(filter, { $set: { status: req.body.status } }, { new: true, runValidators: true });
     if (!data) return res.status(404).json({ success: false, message: "Homework not found" });
     return res.status(200).json({ success: true, data });

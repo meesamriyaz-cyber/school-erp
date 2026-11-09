@@ -195,8 +195,17 @@ describe("Examination API integration", () => {
       method: "POST", token: studentAccount.token, body: JSON.stringify({ answer: "Attempt to replace reviewed answer." }),
     });
     expect(locked.status).toBe(409);
-    const hidden = await request(`/homework/${homeworkId}/submissions`, { token: adminB.token });
-    expect(hidden.status).toBe(404);
+    const movedToDraft = await request(`/homework/${homeworkId}/status`, {
+      method: "PATCH", token: teacherA.token, body: JSON.stringify({ status: "draft" }),
+    });
+    expect(movedToDraft.status).toBe(200);
+    await TeacherAssignment.updateOne({ _id: homeworkAssignment._id }, { $set: { status: "inactive" } });
+    const revokedStatusChange = await request(`/homework/${homeworkId}/status`, {
+      method: "PATCH", token: teacherA.token, body: JSON.stringify({ status: "published" }),
+    });
+    expect(revokedStatusChange.status).toBe(404);
+    const revokedReview = await request(`/homework/${homeworkId}/submissions`, { token: teacherA.token });
+    expect(revokedReview.status).toBe(404);
 
     await HomeworkSubmission.deleteMany({ tenantId: schoolA._id, homeworkId });
     await Homework.deleteOne({ _id: homeworkId, tenantId: schoolA._id });
