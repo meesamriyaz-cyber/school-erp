@@ -9,6 +9,7 @@ const formatDate = (value) => value
 
 export default function StudentResultsPortal() {
   const { user, accessToken, logout } = useAuth();
+  const isParent = user?.role === "parent";
   const [children, setChildren] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [results, setResults] = useState([]);
@@ -142,7 +143,6 @@ export default function StudentResultsPortal() {
   )).length;
   const outstandingFees = visibleFees.reduce((total, invoice) => total + Number(invoice.balance || 0), 0);
 
-  const isParent = user?.role === "parent";
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
 
   return (
