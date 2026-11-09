@@ -448,7 +448,9 @@ function DashboardApp() {
   <GradingScaleManagement />
 ) : activePage === "Homework & Classwork" ? (
   <HomeworkManagement />
-) : activePage === "Announcements" ? (\n  <AnnouncementManagement />\n) : activePage === "Fees & Payments" ? (
+) : activePage === "Announcements" ? (
+  <AnnouncementManagement />
+) : activePage === "Fees & Payments" ? (
   <FeeManagement />
 ) : activePage === "User Management" ? (
   <SchoolUserDirectory />
