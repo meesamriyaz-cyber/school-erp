@@ -67,9 +67,14 @@ export const listMyNotifications = async (req, res, next) => {
         readAt: null,
       }),
     ]);
+    const authorizedStudentIds = new Set(authorization.ids.map((id) => String(id)));
+    const visibleData = data.map((item) => ({
+      ...item,
+      relatedStudentIds: (item.relatedStudentIds || []).filter((id) => authorizedStudentIds.has(String(id))),
+    }));
     return res.status(200).json({
       success: true,
-      data,
+      data: visibleData,
       unreadCount,
       nextCursor: data.length === limitValue ? data[data.length - 1].createdAt : null,
     });
