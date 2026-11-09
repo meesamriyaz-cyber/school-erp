@@ -40,7 +40,6 @@ export async function processPendingNotifications({ batchSize = 50, notification
       const attempt = {
         attempt: notification.attempts,
         startedAt: now,
-        finishedAt: new Date(),
       };
       if (notification.attempts > MAX_ATTEMPTS) {
         await Notification.updateOne(
@@ -48,7 +47,7 @@ export async function processPendingNotifications({ batchSize = 50, notification
           {
             $set: { deliveryStatus: "failed", lastError: "Delivery lease expired after the final attempt" },
             $unset: { processingStartedAt: 1, processingToken: 1 },
-            $push: { deliveryHistory: { ...attempt, outcome: "failed", error: "Delivery lease expired after the final attempt" } },
+            $push: { deliveryHistory: { ...attempt, finishedAt: new Date(), outcome: "failed", error: "Delivery lease expired after the final attempt" } },
           },
         );
         processed += 1;
@@ -68,7 +67,7 @@ export async function processPendingNotifications({ batchSize = 50, notification
             {
               $set: { deliveryStatus: "cancelled", lastError: "Recipient account is no longer active" },
               $unset: { processingStartedAt: 1, processingToken: 1 },
-              $push: { deliveryHistory: { ...attempt, outcome: "cancelled", error: "Recipient account is no longer active" } },
+              $push: { deliveryHistory: { ...attempt, finishedAt: new Date(), outcome: "cancelled", error: "Recipient account is no longer active" } },
             },
           );
           processed += 1;
@@ -80,7 +79,7 @@ export async function processPendingNotifications({ batchSize = 50, notification
           {
             $set: { deliveryStatus: "delivered", deliveredAt: new Date(), lastError: null },
             $unset: { processingStartedAt: 1, processingToken: 1 },
-            $push: { deliveryHistory: { ...attempt, outcome: "delivered", error: null } },
+            $push: { deliveryHistory: { ...attempt, finishedAt: new Date(), outcome: "delivered", error: null } },
           },
         );
         if (result.matchedCount) processed += 1;
@@ -98,6 +97,7 @@ export async function processPendingNotifications({ batchSize = 50, notification
             $unset: { processingStartedAt: 1, processingToken: 1 },
             $push: { deliveryHistory: {
               ...attempt,
+              finishedAt: new Date(),
               outcome: notification.attempts >= MAX_ATTEMPTS ? "failed" : "retry_scheduled",
               error: message,
             } },
