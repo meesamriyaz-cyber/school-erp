@@ -24,7 +24,7 @@ const validBody = (overrides = {}) => ({
   title: "School holiday",
   body: "The school will remain closed on Friday.",
   audienceType: "SCHOOL",
-  academicYearId: "year-a",
+  academicYearId: "111111111111111111111111",
   ...overrides,
 });
 
@@ -36,15 +36,15 @@ describe("announcement creation authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     req = {
-      tenantId: "tenant-a",
-      auth: { userId: "admin-a", role: "school_admin" },
+      tenantId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+      auth: { userId: "bbbbbbbbbbbbbbbbbbbbbbbb", role: "school_admin" },
       body: validBody(),
     };
     res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     next = vi.fn();
-    mocks.academicYearFindOne.mockReturnValue(query({ _id: "year-a" }));
-    mocks.classFindOne.mockReturnValue(query({ _id: "class-a" }));
-    mocks.sectionFindOne.mockReturnValue(query({ _id: "section-a" }));
+    mocks.academicYearFindOne.mockReturnValue(query({ _id: "111111111111111111111111" }));
+    mocks.classFindOne.mockReturnValue(query({ _id: "222222222222222222222222" }));
+    mocks.sectionFindOne.mockReturnValue(query({ _id: "333333333333333333333333" }));
     mocks.assignmentExists.mockResolvedValue(true);
     mocks.announcementCreate.mockResolvedValue({ _id: "notice-a", status: "draft" });
   });
@@ -53,12 +53,12 @@ describe("announcement creation authorization", () => {
     await createAnnouncement(req, res, next);
 
     expect(mocks.academicYearFindOne).toHaveBeenCalledWith({
-      _id: "year-a", tenantId: "tenant-a", status: "active",
+      _id: "111111111111111111111111", tenantId: "aaaaaaaaaaaaaaaaaaaaaaaa", status: "active",
     });
     expect(mocks.announcementCreate).toHaveBeenCalledWith(expect.objectContaining({
-      tenantId: "tenant-a",
-      createdBy: "admin-a",
-      updatedBy: "admin-a",
+      tenantId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+      createdBy: "bbbbbbbbbbbbbbbbbbbbbbbb",
+      updatedBy: "bbbbbbbbbbbbbbbbbbbbbbbb",
       audienceType: "SCHOOL",
       classId: null,
       sectionId: null,
@@ -69,41 +69,41 @@ describe("announcement creation authorization", () => {
   });
 
   it("rejects a class outside the authenticated tenant", async () => {
-    req.body = validBody({ audienceType: "CLASS", classId: "class-foreign" });
+    req.body = validBody({ audienceType: "CLASS", classId: "444444444444444444444444" });
     mocks.classFindOne.mockReturnValue(query(null));
 
     await createAnnouncement(req, res, next);
 
     expect(mocks.classFindOne).toHaveBeenCalledWith({
-      _id: "class-foreign", tenantId: "tenant-a", academicYearId: "year-a", status: "active",
+      _id: "444444444444444444444444", tenantId: "aaaaaaaaaaaaaaaaaaaaaaaa", academicYearId: "111111111111111111111111", status: "active",
     });
     expect(mocks.announcementCreate).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
   it("denies a teacher who is not assigned to the target class", async () => {
-    req.auth = { userId: "teacher-a", role: "teacher" };
-    req.body = validBody({ audienceType: "CLASS", classId: "class-a" });
+    req.auth = { userId: "cccccccccccccccccccccccc", role: "teacher" };
+    req.body = validBody({ audienceType: "CLASS", classId: "222222222222222222222222" });
     mocks.assignmentExists.mockResolvedValue(false);
 
     await createAnnouncement(req, res, next);
 
     expect(mocks.assignmentExists).toHaveBeenCalledWith(expect.objectContaining({
-      tenantId: "tenant-a", teacherId: "teacher-a", academicYearId: "year-a",
-      classId: "class-a", status: "active", sectionId: null,
+      tenantId: "aaaaaaaaaaaaaaaaaaaaaaaa", teacherId: "cccccccccccccccccccccccc", academicYearId: "111111111111111111111111",
+      classId: "222222222222222222222222", status: "active", sectionId: null,
     }));
     expect(mocks.announcementCreate).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
   it("allows a teacher with an active class assignment to create a draft", async () => {
-    req.auth = { userId: "teacher-a", role: "teacher" };
-    req.body = validBody({ audienceType: "CLASS", classId: "class-a" });
+    req.auth = { userId: "cccccccccccccccccccccccc", role: "teacher" };
+    req.body = validBody({ audienceType: "CLASS", classId: "222222222222222222222222" });
 
     await createAnnouncement(req, res, next);
 
     expect(mocks.announcementCreate).toHaveBeenCalledWith(expect.objectContaining({
-      tenantId: "tenant-a", createdBy: "teacher-a", audienceType: "CLASS",
+      tenantId: "aaaaaaaaaaaaaaaaaaaaaaaa", createdBy: "cccccccccccccccccccccccc", audienceType: "CLASS",
     }));
     expect(res.status).toHaveBeenCalledWith(201);
     expect(next).not.toHaveBeenCalled();
