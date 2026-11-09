@@ -5,6 +5,7 @@ import AcademicYear from "../models/AcademicYear.js";
 import AcademicTerm from "../models/AcademicTerm.js";
 import SchoolClass from "../models/SchoolClass.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
+import { enqueueStudentScopedNotification } from "../services/notificationEnqueueService.js";
 
 const STATUSES = ["present", "absent", "late", "excused"];
 const validId = (value) => mongoose.isValidObjectId(value);
@@ -158,6 +159,10 @@ export const saveAttendance = async (req, res, next) => {
         }
       }
       const enrollmentByStudent = new Map(enrollments.map((item) => [String(item.studentId), item]));
+      const previousRecords = await Attendance.find({
+        tenantId: req.tenantId, studentId: { $in: ids }, date: day,
+      }).select("_id studentId status").session(session).lean();
+      const previousByStudent = new Map(previousRecords.map((item) => [String(item.studentId), item]));
       const operations = records.map((record) => {
         const enrollment = enrollmentByStudent.get(String(record.studentId));
         return { updateOne: {
@@ -174,6 +179,20 @@ export const saveAttendance = async (req, res, next) => {
       saved = await Attendance.find({
         tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids },
       }).session(session).lean();
+      const newlyAbsent = saved.filter((item) =>
+        item.status === "absent" && previousByStudent.get(String(item.studentId))?.status !== "absent"
+      );
+      for (const item of newlyAbsent) {
+        const enrollment = enrollmentByStudent.get(String(item.studentId));
+        await enqueueStudentScopedNotification({
+          tenantId: req.tenantId, enrollmentIds: [enrollment._id],
+          eventType: "attendance_absence", sourceType: "Attendance", sourceId: item._id,
+          eventKey: `attendance:${item.studentId}:${day.toISOString().slice(0, 10)}:absent`,
+          title: "Student marked absent",
+          body: `Attendance recorded as absent for ${day.toISOString().slice(0, 10)}.`,
+          link: "/portal?tab=attendance", session,
+        });
+      }
     });
     return res.status(200).json({ success: true, data: saved, savedCount: saved.length });
   } catch (error) {
