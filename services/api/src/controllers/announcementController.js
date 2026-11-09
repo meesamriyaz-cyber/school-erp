@@ -38,7 +38,7 @@ const auditEntry = (req, action, changedFields = []) => ({
 });
 
 const parseExpiry = (value) => {
-  if (value === null || value === "") return null;
+  if (value === undefined || value === null || value === "") return null;
   if (typeof value !== "string" && !(value instanceof Date)) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date;
