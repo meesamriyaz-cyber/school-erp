@@ -36,12 +36,16 @@ const demotePrimaryRelationships = async ({ tenantId, studentId, exceptId = null
   if (exceptId) filter._id = { $ne: exceptId };
   const previousPrimaries = await StudentGuardian.find(filter).session(session);
   for (const previous of previousPrimaries) {
+    const hadPortalAccess = previous.canAccessPortal === true;
     previous.isPrimary = false;
-    if (previous.canAccessPortal) previous.canAccessPortal = false;
+    previous.canAccessPortal = false;
     appendAudit(previous, {
       action: "primary_demoted",
       actorUserId,
-      changes: [{ field: "isPrimary", from: true, to: false }],
+      changes: [
+        { field: "isPrimary", from: true, to: false },
+        ...(hadPortalAccess ? [{ field: "canAccessPortal", from: true, to: false }] : []),
+      ],
     });
     await previous.save({ session });
   }
