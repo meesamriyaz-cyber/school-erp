@@ -119,4 +119,21 @@ describe("notification recipient resolution", () => {
     expect(mocks.guardianFind).not.toHaveBeenCalled();
   });
 
+  it("still resolves authorized parents when students do not have separate portal logins", async () => {
+    mocks.studentFind.mockReturnValue(query([{ _id: studentA, userId: null }]));
+    mocks.studentGuardianFind.mockReturnValue(query([{ studentId: studentA, guardianId }]));
+    mocks.userFind.mockImplementation((filter) => query(
+      filter.role === "student" ? [] : [{ _id: parentUser }],
+    ));
+    const recipients = await resolveAnnouncementRecipients({
+      tenantId: "555555555555555555555555",
+      announcement: { audienceType: "SCHOOL", academicYearId: "777777777777777777777777" },
+    });
+    expect(recipients).toEqual([{
+      recipientUserId: parentUser,
+      recipientRole: "parent",
+      relatedStudentIds: [studentA],
+    }]);
+  });
+
 });
