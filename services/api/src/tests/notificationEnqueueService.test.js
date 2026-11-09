@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ bulkWrite: vi.fn(), resolveRecipients: vi.fn() }));
+const mocks = vi.hoisted(() => ({ bulkWrite: vi.fn(), resolveRecipients: vi.fn(), resolveScopedRecipients: vi.fn() }));
 vi.mock("../models/Notification.js", () => ({ default: { bulkWrite: mocks.bulkWrite } }));
 vi.mock("../services/notificationRecipientResolver.js", () => ({
   resolveAnnouncementRecipients: mocks.resolveRecipients,
+  resolveStudentScopedRecipients: mocks.resolveScopedRecipients,
 }));
 
-import { enqueueAnnouncementPublishedNotifications } from "../services/notificationEnqueueService.js";
+import { enqueueAnnouncementPublishedNotifications, enqueueStudentScopedNotification } from "../services/notificationEnqueueService.js";
 
 describe("announcement notification enqueue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resolveScopedRecipients.mockResolvedValue([
+      { recipientUserId: "aaaaaaaaaaaaaaaaaaaaaaaa", recipientRole: "student", relatedStudentIds: ["bbbbbbbbbbbbbbbbbbbbbbbb"] },
+    ]);
     mocks.resolveRecipients.mockResolvedValue([
       { recipientUserId: "aaaaaaaaaaaaaaaaaaaaaaaa", recipientRole: "student", relatedStudentIds: ["bbbbbbbbbbbbbbbbbbbbbbbb"] },
       { recipientUserId: "cccccccccccccccccccccccc", recipientRole: "parent", relatedStudentIds: ["bbbbbbbbbbbbbbbbbbbbbbbb"] },
@@ -52,6 +56,46 @@ describe("announcement notification enqueue", () => {
     });
     expect(options).toEqual({ ordered: false });
     expect(result).toEqual({ recipientCount: 2, queuedCount: 2 });
+  });
+
+  it("enqueues a scoped lifecycle event idempotently using the resolved active recipients", async () => {
+    const session = { id: "transaction" };
+    const result = await enqueueStudentScopedNotification({
+      tenantId: "eeeeeeeeeeeeeeeeeeeeeeee",
+      enrollmentIds: ["ffffffffffffffffffffffff"],
+      eventType: "homework_published",
+      sourceType: "Homework",
+      sourceId: "dddddddddddddddddddddddd",
+      eventKey: "homework:dddddddddddddddddddddddd:published",
+      title: "New homework: Algebra",
+      body: "Complete exercises 1–5.",
+      link: "/portal?tab=homework",
+      session,
+    });
+    expect(mocks.resolveScopedRecipients).toHaveBeenCalledWith({
+      tenantId: "eeeeeeeeeeeeeeeeeeeeeeee",
+      enrollmentIds: ["ffffffffffffffffffffffff"],
+      session,
+    });
+    expect(mocks.bulkWrite).toHaveBeenCalledWith([
+      { updateOne: {
+        filter: {
+          tenantId: "eeeeeeeeeeeeeeeeeeeeeeee",
+          recipientUserId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+          eventKey: "homework:dddddddddddddddddddddddd:published",
+        },
+        update: { $setOnInsert: expect.objectContaining({
+          eventType: "homework_published",
+          sourceType: "Homework",
+          sourceId: "dddddddddddddddddddddddd",
+          title: "New homework: Algebra",
+          link: "/portal?tab=homework",
+          deliveryStatus: "pending",
+        }) },
+        upsert: true,
+      }},
+    ], { ordered: false, session });
+    expect(result).toEqual({ recipientCount: 1, queuedCount: 2 });
   });
 
   it("does not write anything when no eligible recipients exist", async () => {
