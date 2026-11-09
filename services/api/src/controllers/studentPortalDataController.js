@@ -8,6 +8,7 @@ import FeeInvoice from "../models/FeeInvoice.js";
 import FeePayment from "../models/FeePayment.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import TimetableEntry from "../models/TimetableEntry.js";
+import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
@@ -41,6 +42,7 @@ const loadAuthorizedChildren = async (req, fields = studentFields) => {
     tenantId: req.tenantId,
     guardianId: guardian._id,
     status: "active",
+    ...guardianPortalAccessFilter(),
   }).select("studentId").lean();
 
   if (!links.length) return { children: [] };
