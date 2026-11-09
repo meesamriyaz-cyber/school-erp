@@ -6,6 +6,7 @@ import { getMyPublishedResults, getMyHomework } from "../controllers/studentResu
 import { getMyHomeworkSubmissions } from "../controllers/homeworkSubmissionController.js";
 import { getMyChildren } from "../controllers/studentPortalController.js";
 import { getMyAttendance, getMyFees, getMyProfile, getMyTimetable } from "../controllers/studentPortalDataController.js";
+import { getPortalAnnouncements } from "../controllers/announcementController.js";
 
 const router = Router();
 router.use(authenticate, requireActiveTenant);
@@ -17,4 +18,5 @@ router.get("/timetable", authorizeRoles("student", "parent"), getMyTimetable);
 router.get("/results", authorizeRoles("student", "parent"), getMyPublishedResults);
 router.get("/homework", authorizeRoles("student", "parent"), getMyHomework);
 router.get("/homework-submissions", authorizeRoles("student", "parent"), getMyHomeworkSubmissions);
+router.get("/announcements", authorizeRoles("student", "parent"), getPortalAnnouncements);
 export default router;
