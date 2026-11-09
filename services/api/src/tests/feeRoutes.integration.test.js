@@ -15,9 +15,10 @@ import Section from "../models/Section.js";
 import FeeStructure from "../models/FeeStructure.js";
 import FeeInvoice from "../models/FeeInvoice.js";
 import FeePayment from "../models/FeePayment.js";
+import Notification from "../models/Notification.js";
 import { createAccessToken } from "../utils/tokens.js";
 
-let server, baseUrl, school, otherSchool, admin, otherAdmin, year, schoolClass, student, enrollment;
+let server, baseUrl, school, otherSchool, admin, otherAdmin, year, schoolClass, student, enrollment, studentAccount;
 const request = async (path, { token, ...options } = {}) => {
   const response = await fetch(baseUrl + path, { ...options, headers: {
     ...(options.body ? { "Content-Type": "application/json" } : {}),
@@ -46,12 +47,13 @@ describe("Fee management API", () => {
     if (databaseName !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== "school-erp-test") throw new Error("Safety stop: unexpected database.");
-    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), FeeStructure.init(), FeeInvoice.init(), FeePayment.init(), Section.init()]);
+    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), FeeStructure.init(), FeeInvoice.init(), FeePayment.init(), Section.init(), Notification.init()]);
     school = await makeSchool("main"); otherSchool = await makeSchool("other");
     admin = await makeAdmin(school); otherAdmin = await makeAdmin(otherSchool);
     year = await AcademicYear.create({ tenantId: school._id, name: `AY-${randomUUID().slice(0, 8)}`, startDate: "2026-04-01", endDate: "2027-03-31", status: "active" });
     schoolClass = await SchoolClass.create({ tenantId: school._id, academicYearId: year._id, name: "Class 5" });
-    student = await Student.create({ tenantId: school._id, admissionNumber: `FEE-${randomUUID().slice(0, 8)}`, firstName: "Test", lastName: "Pupil", admissionDate: new Date("2026-04-01") });
+    studentAccount = await User.create({ tenantId: school._id, firstName: "Portal", lastName: "Student", email: `fee-student-${randomUUID()}@example.test`, passwordHash: "test-only", role: "student", status: "active", authVersion: 0 });
+    student = await Student.create({ tenantId: school._id, userId: studentAccount._id, admissionNumber: `FEE-${randomUUID().slice(0, 8)}`, firstName: "Test", lastName: "Pupil", admissionDate: new Date("2026-04-01") });
     enrollment = await Enrollment.create({ tenantId: school._id, studentId: student._id, academicYearId: year._id, classId: schoolClass._id, status: "active" });
     server = app.listen(0, "127.0.0.1");
     await new Promise((resolve, reject) => { server.once("listening", resolve); server.once("error", reject); });
@@ -62,6 +64,7 @@ describe("Fee management API", () => {
     if (server) await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     if (mongoose.connection.readyState === 1) {
       if (school?._id && otherSchool?._id) {
+        await Notification.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await FeePayment.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await FeeInvoice.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
         await FeeStructure.deleteMany({ tenantId: { $in: [school._id, otherSchool._id] } });
@@ -91,6 +94,8 @@ describe("Fee management API", () => {
     expect(invoice.status).toBe(201);
     expect(invoice.body.data.totalAmount).toBe(1500);
     expect(String(invoice.body.data.studentId)).toBe(String(student._id));
+    const invoiceNotice = await Notification.findOne({ tenantId: school._id, recipientUserId: studentAccount._id, eventType: "fee_invoice_created", sourceId: invoice.body.data._id }).lean();
+    expect(invoiceNotice).toMatchObject({ recipientRole: "student", deliveryStatus: "pending", link: "/portal?tab=fees" });
     expect((await request("/fees/invoices", { token: otherAdmin.token })).body.data).toHaveLength(0);
     expect((await post("/fees/invoices", otherAdmin.token, {
       enrollmentId: String(enrollment._id), feeStructureId: structure.body.data._id,
@@ -107,6 +112,7 @@ describe("Fee management API", () => {
     expect(bulk.body.data.created).toBe(1);
     expect(bulk.body.data.skipped).toBe(1);
     expect(bulk.body.data.results.some((item) => item.enrollmentId === String(secondEnrollment._id) && item.status === "created")).toBe(true);
+    expect(await Notification.countDocuments({ tenantId: school._id, eventType: "fee_invoice_created" })).toBe(1);
     const repeated = await post("/fees/invoices/bulk", admin.token, {
       academicYearId: String(year._id), classId: String(schoolClass._id),
       feeStructureId: structure.body.data._id, dueDate: "2026-05-10", invoiceNumberPrefix: "MAY26",
@@ -130,6 +136,7 @@ describe("Fee management API", () => {
     expect(structure).toBeTruthy(); expect(invoice).toBeTruthy();
     const first = await post(`/fees/invoices/${invoice._id}/payments`, admin.token, { amount: 500, method: "cash", paymentDate: "2026-05-01" });
     expect(first.status).toBe(201);
+    expect(await Notification.countDocuments({ tenantId: school._id, recipientUserId: studentAccount._id, eventType: "fee_payment_received" })).toBe(1);
     const partial = await FeeInvoice.findById(invoice._id);
     expect(partial.paidAmount).toBe(500); expect(partial.status).toBe("partial");
     expect((await post(`/fees/invoices/${invoice._id}/payments`, admin.token, { amount: 1001, method: "upi" })).status).toBe(400);
@@ -148,6 +155,7 @@ describe("Fee management API", () => {
     expect(reversal.body.data.status).toBe("reversed");
     expect(reversal.body.data.reversalReason).toBe("Duplicate cash receipt entry");
     expect(reversal.body.data.reversedAt).toBeTruthy();
+    expect(await Notification.countDocuments({ tenantId: school._id, recipientUserId: studentAccount._id, eventType: "fee_payment_reversed" })).toBe(1);
     expect(String(reversal.body.data.reversedBy)).toBe(String(admin.user._id));
     const adjusted = await FeeInvoice.findById(invoice._id);
     expect(adjusted.paidAmount).toBe(1000);
