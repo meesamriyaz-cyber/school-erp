@@ -7,6 +7,7 @@ import { getMyHomeworkSubmissions } from "../controllers/homeworkSubmissionContr
 import { getMyChildren } from "../controllers/studentPortalController.js";
 import { getMyAttendance, getMyFees, getMyProfile, getMyTimetable } from "../controllers/studentPortalDataController.js";
 import { getPortalAnnouncements } from "../controllers/announcementController.js";
+import { listMyNotifications, markNotificationRead, markAllNotificationsRead } from "../controllers/notificationController.js";
 
 const router = Router();
 router.use(authenticate, requireActiveTenant);
@@ -19,4 +20,7 @@ router.get("/results", authorizeRoles("student", "parent"), getMyPublishedResult
 router.get("/homework", authorizeRoles("student", "parent"), getMyHomework);
 router.get("/homework-submissions", authorizeRoles("student", "parent"), getMyHomeworkSubmissions);
 router.get("/announcements", authorizeRoles("student", "parent"), getPortalAnnouncements);
+router.get("/notifications", authorizeRoles("student", "parent"), listMyNotifications);
+router.patch("/notifications/read-all", authorizeRoles("student", "parent"), markAllNotificationsRead);
+router.patch("/notifications/:notificationId/read", authorizeRoles("student", "parent"), markNotificationRead);
 export default router;
