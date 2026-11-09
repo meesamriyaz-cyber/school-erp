@@ -10,6 +10,7 @@ const formatDate = (value) => value
 export default function StudentResultsPortal() {
   const { user, accessToken, logout } = useAuth();
   const [children, setChildren] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [results, setResults] = useState([]);
   const [homework, setHomework] = useState([]);
   const [attendance, setAttendance] = useState([]);
@@ -29,16 +30,18 @@ export default function StudentResultsPortal() {
     const controller = new AbortController();
     Promise.allSettled([
       apiRequest("/portal/children", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/profile", { accessToken, signal: controller.signal }),
       apiRequest("/portal/results", { accessToken, signal: controller.signal }),
       apiRequest("/portal/homework", { accessToken, signal: controller.signal }),
       apiRequest("/portal/homework-submissions", { accessToken, signal: controller.signal }),
       apiRequest("/portal/attendance", { accessToken, signal: controller.signal }),
       apiRequest("/portal/fees", { accessToken, signal: controller.signal }),
       apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),
-    ]).then(([childrenResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse]) => {
+    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse]) => {
       if (controller.signal.aborted) return;
       setError("");
       if (childrenResponse.status === "fulfilled") setChildren(Array.isArray(childrenResponse.value?.data) ? childrenResponse.value.data : []);
+      if (profileResponse.status === "fulfilled") setProfiles(Array.isArray(profileResponse.value?.data) ? profileResponse.value.data : []);
       else setError(childrenResponse.reason?.message || "Unable to load linked student records.");
       if (resultResponse.status === "fulfilled") setResults(Array.isArray(resultResponse.value?.data) ? resultResponse.value.data : []);
       else setError((current) => current || resultResponse.reason?.message || "Unable to load published results.");
@@ -83,6 +86,11 @@ export default function StudentResultsPortal() {
     : submissions.filter((item) => String(item.studentId?._id || item.studentId) === selectedStudent),
   [submissions, selectedStudent]);
 
+  const visibleProfiles = useMemo(() => selectedStudent === "all"
+    ? profiles
+    : profiles.filter((item) => String(item.student?._id) === selectedStudent),
+  [profiles, selectedStudent]);
+
   const isParent = user?.role === "parent";
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
 
@@ -101,6 +109,7 @@ export default function StudentResultsPortal() {
       </header>
 
       <nav className="portal-tabs no-print" aria-label="Student portal sections">
+        <button type="button" className={activeTab === "profile" ? "active" : ""} aria-pressed={activeTab === "profile"} onClick={() => setActiveTab("profile")}>Profile</button>
         <button type="button" className={activeTab === "results" ? "active" : ""} aria-pressed={activeTab === "results"} onClick={() => setActiveTab("results")}>Results</button>
         <button type="button" className={activeTab === "attendance" ? "active" : ""} aria-pressed={activeTab === "attendance"} onClick={() => setActiveTab("attendance")}>Attendance</button>
         <button type="button" className={activeTab === "homework" ? "active" : ""} aria-pressed={activeTab === "homework"} onClick={() => setActiveTab("homework")}>Homework ({visibleHomework.length})</button>
@@ -124,7 +133,27 @@ export default function StudentResultsPortal() {
           </div>
         </section>
       )}
-      {activeTab === "attendance" ? (
+      {activeTab === "profile" ? (
+        loading ? <div className="portal-state">Loading student profile…</div> : visibleProfiles.length === 0 ? <div className="portal-empty"><h2>Student profile unavailable</h2><p>Your school has not linked an active student profile to this account.</p></div> : (
+          <section className="portal-profile-list">{visibleProfiles.map(({ student, currentEnrollment }) => (
+            <article className="portal-profile-card" key={student._id}>
+              <header className="portal-profile-heading">
+                <div><span>STUDENT PROFILE</span><h2>{[student.firstName, student.lastName].filter(Boolean).join(" ")}</h2><small>Admission number: {student.admissionNumber || "—"}</small></div>
+                {student.photoUrl && <img src={student.photoUrl} alt={`${student.firstName || "Student"} profile`} />}
+              </header>
+              <div className="portal-profile-grid">
+                <div><span>Date of birth</span><strong>{formatDate(student.dateOfBirth)}</strong></div>
+                <div><span>Gender</span><strong>{(student.gender || "not_specified").replaceAll("_", " ")}</strong></div>
+                <div><span>Admission date</span><strong>{formatDate(student.admissionDate)}</strong></div>
+                <div><span>Status</span><strong>{student.status || "—"}</strong></div>
+                <div><span>Address</span><strong>{[student.address?.line1, student.address?.line2, student.address?.city, student.address?.district, student.address?.state, student.address?.postalCode].filter(Boolean).join(", ") || "—"}</strong></div>
+              </div>
+              <div className="portal-profile-section"><h3>Current academic placement</h3><p>{currentEnrollment ? [currentEnrollment.classId?.name, currentEnrollment.sectionId?.name, currentEnrollment.academicYearId?.name].filter(Boolean).join(" · ") : "No active enrollment"}</p></div>
+              <div className="portal-profile-section"><h3>Primary guardian details</h3><p><strong>{student.guardianName || "—"}</strong>{student.guardianRelationship ? ` · ${student.guardianRelationship.replaceAll("_", " ")}` : ""}</p><p>{student.guardianPhone || "No phone number recorded"}{student.guardianEmail ? ` · ${student.guardianEmail}` : ""}</p></div>
+            </article>
+          ))}</section>
+        )
+      ) : activeTab === "attendance" ? (
         loading ? <div className="portal-state">Loading attendance…</div> : visibleAttendance.length === 0 ? <div className="portal-empty"><h2>No attendance records</h2><p>Attendance records shared by your school will appear here.</p></div> : (
           <section className="portal-data-panel"><div className="portal-data-heading"><h2>Attendance history</h2><span>{visibleAttendance.length} records · recent 12 months</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Date</th>{isParent && <th>Student</th>}<th>Status</th><th>Remarks</th></tr></thead><tbody>{visibleAttendance.map((record) => <tr key={record._id}><td>{formatDate(record.date)}</td>{isParent && <td>{[record.student?.firstName, record.student?.lastName].filter(Boolean).join(" ")}</td>}<td><span className={"portal-attendance-status attendance-" + record.status}>{record.status}</span></td><td>{record.remarks || "—"}</td></tr>)}</tbody></table></div></section>
         )
