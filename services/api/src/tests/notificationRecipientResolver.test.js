@@ -108,4 +108,15 @@ describe("notification recipient resolution", () => {
     expect(mocks.studentFind).not.toHaveBeenCalled();
     expect(mocks.studentGuardianFind).not.toHaveBeenCalled();
   });
+  it("does not notify guardians for a student profile that is no longer active", async () => {
+    mocks.studentFind.mockReturnValue(query([]));
+    mocks.studentGuardianFind.mockReturnValue(query([{ studentId: studentA, guardianId }]));
+    const recipients = await resolveAnnouncementRecipients({
+      tenantId: "555555555555555555555555",
+      announcement: { audienceType: "SCHOOL", academicYearId: "777777777777777777777777" },
+    });
+    expect(recipients).toEqual([]);
+    expect(mocks.guardianFind).not.toHaveBeenCalled();
+  });
+
 });
