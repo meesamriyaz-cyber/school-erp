@@ -44,7 +44,8 @@ export default function AnnouncementManagement() {
     Promise.all([
       apiRequest("/academic-years", { accessToken, signal: controller.signal }),
       apiRequest("/announcements", { accessToken, signal: controller.signal }),
-    ]).then(([yearResponse, announcementResponse]) => {
+      isTeacher ? apiRequest("/teacher-assignments?status=active", { accessToken, signal: controller.signal }) : Promise.resolve({ success: true, data: [] }),
+    ]).then(([yearResponse, announcementResponse, assignmentResponse]) => {
       if (controller.signal.aborted) return;
       if (yearResponse?.success && Array.isArray(yearResponse.data)) setYears(yearResponse.data);
       if (announcementResponse?.success && Array.isArray(announcementResponse.data)) setItems(announcementResponse.data);
@@ -57,7 +58,7 @@ export default function AnnouncementManagement() {
       }
     });
     return () => controller.abort();
-  }, [accessToken]);
+  }, [accessToken, isTeacher]);
 
   useEffect(() => {
     if (!form?.academicYearId) return undefined;
@@ -85,18 +86,18 @@ export default function AnnouncementManagement() {
   const visibleItems = items.filter((item) => filter === "all" || item.status === filter);
   const assignedClassIds = new Set(assignments.map((item) => String(item.classId?._id || item.classId)));
   const visibleClasses = isTeacher ? classes.filter((item) => assignedClassIds.has(String(item._id))) : classes;
-  const classWideAssignments = assignments.filter((item) => !item.sectionId);
-  const sectionAssignments = assignments.filter((item) => item.sectionId);
-  const canTargetClass = !isTeacher || classWideAssignments.length > 0;
-  const canTargetSection = !isTeacher || assignments.length > 0;
-  const visibleSections = isTeacher && sectionAssignments.length > 0 && !classWideAssignments.some((item) => String(item.classId?._id || item.classId) === String(form?.classId))
-    ? sections.filter((item) => sectionAssignments.some((assignment) => String(assignment.sectionId?._id || assignment.sectionId) === String(item._id)))
+  const classAssignments = assignments.filter((item) => String(item.classId?._id || item.classId) === String(form?.classId));
+  const classWideAssignments = classAssignments.filter((item) => !item.sectionId);
+  const canTargetClass = !isTeacher || (form?.classId ? classWideAssignments.length > 0 : assignments.some((item) => !item.sectionId));
+  const canTargetSection = !isTeacher || (form?.classId ? classAssignments.length > 0 : assignments.length > 0);
+  const visibleSections = isTeacher && classAssignments.some((item) => item.sectionId) && !classWideAssignments.length
+    ? sections.filter((item) => classAssignments.some((assignment) => String(assignment.sectionId?._id || assignment.sectionId) === String(item._id)))
     : sections;
   const startCreate = () => {
     const year = activeYears[0] || years.find((item) => item.status !== "closed");
     setError(""); setNotice("");
     setForm({
-      title: "", body: "", category: "general", audienceType: isTeacher ? "CLASS" : "SCHOOL",
+      title: "", body: "", category: "general", audienceType: isTeacher ? (assignments.some((item) => !item.sectionId) ? "CLASS" : "SECTION") : "SCHOOL",
       academicYearId: year?._id || "", classId: "", sectionId: "", expiresAt: "",
     });
   };
@@ -161,7 +162,7 @@ export default function AnnouncementManagement() {
         <label>Category<select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         {!form._id && <label>Audience<select value={form.audienceType} onChange={(event) => { setForm((current) => ({ ...current, audienceType: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}>{!isTeacher && <option value="SCHOOL">Entire school</option>}{canTargetClass && <option value="CLASS">A class</option>}{canTargetSection && <option value="SECTION">A section</option>}</select></label>}
         {!form._id && <label>Academic year<select value={form.academicYearId} required onChange={(event) => { setForm((current) => ({ ...current, academicYearId: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}><option value="">Select academic year</option>{years.filter((year) => year.status !== "closed").map((year) => <option key={year._id} value={year._id}>{year.name} · {year.status}</option>)}</select></label>}
-        {!form._id && form.audienceType !== "SCHOOL" && <label>Class<select value={form.classId} required onChange={(event) => { setForm((current) => ({ ...current, classId: event.target.value, sectionId: "" })); setSections([]); }}><option value="">Select class</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
+        {!form._id && form.audienceType !== "SCHOOL" && <label>Class<select value={form.classId} required onChange={(event) => { setForm((current) => ({ ...current, classId: event.target.value, sectionId: "", audienceType: isTeacher && !assignments.some((item) => String(item.classId?._id || item.classId) === String(event.target.value) && !item.sectionId) ? "SECTION" : current.audienceType })); setSections([]); }}><option value="">Select class</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
         {!form._id && form.audienceType === "SECTION" && <label>Section<select value={form.sectionId} required onChange={(event) => setForm((current) => ({ ...current, sectionId: event.target.value }))}><option value="">Select section</option>{visibleSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
         <label>Expiry (optional)<input type="datetime-local" value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} /></label>
       </div>
