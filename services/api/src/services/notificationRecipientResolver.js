@@ -56,9 +56,11 @@ export async function resolveAnnouncementRecipients({ tenantId, announcement, se
       ...guardianPortalAccessFilter(),
     }).select("studentId guardianId").lean(), session,
   );
-  if (!links.length) return [...recipients.values()];
+  const activeStudentIds = new Set(students.map((student) => String(student._id)));
+  const eligibleLinks = links.filter((link) => activeStudentIds.has(String(link.studentId)));
+  if (!eligibleLinks.length) return [...recipients.values()];
 
-  const guardianIds = [...new Set(links.map((link) => String(link.guardianId)))];
+  const guardianIds = [...new Set(eligibleLinks.map((link) => String(link.guardianId)))];
   const guardians = await withSession(
     Guardian.find({
       tenantId, _id: { $in: guardianIds }, status: "active",
@@ -75,7 +77,7 @@ export async function resolveAnnouncementRecipients({ tenantId, announcement, se
   const activeParentUserIds = new Set(activeParentUsers.map((user) => String(user._id)));
   const studentIdsByParent = new Map();
 
-  for (const link of links) {
+  for (const link of eligibleLinks) {
     const guardian = guardianById.get(String(link.guardianId));
     if (!guardian || !activeParentUserIds.has(String(guardian.userId))) continue;
     const key = String(guardian.userId);
