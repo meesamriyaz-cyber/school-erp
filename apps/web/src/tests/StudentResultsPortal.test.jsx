@@ -77,6 +77,23 @@ describe("StudentResultsPortal family overview", () => {
     });
   });
 
+  it("opens with an overview dashboard and recalculates metrics for a selected child", async () => {
+    render(<StudentResultsPortal />);
+
+    expect(await screen.findByText("Portal overview")).toBeTruthy();
+    expect(screen.getByText("50%")).toBeTruthy();
+    expect(screen.getByText("Combined view of your linked children")).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Select child" }), {
+      target: { value: "student-a" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("100%")).toBeTruthy();
+      expect(screen.getByText("Selected child's academic snapshot")).toBeTruthy();
+    });
+  });
+
   it("shows all linked children and filters the detail view to the selected child", async () => {
     render(<StudentResultsPortal />);
 
