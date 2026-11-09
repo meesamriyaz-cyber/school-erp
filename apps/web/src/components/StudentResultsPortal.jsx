@@ -15,7 +15,7 @@ export default function StudentResultsPortal() {
   const [homework, setHomework] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [fees, setFees] = useState([]);
-  const [timetable, setTimetable] = useState([]);
+  const [timetable, setTimetable] = useState([]);\n  const [announcements, setAnnouncements] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState("");
@@ -36,8 +36,8 @@ export default function StudentResultsPortal() {
       apiRequest("/portal/homework-submissions", { accessToken, signal: controller.signal }),
       apiRequest("/portal/attendance", { accessToken, signal: controller.signal }),
       apiRequest("/portal/fees", { accessToken, signal: controller.signal }),
-      apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),
-    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse]) => {
+      apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),\n      apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
+    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse]) => {
       if (controller.signal.aborted) return;
       setError("");
       if (childrenResponse.status === "fulfilled") setChildren(Array.isArray(childrenResponse.value?.data) ? childrenResponse.value.data : []);
@@ -50,7 +50,7 @@ export default function StudentResultsPortal() {
       if (submissionResponse.status === "fulfilled") setSubmissions(Array.isArray(submissionResponse.value?.data) ? submissionResponse.value.data : []);
       if (attendanceResponse.status === "fulfilled") setAttendance(Array.isArray(attendanceResponse.value?.data) ? attendanceResponse.value.data : []);
       if (feesResponse.status === "fulfilled") setFees(Array.isArray(feesResponse.value?.data) ? feesResponse.value.data : []);
-      if (timetableResponse.status === "fulfilled") setTimetable(Array.isArray(timetableResponse.value?.data) ? timetableResponse.value.data : []);
+      if (timetableResponse.status === "fulfilled") setTimetable(Array.isArray(timetableResponse.value?.data) ? timetableResponse.value.data : []);\n      if (announcementResponse.status === "fulfilled") setAnnouncements(Array.isArray(announcementResponse.value?.data) ? announcementResponse.value.data : []);
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });
@@ -128,7 +128,7 @@ export default function StudentResultsPortal() {
         <button type="button" className={activeTab === "attendance" ? "active" : ""} aria-pressed={activeTab === "attendance"} onClick={() => setActiveTab("attendance")}>Attendance</button>
         <button type="button" className={activeTab === "homework" ? "active" : ""} aria-pressed={activeTab === "homework"} onClick={() => setActiveTab("homework")}>Homework ({visibleHomework.length})</button>
         <button type="button" className={activeTab === "fees" ? "active" : ""} aria-pressed={activeTab === "fees"} onClick={() => setActiveTab("fees")}>Fees</button>
-        <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
+        <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>\n        <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
       </nav>
       {isParent && children.length > 0 && (
         <section className="portal-child-overview" aria-label="Linked children">
@@ -191,6 +191,17 @@ export default function StudentResultsPortal() {
       ) : activeTab === "timetable" ? (
         loading ? <div className="portal-state">Loading timetable…</div> : visibleTimetable.length === 0 || visibleTimetable.every((item) => !item.entries?.length) ? <div className="portal-empty"><h2>No timetable available</h2><p>Your current class timetable will appear here once it is published in the school workspace.</p></div> : (
           <section className="portal-timetable-list">{visibleTimetable.map((item) => <article className="portal-data-panel" key={String(item.student?._id)}><div className="portal-data-heading"><h2>{isParent ? [item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ") : "My timetable"}</h2><span>{[item.enrollment?.classId?.name, item.enrollment?.sectionId?.name, item.enrollment?.academicYearId?.name].filter(Boolean).join(" · ")}</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Day</th><th>Period</th><th>Time</th><th>Subject</th><th>Teacher</th><th>Room</th></tr></thead><tbody>{item.entries.map((entry) => <tr key={entry._id}><td>{["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][entry.dayOfWeek]}</td><td>{entry.periodNumber}</td><td>{entry.startTime}–{entry.endTime}</td><td>{entry.assignmentId?.subjectId?.name || "—"}</td><td>{[entry.assignmentId?.teacherId?.firstName, entry.assignmentId?.teacherId?.lastName].filter(Boolean).join(" ") || "—"}</td><td>{entry.room || "—"}</td></tr>)}</tbody></table></div></article>)}</section>
+        )
+      ) : activeTab === "announcements" ? (
+        announcements.length === 0 ? <div className="portal-empty"><h2>No current notices</h2><p>Published school announcements will appear here.</p></div> : (
+          <section className="portal-announcement-list" aria-label="School announcements">
+            {announcements.map((item) => <article className="portal-announcement-card" key={item._id}>
+              <div className="portal-announcement-meta"><span>{(item.category || "general").replaceAll("_", " ")}</span><time dateTime={item.publishedAt}>{formatDate(item.publishedAt)}</time></div>
+              <h2>{item.title}</h2><p>{item.body}</p>
+              {isParent && <small>For: {children.filter(({ student }) => selectedStudent === "all" || String(student?._id) === selectedStudent).map(({ student }) => [student.firstName, student.lastName].filter(Boolean).join(" ")).join(", ")}</small>}
+              {item.expiresAt && <footer>Available until {formatDate(item.expiresAt)}</footer>}
+            </article>)}
+          </section>
         )
       ) : activeTab === "homework" ? (
         loading ? <div className="portal-state">Loading homework…</div> : visibleHomework.length === 0 ? <div className="portal-empty"><h2>No published homework</h2><p>Assignments shared by your school will appear here.</p></div> : (
