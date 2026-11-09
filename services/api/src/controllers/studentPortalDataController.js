@@ -13,13 +13,13 @@ const validId = (value) => mongoose.isValidObjectId(value);
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const studentFields = "_id admissionNumber firstName lastName status";
 
-const loadAuthorizedChildren = async (req) => {
+const loadAuthorizedChildren = async (req, fields = studentFields) => {
   if (req.auth.role === "student") {
     const student = await Student.findOne({
       tenantId: req.tenantId,
       userId: req.auth.userId,
       status: "active",
-    }).select(studentFields).lean();
+    }).select(fields).lean();
 
     if (!student) {
       return { error: [409, "Your student account has not been linked by the school"] };
@@ -49,13 +49,13 @@ const loadAuthorizedChildren = async (req) => {
     tenantId: req.tenantId,
     _id: { $in: links.map((link) => link.studentId) },
     status: "active",
-  }).select(studentFields).sort({ firstName: 1, lastName: 1, _id: 1 }).lean();
+  }).select(fields).sort({ firstName: 1, lastName: 1, _id: 1 }).lean();
 
   return { children };
 };
 
-const selectAuthorizedChildren = async (req, res) => {
-  const result = await loadAuthorizedChildren(req);
+const selectAuthorizedChildren = async (req, res, fields = studentFields) => {
+  const result = await loadAuthorizedChildren(req, fields);
   if (result.error) {
     res.status(result.error[0]).json({ success: false, message: result.error[1] });
     return null;
@@ -90,6 +90,47 @@ const parseDay = (value) => {
   return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value
     ? null
     : date;
+};
+
+const profileFields = [
+  studentFields,
+  "dateOfBirth photoUrl address gender admissionDate guardianName guardianRelationship guardianPhone guardianEmail",
+].join(" ");
+
+/**
+ * Returns profile details only for the authenticated student or children
+ * connected through an active guardian relationship in the current tenant.
+ * Profile reads are deliberately read-only; edits remain in the school workspace.
+ */
+export const getMyProfile = async (req, res, next) => {
+  try {
+    const children = await selectAuthorizedChildren(req, res, profileFields);
+    if (!children) return;
+    if (!children.length) return res.status(200).json({ success: true, data: [] });
+
+    const enrollments = await Enrollment.find({
+      tenantId: req.tenantId,
+      studentId: { $in: children.map((student) => student._id) },
+      status: "active",
+    })
+      .populate("academicYearId", "name startDate endDate")
+      .populate("classId", "name")
+      .populate("sectionId", "name")
+      .lean();
+
+    const enrollmentByStudentId = new Map(
+      enrollments.map((enrollment) => [String(enrollment.studentId), enrollment]),
+    );
+    return res.status(200).json({
+      success: true,
+      data: children.map((student) => ({
+        student,
+        currentEnrollment: enrollmentByStudentId.get(String(student._id)) || null,
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 export const getMyAttendance = async (req, res, next) => {
