@@ -19,7 +19,7 @@ describe("StudentGuardian model", () => {
     expect(link.isEmergencyContact).toBe(false);
     expect(link.canPickup).toBe(false);
     expect(link.receivesCommunication).toBe(true);
-    expect(link.canAccessPortal).toBe(false);
+    expect(link.canAccessPortal).toBeUndefined();
   });
 
   it("requires tenant, student and guardian references", () => {
