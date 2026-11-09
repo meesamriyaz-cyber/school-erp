@@ -139,6 +139,7 @@ export default function StudentGuardianManagement({
             guardianId,
             relationship,
             ...flags,
+            canAccessPortal: typeof flags.canAccessPortal === "boolean" ? flags.canAccessPortal : flags.isPrimary,
           },
         },
       );
@@ -169,6 +170,7 @@ export default function StudentGuardianManagement({
       isEmergencyContact: Boolean(link.isEmergencyContact),
       canPickup: Boolean(link.canPickup),
       receivesCommunication: link.receivesCommunication !== false,
+      canAccessPortal: typeof link.canAccessPortal === "boolean" ? link.canAccessPortal : Boolean(link.isPrimary),
     });
     setError("");
     setNotice("");
@@ -314,16 +316,18 @@ export default function StudentGuardianManagement({
           </label>
 
           <div className="student-guardian-flags">
+            <p className="student-guardian-permission-help">Academic portal access is separate from emergency-contact and pickup permissions. Secondary guardians are not granted academic access unless the school enables it.</p>
             {[
               ["isPrimary", "Primary guardian"],
               ["isEmergencyContact", "Emergency contact"],
               ["canPickup", "May pick up student"],
               ["receivesCommunication", "Receives school communication"],
+              ["canAccessPortal", "Can access academic portal"],
             ].map(([key, label]) => (
               <label key={key}>
                 <input
                   type="checkbox"
-                  checked={flags[key]}
+                  checked={key === "canAccessPortal" ? (flags.canAccessPortal ?? Boolean(flags.isPrimary)) : flags[key]}
                   onChange={(event) => setFlags((current) => ({ ...current, [key]: event.target.checked }))}
                 />
                 {label}
@@ -373,6 +377,7 @@ export default function StudentGuardianManagement({
                   {link.isEmergencyContact && <span>Emergency contact</span>}
                   {link.canPickup && <span>Pickup permitted</span>}
                   {link.receivesCommunication && <span>Receives communication</span>}
+                  {link.canAccessPortal && <span>Academic portal access</span>}
                 </div>
 
                 {isEditing && canManage && editForm && (
@@ -392,17 +397,23 @@ export default function StudentGuardianManagement({
                         ["isEmergencyContact", "Emergency contact"],
                         ["canPickup", "May pick up student"],
                         ["receivesCommunication", "Receives school communication"],
+                        ["canAccessPortal", "Can access academic portal"],
                       ].map(([key, label]) => (
                         <label key={key}>
                           <input
                             type="checkbox"
                             checked={editForm[key]}
-                            onChange={(event) => setEditForm((current) => ({ ...current, [key]: event.target.checked }))}
+                            onChange={(event) => setEditForm((current) => ({
+                              ...current,
+                              [key]: event.target.checked,
+                              ...(key === "isPrimary" ? { canAccessPortal: event.target.checked } : {}),
+                            }))}
                           />
                           {label}
                         </label>
                       ))}
                     </div>
+                    <p className="student-guardian-permission-help">Portal access controls academic records. Emergency contact and pickup permissions remain independent.</p>
                     <div className="student-guardian-form-actions">
                       <button type="submit" className="student-guardian-primary-button" disabled={saving}>
                         {saving ? "Saving…" : "Save changes"}
