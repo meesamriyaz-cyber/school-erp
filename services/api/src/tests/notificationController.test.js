@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   find: vi.fn(), countDocuments: vi.fn(), findOneAndUpdate: vi.fn(), updateMany: vi.fn(),
+  studentFindOne: vi.fn(), guardianFindOne: vi.fn(), relationshipFind: vi.fn(),
 }));
+vi.mock("../models/Student.js", () => ({ default: { findOne: mocks.studentFindOne } }));
+vi.mock("../models/Guardian.js", () => ({ default: { findOne: mocks.guardianFindOne } }));
+vi.mock("../models/StudentGuardian.js", () => ({ default: { find: mocks.relationshipFind } }));
 vi.mock("../models/Notification.js", () => ({ default: {
   find: mocks.find, countDocuments: mocks.countDocuments,
   findOneAndUpdate: mocks.findOneAndUpdate, updateMany: mocks.updateMany,
@@ -30,6 +34,8 @@ describe("notification inbox and delivery history", () => {
     req = { tenantId: "aaaaaaaaaaaaaaaaaaaaaaaa", auth: { userId: "bbbbbbbbbbbbbbbbbbbbbbbb", role: "parent" }, query: {}, params: {}, body: {} };
     res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     next = vi.fn();
+    mocks.guardianFindOne.mockReturnValue(chain({ _id: "dddddddddddddddddddddddd" }));
+    mocks.relationshipFind.mockReturnValue(chain([{ studentId: "eeeeeeeeeeeeeeeeeeeeeeee" }]));
     mocks.find.mockReturnValue(chain([{ _id: "notice-a", deliveryStatus: "delivered" }]));
     mocks.countDocuments.mockResolvedValue(2);
     mocks.findOneAndUpdate.mockReturnValue(chain({ _id: "notice-a", readAt: new Date() }));
@@ -42,10 +48,11 @@ describe("notification inbox and delivery history", () => {
       tenantId: req.tenantId,
       recipientUserId: req.auth.userId,
       deliveryStatus: "delivered",
+      relatedStudentIds: { $in: ["eeeeeeeeeeeeeeeeeeeeeeee"] },
     });
     expect(mocks.countDocuments).toHaveBeenCalledWith({
       tenantId: req.tenantId, recipientUserId: req.auth.userId,
-      deliveryStatus: "delivered", readAt: null,
+      deliveryStatus: "delivered", relatedStudentIds: { $in: ["eeeeeeeeeeeeeeeeeeeeeeee"] }, readAt: null,
     });
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       success: true, data: [{ _id: "notice-a", deliveryStatus: "delivered" }], unreadCount: 2,
@@ -75,7 +82,7 @@ describe("notification inbox and delivery history", () => {
     await markAllNotificationsRead(req, res, next);
     expect(mocks.updateMany).toHaveBeenCalledWith({
       tenantId: req.tenantId, recipientUserId: req.auth.userId,
-      deliveryStatus: "delivered", readAt: null,
+      deliveryStatus: "delivered", relatedStudentIds: { $in: ["eeeeeeeeeeeeeeeeeeeeeeee"] }, readAt: null,
     }, { $set: { readAt: expect.any(Date) } });
     expect(res.json).toHaveBeenCalledWith({ success: true, data: { modifiedCount: 2 } });
   });
