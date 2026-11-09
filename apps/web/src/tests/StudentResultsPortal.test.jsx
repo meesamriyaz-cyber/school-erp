@@ -105,7 +105,7 @@ describe("StudentResultsPortal family overview", () => {
     expect(await screen.findByText("Family learning overview")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Profile" }));
 
-    expect(await screen.findByText("STUDENT PROFILE")).toBeTruthy();
+    expect((await screen.findAllByText("STUDENT PROFILE")).length).toBe(2);
     expect(screen.getByText("Srinagar, Srinagar, Jammu and Kashmir")).toBeTruthy();
     expect(screen.getByText("9999999999 · parent@example.test")).toBeTruthy();
     expect(screen.getByText("Class 5 · A · 2026–27")).toBeTruthy();
@@ -115,7 +115,7 @@ describe("StudentResultsPortal family overview", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Bilal Khan")).toBeTruthy();
+      expect(screen.getAllByText("Bilal Khan").length).toBeGreaterThan(0);
       expect(screen.queryByText("Srinagar, Srinagar, Jammu and Kashmir")).toBeNull();
     });
   });
