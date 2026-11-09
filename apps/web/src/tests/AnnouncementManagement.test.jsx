@@ -17,7 +17,8 @@ describe("AnnouncementManagement", () => {
       if (path === "/academic-years") return Promise.resolve({ success: true, data: [{ _id: "year-1", name: "2026-27", status: "active" }] });
       if (path.startsWith("/classes?")) return Promise.resolve({ success: true, data: [{ _id: "class-1", name: "Class 5", status: "active" }] });
       if (path.startsWith("/sections?")) return Promise.resolve({ success: true, data: [{ _id: "section-1", name: "A", status: "active" }] });
-      if (path === "/announcements") return Promise.resolve({ success: true, data: [] });\n      if (path === "/teacher-assignments?status=active") return Promise.resolve({ success: true, data: [{ classId: "class-1", sectionId: null }] });
+      if (path === "/announcements") return Promise.resolve({ success: true, data: [] });
+      if (path === "/teacher-assignments?status=active") return Promise.resolve({ success: true, data: [{ classId: "class-1", sectionId: null }] });
       return Promise.resolve({ success: true, data: {} });
     });
   });
