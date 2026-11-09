@@ -28,7 +28,7 @@ const makeId = () => randomUUID().replaceAll("-", "").slice(0, 10);
 describe("Attendance notification integration", () => {
   beforeAll(async () => {
     if (env.nodeEnv !== "test" || !env.mongoUri) throw new Error("Safety stop: configure the test environment.");
-    const uri = env.mongoUri.replace(/^mongodb(?:\\+srv)?:\\/\\//i, "");
+    const uri = env.mongoUri.replace(/^mongodb(?:\+srv)?:\/\//i, "");
     const slash = uri.indexOf("/");
     const databaseName = slash < 0 ? "" : decodeURIComponent(uri.slice(slash + 1).split("?")[0]);
     if (databaseName !== "school-erp-test") throw new Error("Safety stop: expected school-erp-test database.");
