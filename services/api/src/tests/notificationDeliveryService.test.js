@@ -40,10 +40,9 @@ describe("notification delivery worker", () => {
 
     expect(mocks.findOneAndUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        attempts: { $lt: notificationRetryPolicy.maxAttempts },
         $or: expect.arrayContaining([
-          expect.objectContaining({ deliveryStatus: "pending", nextAttemptAt: { $lte: expect.any(Date) } }),
-          expect.objectContaining({ deliveryStatus: "processing" }),
+          expect.objectContaining({ deliveryStatus: "pending", attempts: { $lt: notificationRetryPolicy.maxAttempts }, nextAttemptAt: { $lte: expect.any(Date) } }),
+          expect.objectContaining({ deliveryStatus: "processing", attempts: { $lte: notificationRetryPolicy.maxAttempts } }),
         ]),
       }),
       expect.objectContaining({
@@ -118,4 +117,18 @@ describe("notification delivery worker", () => {
     expect(result).toEqual({ processed: 0, skipped: false });
     expect(mocks.userFindOne).not.toHaveBeenCalled();
   });
+  it("finalizes a crashed lease after the last allowed attempt without dispatching again", async () => {
+    mocks.findOneAndUpdate.mockReturnValue(claimQuery({ ...notification, attempts: notificationRetryPolicy.maxAttempts + 1 }));
+    await processPendingNotifications({ batchSize: 1 });
+
+    expect(mocks.userFindOne).not.toHaveBeenCalled();
+    expect(mocks.updateOne).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({
+        $set: expect.objectContaining({ deliveryStatus: "failed" }),
+        $push: { deliveryHistory: expect.objectContaining({ outcome: "failed" }) },
+      }),
+    );
+  });
+
 });
