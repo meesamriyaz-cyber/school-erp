@@ -12,7 +12,7 @@ export const getTeacherEnrollmentScope = async (req) => {
 };
 
 export const teacherCanAccessEnrollment = async (req, enrollment) => {
-  if (req.auth.role !== "teacher") return true;
+  if (req.auth?.role !== "teacher") return true;
   return Boolean(await TeacherAssignment.exists({
     tenantId: req.tenantId, teacherId: req.auth.userId,
     academicYearId: enrollment.academicYearId, classId: enrollment.classId,

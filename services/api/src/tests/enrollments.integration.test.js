@@ -681,24 +681,23 @@ describe("Student Enrollment API", () => {
 
 
   it("limits teacher enrollment and student reads to active assigned sections and class-wide assignments", async () => {
-    const siblingSection = await Section.create({ tenantId: schoolA._id, classId: classA._id, name: "B" });
+    const scopedClass = await SchoolClass.create({ tenantId: schoolA._id, academicYearId: yearA._id, name: "Scoped Class" });
+    const scopedSectionA = await Section.create({ tenantId: schoolA._id, classId: scopedClass._id, name: "A" });
+    const scopedSectionB = await Section.create({ tenantId: schoolA._id, classId: scopedClass._id, name: "B" });
     const classWide = await SchoolClass.create({ tenantId: schoolA._id, academicYearId: yearA._id, name: "Class 2" });
     const wideSectionA = await Section.create({ tenantId: schoolA._id, classId: classWide._id, name: "A" });
     const wideSectionB = await Section.create({ tenantId: schoolA._id, classId: classWide._id, name: "B" });
+    const assignedStudent = await makeStudent(schoolA, "teacher-assigned");
     const siblingStudent = await makeStudent(schoolA, "teacher-sibling");
     const wideStudentA = await makeStudent(schoolA, "teacher-wide-a");
     const wideStudentB = await makeStudent(schoolA, "teacher-wide-b");
-    const existingAssignedEnrollment = await Enrollment.findOne({
-      tenantId: schoolA._id, studentId: studentA._id, academicYearId: yearA._id,
-      classId: classA._id, sectionId: sectionA._id, status: "active",
-    }).lean();
-    expect(existingAssignedEnrollment).toBeTruthy();
     const placements = [
-      [siblingStudent, classA, siblingSection],
+      [assignedStudent, scopedClass, scopedSectionA],
+      [siblingStudent, scopedClass, scopedSectionB],
       [wideStudentA, classWide, wideSectionA],
       [wideStudentB, classWide, wideSectionB],
     ];
-    const placementIds = { [String(studentA._id)]: String(existingAssignedEnrollment._id) };
+    const placementIds = {};
     for (const [student, schoolClass, section] of placements) {
       const response = await post("/enrollments", adminA.token, {
         studentId: String(student._id), academicYearId: String(yearA._id),
@@ -711,7 +710,7 @@ describe("Student Enrollment API", () => {
     const subject = await Subject.create({ tenantId: schoolA._id, name: `Teacher Scope ${randomUUID().slice(0, 6)}` });
     const sectionAssignment = await TeacherAssignment.create({
       tenantId: schoolA._id, teacherId: teacherA.user._id, subjectId: subject._id,
-      academicYearId: yearA._id, classId: classA._id, sectionId: sectionA._id,
+      academicYearId: yearA._id, classId: scopedClass._id, sectionId: scopedSectionA._id,
       assignedBy: adminA.user._id,
     });
     await TeacherAssignment.create({
@@ -723,33 +722,33 @@ describe("Student Enrollment API", () => {
     const list = await request("/enrollments", { token: teacherA.token });
     expect(list.status).toBe(200);
     expect(new Set(list.body.data.map((item) => String(item.studentId._id)))).toEqual(new Set([
-      String(studentA._id), String(wideStudentA._id), String(wideStudentB._id),
+      String(assignedStudent._id), String(wideStudentA._id), String(wideStudentB._id),
     ]));
-    const narrowed = await request(`/enrollments?classId=${classA._id}`, { token: teacherA.token });
-    expect(narrowed.body.data.map((item) => String(item.studentId._id))).toEqual([String(studentA._id)]);
-    const siblingQuery = await request(`/enrollments?sectionId=${siblingSection._id}`, { token: teacherA.token });
+    const narrowed = await request(`/enrollments?classId=${scopedClass._id}`, { token: teacherA.token });
+    expect(narrowed.body.data.map((item) => String(item.studentId._id))).toEqual([String(assignedStudent._id)]);
+    const siblingQuery = await request(`/enrollments?sectionId=${scopedSectionB._id}`, { token: teacherA.token });
     expect(siblingQuery.body.data).toHaveLength(0);
-    expect((await request(`/enrollments/${placementIds[String(studentA._id)]}`, { token: teacherA.token })).status).toBe(200);
+    expect((await request(`/enrollments/${placementIds[String(assignedStudent._id)]}`, { token: teacherA.token })).status).toBe(200);
     expect((await request(`/enrollments/${placementIds[String(siblingStudent._id)]}`, { token: teacherA.token })).status).toBe(404);
     expect((await request(`/enrollments/${placementIds[String(wideStudentB._id)]}`, { token: teacherA.token })).status).toBe(200);
 
     const studentList = await request("/students?limit=100", { token: teacherA.token });
     expect(studentList.status).toBe(200);
     expect(new Set(studentList.body.data.map((item) => String(item._id)))).toEqual(new Set([
-      String(studentA._id), String(wideStudentA._id), String(wideStudentB._id),
+      String(assignedStudent._id), String(wideStudentA._id), String(wideStudentB._id),
     ]));
     expect(studentList.body.data[0]).not.toHaveProperty("guardianPhone");
     expect(studentList.body.data[0]).not.toHaveProperty("address");
-    const assignedStudentRead = await request(`/students/${studentA._id}`, { token: teacherA.token });
+    const assignedStudentRead = await request(`/students/${assignedStudent._id}`, { token: teacherA.token });
     expect(assignedStudentRead.status).toBe(200);
     expect(assignedStudentRead.body.data).not.toHaveProperty("guardianPhone");
     expect(assignedStudentRead.body.data).not.toHaveProperty("address");
     expect((await request(`/students/${siblingStudent._id}`, { token: teacherA.token })).status).toBe(404);
 
     await TeacherAssignment.updateOne({ _id: sectionAssignment._id }, { $set: { status: "inactive" } });
-    const afterRevocation = await request(`/enrollments?classId=${classA._id}`, { token: teacherA.token });
+    const afterRevocation = await request(`/enrollments?classId=${scopedClass._id}`, { token: teacherA.token });
     expect(afterRevocation.body.data).toHaveLength(0);
-    expect((await request(`/students/${studentA._id}`, { token: teacherA.token })).status).toBe(404);
+    expect((await request(`/students/${assignedStudent._id}`, { token: teacherA.token })).status).toBe(404);
   });
 
 });
