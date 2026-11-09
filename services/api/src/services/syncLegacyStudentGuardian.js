@@ -139,16 +139,19 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
     if (existingPair.status !== "active") {
       changes.push({ field: "status", from: existingPair.status, to: "active" });
     }
-    if (!existingPair.isPrimary) {
+    const wasPrimary = existingPair.isPrimary === true;
+    if (!wasPrimary) {
       changes.push({ field: "isPrimary", from: false, to: true });
     }
-    if (existingPair.canAccessPortal !== true) {
+    if (!wasPrimary && existingPair.canAccessPortal !== true) {
       changes.push({ field: "canAccessPortal", from: existingPair.canAccessPortal ?? false, to: true });
+    } else if (wasPrimary && existingPair.canAccessPortal == null) {
+      changes.push({ field: "canAccessPortal", from: null, to: true });
     }
     existingPair.relationship = relationshipType;
     existingPair.status = "active";
     existingPair.isPrimary = true;
-    existingPair.canAccessPortal = true;
+    if (!wasPrimary || existingPair.canAccessPortal == null) existingPair.canAccessPortal = true;
     if (existingPair.source === "manual") existingPair.source = "manual_and_legacy";
     if (changes.length) {
       appendRelationshipAudit(existingPair, {
