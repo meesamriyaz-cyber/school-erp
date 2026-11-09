@@ -59,6 +59,7 @@ startServer().catch(async (error) => {
 
   try {
     await stopAuditOutboxWorker();
+    await stopNotificationDeliveryWorker();
     await disconnectDatabase();
   } finally {
     process.exitCode = 1;
