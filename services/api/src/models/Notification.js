@@ -1,7 +1,18 @@
 import mongoose from "mongoose";
 
-export const NOTIFICATION_EVENTS = ["announcement_published"];
-export const NOTIFICATION_SOURCE_TYPES = ["Announcement"];
+export const NOTIFICATION_EVENTS = [
+  "announcement_published",
+  "homework_published",
+  "attendance_absence",
+  "examination_scheduled",
+  "examination_results_published",
+  "fee_invoice_created",
+  "fee_payment_received",
+  "fee_payment_reversed",
+];
+export const NOTIFICATION_SOURCE_TYPES = [
+  "Announcement", "Homework", "Attendance", "Examination", "FeeInvoice", "FeePayment",
+];
 export const NOTIFICATION_RECIPIENT_ROLES = ["student", "parent"];
 export const NOTIFICATION_DELIVERY_STATUSES = ["pending", "processing", "delivered", "failed", "cancelled"];
 
