@@ -108,6 +108,10 @@ describe("student and parent portal results and homework access", () => {
       tenantId: "tenant-a",
       guardianId: "guardian-a",
       status: "active",
+      $or: [
+        { canAccessPortal: true },
+        { isPrimary: true, canAccessPortal: { $exists: false } },
+      ],
     });
     expect(mocks.studentFind).toHaveBeenCalledWith({
       tenantId: "tenant-a",
