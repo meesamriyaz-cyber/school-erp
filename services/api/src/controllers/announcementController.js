@@ -59,16 +59,18 @@ export const listAnnouncements = async (req, res, next) => {
       const assignments = await TeacherAssignment.find({
         tenantId: req.tenantId, teacherId: req.auth.userId, status: "active",
       }).select("academicYearId classId sectionId").lean();
-      const scopes = assignments.map((item) => ({
-        academicYearId: item.academicYearId,
-        $or: [
-          { audienceType: "SCHOOL" },
-          { audienceType: "CLASS", classId: item.classId },
-          { audienceType: "SECTION", classId: item.classId, sectionId: item.sectionId },
-        ],
-      }));
-      filter.$or = scopes.length ? scopes : [{ createdBy: req.auth.userId }];
-      filter.createdBy = req.auth.userId;
+      const scopes = assignments.flatMap((item) => [
+        { academicYearId: item.academicYearId, audienceType: "CLASS", classId: item.classId },
+        ...(item.sectionId
+          ? [{ academicYearId: item.academicYearId, audienceType: "SECTION", classId: item.classId, sectionId: item.sectionId }]
+          : []),
+      ]);
+      filter.$or = [
+        { audienceType: "SCHOOL", status: "published" },
+        ...scopes,
+        { createdBy: req.auth.userId, status: "draft" },
+      ];
+      filter.$and = [{ $or: [{ status: "published" }, { createdBy: req.auth.userId }] }];
     }
     const data = await Announcement.find(filter)
       .populate("academicYearId", "name")
@@ -130,7 +132,13 @@ export const getAnnouncement = async (req, res, next) => {
     const data = await Announcement.findOne({ _id: req.params.announcementId, tenantId: req.tenantId })
       .populate("academicYearId", "name").populate("classId", "name").populate("sectionId", "name").lean();
     if (!data) return res.status(404).json({ success: false, message: "Announcement not found" });
-    if (req.auth.role === "teacher" && !(await teacherCanTarget(req, data))) return res.status(404).json({ success: false, message: "Announcement not found" });
+    if (req.auth.role === "teacher") {
+      const canReadSchoolNotice = data.audienceType === "SCHOOL" && data.status === "published";
+      const ownsDraft = data.status === "draft" && String(data.createdBy) === req.auth.userId;
+      if (!canReadSchoolNotice && !ownsDraft && !(await teacherCanTarget(req, data))) {
+        return res.status(404).json({ success: false, message: "Announcement not found" });
+      }
+    }
     return res.status(200).json({ success: true, data });
   } catch (error) { return next(error); }
 };
