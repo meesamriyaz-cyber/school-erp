@@ -41,8 +41,9 @@ export default function StudentResultsPortal() {
       if (controller.signal.aborted) return;
       setError("");
       if (childrenResponse.status === "fulfilled") setChildren(Array.isArray(childrenResponse.value?.data) ? childrenResponse.value.data : []);
-      if (profileResponse.status === "fulfilled") setProfiles(Array.isArray(profileResponse.value?.data) ? profileResponse.value.data : []);
       else setError(childrenResponse.reason?.message || "Unable to load linked student records.");
+      if (profileResponse.status === "fulfilled") setProfiles(Array.isArray(profileResponse.value?.data) ? profileResponse.value.data : []);
+      else setError((current) => current || profileResponse.reason?.message || "Unable to load student profiles.");
       if (resultResponse.status === "fulfilled") setResults(Array.isArray(resultResponse.value?.data) ? resultResponse.value.data : []);
       else setError((current) => current || resultResponse.reason?.message || "Unable to load published results.");
       if (homeworkResponse.status === "fulfilled") setHomework(Array.isArray(homeworkResponse.value?.data) ? homeworkResponse.value.data : []);
