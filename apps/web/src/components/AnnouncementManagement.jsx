@@ -94,7 +94,7 @@ export default function AnnouncementManagement() {
     ? sections.filter((item) => classAssignments.some((assignment) => String(assignment.sectionId?._id || assignment.sectionId) === String(item._id)))
     : sections;
   const startCreate = () => {
-    const year = activeYears[0] || years.find((item) => item.status !== "closed");
+    const year = activeYears[0];
     setError(""); setNotice("");
     setForm({
       title: "", body: "", category: "general", audienceType: isTeacher ? (assignments.some((item) => !item.sectionId) ? "CLASS" : "SECTION") : "SCHOOL",
@@ -146,7 +146,7 @@ export default function AnnouncementManagement() {
   return <section className="announcement-page" aria-labelledby="announcement-title">
     <div className="announcement-intro">
       <div><p className="announcement-eyebrow">{isTeacher ? "TEACHER WORKSPACE" : "SCHOOL COMMUNICATION"}</p><h2 id="announcement-title">Announcements & notices</h2><p>Publish important information for the school community, classes or sections.</p></div>
-      <button type="button" className="announcement-primary" onClick={startCreate} disabled={loading || years.length === 0}>+ New announcement</button>
+      <button type="button" className="announcement-primary" onClick={startCreate} disabled={loading || activeYears.length === 0 || (isTeacher && assignments.length === 0)}>+ New announcement</button>
     </div>
     {notice && <p className="announcement-success" role="status">{notice}</p>}
     {error && <p className="announcement-error" role="alert">{error}</p>}
@@ -161,7 +161,7 @@ export default function AnnouncementManagement() {
       <div className="announcement-fields">
         <label>Category<select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         {!form._id && <label>Audience<select value={form.audienceType} onChange={(event) => { setForm((current) => ({ ...current, audienceType: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}>{!isTeacher && <option value="SCHOOL">Entire school</option>}{canTargetClass && <option value="CLASS">A class</option>}{canTargetSection && <option value="SECTION">A section</option>}</select></label>}
-        {!form._id && <label>Academic year<select value={form.academicYearId} required onChange={(event) => { setForm((current) => ({ ...current, academicYearId: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}><option value="">Select academic year</option>{years.filter((year) => year.status !== "closed").map((year) => <option key={year._id} value={year._id}>{year.name} · {year.status}</option>)}</select></label>}
+        {!form._id && <label>Academic year<select value={form.academicYearId} required onChange={(event) => { setForm((current) => ({ ...current, academicYearId: event.target.value, classId: "", sectionId: "" })); setClasses([]); setSections([]); }}><option value="">Select academic year</option>{activeYears.map((year) => <option key={year._id} value={year._id}>{year.name} · {year.status}</option>)}</select></label>}
         {!form._id && form.audienceType !== "SCHOOL" && <label>Class<select value={form.classId} required onChange={(event) => { setForm((current) => ({ ...current, classId: event.target.value, sectionId: "", audienceType: isTeacher && !assignments.some((item) => String(item.classId?._id || item.classId) === String(event.target.value) && !item.sectionId) ? "SECTION" : current.audienceType })); setSections([]); }}><option value="">Select class</option>{visibleClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
         {!form._id && form.audienceType === "SECTION" && <label>Section<select value={form.sectionId} required onChange={(event) => setForm((current) => ({ ...current, sectionId: event.target.value }))}><option value="">Select section</option>{visibleSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>}
         <label>Expiry (optional)<input type="datetime-local" value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} /></label>
