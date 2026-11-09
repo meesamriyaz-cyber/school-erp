@@ -25,7 +25,6 @@ export async function resolveAnnouncementRecipients({ tenantId, announcement, se
   const students = await withSession(
     Student.find({
       tenantId, _id: { $in: studentIds }, status: "active",
-      userId: { $ne: null },
     }).select("_id userId").lean(), session,
   );
   const studentById = new Map(students.map((student) => [String(student._id), student]));
@@ -39,7 +38,7 @@ export async function resolveAnnouncementRecipients({ tenantId, announcement, se
   const activeStudentUserIds = new Set(activeStudentUsers.map((user) => String(user._id)));
 
   for (const student of students) {
-    if (!activeStudentUserIds.has(String(student.userId))) continue;
+    if (!student.userId || !activeStudentUserIds.has(String(student.userId))) continue;
     recipients.set(String(student.userId), {
       recipientUserId: student.userId,
       recipientRole: "student",
