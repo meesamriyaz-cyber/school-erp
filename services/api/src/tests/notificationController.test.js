@@ -120,4 +120,17 @@ describe("notification inbox and delivery history", () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
+  it("removes revoked child references from a parent's stored notification payload", async () => {
+    mocks.find.mockReturnValue(chain([{
+      _id: "notice-a",
+      relatedStudentIds: ["eeeeeeeeeeeeeeeeeeeeeeee", "ffffffffffffffffffffffff"],
+    }]));
+    await listMyNotifications(req, res, next);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({
+        relatedStudentIds: ["eeeeeeeeeeeeeeeeeeeeeeee"],
+      })],
+    }));
+  });
+
 });
