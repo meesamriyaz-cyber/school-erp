@@ -228,6 +228,15 @@ describe("student portal read-only academic data", () => {
 
     await getMyProfile(req, res, next);
 
+    expect(mocks.relationshipFind).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: "tenant-a",
+      guardianId: "guardian-a",
+      status: "active",
+      $or: [
+        { canAccessPortal: true },
+        { isPrimary: true, canAccessPortal: { $exists: false } },
+      ],
+    }));
     expect(mocks.studentFind).toHaveBeenCalledWith(expect.objectContaining({
       tenantId: "tenant-a",
       _id: { $in: ["student-a"] },
@@ -249,6 +258,19 @@ describe("student portal read-only academic data", () => {
       success: true,
       data: [{ student: profile, currentEnrollment: enrollment }],
     });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+
+  it("does not expose any academic profile to a secondary guardian without portal permission", async () => {
+    mocks.relationshipFind.mockReturnValue(query([], ["select"]));
+
+    await getMyProfile(req, res, next);
+
+    expect(mocks.studentFind).not.toHaveBeenCalled();
+    expect(mocks.enrollmentFind).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ success: true, data: [] });
     expect(next).not.toHaveBeenCalled();
   });
 
