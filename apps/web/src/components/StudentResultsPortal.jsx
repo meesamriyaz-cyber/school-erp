@@ -15,7 +15,8 @@ export default function StudentResultsPortal() {
   const [homework, setHomework] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [fees, setFees] = useState([]);
-  const [timetable, setTimetable] = useState([]);\n  const [announcements, setAnnouncements] = useState([]);
+  const [timetable, setTimetable] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState("");
@@ -36,7 +37,8 @@ export default function StudentResultsPortal() {
       apiRequest("/portal/homework-submissions", { accessToken, signal: controller.signal }),
       apiRequest("/portal/attendance", { accessToken, signal: controller.signal }),
       apiRequest("/portal/fees", { accessToken, signal: controller.signal }),
-      apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),\n      apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
     ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse]) => {
       if (controller.signal.aborted) return;
       setError("");
@@ -50,7 +52,8 @@ export default function StudentResultsPortal() {
       if (submissionResponse.status === "fulfilled") setSubmissions(Array.isArray(submissionResponse.value?.data) ? submissionResponse.value.data : []);
       if (attendanceResponse.status === "fulfilled") setAttendance(Array.isArray(attendanceResponse.value?.data) ? attendanceResponse.value.data : []);
       if (feesResponse.status === "fulfilled") setFees(Array.isArray(feesResponse.value?.data) ? feesResponse.value.data : []);
-      if (timetableResponse.status === "fulfilled") setTimetable(Array.isArray(timetableResponse.value?.data) ? timetableResponse.value.data : []);\n      if (announcementResponse.status === "fulfilled") setAnnouncements(Array.isArray(announcementResponse.value?.data) ? announcementResponse.value.data : []);
+      if (timetableResponse.status === "fulfilled") setTimetable(Array.isArray(timetableResponse.value?.data) ? timetableResponse.value.data : []);
+      if (announcementResponse.status === "fulfilled") setAnnouncements(Array.isArray(announcementResponse.value?.data) ? announcementResponse.value.data : []);
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });
@@ -128,7 +131,8 @@ export default function StudentResultsPortal() {
         <button type="button" className={activeTab === "attendance" ? "active" : ""} aria-pressed={activeTab === "attendance"} onClick={() => setActiveTab("attendance")}>Attendance</button>
         <button type="button" className={activeTab === "homework" ? "active" : ""} aria-pressed={activeTab === "homework"} onClick={() => setActiveTab("homework")}>Homework ({visibleHomework.length})</button>
         <button type="button" className={activeTab === "fees" ? "active" : ""} aria-pressed={activeTab === "fees"} onClick={() => setActiveTab("fees")}>Fees</button>
-        <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>\n        <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
+        <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
+        <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
       </nav>
       {isParent && children.length > 0 && (
         <section className="portal-child-overview" aria-label="Linked children">
