@@ -103,7 +103,7 @@ describe("announcement notification enqueue", () => {
     mocks.resolveRecipients.mockResolvedValue([]);
     const result = await enqueueAnnouncementPublishedNotifications({
       tenantId: "eeeeeeeeeeeeeeeeeeeeeeee",
-      announcement: { _id: "dddddddddddddddddddddddd" },
+      announcement: { _id: "dddddddddddddddddddddddd", publishedAt: "2026-11-09T09:00:00.000Z" },
     });
     expect(mocks.bulkWrite).not.toHaveBeenCalled();
     expect(result).toEqual({ recipientCount: 0, queuedCount: 0 });
