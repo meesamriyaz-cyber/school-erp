@@ -17,7 +17,8 @@ export default function AnnouncementManagement() {
   const [items, setItems] = useState([]);
   const [years, setYears] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [sections, setSections] = useState([]);\n  const [assignments, setAssignments] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [form, setForm] = useState(null);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,8 @@ export default function AnnouncementManagement() {
     ]).then(([yearResponse, announcementResponse]) => {
       if (controller.signal.aborted) return;
       if (yearResponse?.success && Array.isArray(yearResponse.data)) setYears(yearResponse.data);
-      if (announcementResponse?.success && Array.isArray(announcementResponse.data)) setItems(announcementResponse.data);\n      if (assignmentResponse?.success && Array.isArray(assignmentResponse.data)) setAssignments(assignmentResponse.data);
+      if (announcementResponse?.success && Array.isArray(announcementResponse.data)) setItems(announcementResponse.data);
+      if (assignmentResponse?.success && Array.isArray(assignmentResponse.data)) setAssignments(assignmentResponse.data);
       setLoading(false);
     }).catch((err) => {
       if (err.name !== "AbortError" && !controller.signal.aborted) {
@@ -80,7 +82,16 @@ export default function AnnouncementManagement() {
   }, [accessToken, form?.classId, form?.audienceType]);
 
   const activeYears = useMemo(() => years.filter((year) => year.status === "active"), [years]);
-  const visibleItems = items.filter((item) => filter === "all" || item.status === filter);\n  const assignedClassIds = new Set(assignments.map((item) => String(item.classId?._id || item.classId)));\n  const visibleClasses = isTeacher ? classes.filter((item) => assignedClassIds.has(String(item._id))) : classes;\n  const classWideAssignments = assignments.filter((item) => !item.sectionId);\n  const sectionAssignments = assignments.filter((item) => item.sectionId);\n  const canTargetClass = !isTeacher || classWideAssignments.length > 0;\n  const canTargetSection = !isTeacher || assignments.length > 0;\n  const visibleSections = isTeacher && sectionAssignments.length > 0 && !classWideAssignments.some((item) => String(item.classId?._id || item.classId) === String(form?.classId))\n    ? sections.filter((item) => sectionAssignments.some((assignment) => String(assignment.sectionId?._id || assignment.sectionId) === String(item._id)))\n    : sections;
+  const visibleItems = items.filter((item) => filter === "all" || item.status === filter);
+  const assignedClassIds = new Set(assignments.map((item) => String(item.classId?._id || item.classId)));
+  const visibleClasses = isTeacher ? classes.filter((item) => assignedClassIds.has(String(item._id))) : classes;
+  const classWideAssignments = assignments.filter((item) => !item.sectionId);
+  const sectionAssignments = assignments.filter((item) => item.sectionId);
+  const canTargetClass = !isTeacher || classWideAssignments.length > 0;
+  const canTargetSection = !isTeacher || assignments.length > 0;
+  const visibleSections = isTeacher && sectionAssignments.length > 0 && !classWideAssignments.some((item) => String(item.classId?._id || item.classId) === String(form?.classId))
+    ? sections.filter((item) => sectionAssignments.some((assignment) => String(assignment.sectionId?._id || assignment.sectionId) === String(item._id)))
+    : sections;
   const startCreate = () => {
     const year = activeYears[0] || years.find((item) => item.status !== "closed");
     setError(""); setNotice("");
