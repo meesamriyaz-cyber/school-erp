@@ -25,7 +25,6 @@ export default function CertificatesReports() {
   const [reason, setReason] = useState("");
   const [reissuedFrom, setReissuedFrom] = useState("");
   const [remarks, setRemarks] = useState("");
-  const [reissueDraft, setReissueDraft] = useState(null);
   const [certificates, setCertificates] = useState([]);
   const [issued, setIssued] = useState(null);
   const [reportType, setReportType] = useState("history");
@@ -64,11 +63,9 @@ export default function CertificatesReports() {
       .then((response) => {
         if (controller.signal.aborted) return;
         setEnrollments(response.data || []);
-        setEnrollmentId(reissueDraft ? id(reissueDraft.enrollmentId) : "");
-        setReissueDraft(null);
       }).catch((err) => { if (err.name !== "AbortError") setError(err.message || "Unable to load enrollment history."); });
     return () => controller.abort();
-  }, [accessToken, studentId, reissueDraft]);
+  }, [accessToken, studentId]);
 
   const issue = async (event) => {
     event.preventDefault(); setError(""); setNotice(""); setIssued(null);
@@ -80,7 +77,7 @@ export default function CertificatesReports() {
         ...(reissuedFrom ? { reissuedFrom } : {}),
       }});
       setIssued(response.data); setNotice(reissuedFrom ? "Replacement certificate issued; original history is retained." : "Certificate issued and registered.");
-      setReissuedFrom(""); setReissueDraft(null);
+      setReissuedFrom("");
       await loadCertificates();
     } catch (err) { setError(err.message || "Certificate issuance failed."); }
     finally { setLoading(false); }
@@ -105,8 +102,9 @@ export default function CertificatesReports() {
   };
 
   const prepareReissue = (certificate) => {
-    setTab("certificates"); setIssued(null); setReissueDraft(certificate);
-    setStudentId(id(certificate.studentId)); setCertificateType(certificate.type); setReissuedFrom(certificate._id);
+    setTab("certificates"); setIssued(null);
+    setStudentId(id(certificate.studentId)); setEnrollmentId(id(certificate.enrollmentId));
+    setCertificateType(certificate.type); setReissuedFrom(certificate._id);
     setReason(certificate.reason || ""); setRemarks(certificate.remarks || "");
     setNotice("Review the details and issue a replacement certificate. The original record will remain in the register.");
   };
@@ -153,7 +151,7 @@ export default function CertificatesReports() {
     {tab === "certificates" ? <>
       <form className="cr-panel cr-form" onSubmit={issue}>
         <h3>Issue a certificate</h3>
-        <label>Student<select required value={studentId} onChange={(event) => { setStudentId(event.target.value); setEnrollments([]); setEnrollmentId(""); setIssued(null); }}><option value="">Select student</option>{students.map((item) => <option key={id(item)} value={id(item)}>{item.admissionNumber} — {nameOf(item)}</option>)}</select></label>
+        <label>Student<select required value={studentId} onChange={(event) => { setStudentId(event.target.value); setEnrollments([]); setEnrollmentId(""); setReissuedFrom(""); setIssued(null); }}><option value="">Select student</option>{students.map((item) => <option key={id(item)} value={id(item)}>{item.admissionNumber} — {nameOf(item)}</option>)}</select></label>
         <label>Certificate type<select value={certificateType} onChange={(event) => setCertificateType(event.target.value)}><option value="bonafide">Bonafide certificate</option><option value="transfer">Transfer certificate</option></select></label>
         <label>Enrollment<select required value={enrollmentId} onChange={(event) => setEnrollmentId(event.target.value)}><option value="">Select enrollment record</option>{enrollments.map((item) => <option key={id(item)} value={id(item)}>{item.academicYearId?.name} · {item.classId?.name}{item.sectionId?.name ? ` / ${item.sectionId.name}` : ""} · {item.status}</option>)}</select></label>
         {certificateType === "transfer" && <label>Reason for leaving / transfer<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} required /></label>}
