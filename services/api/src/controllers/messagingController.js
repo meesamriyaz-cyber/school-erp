@@ -127,7 +127,7 @@ export const listMessagingContacts = async (req, res, next) => {
 export const listConversations = async (req, res, next) => {
   try {
     if (!["parent", "teacher"].includes(req.auth.role)) return res.status(403).json({ success: false, message: "Messaging is not available for this role" });
-    let filter = { tenantId: req.tenantId, status: "open" };
+    let filter = { tenantId: req.tenantId };
     if (req.auth.role === "parent") {
       const context = await parentContext(req);
       if (context.error) return res.status(200).json({ success: true, data: [] });
@@ -188,14 +188,14 @@ export const createConversation = async (req, res, next) => {
           tenantId: req.tenantId, studentId, guardianId: context.guardian._id,
           parentUserId: req.auth.userId, teacherUserId: teacherId,
         }, {
+          $set: { status: "open", closedAt: null, closedBy: null },
           $setOnInsert: {
             tenantId: req.tenantId, studentId, enrollmentId: enrollment._id,
             guardianId: context.guardian._id, parentUserId: req.auth.userId,
             teacherUserId: teacherId, teacherAssignmentId: assignment._id,
-            createdBy: req.auth.userId, status: "open",
+            createdBy: req.auth.userId,
           },
         }, { new: true, upsert: true, session, setDefaultsOnInsert: true });
-        if (conversation.status !== "open") throw Object.assign(new Error("This conversation is closed"), { code: "CONVERSATION_CLOSED" });
         const created = await Message.create([{
           tenantId: req.tenantId, conversationId: conversation._id,
           senderUserId: req.auth.userId, senderRole: "parent", body: message.trim(),
@@ -221,7 +221,6 @@ export const createConversation = async (req, res, next) => {
     return res.status(201).json({ success: true, data: await Conversation.findById(conversation._id).populate(conversationPopulate).lean() });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ success: false, message: "A matching conversation already exists; refresh your inbox" });
-    if (error.code === "CONVERSATION_CLOSED") return res.status(409).json({ success: false, message: error.message });
     return next(error);
   }
 };
