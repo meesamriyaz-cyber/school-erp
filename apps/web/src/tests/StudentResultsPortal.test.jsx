@@ -269,5 +269,28 @@ describe("StudentResultsPortal family overview", () => {
     expect(screen.getByText(/Excellent understanding/)).toBeTruthy();
   });
 
+ 
+  it("surfaces partial portal failures and retries the failed sections", async () => {
+    let feeCalls = 0;
+    mocks.apiRequest.mockImplementation((path) => {
+      if (path === "/portal/fees") {
+        feeCalls += 1;
+        return feeCalls === 1
+          ? Promise.reject(new Error("Fees service unavailable"))
+          : Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<StudentResultsPortal />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/fees/i);
+    fireEvent.click(screen.getByRole("button", { name: "Retry failed sections" }));
+
+    await waitFor(() => {
+      expect(feeCalls).toBe(2);
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
 
 });
