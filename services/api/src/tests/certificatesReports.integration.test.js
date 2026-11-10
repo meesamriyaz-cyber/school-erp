@@ -12,6 +12,9 @@ import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Enrollment from "../models/Enrollment.js";
 import Attendance from "../models/Attendance.js";
+import FeeStructure from "../models/FeeStructure.js";
+import FeeInvoice from "../models/FeeInvoice.js";
+import FeePayment from "../models/FeePayment.js";
 import Certificate from "../models/Certificate.js";
 import CertificateCounter from "../models/CertificateCounter.js";
 import { createAccessToken } from "../utils/tokens.js";
@@ -44,7 +47,7 @@ describe("Certificates and school reports API", () => {
     if (!match || decodeURIComponent(match[1]) !== TEST_DB) throw new Error(`Safety stop: expected ${TEST_DB}`);
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== TEST_DB) throw new Error("Safety stop: unexpected test database");
-    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), Certificate.init(), CertificateCounter.init(), Attendance.init()]);
+    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), Certificate.init(), CertificateCounter.init(), Attendance.init(), FeeStructure.init(), FeeInvoice.init(), FeePayment.init()]);
     school = await createSchool("A"); otherSchool = await createSchool("B");
     admin = await createAdmin(school); otherAdmin = await createAdmin(otherSchool);
     year = await AcademicYear.create({ tenantId: school._id, name: `AY-${randomUUID().slice(0, 7)}`, startDate: "2026-04-01", endDate: "2027-03-31", status: "active" });
@@ -62,6 +65,9 @@ describe("Certificates and school reports API", () => {
       await Certificate.deleteMany({ tenantId: { $in: tenantIds } });
       await CertificateCounter.deleteMany({ tenantId: { $in: tenantIds } });
       await Attendance.deleteMany({ tenantId: { $in: tenantIds } });
+      await FeePayment.deleteMany({ tenantId: { $in: tenantIds } });
+      await FeeInvoice.deleteMany({ tenantId: { $in: tenantIds } });
+      await FeeStructure.deleteMany({ tenantId: { $in: tenantIds } });
       await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
       await Student.deleteMany({ tenantId: { $in: tenantIds } });
       await SchoolClass.deleteMany({ tenantId: { $in: tenantIds } });
@@ -129,6 +135,19 @@ describe("Certificates and school reports API", () => {
     const hidden = await request(`/reports/student-history?studentId=${student._id}`, { token: otherAdmin.token });
     expect(hidden.status).toBe(404);
     expect((await request("/reports/student-history?studentId=bad", { token: admin.token })).status).toBe(400);
+  });
+
+  it("separates posted and reversed fee collections in the financial report", async () => {
+    const structure = await FeeStructure.create({ tenantId: school._id, academicYearId: year._id, classId: schoolClass._id, name: `Report Fee ${randomUUID().slice(0, 6)}`, items: [{ name: "Tuition", amount: 500, frequency: "annually" }] });
+    const invoice = await FeeInvoice.create({ tenantId: school._id, enrollmentId: activeEnrollment._id, studentId: student._id, academicYearId: year._id, feeStructureId: structure._id, invoiceNumber: `RPT-${randomUUID().slice(0, 8)}`, items: [{ name: "Tuition", amount: 500 }], totalAmount: 500, paidAmount: 100, dueDate: "2026-12-01", status: "partial" });
+    await FeePayment.create([
+      { tenantId: school._id, invoiceId: invoice._id, receiptNumber: `POST-${randomUUID().slice(0, 8)}`, amount: 100, paymentDate: "2026-11-01", method: "cash", receivedBy: admin.user._id, status: "posted" },
+      { tenantId: school._id, invoiceId: invoice._id, receiptNumber: `REV-${randomUUID().slice(0, 8)}`, amount: 25, paymentDate: "2026-11-02", method: "cash", receivedBy: admin.user._id, status: "reversed", reversedAt: new Date("2026-11-03"), reversedBy: admin.user._id, reversalReason: "Duplicate entry" },
+    ]);
+    const report = await request(`/reports/fees?academicYearId=${year._id}`, { token: admin.token });
+    expect(report.status).toBe(200);
+    expect(report.body.summary).toMatchObject({ invoiced: 500, outstanding: 400, postedPayments: 100, reversedPayments: 25, postedPaymentsCount: 1, reversedPaymentsCount: 1 });
+    expect((await request(`/reports/fees?academicYearId=${year._id}`, { token: otherAdmin.token })).status).toBe(404);
   });
 
   it("lists tenant-scoped enrollment strength and validates report filters", async () => {
