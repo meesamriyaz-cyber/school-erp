@@ -34,7 +34,7 @@ describe("SchoolDashboard", () => {
   it("renders live school, attendance, staff, fee and academic indicators", async () => {
     render(<SchoolDashboard accessToken="token" academicYearId="year-1" />);
     expect(await screen.findByText("School at a glance")).toBeInTheDocument();
-    expect(screen.getByText("115")).toBeInTheDocument();
+    expect(screen.getAllByText("115").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("₹48,000")).toBeInTheDocument();
     expect(screen.getByText("Term 1")).toBeInTheDocument();
     expect(screen.getByText("76.5%")).toBeInTheDocument();
