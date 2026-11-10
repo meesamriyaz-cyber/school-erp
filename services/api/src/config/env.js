@@ -37,14 +37,33 @@ if (!/^mongodb(?:\+srv)?:\/\//.test(selectedMongoUri)) {
 
 const getMongoTarget = (uri) => {
   try {
-    const parsed = new URL(uri);
+    // WHATWG URL does not support MongoDB's comma-separated replica-set hosts.
+    // Parse the MongoDB authority and database path without altering the URI.
+    const schemeEnd = uri.indexOf("://");
+    if (schemeEnd < 0) return "";
+
+    const remainder = uri.slice(schemeEnd + 3);
+    const authorityEnd = remainder.search(/[/?#]/);
+    const authority = authorityEnd === -1
+      ? remainder
+      : remainder.slice(0, authorityEnd);
+    const pathAndQuery = authorityEnd === -1 ? "" : remainder.slice(authorityEnd);
+    const hostList = authority.slice(authority.lastIndexOf("@") + 1);
+    const hosts = hostList.split(",").map((host) => host.trim());
+
+    if (!hosts.length || hosts.some((host) => !host)) return "";
+
+    const firstHost = hosts[0];
+    const normalizedHost = firstHost.startsWith("[")
+      ? firstHost.slice(1, firstHost.indexOf("]")).toLowerCase()
+      : firstHost.replace(/:\\d+$/, "").toLowerCase();
+    const databasePath = pathAndQuery.split(/[?#]/, 1)[0];
     const databaseName = decodeURIComponent(
-      parsed.pathname.replace(/^\/+/, "").split("/")[0] || ""
+      databasePath.replace(/^\\/+/, "").split("/")[0] || ""
     );
 
-    if (!parsed.hostname || !databaseName) return "";
-
-    return `${parsed.hostname.toLowerCase()}/${databaseName}`;
+    if (!normalizedHost || !databaseName) return "";
+    return `${normalizedHost}/${databaseName}`;
   } catch {
     return "";
   }
