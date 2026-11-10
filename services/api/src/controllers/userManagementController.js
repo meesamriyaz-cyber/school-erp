@@ -7,8 +7,12 @@ import { hashPassword } from "../utils/password.js";
 import { writeUserAudit, withAuditTransaction } from "../services/auditLogService.js";
 
 const STATUSES = ["pending", "active", "suspended"];
-const SCHOOL_ROLES = USER_ROLES.filter(
+const UNSUPPORTED_SCHOOL_ROLES = new Set(["accountant", "librarian", "transport_manager"]);
+const LISTABLE_SCHOOL_ROLES = USER_ROLES.filter(
   (role) => role !== "platform_admin" && role !== "school_admin",
+);
+const SCHOOL_ROLES = LISTABLE_SCHOOL_ROLES.filter(
+  (role) => !UNSUPPORTED_SCHOOL_ROLES.has(role),
 );
 const PROFILE_FIELDS = ["firstName", "lastName", "email", "phone"];
 const sendError = (res, status, message) => res.status(status).json({ success: false, message });
@@ -56,6 +60,12 @@ function allowedRolesFor(req) {
   return isPlatformAdmin(req) ? SCHOOL_ROLES.concat("school_admin") : SCHOOL_ROLES;
 }
 
+function filterableRolesFor(req) {
+  return isPlatformAdmin(req)
+    ? LISTABLE_SCHOOL_ROLES.concat("school_admin")
+    : LISTABLE_SCHOOL_ROLES;
+}
+
 function parsePageQuery(query) {
   const page = Number.parseInt(query.page ?? "1", 10);
   const limit = Number.parseInt(query.limit ?? "20", 10);
@@ -68,7 +78,7 @@ function parsePageQuery(query) {
 function buildListFilter(req) {
   const filter = { ...scopeFor(req) };
   if (req.query.role !== undefined) {
-    if (typeof req.query.role !== "string" || !allowedRolesFor(req).includes(req.query.role)) {
+    if (typeof req.query.role !== "string" || !filterableRolesFor(req).includes(req.query.role)) {
       return { error: "Invalid role filter" };
     }
     filter.role = req.query.role;
