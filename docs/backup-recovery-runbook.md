@@ -2,8 +2,9 @@
 
 ## Scope and current implementation
 
-The API persists application data in MongoDB through Mongoose and reads its
-runtime connection string from `MONGO_URI`. The repository does not currently
+The API persists application data in MongoDB through Mongoose and selects its
+runtime connection string by `NODE_ENV`: `MONGO_DEV_URI` for development,
+`MONGO_TEST_URI` for tests, and `MONGO_URI` for production. The repository does not currently
 define a production MongoDB provider, backup destination, backup schedule,
 retention policy, or automated restore workflow.
 
