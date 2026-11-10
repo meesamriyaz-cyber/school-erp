@@ -60,12 +60,6 @@ const navigation = [
   { label: "Settings", icon: "⚙", section: "SYSTEM" },
 ];
 
-const stats = [
-  { label: "Total students", value: "—", note: "Live data will appear here", icon: "♙" },
-  { label: "Present today", value: "—", note: "Attendance module pending", icon: "✓" },
-  { label: "Teaching staff", value: "—", note: "Staff module pending", icon: "♧" },
-  { label: "Fee collection", value: "—", note: "Finance module pending", icon: "₹" },
-];
 
 function DashboardApp() {
    const { status, user, schoolContext, logout, accessToken } = useAuth();
