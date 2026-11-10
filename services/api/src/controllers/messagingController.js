@@ -80,12 +80,18 @@ export const listMessagingContacts = async (req, res, next) => {
           classId: item.classId, academicYearId: item.academicYearId,
           $or: [{ sectionId: null }, ...(item.sectionId ? [{ sectionId: item.sectionId }] : [])],
         })),
-      }).select("teacherId subjectId classId sectionId").populate("teacherId", "firstName lastName status").populate("subjectId", "name").lean() : [];
-      const data = assignments.filter((item) => item.teacherId?.status === "active").map((item) => ({
-        teacher: item.teacherId, subject: item.subjectId, classId: item.classId, sectionId: item.sectionId,
-        studentIds: enrollments.filter((enrollment) => String(enrollment.classId) === String(item.classId)
-          && (!item.sectionId || String(enrollment.sectionId) === String(item.sectionId))).map((enrollment) => String(enrollment.studentId)),
-      })).filter((item) => item.studentIds.length);
+      }).select("teacherId subjectId classId sectionId academicYearId").populate("teacherId", "firstName lastName status").populate("subjectId", "name").lean() : [];
+      const activeStudents = await Student.find({ tenantId: req.tenantId, _id: { $in: enrollments.map((item) => item.studentId) }, status: "active" })
+        .select("_id firstName lastName admissionNumber").lean();
+      const data = assignments.filter((item) => item.teacherId?.status === "active").map((item) => {
+        const matchedIds = enrollments.filter((enrollment) => String(enrollment.classId) === String(item.classId)
+          && String(enrollment.academicYearId) === String(item.academicYearId)
+          && (!item.sectionId || String(enrollment.sectionId) === String(item.sectionId))).map((enrollment) => String(enrollment.studentId));
+        return {
+          teacher: item.teacherId, subject: item.subjectId, classId: item.classId, sectionId: item.sectionId,
+          students: activeStudents.filter((student) => matchedIds.includes(String(student._id))),
+        };
+      }).filter((item) => item.students.length);
       return res.status(200).json({ success: true, data });
     }
     if (req.auth.role === "teacher") {
@@ -230,10 +236,11 @@ export const sendConversationMessage = async (req, res, next) => {
           tenantId: req.tenantId, conversationId: conversation._id,
           senderUserId: req.auth.userId, senderRole: req.auth.role, body: body.trim(),
         }], { session });
-        await Conversation.updateOne({ _id: conversation._id, tenantId: req.tenantId, status: "open" }, {
+        const updated = await Conversation.updateOne({ _id: conversation._id, tenantId: req.tenantId, status: "open" }, {
           $set: { lastMessageAt: created.createdAt || new Date(), lastMessagePreview: body.trim().slice(0, 180) },
           $inc: senderIsParent ? { teacherUnreadCount: 1 } : { parentUnreadCount: 1 },
         }, { session });
+        if (!updated.matchedCount) throw Object.assign(new Error("This conversation is closed"), { code: "CONVERSATION_CLOSED" });
         await Notification.updateOne({
           tenantId: req.tenantId, recipientUserId, eventKey: `message:${created._id}`,
         }, { $setOnInsert: {
@@ -265,6 +272,10 @@ export const markConversationRead = async (req, res, next) => {
         await Conversation.updateOne({ _id: conversation._id, tenantId: req.tenantId }, {
           $set: req.auth.role === "parent" ? { parentUnreadCount: 0 } : { teacherUnreadCount: 0 },
         }, { session });
+        await Notification.updateMany({
+          tenantId: req.tenantId, recipientUserId: req.auth.userId,
+          sourceId: conversation._id, eventType: "message_received", readAt: null,
+        }, { $set: { readAt: new Date() } }, { session });
       });
     } finally { await session.endSession(); }
     return res.status(200).json({ success: true, data: { read: true } });
