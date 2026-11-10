@@ -65,7 +65,7 @@ describe("MessagingWorkspace", () => {
       return Promise.resolve({ success: true, data: {} });
     });
     render(<MessagingWorkspace mode="teacher" />);
-    fireEvent.click(await screen.findByRole("button", { name: /Ayaan Ahmed/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Parent Khan/ }));
     expect(await screen.findByText("Could we discuss homework?")).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText("Write your reply…"), { target: { value: "I will follow up." } });
     fireEvent.click(screen.getByRole("button", { name: "Send reply" }));
