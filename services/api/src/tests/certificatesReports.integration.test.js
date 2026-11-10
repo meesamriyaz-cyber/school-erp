@@ -96,7 +96,7 @@ describe("Certificates and school reports API", () => {
     const ended = await Enrollment.create({ tenantId: school._id, studentId: student._id, academicYearId: year._id, classId: schoolClass._id, enrollmentDate: "2026-04-01", status: "completed", endedAt: new Date("2026-10-31T00:00:00.000Z") });
     const issued = await post("/certificates", admin.token, { studentId: String(student._id), enrollmentId: String(ended._id), type: "transfer", reason: "Family relocation" });
     expect(issued.status).toBe(201);
-    expect(issued.body.data.certificateNumber).toMatch(/^TC\\/\\d{4}\\/\\d{5}$/);
+    expect(issued.body.data.certificateNumber).toMatch(new RegExp("^TC/[0-9]{4}/[0-9]{5}$"));
     expect(issued.body.data.snapshot.enrollmentStatus).toBe("completed");
     expect(issued.body.data.snapshot.transferReason).toBe("Family relocation");
   });
