@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
 
   if (mode === 'production') {
     const apiBaseUrl = env.VITE_API_BASE_URL
@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
     const normalizedPath = parsedApiBaseUrl.pathname.replace(/\/+$/, '')
     if (
       parsedApiBaseUrl.protocol !== 'https:' ||
-      ['localhost', '127.0.0.1', '::1'].includes(parsedApiBaseUrl.hostname) ||
+      ['localhost', '127.0.0.1', '::1', '[::1]'].includes(parsedApiBaseUrl.hostname) ||
       normalizedPath !== '/api/v1' ||
       parsedApiBaseUrl.search ||
       parsedApiBaseUrl.hash ||
