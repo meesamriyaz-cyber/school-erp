@@ -80,6 +80,9 @@ describe("Certificates and school reports API", () => {
     const verified = await request(`/certificates/verify/${stored.verificationCode}`);
     expect(verified.status).toBe(200);
     expect(verified.body.data).toMatchObject({ certificateNumber: issued.body.data.certificateNumber, studentName: "Amina Khan", status: "issued" });
+    const concurrent = await Promise.all([1, 2].map(() => post("/certificates", admin.token, { studentId: String(student._id), enrollmentId: String(activeEnrollment._id), type: "bonafide" })));
+    expect(concurrent.map((item) => item.status)).toEqual([201, 201]);
+    expect(new Set(concurrent.map((item) => item.body.data.certificateNumber)).size).toBe(2);
     const hidden = await request("/certificates", { token: otherAdmin.token });
     expect(hidden.status).toBe(200); expect(hidden.body.data).toHaveLength(0);
     const forged = await post("/certificates", otherAdmin.token, { studentId: String(student._id), enrollmentId: String(activeEnrollment._id), type: "bonafide" });
@@ -87,6 +90,16 @@ describe("Certificates and school reports API", () => {
     const voided = await request(`/certificates/${issued.body.data._id}/void`, { token: admin.token, method: "PATCH", body: JSON.stringify({ reason: "Printed with a clerical error" }) });
     expect(voided.status).toBe(200); expect(voided.body.data.status).toBe("void");
     expect((await request(`/certificates/verify/${stored.verificationCode}`)).body.data.status).toBe("void");
+  });
+
+  it("issues transfer certificates only from ended enrollment history", async () => {
+    const ended = await Enrollment.findById(activeEnrollment._id);
+    ended.status = "completed"; ended.endedAt = new Date("2026-10-31T00:00:00.000Z"); await ended.save();
+    const issued = await post("/certificates", admin.token, { studentId: String(student._id), enrollmentId: String(ended._id), type: "transfer", reason: "Family relocation" });
+    expect(issued.status).toBe(201);
+    expect(issued.body.data.certificateNumber).toMatch(/^TC\\/\\d{4}\\/\\d{5}$/);
+    expect(issued.body.data.snapshot.enrollmentStatus).toBe("completed");
+    expect(issued.body.data.snapshot.transferReason).toBe("Family relocation");
   });
 
   it("rejects transfer certificates for active enrollments and rejects forged snapshot fields", async () => {
