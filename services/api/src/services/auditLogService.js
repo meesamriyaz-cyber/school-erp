@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { randomUUID } from "node:crypto";
 import AuditLog from "../models/AuditLog.js";
 import AuditOutbox from "../models/AuditOutbox.js";
+import { markWorkerStarted, markWorkerCycleStarted, markWorkerCycleSucceeded, markWorkerCycleFailed, markWorkerStopped } from "./workerHealth.js";
 
 const AUDITABLE_FIELDS = new Set([
   "firstName", "lastName", "email", "phone", "role", "status",
@@ -67,6 +68,7 @@ export async function processPendingAuditEvents({
 } = {}) {
   if (workerRunning) return { processed: 0, skipped: true };
   workerRunning = true;
+  markWorkerCycleStarted("auditOutbox");
   let processed = 0;
   try {
     for (let i = 0; i < Math.min(Math.max(batchSize, 1), 100); i += 1) {
@@ -152,8 +154,10 @@ export async function processPendingAuditEvents({
         });
       }
     }
+    markWorkerCycleSucceeded("auditOutbox", processed);
     return { processed, skipped: false };
   } catch (error) {
+    markWorkerCycleFailed("auditOutbox", error);
     console.error("Audit outbox polling failed", {
       errorName: error?.name ?? "Error",
       errorMessage: safeErrorMessage(error),
@@ -166,6 +170,7 @@ export async function processPendingAuditEvents({
 
 export function startAuditOutboxWorker() {
   if (workerTimer) return;
+  markWorkerStarted("auditOutbox");
   void processPendingAuditEvents();
   workerTimer = setInterval(() => {
     void processPendingAuditEvents();
@@ -180,6 +185,7 @@ export async function stopAuditOutboxWorker() {
   while (workerRunning) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
+  markWorkerStopped("auditOutbox");
 }
 
 /**
