@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { randomUUID } from "node:crypto";
 import AuditLog from "../models/AuditLog.js";
 import AuditOutbox from "../models/AuditOutbox.js";
-import { markWorkerStarted, markWorkerCycleStarted, markWorkerCycleSucceeded, markWorkerCycleFailed, markWorkerStopped } from "./workerHealth.js";
+import { markWorkerStarted, markWorkerHeartbeat, markWorkerCycleStarted, markWorkerCycleSucceeded, markWorkerCycleFailed, markWorkerStopped } from "./workerHealth.js";
 
 const AUDITABLE_FIELDS = new Set([
   "firstName", "lastName", "email", "phone", "role", "status",
@@ -72,6 +72,7 @@ export async function processPendingAuditEvents({
   let processed = 0;
   try {
     for (let i = 0; i < Math.min(Math.max(batchSize, 1), 100); i += 1) {
+      markWorkerHeartbeat("auditOutbox");
       const processingToken = randomUUID();
       const claimedAt = new Date();
       const outbox = await AuditOutbox.findOneAndUpdate(
