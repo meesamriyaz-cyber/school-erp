@@ -15,6 +15,8 @@ Before a production release, confirm all of the following:
 - A reviewed commit SHA is selected from the intended release branch.
 - CI is green for that exact SHA: backend tests, frontend lint, frontend tests, and frontend production build.
 - The API runtime uses `NODE_ENV=production`, `MONGO_URI`, strong distinct JWT secrets, and an HTTPS `WEB_URL`.
+- The frontend is built with `VITE_API_BASE_URL` set to the actual HTTPS API base URL, including the `/api/v1` path. This is a Vite build-time variable embedded in the static bundle; setting it only as a runtime hosting variable after the bundle is built does not change the API destination.
+- Never promote the CI build artifact that uses the reserved `api.school-erp-ci.invalid` sentinel. Build a separate production artifact with the real API origin and verify its compiled configuration before publication.
 - `MONGO_DEV_URI` and `MONGO_TEST_URI` are not configured as production fallbacks. Production must not silently fall back to either.
 - Production secrets are stored in the hosting provider's secret manager, not in repository files, build arguments, logs, or deployment artifacts.
 - The production MongoDB cluster supports transactions and has the approved backup/PITR controls described in [backup-recovery-runbook.md](./backup-recovery-runbook.md).
@@ -50,7 +52,7 @@ Before a production release, confirm all of the following:
 - Student, guardian, academic year, class/section, enrollment, attendance, examination/marks/results, fees, homework, notifications, messaging, and reports load for authorized roles.
 - Unpublished examination results remain unavailable to student/parent portal accounts.
 - Audit events and notification delivery progress; no sensitive payloads or secrets appear in operational responses/logs.
-- Frontend routes load and API requests use the intended production API origin.
+- Frontend routes load and the compiled bundle uses the intended production API origin (not localhost or the CI sentinel).
 - Error responses do not disclose stack traces, database URIs, credentials, or internal implementation details.
 
 Use synthetic or approved test accounts. Do not create or modify real student/financial records merely to perform a smoke test.
