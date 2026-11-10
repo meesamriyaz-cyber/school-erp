@@ -133,6 +133,7 @@ export const getFeeCollectionReport = async (req, res, next) => {
       return total;
     }, { invoiced: 0, outstanding: 0, postedPayments: 0, reversedPayments: 0, postedPaymentsCount: 0, reversedPaymentsCount: 0 });
     for (const key of ["invoiced", "outstanding", "postedPayments", "reversedPayments"]) summary[key] = Math.round(summary[key] * 100) / 100;
+    summary.netPayments = Math.round((summary.postedPayments - summary.reversedPayments) * 100) / 100;
     return res.json({ success: true, data, summary });
   } catch (error) { return next(error); }
 };
