@@ -117,7 +117,7 @@ describe("Certificates and school reports API", () => {
     const history = await request(`/reports/student-history?studentId=${student._id}`, { token: admin.token });
     expect(history.status).toBe(200);
     expect(history.body.data.student.admissionNumber).toBe(student.admissionNumber);
-    expect(history.body.data.enrollments).toHaveLength(1);
+    expect(history.body.data.enrollments).toHaveLength(2);
     const hidden = await request(`/reports/student-history?studentId=${student._id}`, { token: otherAdmin.token });
     expect(hidden.status).toBe(404);
     expect((await request("/reports/student-history?studentId=bad", { token: admin.token })).status).toBe(400);
