@@ -9,11 +9,12 @@ export const NOTIFICATION_EVENTS = [
   "fee_invoice_created",
   "fee_payment_received",
   "fee_payment_reversed",
+  "message_received",
 ];
 export const NOTIFICATION_SOURCE_TYPES = [
-  "Announcement", "Homework", "Attendance", "Examination", "FeeInvoice", "FeePayment",
+  "Announcement", "Homework", "Attendance", "Examination", "FeeInvoice", "FeePayment", "Conversation",
 ];
-export const NOTIFICATION_RECIPIENT_ROLES = ["student", "parent"];
+export const NOTIFICATION_RECIPIENT_ROLES = ["student", "parent", "teacher"];
 export const NOTIFICATION_DELIVERY_STATUSES = ["pending", "processing", "delivered", "failed", "cancelled"];
 
 const deliveryHistorySchema = new mongoose.Schema({
