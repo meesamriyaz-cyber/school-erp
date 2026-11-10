@@ -135,6 +135,9 @@ describe("Parent teacher messaging API integration", () => {
     await processPendingNotifications({ notificationId: teacherNotice._id });
     await teacherNotice.reload?.();
     expect((await Notification.findById(teacherNotice._id).lean()).deliveryStatus).toBe("delivered");
+    const teacherInbox = await request("/portal/notifications", { token: teacher.token });
+    expect(teacherInbox.status).toBe(200);
+    expect(teacherInbox.body.data.some((item) => item.eventType === "message_received")).toBe(true);
   });
 
   it("allows the assigned teacher to reply and tracks unread and read state", async () => {
