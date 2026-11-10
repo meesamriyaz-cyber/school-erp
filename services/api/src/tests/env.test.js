@@ -163,6 +163,23 @@ describe("environment configuration", () => {
     expect(env.mongoUri).toBe(validEnv.MONGO_TEST_URI);
   });
 
+  it("does not require the production URI in development mode", async () => {
+    const { default: env } = await importEnv({
+      NODE_ENV: "development",
+      MONGO_URI: "",
+    });
+
+    expect(env.mongoUri).toBe(validEnv.MONGO_DEV_URI);
+  });
+
+  it("requires MONGO_URI in production mode", async () => {
+    await expect(importEnv({
+      NODE_ENV: "production",
+      MONGO_URI: "",
+      WEB_URL: "https://example.com",
+    })).rejects.toThrow("MONGO_URI is required when NODE_ENV=production");
+  });
+
   it("requires MONGO_TEST_URI in test mode", async () => {
     await expect(
       importEnv({ MONGO_TEST_URI: "" }),
