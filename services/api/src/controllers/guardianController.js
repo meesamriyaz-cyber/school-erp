@@ -40,12 +40,10 @@ const validateBody = (body, res, allowedFields) => {
   return pick(body, allowedFields);
 };
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\export const listGuardians = async (req, res, next) => {
-  try {
-    const guardians = await Guardian.find({ tenantId: req.tenantId }).sort({ firstName: 1, lastName: 1, _id: 1 }).lean();
-    return res.status(200).json({ success: true, data: guardians });
-  } catch (error) { return next(error); }
-};");
+const escapeRegex = (value) => value.split("").map((character) => {
+  const specialCharacters = ".*+?^${}()|[]\\";
+  return specialCharacters.includes(character) ? String.fromCharCode(92) + character : character;
+}).join("");
 
 export const listGuardians = async (req, res, next) => {
   try {
