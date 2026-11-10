@@ -73,11 +73,22 @@ export default function HomeworkManagement() {
   const toggleSubmissions = async (item) => {
     if (expandedHomework === item._id) { setExpandedHomework(""); return; }
     setExpandedHomework(item._id);
-    if (submissions[item._id]) return;
+    setSubmissions((current) => ({ ...current, [item._id]: { ...(current[item._id] || {}), loading: true } }));
     try {
       const response = await apiRequest(`/homework/${item._id}/submissions`, { accessToken });
-      setSubmissions((current) => ({ ...current, [item._id]: response.data || [] }));
-    } catch (err) { setError(err.message || "Unable to load submissions."); }
+      setSubmissions((current) => ({
+        ...current,
+        [item._id]: {
+          data: response.data || [],
+          roster: response.roster || [],
+          summary: response.summary || { assigned: 0, submitted: (response.data || []).length, pending: 0, reviewed: 0 },
+          loading: false,
+        },
+      }));
+    } catch (err) {
+      setSubmissions((current) => ({ ...current, [item._id]: { ...(current[item._id] || {}), loading: false } }));
+      setError(err.message || "Unable to load submissions.");
+    }
   };
 
   const reviewSubmission = async (item, submission) => {
@@ -88,7 +99,21 @@ export default function HomeworkManagement() {
         method: "PATCH", accessToken,
         body: { marksObtained: form.marksObtained || null, maxMarks: form.maxMarks || null, feedback: form.feedback || "" },
       });
-      setSubmissions((current) => ({ ...current, [item._id]: current[item._id].map((row) => row._id === submission._id ? response.data : row) }));
+      setSubmissions((current) => {
+        const currentRegister = current[item._id] || { data: [], roster: [], summary: {} };
+        const data = currentRegister.data.map((row) => row._id === submission._id ? response.data : row);
+        const reviewed = data.filter((row) => row.status === "reviewed").length;
+        return {
+          ...current,
+          [item._id]: {
+            ...currentRegister,
+            data,
+            summary: { ...currentRegister.summary, reviewed },
+            roster: currentRegister.roster.map((row) => row.submissionId === submission._id
+              ? { ...row, submissionStatus: "reviewed" } : row),
+          },
+        };
+      });
       setNotice("Submission reviewed successfully.");
     } catch (err) { setError(err.message || "Unable to review submission."); }
   };
@@ -122,16 +147,35 @@ export default function HomeworkManagement() {
       {loading ? <p className="homework-empty">Loading assignments…</p> : items.length ? <div className="homework-list">{items.map((item) => <div className="homework-item" key={item._id}>
         <div className="homework-item-main"><div><strong>{item.title}</strong><span>{item.classId?.name || "Class"}{item.sectionId?.name ? ` · Section ${item.sectionId.name}` : " · All sections"} · {item.subjectId?.name || "Subject"}</span></div><em className={`homework-status status-${item.status}`}>{item.status}</em></div>
         <p>{item.instructions}</p><footer><span>Assigned {new Date(item.assignedDate).toLocaleDateString("en-IN")} · Due {new Date(item.dueDate).toLocaleDateString("en-IN")}</span><div className="homework-item-actions"><button type="button" onClick={() => void toggleSubmissions(item)}>{expandedHomework === item._id ? "Hide submissions" : "View submissions"}</button><button type="button" onClick={() => void updateStatus(item, item.status === "published" ? "draft" : "published")}>{item.status === "published" ? "Move to draft" : "Publish"}</button></div></footer>
-        {expandedHomework === item._id && <div className="homework-submissions"><h4>Student submissions ({(submissions[item._id] || []).length})</h4>{!submissions[item._id] ? <p>Loading submissions…</p> : submissions[item._id].length ? submissions[item._id].map((submission) => <article className="homework-submission" key={submission._id}>
-          <div className="homework-submission-heading"><strong>{[submission.studentId?.firstName, submission.studentId?.lastName].filter(Boolean).join(" ") || "Student"} · {submission.studentId?.admissionNumber || ""}</strong><em className={`homework-status status-${submission.status}`}>{submission.status}</em></div>
-          <p className="homework-submission-answer">{submission.answer}</p>
-          {submission.status === "reviewed" ? <p className="homework-review-summary">{submission.marksObtained !== null ? `Marks: ${submission.marksObtained}/${submission.maxMarks}. ` : ""}{submission.feedback || "Reviewed without written feedback."}</p> : <div className="homework-review-form">
-            <label>Marks<input type="number" min="0" step="0.5" value={reviewForms[submission._id]?.marksObtained || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], marksObtained: e.target.value } }))} /></label>
-            <label>Out of<input type="number" min="0.5" step="0.5" value={reviewForms[submission._id]?.maxMarks || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], maxMarks: e.target.value } }))} /></label>
-            <label className="homework-review-feedback">Feedback<textarea rows="2" maxLength="3000" value={reviewForms[submission._id]?.feedback || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], feedback: e.target.value } }))} /></label>
-            <button type="button" onClick={() => void reviewSubmission(item, submission)}>Submit review</button>
-          </div>}
-        </article>) : <p>No submissions received yet.</p>}</div>}
+        {expandedHomework === item._id && <div className="homework-submissions">
+          <div className="homework-register-heading"><h4>Submission register</h4><button type="button" onClick={() => void toggleSubmissions(item)}>Refresh register</button></div>
+          {!submissions[item._id] || submissions[item._id].loading ? <p>Loading submission register…</p> : <>
+            <div className="homework-register-summary">
+              <span><strong>{submissions[item._id].summary?.assigned ?? 0}</strong> Assigned</span>
+              <span><strong>{submissions[item._id].summary?.submitted ?? 0}</strong> Submitted</span>
+              <span><strong>{submissions[item._id].summary?.pending ?? 0}</strong> Not submitted</span>
+              <span><strong>{submissions[item._id].summary?.reviewed ?? 0}</strong> Reviewed</span>
+            </div>
+            <div className="homework-roster">
+              <h5>Assigned students</h5>
+              {submissions[item._id].roster?.length ? submissions[item._id].roster.map((row) => <div className="homework-roster-row" key={row.enrollmentId}>
+                <span>{[row.studentId?.firstName, row.studentId?.lastName].filter(Boolean).join(" ") || "Student"} · {row.studentId?.admissionNumber || "No admission number"}</span>
+                <em className={`homework-status status-${row.submissionStatus}`}>{row.submissionStatus.replaceAll("_", " ")}</em>
+              </div>) : <p>No students are currently assigned to this class scope.</p>}
+            </div>
+            <h5>Submitted answers</h5>
+            {submissions[item._id].data?.length ? submissions[item._id].data.map((submission) => <article className="homework-submission" key={submission._id}>
+              <div className="homework-submission-heading"><strong>{[submission.studentId?.firstName, submission.studentId?.lastName].filter(Boolean).join(" ") || "Student"} · {submission.studentId?.admissionNumber || ""}</strong><em className={`homework-status status-${submission.status}`}>{submission.status}</em></div>
+              <p className="homework-submission-answer">{submission.answer}</p>
+              {submission.status === "reviewed" ? <p className="homework-review-summary">{submission.marksObtained !== null ? `Marks: ${submission.marksObtained}/${submission.maxMarks}. ` : ""}{submission.feedback || "Reviewed without written feedback."}</p> : <div className="homework-review-form">
+                <label>Marks<input type="number" min="0" step="0.5" value={reviewForms[submission._id]?.marksObtained || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], marksObtained: e.target.value } }))} /></label>
+                <label>Out of<input type="number" min="0.5" step="0.5" value={reviewForms[submission._id]?.maxMarks || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], maxMarks: e.target.value } }))} /></label>
+                <label className="homework-review-feedback">Feedback<textarea rows="2" maxLength="3000" value={reviewForms[submission._id]?.feedback || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], feedback: e.target.value } }))} /></label>
+                <button type="button" onClick={() => void reviewSubmission(item, submission)}>Submit review</button>
+              </div>}
+            </article>) : <p>No submissions received yet.</p>}
+          </>}
+        </div>}
       </div>)}</div> : <p className="homework-empty">No homework has been created yet.</p>}
     </article>
   </section>;

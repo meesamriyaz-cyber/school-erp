@@ -38,12 +38,28 @@ export const listHomeworkSubmissions = async (req, res, next) => {
       tenantId: req.tenantId, academicYearId: homework.academicYearId, classId: homework.classId,
       status: { $in: ["active", "completed", "transferred"] },
       ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
-    }).select("_id studentId").lean();
+    }).populate("studentId", "admissionNumber firstName lastName").select("_id studentId").lean();
     const data = await HomeworkSubmission.find({
       tenantId: req.tenantId, homeworkId: homework._id, enrollmentId: { $in: enrollments.map((item) => item._id) },
     }).populate("studentId", "admissionNumber firstName lastName")
       .populate("reviewedBy", "firstName lastName").sort({ submittedAt: -1 }).lean();
-    return res.status(200).json({ success: true, data, summary: { assigned: enrollments.length, submitted: data.length, reviewed: data.filter((item) => item.status === "reviewed").length } });
+    const submissionByEnrollment = new Map(data.map((item) => [String(item.enrollmentId), item]));
+    const roster = enrollments.filter((item) => item.studentId).map((enrollment) => {
+      const submission = submissionByEnrollment.get(String(enrollment._id)) || null;
+      return {
+        enrollmentId: enrollment._id,
+        studentId: enrollment.studentId,
+        submissionId: submission?._id || null,
+        submissionStatus: submission?.status || "not_submitted",
+        submittedAt: submission?.submittedAt || null,
+      };
+    });
+    const reviewed = data.filter((item) => item.status === "reviewed").length;
+    const submitted = data.length;
+    return res.status(200).json({
+      success: true, data, roster,
+      summary: { assigned: roster.length, submitted, pending: Math.max(roster.length - submitted, 0), reviewed },
+    });
   } catch (error) { return next(error); }
 };
 
@@ -63,10 +79,8 @@ export const submitHomework = async (req, res, next) => {
       ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
     }).select("_id").lean();
     if (!enrollment) return res.status(403).json({ success: false, message: "This homework is not assigned to your current or historical class enrollment" });
-    const existing = await HomeworkSubmission.findOne({ tenantId: req.tenantId, homeworkId: homework._id, enrollmentId: enrollment._id });
-    if (existing?.status === "reviewed") return res.status(409).json({ success: false, message: "This submission has already been reviewed and is locked" });
     const submission = await HomeworkSubmission.findOneAndUpdate(
-      { tenantId: req.tenantId, homeworkId: homework._id, enrollmentId: enrollment._id },
+      { tenantId: req.tenantId, homeworkId: homework._id, enrollmentId: enrollment._id, status: { $ne: "reviewed" } },
       { $set: { answer: req.body.answer.trim(), submittedAt: new Date(), status: "submitted", marksObtained: null, maxMarks: null, feedback: "", reviewedBy: null, reviewedAt: null },
         $setOnInsert: { tenantId: req.tenantId, homeworkId: homework._id, enrollmentId: enrollment._id, studentId: student._id } },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
@@ -95,17 +109,15 @@ export const reviewHomeworkSubmission = async (req, res, next) => {
     }
     const homework = await getHomeworkForTeacher(req, req.params.homeworkId);
     if (!homework) return res.status(404).json({ success: false, message: "Homework not found or access denied" });
-    const submission = await HomeworkSubmission.findOne({
-      _id: req.params.submissionId, tenantId: req.tenantId, homeworkId: homework._id, status: "submitted",
-    });
-    if (!submission) return res.status(404).json({ success: false, message: "Pending submission not found" });
-    submission.status = "reviewed";
-    submission.marksObtained = score;
-    submission.maxMarks = maximum;
-    submission.feedback = feedback.trim();
-    submission.reviewedBy = req.auth.userId;
-    submission.reviewedAt = new Date();
-    await submission.save();
+    const submission = await HomeworkSubmission.findOneAndUpdate(
+      { _id: req.params.submissionId, tenantId: req.tenantId, homeworkId: homework._id, status: "submitted" },
+      { $set: {
+        status: "reviewed", marksObtained: score, maxMarks: maximum,
+        feedback: feedback.trim(), reviewedBy: req.auth.userId, reviewedAt: new Date(),
+      } },
+      { new: true, runValidators: true },
+    );
+    if (!submission) return res.status(404).json({ success: false, message: "Pending submission not found or already reviewed" });
     return res.status(200).json({ success: true, data: submission });
   } catch (error) {
     if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "Review details are invalid");
