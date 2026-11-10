@@ -4,7 +4,6 @@ import AcademicYear from "../models/AcademicYear.js";
 import Section from "../models/Section.js";
 import Enrollment from "../models/Enrollment.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
-import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const CREATE_FIELDS = ["academicYearId", "name", "sortOrder", "status"];
 const UPDATE_FIELDS = ["name", "sortOrder", "status"];
