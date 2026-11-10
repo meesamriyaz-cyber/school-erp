@@ -87,7 +87,7 @@ export const issueCertificate = async (req, res, next) => {
       [created] = await Certificate.create([{
         tenantId: req.tenantId, studentId, enrollmentId, academicYearId: year._id, type,
         certificateNumber, verificationCode: randomBytes(18).toString("hex"),
-        issuedAt: now, issuedBy: req.auth.userId, reason: reason.trim(), remarks: remarks.trim(),
+        issuedAt: now, issuedBy: req.auth.userId, reason: type === "transfer" ? (transferAudit?.reason || reason.trim()) : reason.trim(), remarks: remarks.trim(),
         snapshot: makeSnapshot({ tenant: req.tenant, student, enrollment, year, schoolClass, section, transferReason: transferAudit?.reason || reason.trim() }),
         reissuedFrom: previous?._id || null,
       }], { session });
@@ -123,7 +123,7 @@ export const listCertificates = async (req, res, next) => {
 
 export const voidCertificate = async (req, res, next) => {
   try {
-    if (!validId(req.params.certificateId) || typeof req.body?.reason !== "string" || !req.body.reason.trim() || req.body.reason.trim().length > 500) return fail(res, 400, "A valid certificate and void reason (maximum 500 characters) are required");
+    if (!validId(req.params.certificateId) || !req.body || typeof req.body !== "object" || Array.isArray(req.body) || Object.keys(req.body).some((key) => key !== "reason") || typeof req.body.reason !== "string" || !req.body.reason.trim() || req.body.reason.trim().length > 500) return fail(res, 400, "A valid certificate and void reason (maximum 500 characters) are required");
     const data = await Certificate.findOneAndUpdate(
       { _id: req.params.certificateId, tenantId: req.tenantId, status: "issued" },
       { $set: { status: "void", voidedAt: new Date(), voidedBy: req.auth.userId, voidReason: req.body.reason.trim() } },
