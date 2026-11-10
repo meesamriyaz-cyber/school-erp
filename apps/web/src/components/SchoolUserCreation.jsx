@@ -6,9 +6,6 @@ import "./SchoolUserCreation.css";
 const ROLE_OPTIONS = [
   { value: "principal", label: "Principal" },
   { value: "teacher", label: "Teacher" },
-  { value: "accountant", label: "Accountant" },
-  { value: "librarian", label: "Librarian" },
-  { value: "transport_manager", label: "Transport manager" },
   { value: "student", label: "Student" },
   { value: "parent", label: "Parent" },
 ];
