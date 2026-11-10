@@ -1,5 +1,5 @@
 
-import "dotenv/config";
+import env from "../config/env.js";
 
 import mongoose from "mongoose";
 
@@ -25,13 +25,7 @@ const recoverPlatformAdmin = async () => {
     throw new Error("Recovery password exceeds the bcrypt limit of 72 bytes");
   }
 
-  const mongoUri = process.env.MONGO_URI;
-
-  if (!mongoUri) {
-    throw new Error("MONGO_URI is missing from services/api/.env");
-  }
-
-  await mongoose.connect(mongoUri);
+  await mongoose.connect(env.mongoUri);
 
   let dbSession;
 
