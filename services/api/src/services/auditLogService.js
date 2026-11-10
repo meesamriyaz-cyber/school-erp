@@ -73,19 +73,23 @@ export async function processPendingAuditEvents({
       const processingToken = randomUUID();
       const claimedAt = new Date();
       const outbox = await AuditOutbox.findOneAndUpdate(
-       {
-  ...(outboxId ? { _id: outboxId } : {}),
-  attempts: { $lt: MAX_ATTEMPTS },
-  $or: [
-    { status: "pending", nextAttemptAt: { $lte: claimedAt } },
-    {
-      status: "processing",
-      processingStartedAt: {
-        $lte: new Date(claimedAt.getTime() - PROCESSING_LEASE_MS),
-      },
-    },
-  ],
-},
+        {
+          ...(outboxId ? { _id: outboxId } : {}),
+          $or: [
+            {
+              status: "pending",
+              attempts: { $lt: MAX_ATTEMPTS },
+              nextAttemptAt: { $lte: claimedAt },
+            },
+            {
+              status: "processing",
+              attempts: { $lte: MAX_ATTEMPTS },
+              processingStartedAt: {
+                $lte: new Date(claimedAt.getTime() - PROCESSING_LEASE_MS),
+              },
+            },
+          ],
+        },
         { $set: { status: "processing", processingStartedAt: claimedAt, processingToken }, $inc: { attempts: 1 } },
         {
           returnDocument: "after",
@@ -93,11 +97,23 @@ export async function processPendingAuditEvents({
         },
       ).lean();
       if (!outbox) break;
-       // TEMPORARY B3.9 crash-recovery test instrumentation.
-      // TEMPORARY B3.9 crash-recovery test instrumentation.
-if (process.env.NODE_ENV === "test") {
 
-}
+      // A worker may crash during its final permitted attempt. Reclaim the
+      // expired lease once, then fail it without dispatching another delivery.
+      if (outbox.attempts > MAX_ATTEMPTS) {
+        await AuditOutbox.updateOne(
+          { _id: outbox._id, status: "processing", processingToken },
+          {
+            $set: {
+              status: "failed",
+              lastError: "Processing lease expired after the final attempt",
+            },
+            $unset: { processingStartedAt: 1, processingToken: 1 },
+          },
+        );
+        processed += 1;
+        continue;
+      }
       try {
         // The event payload is constructed from allowlisted fields before it enters the outbox.
         try {
