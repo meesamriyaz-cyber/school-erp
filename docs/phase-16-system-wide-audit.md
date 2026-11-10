@@ -37,7 +37,7 @@ Existing users already assigned unsupported roles still require a school-by-scho
 - Teacher assignment scoping is implemented in important workflows, including student records, enrollments, attendance, timetable, examinations/marks, homework, reports, announcements and parent-teacher messaging.
 - Student and parent portal data is derived from the authenticated student or active guardian-to-student links, including portal-access relationship rules.
 - Academic-year, enrollment-transfer, guardian-primary, examination snapshot/mark-audit, fee-payment reversal and audit-outbox workflows have transaction and integrity controls.
-- Schema index contracts are tested for important high-use collections.
+- Schema index contracts are tested for important high-use collections. These tests verify declared Mongoose schema indexes; they do not prove that production MongoDB has built those indexes or that real query plans meet performance targets.
 - Readiness checks include MongoDB connectivity and background-worker health, including stale-heartbeat detection.
 - Backup/recovery and deployment/rollback runbooks explicitly state that documentation is not evidence of a completed production drill.
 
@@ -202,7 +202,21 @@ The API exposes an authenticated change-password endpoint, but no corresponding 
 
 The notification worker validates that the recipient account is active and marks the database notification as delivered. The repository does not contain an email, SMS or mobile-push transport integration. The current verified capability is in-app notifications. If external delivery is promised for launch, that is an unmet release requirement.
 
-## 4. Production/operations gates not verifiable from repository CI
+## 4. First-release scope confirmations
+
+The repository evidence leaves these product decisions to be confirmed before release:
+
+1. **Web versus mobile:** the web application is the implemented client. The Expo mobile app remains a starter screen with no ERP workflows. A first release must be explicitly web-only, or mobile must be treated as a separate unfinished release surface.
+2. **Provisionable roles:** only platform administrator, school administrator, principal, teacher, student and parent have application workspaces. Accountant, librarian and transport-manager provisioning is now blocked; any legacy accounts with those roles must be reassigned or suspended.
+3. **Teacher guardian access:** the implemented policy now permits teachers to read guardian details only through an assigned-student context. School-wide guardian directory/detail access is restricted to school administrators and principals.
+4. **Notifications:** the verified capability is in-app notifications. No email, SMS or mobile-push transport provider is configured in the repository.
+5. **Fee payments:** the fee module records payments and receipts; no online payment-gateway integration was found. Confirm whether the first release requires online parent payments or only school-recorded payments.
+6. **Password onboarding/recovery:** school user creation requires an administrator-supplied initial password. A self-service change-password API exists, but no web UI or forgot/reset-password flow was found.
+7. **Browser acceptance:** automated API and component tests exist, but there is no browser-level end-to-end suite. Real role workflows still need a controlled acceptance pass using synthetic school data.
+
+These are scope/operational decisions, not authorization to add new modules during the freeze. Any new capability requires separate approval.
+
+## 5. Production/operations gates not verifiable from repository CI
 
 These require the actual hosting and database environments; passing local tests or GitHub Actions cannot substitute for them.
 
@@ -219,7 +233,7 @@ These require the actual hosting and database environments; passing local tests 
 
 The production deployment runbook must also be updated to require `VITE_API_BASE_URL` at frontend build time.
 
-## 5. Release role/workflow matrix
+## 6. Release role/workflow matrix
 
 | Role | Current workspace | Audit status |
 |---|---|---|
@@ -233,7 +247,7 @@ The production deployment runbook must also be updated to require `VITE_API_BASE
 | Librarian | No workspace | Not supported for this release unless scope is explicitly expanded |
 | Transport manager | No workspace | Not supported for this release unless scope is explicitly expanded |
 
-## 6. Recommended remediation order
+## 7. Recommended remediation order
 
 1. Close guardian privacy/assignment-scope exposure and replace permissive regression tests.
 2. Make role provisioning consistent with the workspaces actually supported; correct principal navigation.
@@ -243,7 +257,7 @@ The production deployment runbook must also be updated to require `VITE_API_BASE
 6. Add browser-level acceptance coverage for the release-critical role journeys; decide web-only versus mobile scope.
 7. Complete provider-specific backup, restore, deploy, rollback, shutdown, monitoring and load evidence.
 
-## 7. Freeze and release decision
+## 8. Freeze and release decision
 
 The core feature freeze remains in effect. Only audit-driven defect fixes, security/privacy fixes, reliability improvements, test coverage and release documentation are permitted without a separate scope approval.
 
