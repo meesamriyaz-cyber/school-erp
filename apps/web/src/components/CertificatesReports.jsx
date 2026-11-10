@@ -33,7 +33,6 @@ export default function CertificatesReports() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const selectedStudent = useMemo(() => students.find((item) => id(item) === studentId), [students, studentId]);
   const loadCertificates = async () => {
     const response = await apiRequest("/certificates?limit=100", { accessToken });
     setCertificates(response.data || []);
@@ -95,7 +94,7 @@ export default function CertificatesReports() {
         path = `/reports/fees${yearId ? `?academicYearId=${encodeURIComponent(yearId)}` : ""}`;
       }
       const response = await apiRequest(path, { accessToken });
-      setReport(response.data || response);
+      setReport(reportType === "history" ? response.data : response);
     } catch (err) { setError(err.message || "Unable to generate report."); }
     finally { setLoading(false); }
   };
@@ -114,7 +113,7 @@ export default function CertificatesReports() {
   const exportRows = () => {
     if (!report) return;
     let rows = [];
-    if (reportType === "strength") rows = report.map(({ academicYear, className, sectionName, active, completed, transferred, withdrawn }) => ({ academicYear, className, sectionName, active, completed, transferred, withdrawn }));
+    if (reportType === "strength") rows = (report.data || []).map(({ academicYear, className, sectionName, active, completed, transferred, withdrawn }) => ({ academicYear, className, sectionName, active, completed, transferred, withdrawn }));
     else if (reportType === "fees") rows = report.data.map((item) => ({
       invoiceNumber: item.invoiceNumber, student: nameOf(item.studentId), academicYear: item.academicYearId?.name,
       totalAmount: item.totalAmount, paidAmount: item.paidAmount, outstanding: Math.max(0, item.totalAmount - item.paidAmount),
@@ -179,7 +178,7 @@ export default function CertificatesReports() {
           <h4>Enrollment history</h4><div className="cr-table-wrap"><table><thead><tr><th>Academic year</th><th>Class</th><th>Section</th><th>From</th><th>To</th><th>Status</th></tr></thead><tbody>{report.enrollments.map((item) => <tr key={item._id}><td>{item.academicYearId?.name}</td><td>{item.classId?.name}</td><td>{item.sectionId?.name || "—"}</td><td>{new Date(item.enrollmentDate).toLocaleDateString()}</td><td>{item.endedAt ? new Date(item.endedAt).toLocaleDateString() : "—"}</td><td>{item.status}</td></tr>)}</tbody></table></div>
           <h4>Published examination results</h4><div className="cr-table-wrap"><table><thead><tr><th>Examination</th><th>Date</th><th>Score</th><th>Percentage</th><th>Grade</th><th>Status</th></tr></thead><tbody>{report.academicResults.map((item) => <tr key={item.examinationId}><td>{item.examinationName}</td><td>{new Date(item.startDate).toLocaleDateString()}</td><td>{item.result.totalObtained}/{item.result.totalMaximum}</td><td>{item.result.percentage}%</td><td>{item.result.grade || "—"}</td><td>{item.result.status}</td></tr>)}</tbody></table></div>
         </> : reportType === "strength" ? <>
-          <h3>Enrollment strength</h3><p>Total records: {report.summary?.totalStudents || 0}</p><div className="cr-table-wrap"><table><thead><tr><th>Year</th><th>Class</th><th>Section</th><th>Active</th><th>Completed</th><th>Transferred</th><th>Withdrawn</th></tr></thead><tbody>{report.map((item, index) => <tr key={index}><td>{item.academicYear}</td><td>{item.className}</td><td>{item.sectionName}</td><td>{item.active}</td><td>{item.completed}</td><td>{item.transferred}</td><td>{item.withdrawn}</td></tr>)}</tbody></table></div>
+          <h3>Enrollment strength</h3><p>Total records: {report.summary?.totalStudents || 0}</p><div className="cr-table-wrap"><table><thead><tr><th>Year</th><th>Class</th><th>Section</th><th>Active</th><th>Completed</th><th>Transferred</th><th>Withdrawn</th></tr></thead><tbody>{(report.data || []).map((item, index) => <tr key={index}><td>{item.academicYear}</td><td>{item.className}</td><td>{item.sectionName}</td><td>{item.active}</td><td>{item.completed}</td><td>{item.transferred}</td><td>{item.withdrawn}</td></tr>)}</tbody></table></div>
         </> : <>
           <h3>Fee collection report</h3><div className="cr-metrics"><span>Invoiced: ₹{report.summary?.invoiced ?? 0}</span><span>Outstanding: ₹{report.summary?.outstanding ?? 0}</span><span>Posted payments: ₹{report.summary?.postedPayments ?? 0}</span><span>Reversed payments: ₹{report.summary?.reversedPayments ?? 0}</span></div><div className="cr-table-wrap"><table><thead><tr><th>Invoice</th><th>Student</th><th>Total</th><th>Paid</th><th>Outstanding</th><th>Posted</th><th>Reversed</th></tr></thead><tbody>{report.data?.map((item) => <tr key={item._id}><td>{item.invoiceNumber}</td><td>{nameOf(item.studentId)}</td><td>₹{item.totalAmount}</td><td>₹{item.paidAmount}</td><td>₹{Math.max(0, item.totalAmount - item.paidAmount)}</td><td>₹{item.paymentSummary?.posted || 0}</td><td>₹{item.paymentSummary?.reversed || 0}</td></tr>)}</tbody></table></div>
         </>}
