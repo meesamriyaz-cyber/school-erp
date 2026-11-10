@@ -5,9 +5,21 @@ Never point `MONGO_TEST_URI` at a development or production database. The API
 environment loader rejects test database names that do not contain `test`, and
 database-backed suites verify the connected database before running.
 
+## Runtime database selection
+
+The API selects exactly one URI from `NODE_ENV`:
+
+| `NODE_ENV` | Required variable | Intended database |
+|---|---|---|
+| `development` | `MONGO_DEV_URI` | Separate development database (for example, `school-erp-dev`) |
+| `test` | `MONGO_TEST_URI` | Dedicated test database (`school-erp-test`) |
+| `production` | `MONGO_URI` | Production database only |
+
+Create a separate development database in Atlas before running the API in development mode. It may share the Atlas cluster with the other databases, but it must have a distinct database name and appropriately scoped credentials. The loader rejects an active URI that resolves to the same MongoDB host and database as another configured environment URI. Do not use the production URI for local development or CI.
+
 ## Local configuration
 
-Set these values in `services/api/.env`:
+Set these values in `services/api/.env` for backend tests:
 
 ```dotenv
 NODE_ENV=test
