@@ -92,8 +92,10 @@ for (const [variable, value] of Object.entries({
 }
 
 if (nodeEnv === "test") {
-  const databaseName = decodeURIComponent(
-    new URL(selectedMongoUri).pathname.replace(/^\/+/, "").split("/")[0] || ""
+  // getMongoTarget already parsed the MongoDB URI without WHATWG URL,
+  // which cannot handle comma-separated replica-set hosts.
+  const databaseName = selectedMongoTarget.slice(
+    selectedMongoTarget.lastIndexOf("/") + 1
   );
 
   if (!/test/i.test(databaseName)) {
