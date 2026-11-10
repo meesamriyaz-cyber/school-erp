@@ -93,8 +93,7 @@ describe("Certificates and school reports API", () => {
   });
 
   it("issues transfer certificates only from ended enrollment history", async () => {
-    const ended = await Enrollment.findById(activeEnrollment._id);
-    ended.status = "completed"; ended.endedAt = new Date("2026-10-31T00:00:00.000Z"); await ended.save();
+    const ended = await Enrollment.create({ tenantId: school._id, studentId: student._id, academicYearId: year._id, classId: schoolClass._id, enrollmentDate: "2026-04-01", status: "completed", endedAt: new Date("2026-10-31T00:00:00.000Z") });
     const issued = await post("/certificates", admin.token, { studentId: String(student._id), enrollmentId: String(ended._id), type: "transfer", reason: "Family relocation" });
     expect(issued.status).toBe(201);
     expect(issued.body.data.certificateNumber).toMatch(/^TC\\/\\d{4}\\/\\d{5}$/);
