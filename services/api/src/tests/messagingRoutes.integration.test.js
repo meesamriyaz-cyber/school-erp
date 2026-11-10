@@ -18,6 +18,7 @@ import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import Notification from "../models/Notification.js";
 import { createAccessToken } from "../utils/tokens.js";
+import { processPendingNotifications } from "../services/notificationDeliveryService.js";
 
 const TEST_DATABASE = "school-erp-test";
 let server, baseUrl, school, otherSchool, admin, parent, teacher, outsider, student, guardian, enrollment, assignment, link;
@@ -129,7 +130,11 @@ describe("Parent teacher messaging API integration", () => {
     expect(String(created.body.data.studentId._id)).toBe(String(student._id));
     const stored = await Message.findOne({ tenantId: school._id, conversationId: created.body.data._id }).lean();
     expect(stored).toMatchObject({ senderRole: "parent", body: "Could we discuss the homework?" });
-    expect(await Notification.countDocuments({ tenantId: school._id, recipientUserId: teacher.user._id, eventType: "message_received" })).toBe(1);
+    const teacherNotice = await Notification.findOne({ tenantId: school._id, recipientUserId: teacher.user._id, eventType: "message_received" });
+    expect(teacherNotice).toBeTruthy();
+    await processPendingNotifications({ notificationId: teacherNotice._id });
+    await teacherNotice.reload?.();
+    expect((await Notification.findById(teacherNotice._id).lean()).deliveryStatus).toBe("delivered");
   });
 
   it("allows the assigned teacher to reply and tracks unread and read state", async () => {
@@ -158,6 +163,26 @@ describe("Parent teacher messaging API integration", () => {
     await StudentGuardian.updateOne({ _id: link._id }, { $set: { status: "inactive" } });
     const response = await request(`/messaging/conversations/${conversation._id}/messages`, { token: parent.token });
     expect(response.status).toBe(404);
+  });
+
+  it("revokes teacher access when the related teaching assignment is deactivated", async () => {
+    const conversation = await Conversation.findOne({ tenantId: school._id, studentId: student._id }).lean();
+    await TeacherAssignment.updateOne({ _id: assignment._id }, { $set: { status: "inactive" } });
+    const response = await request(`/messaging/conversations/${conversation._id}/messages`, { token: teacher.token });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects unsupported conversation and message payload fields", async () => {
+    const conversation = await Conversation.findOne({ tenantId: school._id, studentId: student._id }).lean();
+    const create = await request("/messaging/conversations", {
+      method: "POST", token: parent.token,
+      body: JSON.stringify({ studentId: String(student._id), teacherId: String(teacher.user._id), message: "Hello", tenantId: String(otherSchool._id) }),
+    });
+    const send = await request(`/messaging/conversations/${conversation._id}/messages`, {
+      method: "POST", token: teacher.token, body: JSON.stringify({ body: "Hello", senderRole: "parent" }),
+    });
+    expect(create.status).toBe(400);
+    expect(send.status).toBe(400);
   });
 
   it("exposes only conversation metadata to school administrators", async () => {
