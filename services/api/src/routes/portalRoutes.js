@@ -20,7 +20,7 @@ router.get("/results", authorizeRoles("student", "parent"), getMyPublishedResult
 router.get("/homework", authorizeRoles("student", "parent"), getMyHomework);
 router.get("/homework-submissions", authorizeRoles("student", "parent"), getMyHomeworkSubmissions);
 router.get("/announcements", authorizeRoles("student", "parent"), getPortalAnnouncements);
-router.get("/notifications", authorizeRoles("student", "parent"), listMyNotifications);
-router.patch("/notifications/read-all", authorizeRoles("student", "parent"), markAllNotificationsRead);
-router.patch("/notifications/:notificationId/read", authorizeRoles("student", "parent"), markNotificationRead);
+router.get("/notifications", authorizeRoles("student", "parent", "teacher"), listMyNotifications);
+router.patch("/notifications/read-all", authorizeRoles("student", "parent", "teacher"), markAllNotificationsRead);
+router.patch("/notifications/:notificationId/read", authorizeRoles("student", "parent", "teacher"), markNotificationRead);
 export default router;
