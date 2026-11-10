@@ -142,7 +142,11 @@ export const listConversations = async (req, res, next) => {
         tenantId: req.tenantId, status: "active",
         $or: assignments.map((item) => ({ classId: item.classId, academicYearId: item.academicYearId, ...(item.sectionId ? { sectionId: item.sectionId } : {}) })),
       }).select("_id studentId").lean() : [];
-      filter.enrollmentId = { $in: enrollments.map((item) => item._id) };
+      const activeStudents = enrollments.length ? await Student.find({
+        tenantId: req.tenantId, _id: { $in: enrollments.map((item) => item.studentId) }, status: "active",
+      }).select("_id").lean() : [];
+      const activeStudentIds = new Set(activeStudents.map((item) => String(item._id)));
+      filter.enrollmentId = { $in: enrollments.filter((item) => activeStudentIds.has(String(item.studentId))).map((item) => item._id) };
     }
     const data = await Conversation.find(filter).populate(conversationPopulate)
       .sort({ lastMessageAt: -1, updatedAt: -1, _id: -1 }).limit(200).lean();
