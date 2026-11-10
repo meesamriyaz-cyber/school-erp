@@ -25,7 +25,7 @@ The following code-level findings have been addressed on the audit branch:
 | Portal partial failures | Student/parent portal now identifies failed sections and provides a retry action | Partial-failure/retry component test |
 | Production frontend API origin | Production Vite build now requires an HTTPS `VITE_API_BASE_URL` ending in `/api/v1`; CI uses a reserved non-deployable sentinel; example and deployment runbook updated | Frontend lint/build passed with the CI sentinel |
 
-**CI evidence:** run `42813380931` passed backend/MongoDB integration and frontend lint/tests/build on `16af2cd`. Follow-on commits normalize trailing slashes in the API client and remove an unnecessary field from the guardian list projection; the latest branch-head run must also pass before the remediation batch is declared verified.
+**CI evidence:** run `42813648223` passed backend/MongoDB integration and frontend lint/tests/build on code commit `82107b5`. It reported 85 backend test files with 794 tests and 34 frontend test files with 254 tests; frontend lint and production build also passed. The branch-head commit `5ad261f` contains only audit documentation updates and its CI run is pending.
 
 Existing users already assigned unsupported roles still require a school-by-school review and reassignment or suspension before launch; blocking new assignments does not automatically migrate legacy accounts.
 
