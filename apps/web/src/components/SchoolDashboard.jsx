@@ -34,7 +34,7 @@ export default function SchoolDashboard({ accessToken, academicYearId, onNavigat
         if (!controller.signal.aborted && requestError.name !== "AbortError") {
           setResult({ key: requestKey, data: null, error: requestError.message || "Unable to load school analytics." });
         }
-      })
+      });
     return () => controller.abort();
   }, [accessToken, academicYearId, retryCount, requestKey]);
 
