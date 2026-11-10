@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./GuardianDirectory.css";
@@ -28,8 +28,10 @@ export default function GuardianDirectory() {
   const { accessToken } = useAuth();
   const [guardians, setGuardians] = useState([]);
   const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -52,18 +54,30 @@ export default function GuardianDirectory() {
     async function loadGuardians() {
       setLoading(true);
       setError("");
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (search) params.set("search", search);
+      if (statusFilter) params.set("status", statusFilter);
       try {
-        const response = await apiRequest("/guardians", {
+        const response = await apiRequest("/guardians?" + params.toString(), {
           accessToken,
           signal: controller.signal,
         });
         if (!response?.success || !Array.isArray(response.data)) {
           throw new Error("The server returned an unexpected guardian directory response.");
         }
-        if (!controller.signal.aborted) setGuardians(response.data);
+        if (!controller.signal.aborted) {
+          setGuardians(response.data);
+          setPagination(response.pagination || {
+            page,
+            limit: PAGE_SIZE,
+            total: response.data.length,
+            totalPages: response.data.length ? 1 : 0,
+          });
+        }
       } catch (requestError) {
         if (requestError.name !== "AbortError" && !controller.signal.aborted) {
           setGuardians([]);
+          setPagination({ page, limit: PAGE_SIZE, total: 0, totalPages: 0 });
           setError(requestError.message || "Unable to load guardians.");
         }
       } finally {
@@ -73,28 +87,16 @@ export default function GuardianDirectory() {
 
     void loadGuardians();
     return () => controller.abort();
-  }, [accessToken, refreshKey]);
+  }, [accessToken, refreshKey, page, search, statusFilter]);
 
-  const filteredGuardians = useMemo(() => {
-    const query = searchInput.trim().toLocaleLowerCase();
-    return guardians.filter((guardian) => {
-      if (statusFilter && guardian.status !== statusFilter) return false;
-      if (!query) return true;
-      return [
-        guardian.firstName,
-        guardian.lastName,
-        guardian.phone,
-        guardian.email,
-      ].some((value) => String(value || "").toLocaleLowerCase().includes(query));
-    });
-  }, [guardians, searchInput, statusFilter]);
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(searchInput.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredGuardians.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Number(pagination.totalPages) || 1);
   const currentPage = Math.min(page, totalPages);
-  const visibleGuardians = filteredGuardians.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const visibleGuardians = guardians;
 
   const openGuardian = async (guardian) => {
     setSelectedGuardian(null);
@@ -239,8 +241,8 @@ export default function GuardianDirectory() {
           <p>View guardian contact records registered with your school.</p>
         </div>
         <div className="guardian-directory-total" aria-live="polite">
-          <strong>{filteredGuardians.length}</strong>
-          <span>{filteredGuardians.length === 1 ? "guardian" : "guardians"} found</span>
+          <strong>{pagination.total}</strong>
+          <span>{pagination.total === 1 ? "guardian" : "guardians"} found</span>
         </div>
       </div>
 
@@ -457,9 +459,9 @@ export default function GuardianDirectory() {
 
       <div className="guardian-directory-pagination">
         <span>
-          {filteredGuardians.length === 0
+          {pagination.total === 0
             ? "No records"
-            : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredGuardians.length)} of ${filteredGuardians.length}`}
+            : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, pagination.total)} of ${pagination.total}`}
         </span>
         <div>
           <button type="button" disabled={currentPage <= 1 || loading} onClick={() => setPage((current) => current - 1)}>Previous</button>
