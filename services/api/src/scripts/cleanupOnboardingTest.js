@@ -1,10 +1,9 @@
-import "dotenv/config";
-
 import mongoose from "mongoose";
 
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import Session from "../models/Session.js";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 const SCHOOL_ID = "6acb5132ccf1ce038b184068";
 const ADMIN_ID = "6acb5132ccf1ce038b184069";
@@ -12,7 +11,7 @@ const SCHOOL_SLUG = "tenant-context-test-988ef89e";
 const ADMIN_EMAIL = "tenant-test-988ef89e@example.com";
 
 const cleanup = async () => {
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(getTestDatabaseUri());
 
   let dbSession;
 
