@@ -83,7 +83,7 @@ export const issueCertificate = async (req, res, next) => {
       }], { session });
     });
     const data = await Certificate.findOne({ _id: created._id, tenantId: req.tenantId })
-      .select("-verificationCode").populate("issuedBy", "firstName lastName").lean();
+      .select("+verificationCode").populate("issuedBy", "firstName lastName").lean();
     return res.status(201).json({ success: true, data });
   } catch (error) {
     if (error.statusCode) return fail(res, error.statusCode, error.message);
