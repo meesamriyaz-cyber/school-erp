@@ -50,8 +50,15 @@ async function authorizeConversation(req, conversation) {
   if (!conversation || String(conversation.tenantId) !== String(req.tenantId)) return false;
   if (req.auth.role === "parent") {
     if (String(conversation.parentUserId) !== String(req.auth.userId)) return false;
-    const context = await parentContext(req, conversation.studentId);
-    return !context.error && String(context.guardian._id) === String(conversation.guardianId);
+    const [context, activeEnrollment] = await Promise.all([
+      parentContext(req, conversation.studentId),
+      Enrollment.exists({
+        _id: conversation.enrollmentId, tenantId: req.tenantId,
+        studentId: conversation.studentId, status: "active",
+      }),
+    ]);
+    return !context.error && Boolean(activeEnrollment)
+      && String(context.guardian._id) === String(conversation.guardianId);
   }
   if (req.auth.role === "teacher") {
     return String(conversation.teacherUserId) === String(req.auth.userId)
@@ -120,8 +127,13 @@ export const listConversations = async (req, res, next) => {
     if (req.auth.role === "parent") {
       const context = await parentContext(req);
       if (context.error) return res.status(200).json({ success: true, data: [] });
+      const activeEnrollments = await Enrollment.find({
+        tenantId: req.tenantId, studentId: { $in: context.studentIds }, status: "active",
+      }).select("_id").lean();
+      if (!activeEnrollments.length) return res.status(200).json({ success: true, data: [] });
       filter.parentUserId = req.auth.userId;
       filter.studentId = { $in: context.studentIds };
+      filter.enrollmentId = { $in: activeEnrollments.map((item) => item._id) };
     } else {
       filter.teacherUserId = req.auth.userId;
       const assignments = await TeacherAssignment.find({ tenantId: req.tenantId, teacherId: req.auth.userId, status: "active" }).select("classId sectionId academicYearId").lean();
