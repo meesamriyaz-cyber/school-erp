@@ -158,6 +158,21 @@ describe("Parent teacher messaging API integration", () => {
     expect(response.status).toBe(404);
   });
 
+  it("preserves closed conversation history and allows an authorized parent to reopen it", async () => {
+    const conversation = await Conversation.findOne({ tenantId: school._id, studentId: student._id }).lean();
+    const closed = await request(`/messaging/conversations/${conversation._id}/close`, { method: "PATCH", token: teacher.token });
+    expect(closed.status).toBe(200);
+    expect((await Conversation.findById(conversation._id).lean()).status).toBe("closed");
+    const history = await request(`/messaging/conversations/${conversation._id}/messages`, { token: teacher.token });
+    expect(history.status).toBe(200);
+    const reopened = await request("/messaging/conversations", {
+      method: "POST", token: parent.token,
+      body: JSON.stringify({ studentId: String(student._id), teacherId: String(teacher.user._id), message: "Following up on our earlier discussion." }),
+    });
+    expect(reopened.status).toBe(201);
+    expect(reopened.body.data.status).toBe("open");
+  });
+
   it("revokes parent access immediately when the guardian relationship is deactivated", async () => {
     const conversation = await Conversation.findOne({ tenantId: school._id, studentId: student._id }).lean();
     await StudentGuardian.updateOne({ _id: link._id }, { $set: { status: "inactive" } });
