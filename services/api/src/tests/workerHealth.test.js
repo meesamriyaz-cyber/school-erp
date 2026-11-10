@@ -1,6 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("../services/workerHealth.js", async (importOriginal) => importOriginal());
+import { describe, expect, it } from "vitest";
 
 import {
   getBackgroundWorkerHealth,
