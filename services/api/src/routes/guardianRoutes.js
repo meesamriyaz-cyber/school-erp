@@ -14,9 +14,9 @@ const router = Router();
 
 router.use(authenticate, requireActiveTenant);
 
-router.get("/", authorizeRoles("school_admin", "principal", "teacher"), listGuardians);
+router.get("/", authorizeRoles("school_admin", "principal"), listGuardians);
 router.post("/", authorizeRoles("school_admin", "principal"), createGuardian);
-router.get("/:guardianId", authorizeRoles("school_admin", "principal", "teacher"), getGuardian);
+router.get("/:guardianId", authorizeRoles("school_admin", "principal"), getGuardian);
 router.patch("/:guardianId", authorizeRoles("school_admin", "principal"), updateGuardian);
 router.post("/:guardianId/account", authorizeRoles("school_admin", "principal"), linkGuardianAccount);
 
