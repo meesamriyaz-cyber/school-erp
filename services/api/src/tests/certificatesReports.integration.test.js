@@ -11,6 +11,7 @@ import Student from "../models/Student.js";
 import AcademicYear from "../models/AcademicYear.js";
 import SchoolClass from "../models/SchoolClass.js";
 import Enrollment from "../models/Enrollment.js";
+import Attendance from "../models/Attendance.js";
 import Certificate from "../models/Certificate.js";
 import CertificateCounter from "../models/CertificateCounter.js";
 import { createAccessToken } from "../utils/tokens.js";
@@ -43,7 +44,7 @@ describe("Certificates and school reports API", () => {
     if (!match || decodeURIComponent(match[1]) !== TEST_DB) throw new Error(`Safety stop: expected ${TEST_DB}`);
     await mongoose.connect(env.mongoUri, { serverSelectionTimeoutMS: 10000 });
     if (mongoose.connection.name !== TEST_DB) throw new Error("Safety stop: unexpected test database");
-    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), Certificate.init(), CertificateCounter.init()]);
+    await Promise.all([Tenant.init(), User.init(), Student.init(), AcademicYear.init(), SchoolClass.init(), Enrollment.init(), Certificate.init(), CertificateCounter.init(), Attendance.init()]);
     school = await createSchool("A"); otherSchool = await createSchool("B");
     admin = await createAdmin(school); otherAdmin = await createAdmin(otherSchool);
     year = await AcademicYear.create({ tenantId: school._id, name: `AY-${randomUUID().slice(0, 7)}`, startDate: "2026-04-01", endDate: "2027-03-31", status: "active" });
@@ -60,6 +61,7 @@ describe("Certificates and school reports API", () => {
     if (mongoose.connection.readyState === 1) {
       await Certificate.deleteMany({ tenantId: { $in: tenantIds } });
       await CertificateCounter.deleteMany({ tenantId: { $in: tenantIds } });
+      await Attendance.deleteMany({ tenantId: { $in: tenantIds } });
       await Enrollment.deleteMany({ tenantId: { $in: tenantIds } });
       await Student.deleteMany({ tenantId: { $in: tenantIds } });
       await SchoolClass.deleteMany({ tenantId: { $in: tenantIds } });
@@ -96,12 +98,18 @@ describe("Certificates and school reports API", () => {
   });
 
   it("issues transfer certificates only from ended enrollment history", async () => {
-    const ended = await Enrollment.create({ tenantId: school._id, studentId: student._id, academicYearId: year._id, classId: schoolClass._id, enrollmentDate: "2026-04-01", status: "completed", endedAt: new Date("2026-10-31T00:00:00.000Z") });
+    const historicalClass = await SchoolClass.create({ tenantId: school._id, academicYearId: year._id, name: "Class 8" });
+    const ended = await Enrollment.create({ tenantId: school._id, studentId: student._id, academicYearId: year._id, classId: historicalClass._id, enrollmentDate: "2026-04-01", status: "completed", endedAt: new Date("2026-10-31T00:00:00.000Z") });
+    await Attendance.create({ tenantId: school._id, studentId: student._id, enrollmentId: ended._id, academicYearId: year._id, classId: historicalClass._id, sectionId: null, date: new Date("2026-10-15T00:00:00.000Z"), status: "present", markedBy: admin.user._id });
     const issued = await post("/certificates", admin.token, { studentId: String(student._id), enrollmentId: String(ended._id), type: "transfer", reason: "Family relocation" });
     expect(issued.status).toBe(201);
     expect(issued.body.data.certificateNumber).toMatch(new RegExp("^TC/[0-9]{4}/[0-9]{5}$"));
     expect(issued.body.data.snapshot.enrollmentStatus).toBe("completed");
+    expect(issued.body.data.snapshot.className).toBe("Class 8");
     expect(issued.body.data.snapshot.transferReason).toBe("Family relocation");
+    const attendance = await request(`/attendance/reports?academicYearId=${year._id}&from=2026-10-01&to=2026-10-31`, { token: admin.token });
+    expect(attendance.status).toBe(200);
+    expect(attendance.body.students.find((item) => String(item.enrollmentId) === String(ended._id)).present).toBe(1);
   });
 
   it("rejects transfer certificates for active enrollments and rejects forged snapshot fields", async () => {
