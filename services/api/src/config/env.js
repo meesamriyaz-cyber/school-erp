@@ -56,10 +56,10 @@ const getMongoTarget = (uri) => {
     const firstHost = hosts[0];
     const normalizedHost = firstHost.startsWith("[")
       ? firstHost.slice(1, firstHost.indexOf("]")).toLowerCase()
-      : firstHost.replace(/:\\d+$/, "").toLowerCase();
+      : firstHost.replace(/:\d+$/, "").toLowerCase();
     const databasePath = pathAndQuery.split(/[?#]/, 1)[0];
     const databaseName = decodeURIComponent(
-      databasePath.replace(/^\\/+/, "").split("/")[0] || ""
+      databasePath.replace(/^\/+//, "").split("/")[0] || ""
     );
 
     if (!normalizedHost || !databaseName) return "";
