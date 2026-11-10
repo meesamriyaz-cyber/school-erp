@@ -23,6 +23,10 @@ import User from "../models/User.js";
 import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
+import AcademicYear from "../models/AcademicYear.js";
+import SchoolClass from "../models/SchoolClass.js";
+import Enrollment from "../models/Enrollment.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 import { createAccessToken } from "../utils/tokens.js";
 
 const EXPECTED_TEST_DATABASE = "school-erp-test";
@@ -112,6 +116,41 @@ const createStudent = async (token) => {
   return response.body.data;
 };
 
+const assignTeacherToStudent = async (student, teacher = teacherA) => {
+  const academicYear = await AcademicYear.create({
+    tenantId: schoolA._id,
+    name: "Test " + randomUUID().slice(0, 8),
+    startDate: new Date("2026-04-01T00:00:00.000Z"),
+    endDate: new Date("2027-03-31T00:00:00.000Z"),
+    status: "draft",
+  });
+  const schoolClass = await SchoolClass.create({
+    tenantId: schoolA._id,
+    academicYearId: academicYear._id,
+    name: "Class " + randomUUID().slice(0, 8),
+    sortOrder: 1,
+    status: "active",
+  });
+  await Enrollment.create({
+    tenantId: schoolA._id,
+    studentId: student._id,
+    academicYearId: academicYear._id,
+    classId: schoolClass._id,
+    enrollmentDate: new Date("2026-04-01T00:00:00.000Z"),
+    status: "active",
+  });
+  await TeacherAssignment.create({
+    tenantId: schoolA._id,
+    teacherId: teacher.user._id,
+    subjectId: new mongoose.Types.ObjectId(),
+    academicYearId: academicYear._id,
+    classId: schoolClass._id,
+    sectionId: null,
+    status: "active",
+    assignedBy: adminA.user._id,
+  });
+};
+
 const guardianPayload = (firstName = "Imran") => ({
   firstName,
   lastName: "Khan",
@@ -183,6 +222,10 @@ describe("Guardian API integration tests", () => {
       Student.init(),
       Guardian.init(),
       StudentGuardian.init(),
+      AcademicYear.init(),
+      SchoolClass.init(),
+      Enrollment.init(),
+      TeacherAssignment.init(),
     ]);
 
     schoolA = await createSchool("alpha");
@@ -215,6 +258,10 @@ describe("Guardian API integration tests", () => {
 
     if (mongoose.connection.readyState === 1) {
       if (createdTenantIds.length) {
+        await TeacherAssignment.deleteMany({ tenantId: { $in: createdTenantIds } });
+        await Enrollment.deleteMany({ tenantId: { $in: createdTenantIds } });
+        await SchoolClass.deleteMany({ tenantId: { $in: createdTenantIds } });
+        await AcademicYear.deleteMany({ tenantId: { $in: createdTenantIds } });
         await StudentGuardian.deleteMany({
           tenantId: { $in: createdTenantIds },
         });
@@ -313,14 +360,22 @@ describe("Guardian API integration tests", () => {
     expect(response.body.success).toBe(false);
   });
 
-  it("allows a teacher to list guardians", async () => {
+  it("prevents a teacher from listing the school-wide guardian directory", async () => {
     const response = await request("/guardians", {
       token: teacherA.token,
     });
 
-    expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-    expect(Array.isArray(response.body.data)).toBe(true);
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
+  });
+
+  it("prevents a teacher from retrieving guardian-wide linked student details", async () => {
+    const guardian = await createGuardian(adminA.token);
+    const response = await request("/guardians/" + guardian._id, {
+      token: teacherA.token,
+    });
+    expect(response.status).toBe(403);
+    expect(response.body.success).toBe(false);
   });
 
   it("returns only guardians belonging to the requesting school", async () => {
@@ -850,32 +905,23 @@ describe("Guardian API integration tests", () => {
     expect(response.status).toBe(400);
   });
 
-  it("allows a teacher to view a student's guardians", async () => {
+  it("allows a teacher to view guardian details only for an assigned student", async () => {
     const student = await createStudent(adminA.token);
     const guardian = await createGuardian(adminA.token);
-
-    const linkResponse = await request(
-      `/students/${student._id}/guardians`,
-      {
-        method: "POST",
-        token: adminA.token,
-        body: JSON.stringify({
-          guardianId: String(guardian._id),
-          relationship: "father",
-        }),
-      },
-    );
-
+    const linkResponse = await request("/students/" + student._id + "/guardians", {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ guardianId: String(guardian._id), relationship: "father" }),
+    });
     expect(linkResponse.status).toBe(201);
 
-    const response = await request(
-      `/students/${student._id}/guardians`,
-      { token: teacherA.token },
-    );
+    await assignTeacherToStudent(student);
 
+    const response = await request("/students/" + student._id + "/guardians", {
+      token: teacherA.token,
+    });
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
-    expect(Array.isArray(response.body.data)).toBe(true);
     expect(response.body.data).toHaveLength(2);
     const linkedGuardian = response.body.data.find((item) => String(item.guardianId?._id) === String(guardian._id));
     expect(linkedGuardian.guardianId).toMatchObject({
@@ -885,6 +931,22 @@ describe("Guardian API integration tests", () => {
       email: guardian.email,
     });
     expect(linkedGuardian.auditTrail).toBeUndefined();
+  });
+
+  it("prevents a teacher from viewing guardian details for an unassigned student", async () => {
+    const student = await createStudent(adminA.token);
+    const guardian = await createGuardian(adminA.token);
+    const linkResponse = await request("/students/" + student._id + "/guardians", {
+      method: "POST",
+      token: adminA.token,
+      body: JSON.stringify({ guardianId: String(guardian._id), relationship: "father" }),
+    });
+    expect(linkResponse.status).toBe(201);
+
+    const response = await request("/students/" + student._id + "/guardians", {
+      token: teacherA.token,
+    });
+    expect(response.status).toBe(404);
   });
 
   it("prevents a teacher from creating a student-guardian link", async () => {
