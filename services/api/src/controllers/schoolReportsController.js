@@ -152,8 +152,6 @@ import FeeInvoice from "../models/FeeInvoice.js";
 import FeePayment from "../models/FeePayment.js";
 import { loadResultContext } from "./examResultController.js";
 
-const validId = mongoose.isValidObjectId;
-const fail = (res, status, message) => res.status(status).json({ success: false, message });
 
 export const getDashboardOverview = async (req, res, next) => {
   try {
