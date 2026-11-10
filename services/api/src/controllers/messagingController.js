@@ -30,7 +30,7 @@ async function parentContext(req, studentId = null) {
 }
 
 async function teacherCanAccessConversation(req, conversation) {
-  const [enrollment, assignment] = await Promise.all([
+  const [enrollment, assignment, student] = await Promise.all([
     Enrollment.findOne({
       _id: conversation.enrollmentId, tenantId: req.tenantId, studentId: conversation.studentId,
       status: "active",
@@ -39,8 +39,9 @@ async function teacherCanAccessConversation(req, conversation) {
       _id: conversation.teacherAssignmentId, tenantId: req.tenantId,
       teacherId: req.auth.userId, status: "active",
     }).select("_id classId sectionId academicYearId").lean(),
+    Student.findOne({ _id: conversation.studentId, tenantId: req.tenantId, status: "active" }).select("_id").lean(),
   ]);
-  if (!enrollment || !assignment) return false;
+  if (!enrollment || !assignment || !student) return false;
   return String(enrollment.classId) === String(assignment.classId)
     && String(enrollment.academicYearId) === String(assignment.academicYearId)
     && (!assignment.sectionId || String(assignment.sectionId) === String(enrollment.sectionId));
