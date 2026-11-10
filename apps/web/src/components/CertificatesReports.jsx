@@ -23,7 +23,9 @@ export default function CertificatesReports() {
   const [enrollmentId, setEnrollmentId] = useState("");
   const [certificateType, setCertificateType] = useState("bonafide");
   const [reason, setReason] = useState("");
+  const [reissuedFrom, setReissuedFrom] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [reissueDraft, setReissueDraft] = useState(null);
   const [certificates, setCertificates] = useState([]);
   const [issued, setIssued] = useState(null);
   const [reportType, setReportType] = useState("history");
@@ -62,10 +64,11 @@ export default function CertificatesReports() {
       .then((response) => {
         if (controller.signal.aborted) return;
         setEnrollments(response.data || []);
-        setEnrollmentId("");
+        setEnrollmentId(reissueDraft ? id(reissueDraft.enrollmentId) : "");
+        setReissueDraft(null);
       }).catch((err) => { if (err.name !== "AbortError") setError(err.message || "Unable to load enrollment history."); });
     return () => controller.abort();
-  }, [accessToken, studentId]);
+  }, [accessToken, studentId, reissueDraft]);
 
   const issue = async (event) => {
     event.preventDefault(); setError(""); setNotice(""); setIssued(null);
@@ -74,8 +77,10 @@ export default function CertificatesReports() {
     try {
       const response = await apiRequest("/certificates", { method: "POST", accessToken, body: {
         studentId, enrollmentId, type: certificateType, reason, remarks,
+        ...(reissuedFrom ? { reissuedFrom } : {}),
       }});
-      setIssued(response.data); setNotice("Certificate issued and registered.");
+      setIssued(response.data); setNotice(reissuedFrom ? "Replacement certificate issued; original history is retained." : "Certificate issued and registered.");
+      setReissuedFrom(""); setReissueDraft(null);
       await loadCertificates();
     } catch (err) { setError(err.message || "Certificate issuance failed."); }
     finally { setLoading(false); }
@@ -97,6 +102,13 @@ export default function CertificatesReports() {
       setReport(reportType === "history" ? response.data : response);
     } catch (err) { setError(err.message || "Unable to generate report."); }
     finally { setLoading(false); }
+  };
+
+  const prepareReissue = (certificate) => {
+    setTab("certificates"); setIssued(null); setReissueDraft(certificate);
+    setStudentId(id(certificate.studentId)); setCertificateType(certificate.type); setReissuedFrom(certificate._id);
+    setReason(certificate.reason || ""); setRemarks(certificate.remarks || "");
+    setNotice("Review the details and issue a replacement certificate. The original record will remain in the register.");
   };
 
   const voidCertificate = async (certificate) => {
@@ -160,8 +172,8 @@ export default function CertificatesReports() {
         <small>Printed copy is a representation of the registered certificate. Verify authenticity using the school's certificate register.</small>
       </article>}
       <div className="cr-panel"><h3>Certificate register</h3>
-        <div className="cr-table-wrap"><table><thead><tr><th>Certificate no.</th><th>Student</th><th>Type</th><th>Issued</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          {certificates.map((item) => <tr key={item._id}><td>{item.certificateNumber}</td><td>{nameOf(item.studentId)}</td><td>{item.type}</td><td>{new Date(item.issuedAt).toLocaleDateString()}</td><td>{item.status}</td><td>{item.status === "issued" && <button type="button" onClick={() => voidCertificate(item)}>Void</button>}</td></tr>)}
+        <div className="cr-table-wrap"><table><thead><tr><th>Certificate no.</th><th>Student</th><th>Type</th><th>Issued</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+          {certificates.map((item) => <tr key={item._id}><td>{item.certificateNumber}</td><td>{nameOf(item.studentId)}</td><td>{item.type}</td><td>{new Date(item.issuedAt).toLocaleDateString()}</td><td>{item.status}</td><td>{item.status === "issued" && <div className="cr-actions"><button type="button" onClick={() => prepareReissue(item)}>Reissue</button><button type="button" onClick={() => voidCertificate(item)}>Void</button></div>}</td></tr>)}
           {!certificates.length && <tr><td colSpan="6">No certificates issued yet.</td></tr>}
         </tbody></table></div>
       </div>
