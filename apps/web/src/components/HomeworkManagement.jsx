@@ -70,8 +70,8 @@ export default function HomeworkManagement() {
     finally { setSaving(false); }
   };
 
-  const toggleSubmissions = async (item) => {
-    if (expandedHomework === item._id) { setExpandedHomework(""); return; }
+  const toggleSubmissions = async (item, forceRefresh = false) => {
+    if (expandedHomework === item._id && !forceRefresh) { setExpandedHomework(""); return; }
     setExpandedHomework(item._id);
     setSubmissions((current) => ({ ...current, [item._id]: { ...(current[item._id] || {}), loading: true } }));
     try {
@@ -148,7 +148,7 @@ export default function HomeworkManagement() {
         <div className="homework-item-main"><div><strong>{item.title}</strong><span>{item.classId?.name || "Class"}{item.sectionId?.name ? ` · Section ${item.sectionId.name}` : " · All sections"} · {item.subjectId?.name || "Subject"}</span></div><em className={`homework-status status-${item.status}`}>{item.status}</em></div>
         <p>{item.instructions}</p><footer><span>Assigned {new Date(item.assignedDate).toLocaleDateString("en-IN")} · Due {new Date(item.dueDate).toLocaleDateString("en-IN")}</span><div className="homework-item-actions"><button type="button" onClick={() => void toggleSubmissions(item)}>{expandedHomework === item._id ? "Hide submissions" : "View submissions"}</button><button type="button" onClick={() => void updateStatus(item, item.status === "published" ? "draft" : "published")}>{item.status === "published" ? "Move to draft" : "Publish"}</button></div></footer>
         {expandedHomework === item._id && <div className="homework-submissions">
-          <div className="homework-register-heading"><h4>Submission register</h4><button type="button" onClick={() => void toggleSubmissions(item)}>Refresh register</button></div>
+          <div className="homework-register-heading"><h4>Submission register</h4><button type="button" onClick={() => void toggleSubmissions(item, true)}>Refresh register</button></div>
           {!submissions[item._id] || submissions[item._id].loading ? <p>Loading submission register…</p> : <>
             <div className="homework-register-summary">
               <span><strong>{submissions[item._id].summary?.assigned ?? 0}</strong> Assigned</span>
