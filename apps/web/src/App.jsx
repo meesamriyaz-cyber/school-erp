@@ -31,6 +31,7 @@ import TeacherTimetablePortal from "./components/TeacherTimetablePortal.jsx";
 import AnnouncementManagement from "./components/AnnouncementManagement.jsx";
 import MessagingWorkspace from "./components/MessagingWorkspace.jsx";
 import CertificatesReports from "./components/CertificatesReports.jsx";
+import SchoolDashboard from "./components/SchoolDashboard.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -293,131 +294,7 @@ function DashboardApp() {
           </div>
 
           {activePage === "Overview" ? (
-            <>
-              <section className="welcome-banner">
-                <div className="banner-copy">
-                  <span className="banner-kicker">YOUR SCHOOL, ONE WORKSPACE</span>
-                  <h2>Everything in one place.</h2>
-                  <p>
-                    Build a connected school experience, from student records
-                    to academics and administration.
-                  </p>
-                  <button className="banner-button" onClick={() => selectPage("Students")}>
-                    Explore students <span aria-hidden="true">→</span>
-                  </button>
-                </div>
-                <div className="banner-art" aria-hidden="true">
-                  <div className="art-circle art-circle-one" />
-                  <div className="art-circle art-circle-two" />
-                  <div className="art-card art-card-back">✓</div>
-                  <div className="art-card art-card-front">
-                    <div className="art-card-top"><span /> <span /> <span /></div>
-                    <div className="art-avatar">S</div>
-                    <div className="art-line art-line-long" />
-                    <div className="art-line art-line-short" />
-                    <div className="art-check">✓</div>
-                  </div>
-                </div>
-              </section>
-
-              <div className="section-heading">
-                <div>
-                  <h2>School at a glance</h2>
-                  <p>Key indicators from your school workspace</p>
-                </div>
-                <span className="demo-label">Awaiting live data</span>
-              </div>
-
-              <section className="stats-grid">
-                {stats.map((stat, index) => (
-                  <article className="stat-card" key={stat.label}>
-                    <div className={`stat-icon stat-icon-${index}`}>
-                      {stat.icon}
-                    </div>
-                    <div className="stat-label">{stat.label}</div>
-                    <div className="stat-value">{stat.value}</div>
-                    <div className="stat-note">{stat.note}</div>
-                  </article>
-                ))}
-              </section>
-
-              <section className="lower-grid">
-                <article className="content-card module-card">
-                  <div className="card-heading">
-                    <div>
-                      <h2>Workspace modules</h2>
-                      <p>Build your school's digital workflow</p>
-                    </div>
-                    <span className="card-heading-icon">▦</span>
-                  </div>
-                  <button className="module-row" onClick={() => selectPage("Students")}>
-                    <span className="module-symbol module-symbol-blue">♙</span>
-                    <span className="module-copy">
-                      <strong>Student management</strong>
-                      <span>Admissions, student records and guardians</span>
-                    </span>
-                    <span className="module-status status-ready">API ready</span>
-                    <span className="module-arrow">→</span>
-                  </button>
-                  <div className="module-row module-row-muted">
-                    <span className="module-symbol module-symbol-violet">✓</span>
-                    <span className="module-copy">
-                      <strong>Attendance management</strong>
-                      <span>Daily attendance and summaries</span>
-                    </span>
-                    <span className="module-status">Planned</span>
-                  </div>
-                  <div className="module-row module-row-muted">
-                    <span className="module-symbol module-symbol-amber">₹</span>
-                    <span className="module-copy">
-                      <strong>Fees & payments</strong>
-                      <span>Fee structures, invoices and receipts</span>
-                    </span>
-                    <span className="module-status">Planned</span>
-                  </div>
-                </article>
-
-                <article className="content-card activity-card">
-                  <div className="card-heading">
-                    <div>
-                      <h2>Getting started</h2>
-                      <p>Your implementation progress</p>
-                    </div>
-                    <span className="progress-count">01 / 04</span>
-                  </div>
-                  <div className="progress-track"><div className="progress-fill" /></div>
-                  <div className="progress-caption">Core foundation completed</div>
-                  <div className="checklist-item">
-                    <span className="checklist-check">✓</span>
-                    <span>
-                      <strong>School and account foundation</strong>
-                      <small>Authentication and tenant isolation</small>
-                    </span>
-                  </div>
-                  <div className="checklist-item">
-                    <span className="checklist-pending">2</span>
-                    <span>
-                      <strong>Student management interface</strong>
-                      <small>Currently being built</small>
-                    </span>
-                  </div>
-                  <div className="checklist-item">
-                    <span className="checklist-pending">3</span>
-                    <span>
-                      <strong>Academic operations</strong>
-                      <small>Upcoming development phase</small>
-                    </span>
-                  </div>
-                  <div className="checklist-item">
-                    <span className="checklist-pending">4</span>
-                    <span>
-                      <strong>Mobile experience</strong>
-                      <small>Shared API for web and mobile</small>
-                    </span>
-                  </div>
-                </article>
-              </section>
-            </>
+            <SchoolDashboard accessToken={accessToken} academicYearId={activeAcademicYear?._id} onNavigate={selectPage} />
           ) : activePage === "Students" ? (
   <StudentDirectory />
 ) : activePage === "Guardians" ? (

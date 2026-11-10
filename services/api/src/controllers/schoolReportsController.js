@@ -7,6 +7,8 @@ import Examination from "../models/Examination.js";
 import { loadResultContext } from "./examResultController.js";
 import FeeInvoice from "../models/FeeInvoice.js";
 import FeePayment from "../models/FeePayment.js";
+import Attendance from "../models/Attendance.js";
+import Staff from "../models/Staff.js";
 import { teacherCanAccessEnrollment } from "../utils/teacherAssignmentScope.js";
 
 const validId = mongoose.isValidObjectId;
@@ -136,4 +138,167 @@ export const getFeeCollectionReport = async (req, res, next) => {
     summary.netPayments = Math.round((summary.postedPayments - summary.reversedPayments) * 100) / 100;
     return res.json({ success: true, data, summary });
   } catch (error) { return next(error); }
+};
+
+import mongoose from "mongoose";
+import Student from "../models/Student.js";
+import Enrollment from "../models/Enrollment.js";
+import AcademicYear from "../models/AcademicYear.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
+import Examination from "../models/Examination.js";
+import Attendance from "../models/Attendance.js";
+import Staff from "../models/Staff.js";
+import FeeInvoice from "../models/FeeInvoice.js";
+import FeePayment from "../models/FeePayment.js";
+import { loadResultContext } from "./examResultController.js";
+
+const validId = mongoose.isValidObjectId;
+const fail = (res, status, message) => res.status(status).json({ success: false, message });
+
+export const getDashboardOverview = async (req, res, next) => {
+  try {
+    const { academicYearId } = req.query;
+    if (academicYearId !== undefined && !validId(academicYearId)) {
+      return fail(res, 400, "Invalid academic year ID");
+    }
+
+    const academicYear = academicYearId
+      ? await AcademicYear.findOne({ _id: academicYearId, tenantId: req.tenantId }).select("_id name startDate endDate status").lean()
+      : await AcademicYear.findOne({ tenantId: req.tenantId, status: "active" }).sort({ startDate: -1, _id: -1 }).select("_id name startDate endDate status").lean();
+
+    if (academicYearId && !academicYear) return fail(res, 404, "Academic year not found");
+
+    const tenantId = req.tenantId;
+    const yearId = academicYear?._id;
+    const today = new Date();
+    const dayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const dayEnd = new Date(dayStart.getTime() + 86400000 - 1);
+    const trendStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 5, 1));
+
+    const [
+      activeStudents,
+      totalStudents,
+      activeStaff,
+      teachingStaff,
+      nonTeachingStaff,
+      enrollmentCounts,
+      todayAttendance,
+      attendanceTrend,
+      invoiceIds,
+      publishedExamCount,
+      latestPublishedExam,
+    ] = await Promise.all([
+      Student.countDocuments({ tenantId, status: "active" }),
+      Student.countDocuments({ tenantId }),
+      Staff.countDocuments({ tenantId, employmentStatus: "active" }),
+      Staff.countDocuments({ tenantId, employeeType: "teaching", employmentStatus: "active" }),
+      Staff.countDocuments({ tenantId, employeeType: "non_teaching", employmentStatus: "active" }),
+      yearId ? Enrollment.aggregate([
+        { $match: { tenantId: new mongoose.Types.ObjectId(String(tenantId)), academicYearId: new mongoose.Types.ObjectId(String(yearId)) } },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]) : Promise.resolve([]),
+      yearId ? Attendance.aggregate([
+        { $match: { tenantId: new mongoose.Types.ObjectId(String(tenantId)), academicYearId: new mongoose.Types.ObjectId(String(yearId)), date: { $gte: dayStart, $lte: dayEnd } } },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]) : Promise.resolve([]),
+      yearId ? Attendance.aggregate([
+        { $match: { tenantId: new mongoose.Types.ObjectId(String(tenantId)), academicYearId: new mongoose.Types.ObjectId(String(yearId)), date: { $gte: trendStart, $lte: dayEnd } } },
+        { $group: {
+          _id: { $dateToString: { format: "%Y-%m", date: "$date", timezone: "UTC" } },
+          present: { $sum: { $cond: [{ $eq: ["$status", "present"] }, 1, 0] } },
+          late: { $sum: { $cond: [{ $eq: ["$status", "late"] }, 1, 0] } },
+          absent: { $sum: { $cond: [{ $eq: ["$status", "absent"] }, 1, 0] } },
+          excused: { $sum: { $cond: [{ $eq: ["$status", "excused"] }, 1, 0] } },
+          marked: { $sum: 1 },
+        } },
+        { $sort: { _id: 1 } },
+      ]) : Promise.resolve([]),
+      yearId ? FeeInvoice.find({ tenantId, academicYearId: yearId }).distinct("_id") : Promise.resolve([]),
+      yearId ? Examination.countDocuments({ tenantId, academicYearId: yearId, status: "published" }) : Promise.resolve(0),
+      yearId ? Examination.findOne({ tenantId, academicYearId: yearId, status: "published" }).sort({ startDate: -1, _id: -1 }).lean() : Promise.resolve(null),
+    ]);
+
+    const enrollmentSummary = { active: 0, completed: 0, transferred: 0, withdrawn: 0, total: 0 };
+    for (const item of enrollmentCounts) {
+      if (Object.hasOwn(enrollmentSummary, item._id)) enrollmentSummary[item._id] = item.count;
+      enrollmentSummary.total += item.count;
+    }
+
+    const attendanceSummary = { present: 0, absent: 0, late: 0, excused: 0, marked: 0, attended: 0, percentage: null };
+    for (const item of todayAttendance) {
+      if (Object.hasOwn(attendanceSummary, item._id)) attendanceSummary[item._id] = item.count;
+      attendanceSummary.marked += item.count;
+    }
+    attendanceSummary.attended = attendanceSummary.present + attendanceSummary.late;
+    const consideredAttendance = attendanceSummary.attended + attendanceSummary.absent;
+    attendanceSummary.percentage = consideredAttendance
+      ? Math.round((attendanceSummary.attended / consideredAttendance) * 1000) / 10
+      : null;
+
+    const payments = invoiceIds.length ? await FeePayment.aggregate([
+      { $match: { tenantId: new mongoose.Types.ObjectId(String(tenantId)), invoiceId: { $in: invoiceIds } } },
+      { $group: {
+        _id: "$status",
+        amount: { $sum: "$amount" },
+        count: { $sum: 1 },
+      } },
+    ]) : [];
+    const feeSummary = { posted: 0, reversed: 0, net: 0, postedCount: 0, reversedCount: 0, outstanding: 0 };
+    for (const payment of payments) {
+      if (payment._id === "posted") {
+        feeSummary.posted = payment.amount;
+        feeSummary.postedCount = payment.count;
+      } else if (payment._id === "reversed") {
+        feeSummary.reversed = payment.amount;
+        feeSummary.reversedCount = payment.count;
+      }
+    }
+    feeSummary.net = Math.round((feeSummary.posted - feeSummary.reversed) * 100) / 100;
+    feeSummary.posted = Math.round(feeSummary.posted * 100) / 100;
+    feeSummary.reversed = Math.round(feeSummary.reversed * 100) / 100;
+
+    const [invoiceTotals, resultContext] = await Promise.all([
+      yearId ? FeeInvoice.aggregate([
+        { $match: { tenantId: new mongoose.Types.ObjectId(String(tenantId)), academicYearId: new mongoose.Types.ObjectId(String(yearId)) } },
+        { $group: { _id: null, outstanding: { $sum: { $max: [0, { $subtract: ["$totalAmount", "$paidAmount"] }] } } } },
+      ]) : Promise.resolve([]),
+      latestPublishedExam ? loadResultContext(tenantId, latestPublishedExam) : Promise.resolve(null),
+    ]);
+    feeSummary.outstanding = Math.round((invoiceTotals[0]?.outstanding || 0) * 100) / 100;
+
+    const latestResult = resultContext ? {
+      examinationId: latestPublishedExam._id,
+      name: latestPublishedExam.name,
+      averagePercentage: resultContext.averagePercentage,
+      passed: resultContext.passedCount,
+      failed: resultContext.failedCount,
+      students: resultContext.enrollments.length,
+      passRate: resultContext.enrollments.length
+        ? Math.round((resultContext.passedCount / resultContext.enrollments.length) * 1000) / 10
+        : null,
+    } : null;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        generatedAt: new Date().toISOString(),
+        academicYear: academicYear ? { id: academicYear._id, name: academicYear.name, status: academicYear.status } : null,
+        students: { total: totalStudents, active: activeStudents },
+        enrollments: enrollmentSummary,
+        staff: { totalActive: activeStaff, teaching: teachingStaff, nonTeaching: nonTeachingStaff },
+        attendance: {
+          date: dayStart.toISOString().slice(0, 10),
+          today: attendanceSummary,
+          trend: attendanceTrend.map((item) => ({
+            month: item._id, present: item.present, late: item.late,
+            absent: item.absent, excused: item.excused, marked: item.marked,
+          })),
+        },
+        fees: feeSummary,
+        examinations: { published: publishedExamCount, latestResult },
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
 };
