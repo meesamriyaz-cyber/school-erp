@@ -46,3 +46,8 @@
 .school-dashboard-inline-error { margin:0; color:#a52820; font-size:11px; }
 @media(max-width:900px) { .school-dashboard-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .school-dashboard-panels { grid-template-columns:1fr; } }
 @media(max-width:520px) { .school-dashboard-stat { padding:14px; } .school-dashboard-stat > strong { font-size:20px; } .school-dashboard-panel { padding:15px; } .school-dashboard-result-metrics { gap:6px; } .school-dashboard-result-metrics div { padding:10px 7px; } .school-dashboard-footer { flex-direction:column; } }
+
+.school-dashboard-heading-actions { display:flex; align-items:center; gap:10px; }
+.school-dashboard-action { padding:8px 11px; border:1px solid #e5eaf2; border-radius:8px; background:#fff; color:#5266bd; font-size:10px; font-weight:700; white-space:nowrap; }
+.school-dashboard-action:hover { background:#f7f8fc; }
+@media(max-width:520px) { .school-dashboard-heading-actions { align-items:flex-end; flex-direction:column; } }
