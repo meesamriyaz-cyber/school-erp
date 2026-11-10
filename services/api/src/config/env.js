@@ -29,7 +29,7 @@ if (!selectedMongoUri) {
   );
 }
 
-if (!/^mongodb(?:\\+srv)?:\\/\\//.test(selectedMongoUri)) {
+if (!/^mongodb(?:\+srv)?:\/\//.test(selectedMongoUri)) {
   throw new Error(
     `${selectedMongoVariable} must start with "mongodb://" or "mongodb+srv://"`
   );
@@ -39,7 +39,7 @@ const getMongoTarget = (uri) => {
   try {
     const parsed = new URL(uri);
     const databaseName = decodeURIComponent(
-      parsed.pathname.replace(/^\\/+/, "").split("/")[0] || ""
+      parsed.pathname.replace(/^\/+/, "").split("/")[0] || ""
     );
 
     if (!parsed.hostname || !databaseName) return "";
@@ -74,7 +74,7 @@ for (const [variable, value] of Object.entries({
 
 if (nodeEnv === "test") {
   const databaseName = decodeURIComponent(
-    new URL(selectedMongoUri).pathname.replace(/^\\/+/, "").split("/")[0] || ""
+    new URL(selectedMongoUri).pathname.replace(/^\/+/, "").split("/")[0] || ""
   );
 
   if (!/test/i.test(databaseName)) {
