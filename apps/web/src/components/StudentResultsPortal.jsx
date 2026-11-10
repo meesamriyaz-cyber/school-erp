@@ -36,8 +36,6 @@ export default function StudentResultsPortal() {
   useEffect(() => {
     if (!accessToken) return undefined;
     const controller = new AbortController();
-    setLoading(true);
-    setLoadError("");
     Promise.allSettled([
       apiRequest("/portal/children", { accessToken, signal: controller.signal }),
       apiRequest("/portal/profile", { accessToken, signal: controller.signal }),
@@ -183,7 +181,11 @@ export default function StudentResultsPortal() {
       {loadError && (
         <div className="portal-state portal-error" role="alert">
           <span>{loadError}</span>
-          <button type="button" onClick={() => setRetryCount((count) => count + 1)} disabled={loading}>
+          <button type="button" onClick={() => {
+              setLoading(true);
+              setLoadError("");
+              setRetryCount((count) => count + 1);
+            }} disabled={loading}>
             {loading ? "Retrying…" : "Retry failed sections"}
           </button>
         </div>
