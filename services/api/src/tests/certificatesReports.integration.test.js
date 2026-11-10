@@ -83,6 +83,9 @@ describe("Certificates and school reports API", () => {
     const concurrent = await Promise.all([1, 2].map(() => post("/certificates", admin.token, { studentId: String(student._id), enrollmentId: String(activeEnrollment._id), type: "bonafide" })));
     expect(concurrent.map((item) => item.status)).toEqual([201, 201]);
     expect(new Set(concurrent.map((item) => item.body.data.certificateNumber)).size).toBe(2);
+    const replacement = await post("/certificates", admin.token, { studentId: String(student._id), enrollmentId: String(activeEnrollment._id), type: "bonafide", reissuedFrom: issued.body.data._id, remarks: "Replacement copy" });
+    expect(replacement.status).toBe(201);
+    expect(String(replacement.body.data.reissuedFrom)).toBe(issued.body.data._id);
     const hidden = await request("/certificates", { token: otherAdmin.token });
     expect(hidden.status).toBe(200); expect(hidden.body.data).toHaveLength(0);
     const forged = await post("/certificates", otherAdmin.token, { studentId: String(student._id), enrollmentId: String(activeEnrollment._id), type: "bonafide" });
