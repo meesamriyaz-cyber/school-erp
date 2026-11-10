@@ -154,6 +154,10 @@ export const createConversation = async (req, res, next) => {
   try {
     if (req.auth.role !== "parent") return res.status(403).json({ success: false, message: "Only an authorized parent can initiate a conversation" });
     const { studentId, teacherId, message } = req.body || {};
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)
+      || Object.keys(req.body).some((key) => !["studentId", "teacherId", "message"].includes(key))) {
+      return invalid(res, "Provide only studentId, teacherId and message");
+    }
     if (!validId(studentId) || !validId(teacherId)) return invalid(res, "Select a valid student and teacher");
     if (typeof message !== "string" || !message.trim() || message.trim().length > 5000) return invalid(res, "The first message is required and must not exceed 5,000 characters");
     const context = await parentContext(req, studentId);
@@ -233,7 +237,9 @@ export const listConversationMessages = async (req, res, next) => {
 export const sendConversationMessage = async (req, res, next) => {
   try {
     if (!validId(req.params.conversationId)) return invalid(res, "Invalid conversation ID");
-    const body = req.body?.body;
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)
+      || Object.keys(req.body).some((key) => key !== "body")) return invalid(res, "Provide only the message body");
+    const body = req.body.body;
     if (typeof body !== "string" || !body.trim() || body.trim().length > 5000) return invalid(res, "Message must contain 1 to 5,000 characters");
     const conversation = await Conversation.findOne({ _id: req.params.conversationId, tenantId: req.tenantId });
     if (!await authorizeConversation(req, conversation?.toObject())) return forbidden(res);
@@ -273,6 +279,7 @@ export const sendConversationMessage = async (req, res, next) => {
 export const markConversationRead = async (req, res, next) => {
   try {
     if (!validId(req.params.conversationId)) return invalid(res, "Invalid conversation ID");
+    if (req.body && Object.keys(req.body).length) return invalid(res, "Marking a conversation read does not accept a request body");
     const conversation = await Conversation.findOne({ _id: req.params.conversationId, tenantId: req.tenantId });
     if (!await authorizeConversation(req, conversation?.toObject())) return forbidden(res);
     const session = await mongoose.startSession();
