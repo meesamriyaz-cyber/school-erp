@@ -39,8 +39,10 @@ export const issueCertificate = async (req, res, next) => {
     return fail(res, 400, "Provide valid student, enrollment, certificate type and permitted remarks");
   }
 
-  const issueYear = new Date().getUTCFullYear();
+  const issuedAt = new Date();
+  const issueYear = issuedAt.getUTCFullYear();
   try {
+    await Promise.all([CertificateCounter.init(), Certificate.init()]);
     await CertificateCounter.updateOne(
       { tenantId: req.tenantId, year: issueYear, type },
       { $setOnInsert: { tenantId: req.tenantId, year: issueYear, type, sequence: 0 } },
@@ -76,7 +78,7 @@ export const issueCertificate = async (req, res, next) => {
       const transferAudit = type === "transfer" ? await EnrollmentTransferAudit.findOne({
         tenantId: req.tenantId, studentId, fromEnrollmentId: enrollmentId,
       }).session(session).lean() : null;
-      const now = new Date();
+      const now = issuedAt;
       const counter = await CertificateCounter.findOneAndUpdate(
         { tenantId: req.tenantId, year: issueYear, type },
         { $inc: { sequence: 1 } },
