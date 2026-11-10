@@ -41,7 +41,7 @@ export default function MessagingWorkspace({ mode }) {
     finally { setLoading(false); }
   }, [accessToken, mode]);
 
-  useEffect(() => { void loadWorkspace(); }, [loadWorkspace]);
+  useEffect(() => { void Promise.resolve().then(() => loadWorkspace()); }, [loadWorkspace]);
 
   const openConversation = async (conversation) => {
     setActive(conversation); setMessages([]); setError("");
