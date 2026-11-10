@@ -1,6 +1,6 @@
 
 import mongoose from "mongoose";
-import env from "../config/env.js";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 import User from "../models/User.js";
 import { hashPassword } from "../utils/password.js";
 
@@ -10,7 +10,7 @@ const email = "isolation-admin-1383375035@example.com";
 const temporaryPassword = "TemporaryIsolationPass123!";
 
 try {
-  await mongoose.connect(env.mongoUri);
+  await mongoose.connect(getTestDatabaseUri());
 
   const passwordHash = await hashPassword(temporaryPassword);
 
