@@ -37,13 +37,26 @@ export const getStudentAcademicHistory = async (req, res, next) => {
       .sort({ startDate: 1 }).lean();
     const academicResults = [];
     for (const exam of exams) {
-      const enrollment = enrollments.find((item) => String(item.academicYearId?._id) === String(exam.academicYearId) && String(item.classId?._id) === String(exam.classId) && (!exam.sectionId || String(item.sectionId?._id || "") === String(exam.sectionId)));
-      if (!enrollment) continue;
+      const matchingEnrollments = enrollments.filter((item) =>
+        String(item.academicYearId?._id) === String(exam.academicYearId) &&
+        String(item.classId?._id) === String(exam.classId) &&
+        (!exam.sectionId || String(item.sectionId?._id || "") === String(exam.sectionId))
+      );
+      if (!matchingEnrollments.length) continue;
       const context = await loadResultContext(req.tenantId, exam, { includeHistoricalEnrollments: true });
-      const result = context.results.find((item) => String(item.enrollmentId) === String(enrollment._id));
-      if (result) academicResults.push({ examinationId: exam._id, examinationName: exam.name, academicYearId: exam.academicYearId, startDate: exam.startDate, result });
+      for (const enrollment of matchingEnrollments) {
+        const result = context.results.find((item) => String(item.enrollmentId) === String(enrollment._id));
+        if (result) academicResults.push({
+          examinationId: exam._id, examinationName: exam.name, academicYearId: exam.academicYearId,
+          enrollmentId: enrollment._id, startDate: exam.startDate, result,
+        });
+      }
     }
-    return res.json({ success: true, data: { student, enrollments, academicResults } });
+    const enrollmentHistory = enrollments.map((item) => ({
+      _id: item._id, academicYearId: item.academicYearId, classId: item.classId, sectionId: item.sectionId,
+      enrollmentDate: item.enrollmentDate, admissionType: item.admissionType, status: item.status, endedAt: item.endedAt,
+    }));
+    return res.json({ success: true, data: { student, enrollments: enrollmentHistory, academicResults } });
   } catch (error) { return next(error); }
 };
 
