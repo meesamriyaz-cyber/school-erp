@@ -1,5 +1,5 @@
 
-import "dotenv/config";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
@@ -14,7 +14,7 @@ import {
 const sessionIds = [];
 
 const testSessionLifecycle = async () => {
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(getTestDatabaseUri());
 
   try {
     const user = {
