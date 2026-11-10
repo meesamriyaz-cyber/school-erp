@@ -252,4 +252,28 @@ describe("user audit outbox service", () => {
       logSpy.mockRestore();
     }
   });
+  it("finalizes an expired lease after the final attempt without dispatching again", async () => {
+    const event = { eventId: new mongoose.Types.ObjectId(), action: "USER_PROFILE_UPDATED" };
+    outboxModel.findOneAndUpdate.mockReset().mockReturnValueOnce(leanResult({
+      _id: outboxId,
+      attempts: 11,
+      event,
+    }));
+
+    const result = await processPendingAuditEvents({ batchSize: 1 });
+
+    expect(result).toEqual({ processed: 1, skipped: false });
+    expect(auditLogModel.create).not.toHaveBeenCalled();
+    expect(outboxModel.updateOne).toHaveBeenCalledWith(
+      { _id: outboxId, status: "processing", processingToken: expect.any(String) },
+      {
+        $set: {
+          status: "failed",
+          lastError: "Processing lease expired after the final attempt",
+        },
+        $unset: { processingStartedAt: 1, processingToken: 1 },
+      },
+    );
+  });
+
 });
