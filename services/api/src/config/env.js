@@ -59,7 +59,7 @@ const getMongoTarget = (uri) => {
       : firstHost.replace(/:\d+$/, "").toLowerCase();
     const databasePath = pathAndQuery.split(/[?#]/, 1)[0];
     const databaseName = decodeURIComponent(
-      databasePath.replace(/^\\/+/, "").split("/")[0] || ""
+      databasePath.replace(/^\/+/, "").split("/")[0] || ""
     );
 
     if (!normalizedHost || !databaseName) return "";
