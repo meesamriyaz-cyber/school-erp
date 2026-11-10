@@ -266,7 +266,7 @@ describe("StudentResultsPortal family overview", () => {
     expect(await screen.findByText("Fractions worksheet")).toBeTruthy();
     expect(screen.getByText("Completed worksheet")).toBeTruthy();
     expect(screen.getByText(/Marks: 9\/10/)).toBeTruthy();
-    expect(screen.getByText("Excellent understanding.")).toBeTruthy();
+    expect(screen.getByText(/Excellent understanding\\./)).toBeTruthy();
   });
 
 
