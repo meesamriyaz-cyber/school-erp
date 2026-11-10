@@ -2,9 +2,6 @@ import mongoose from "mongoose";
 import Student from "../models/Student.js";
 import Enrollment from "../models/Enrollment.js";
 import AcademicYear from "../models/AcademicYear.js";
-import SchoolClass from "../models/SchoolClass.js";
-import Section from "../models/Section.js";
-import Attendance from "../models/Attendance.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import Examination from "../models/Examination.js";
 import { loadResultContext } from "./examResultController.js";
@@ -19,15 +16,6 @@ const parseDate = (value) => {
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : date;
 };
-const teacherScope = async (req, academicYearId, classId, sectionId = null) => {
-  if (req.auth.role !== "teacher") return true;
-  const assignments = await TeacherAssignment.find({
-    tenantId: req.tenantId, teacherId: req.auth.userId, academicYearId, classId, status: "active",
-  }).select("sectionId").lean();
-  if (!assignments.length) return false;
-  return assignments.some((item) => !item.sectionId || String(item.sectionId) === String(sectionId || ""));
-};
-
 export const getStudentAcademicHistory = async (req, res, next) => {
   try {
     const { studentId } = req.query;
