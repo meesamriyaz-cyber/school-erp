@@ -53,7 +53,7 @@ export default function SchoolDashboard({ accessToken, academicYearId, onNavigat
       <div><span className="school-dashboard-eyebrow">INSTITUTIONAL OVERVIEW</span><h2>School at a glance</h2>
         <p>{report?.academicYear?.name ? `Live indicators for academic year ${report.academicYear.name}` : "Live indicators across your school workspace"}</p>
       </div>
-      <span className="school-dashboard-live"><i /> Live data</span>
+      <div className="school-dashboard-heading-actions"><button type="button" className="school-dashboard-action" onClick={() => onNavigate?.("Students")}>Student management</button><span className="school-dashboard-live"><i /> Live data</span></div>
     </div>
 
     <div className="school-dashboard-stats">
