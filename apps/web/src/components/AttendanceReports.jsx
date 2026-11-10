@@ -119,7 +119,7 @@ export default function AttendanceReports() {
       <section className="attendance-report-section">
         <div className="attendance-report-section-title"><h3>Student attendance percentages</h3><span>{students.length} students</span></div>
         <div className="attendance-report-table-wrap"><table><thead><tr><th>Admission no.</th><th>Student</th><th>Class</th><th>Section</th><th>Present</th><th>Late</th><th>Absent</th><th>Excused</th><th>Attendance rate</th></tr></thead>
-          <tbody>{students.length ? students.map((item) => <tr key={item.studentId}><td>{item.admissionNumber}</td><td>{item.name}</td><td>{item.className}</td><td>{item.sectionName}</td><td>{item.present}</td><td>{item.late}</td><td>{item.absent}</td><td>{item.excused}</td><td><strong className={item.percentage !== null && item.percentage < 75 ? "attendance-rate-low" : ""}>{percent(item.percentage)}</strong></td></tr>) : <tr><td colSpan="9">No active students found for this academic year.</td></tr>}</tbody>
+          <tbody>{students.length ? students.map((item) => <tr key={item.enrollmentId || item.studentId}><td>{item.admissionNumber}</td><td>{item.name}</td><td>{item.className}</td><td>{item.sectionName}</td><td>{item.present}</td><td>{item.late}</td><td>{item.absent}</td><td>{item.excused}</td><td><strong className={item.percentage !== null && item.percentage < 75 ? "attendance-rate-low" : ""}>{percent(item.percentage)}</strong></td></tr>) : <tr><td colSpan="9">No active students found for this academic year.</td></tr>}</tbody>
         </table></div>
       </section>
       <p className="attendance-report-footnote">Attendance rate = (Present + Late) ÷ (Present + Late + Absent). Excused entries are excluded; unmarked days are not counted.</p>
