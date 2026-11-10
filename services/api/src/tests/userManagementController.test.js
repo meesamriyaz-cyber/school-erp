@@ -114,6 +114,17 @@ describe("user management controller", () => {
     expect(hashPassword).not.toHaveBeenCalled();
   });
 
+  it.each(["accountant", "librarian", "transport_manager"])(
+    "rejects creation of unsupported school role %s",
+    async (role) => {
+      req.body.role = role;
+      await createUser(req, res, next);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(userModel.create).not.toHaveBeenCalled();
+      expect(hashPassword).not.toHaveBeenCalled();
+    },
+  );
+
   it("does not let school admins supply a different tenant ID", async () => {
     req.body.tenantId = new mongoose.Types.ObjectId().toString();
     await createUser(req, res, next);
@@ -220,6 +231,16 @@ describe("user management controller", () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(userModel.findOne).not.toHaveBeenCalled();
   });
+
+  it.each(["accountant", "librarian", "transport_manager"])(
+    "does not allow school admins to assign unsupported role %s",
+    async (role) => {
+      req.body = { role };
+      await updateUserRole(req, res, next);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(userModel.findOne).not.toHaveBeenCalled();
+    },
+  );
 
   it("does not let school admins change a user in another school", async () => {
     userModel.findOne.mockReturnValue({
