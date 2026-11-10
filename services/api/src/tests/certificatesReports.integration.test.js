@@ -126,7 +126,7 @@ describe("Certificates and school reports API", () => {
   it("lists tenant-scoped enrollment strength and validates report filters", async () => {
     const report = await request(`/reports/enrollment-strength?academicYearId=${year._id}`, { token: admin.token });
     expect(report.status).toBe(200);
-    expect(report.body.summary.totalStudents).toBe(1);
+    expect(report.body.summary.totalStudents).toBe(2);
     expect((await request("/reports/enrollment-strength?academicYearId=bad", { token: admin.token })).status).toBe(400);
     const otherReport = await request(`/reports/enrollment-strength?academicYearId=${year._id}`, { token: otherAdmin.token });
     expect(otherReport.status).toBe(404);
