@@ -29,6 +29,8 @@ import staffRoutes from "./staffRoutes.js";
 import announcementRoutes from "./announcementRoutes.js";
 import notificationRoutes from "./notificationRoutes.js";
 import messagingRoutes from "./messagingRoutes.js";
+import certificateRoutes from "./certificateRoutes.js";
+import schoolReportsRoutes from "./schoolReportsRoutes.js";
 const router = Router();
 
 router.get("/health", (req, res) => {
@@ -68,5 +70,7 @@ router.use("/messaging", messagingRoutes);
 router.use("/homework", homeworkRoutes);
 router.use("/homework", homeworkSubmissionRoutes);
 router.use("/fees", feeRoutes);
+router.use("/certificates", certificateRoutes);
+router.use("/reports", schoolReportsRoutes);
 router.use("/staff", staffRoutes);
 export default router;
