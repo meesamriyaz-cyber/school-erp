@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import Student from "../models/Student.js";
+import Enrollment from "../models/Enrollment.js";
+import { teacherCanAccessEnrollment } from "../utils/teacherAssignmentScope.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian, { RELATIONSHIPS } from "../models/StudentGuardian.js";
 
@@ -56,6 +58,16 @@ export const listStudentGuardians = async (req, res, next) => {
     const result = await findStudent(req.params.studentId, req.tenantId);
     if (result.invalidId) return invalid(res, "Invalid student ID");
     if (!result.student) return res.status(404).json({ success: false, message: "Student not found" });
+    if (req.auth.role === "teacher") {
+      const enrollment = await Enrollment.findOne({
+        tenantId: req.tenantId,
+        studentId: result.student._id,
+        status: "active",
+      }).select("academicYearId classId sectionId").lean();
+      if (!enrollment || !(await teacherCanAccessEnrollment(req, enrollment))) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+    }
     const links = await StudentGuardian.find({ tenantId: req.tenantId, studentId: result.student._id })
       .sort({ isPrimary: -1, createdAt: 1, _id: 1 })
       .populate({ path: "guardianId", select: "firstName lastName phone email status", match: { tenantId: req.tenantId } }).lean();
