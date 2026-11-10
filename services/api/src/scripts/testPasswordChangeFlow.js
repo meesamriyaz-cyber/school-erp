@@ -1,5 +1,5 @@
 
-import "dotenv/config";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
@@ -56,9 +56,7 @@ const request = async (path, { body = {}, token, origin } = {}) => {
 };
 
 const testPasswordChangeFlow = async () => {
-  assert.ok(process.env.MONGO_URI, "MONGO_URI must be configured");
-
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(getTestDatabaseUri());
 
   try {
     // 1. Create a disposable active school tenant and teacher.
