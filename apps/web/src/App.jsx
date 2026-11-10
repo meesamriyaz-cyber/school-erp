@@ -30,6 +30,7 @@ import StaffManagement from "./components/StaffManagement.jsx";
 import TeacherTimetablePortal from "./components/TeacherTimetablePortal.jsx";
 import AnnouncementManagement from "./components/AnnouncementManagement.jsx";
 import MessagingWorkspace from "./components/MessagingWorkspace.jsx";
+import CertificatesReports from "./components/CertificatesReports.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
@@ -44,6 +45,7 @@ const navigation = [
   { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
   { label: "Attendance Reports", icon: "▥", section: "ACADEMICS" },
+  { label: "Certificates & Reports", icon: "▤", section: "ACADEMICS" },
   { label: "Subjects", icon: "▤", section: "ACADEMICS" },
   { label: "Class Curriculum", icon: "▦", section: "ACADEMICS" },
   { label: "Teacher Assignments", icon: "♙", section: "ACADEMICS" },
@@ -438,6 +440,8 @@ function DashboardApp() {
   <AttendanceManagement />
 ) : activePage === "Attendance Reports" ? (
   <AttendanceReports />
+) : activePage === "Certificates & Reports" || activePage === "Reports" ? (
+  <CertificatesReports />
 ) : activePage === "Subjects" ? (
   <SubjectManagement />
 ) : activePage === "Teacher Assignments" ? (
