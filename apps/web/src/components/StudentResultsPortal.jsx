@@ -30,10 +30,14 @@ export default function StudentResultsPortal() {
   const [selectedStudent, setSelectedStudent] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!accessToken) return undefined;
     const controller = new AbortController();
+    setLoading(true);
+    setLoadError("");
     Promise.allSettled([
       apiRequest("/portal/children", { accessToken, signal: controller.signal }),
       apiRequest("/portal/profile", { accessToken, signal: controller.signal }),
@@ -47,28 +51,44 @@ export default function StudentResultsPortal() {
       apiRequest("/portal/notifications", { accessToken, signal: controller.signal }),
     ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse, notificationResponse]) => {
       if (controller.signal.aborted) return;
-      setError("");
-      if (childrenResponse.status === "fulfilled") setChildren(Array.isArray(childrenResponse.value?.data) ? childrenResponse.value.data : []);
-      else setError(childrenResponse.reason?.message || "Unable to load linked student records.");
-      if (profileResponse.status === "fulfilled") setProfiles(Array.isArray(profileResponse.value?.data) ? profileResponse.value.data : []);
-      else setError((current) => current || profileResponse.reason?.message || "Unable to load student profiles.");
-      if (resultResponse.status === "fulfilled") setResults(Array.isArray(resultResponse.value?.data) ? resultResponse.value.data : []);
-      else setError((current) => current || resultResponse.reason?.message || "Unable to load published results.");
-      if (homeworkResponse.status === "fulfilled") setHomework(Array.isArray(homeworkResponse.value?.data) ? homeworkResponse.value.data : []);
-      if (submissionResponse.status === "fulfilled") setSubmissions(Array.isArray(submissionResponse.value?.data) ? submissionResponse.value.data : []);
-      if (attendanceResponse.status === "fulfilled") setAttendance(Array.isArray(attendanceResponse.value?.data) ? attendanceResponse.value.data : []);
-      if (feesResponse.status === "fulfilled") setFees(Array.isArray(feesResponse.value?.data) ? feesResponse.value.data : []);
-      if (timetableResponse.status === "fulfilled") setTimetable(Array.isArray(timetableResponse.value?.data) ? timetableResponse.value.data : []);
-      if (announcementResponse.status === "fulfilled") setAnnouncements(Array.isArray(announcementResponse.value?.data) ? announcementResponse.value.data : []);
-      if (notificationResponse.status === "fulfilled") {
-        setNotifications(Array.isArray(notificationResponse.value?.data) ? notificationResponse.value.data : []);
+      const failures = [];
+      const applyList = (response, setter, label) => {
+        if (response.status === "fulfilled" && Array.isArray(response.value?.data)) {
+          setter(response.value.data);
+        } else {
+          setter([]);
+          failures.push(label);
+        }
+      };
+
+      applyList(childrenResponse, setChildren, "linked students");
+      applyList(profileResponse, setProfiles, "student profiles");
+      applyList(resultResponse, setResults, "published results");
+      applyList(homeworkResponse, setHomework, "homework");
+      applyList(submissionResponse, setSubmissions, "homework submissions");
+      applyList(attendanceResponse, setAttendance, "attendance");
+      applyList(feesResponse, setFees, "fees");
+      applyList(timetableResponse, setTimetable, "timetable");
+      applyList(announcementResponse, setAnnouncements, "announcements");
+      applyList(notificationResponse, setNotifications, "notifications");
+
+      if (notificationResponse.status === "fulfilled" && Array.isArray(notificationResponse.value?.data)) {
         setUnreadCount(Number(notificationResponse.value?.unreadCount || 0));
+      } else {
+        setUnreadCount(0);
       }
+
+      setError(resultResponse.status === "rejected"
+        ? resultResponse.reason?.message || "Unable to load published results."
+        : "");
+      setLoadError(failures.length
+        ? "Some portal sections could not be loaded: " + failures.join(", ") + ". Retry to load them again."
+        : "");
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [accessToken]);
+  }, [accessToken, retryCount]);
 
   const visibleNotifications = useMemo(() => selectedStudent === "all" || !isParent
     ? notifications
@@ -159,6 +179,15 @@ export default function StudentResultsPortal() {
           <button type="button" className="portal-signout" onClick={() => void logout()}>Sign out</button>
         </div>
       </header>
+
+      {loadError && (
+        <div className="portal-state portal-error" role="alert">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => setRetryCount((count) => count + 1)} disabled={loading}>
+            {loading ? "Retrying…" : "Retry failed sections"}
+          </button>
+        </div>
+      )}
 
       <nav className="portal-tabs no-print" aria-label="Student portal sections">
         <button type="button" className={activeTab === "overview" ? "active" : ""} aria-pressed={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</button>
