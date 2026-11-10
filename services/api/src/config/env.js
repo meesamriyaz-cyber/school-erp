@@ -1,4 +1,3 @@
-
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 
@@ -7,8 +6,85 @@ dotenv.config({
   override: false,
 });
 
+const nodeEnv = process.env.NODE_ENV || "development";
+
+if (!["development", "test", "production"].includes(nodeEnv)) {
+  throw new Error(
+    "NODE_ENV must be development, test, or production"
+  );
+}
+
+const mongoVariableByEnvironment = {
+  development: "MONGO_DEV_URI",
+  test: "MONGO_TEST_URI",
+  production: "MONGO_URI",
+};
+
+const selectedMongoVariable = mongoVariableByEnvironment[nodeEnv];
+const selectedMongoUri = process.env[selectedMongoVariable]?.trim() || "";
+
+if (!selectedMongoUri) {
+  throw new Error(
+    `${selectedMongoVariable} is required when NODE_ENV=${nodeEnv}`
+  );
+}
+
+if (!/^mongodb(?:\\+srv)?:\\/\\//.test(selectedMongoUri)) {
+  throw new Error(
+    `${selectedMongoVariable} must start with "mongodb://" or "mongodb+srv://"`
+  );
+}
+
+const getMongoTarget = (uri) => {
+  try {
+    const parsed = new URL(uri);
+    const databaseName = decodeURIComponent(
+      parsed.pathname.replace(/^\\/+/, "").split("/")[0] || ""
+    );
+
+    if (!parsed.hostname || !databaseName) return "";
+
+    return `${parsed.hostname.toLowerCase()}/${databaseName}`;
+  } catch {
+    return "";
+  }
+};
+
+const selectedMongoTarget = getMongoTarget(selectedMongoUri);
+
+if (!selectedMongoTarget) {
+  throw new Error(
+    `${selectedMongoVariable} must include a MongoDB host and database name`
+  );
+}
+
+for (const [variable, value] of Object.entries({
+  MONGO_DEV_URI: process.env.MONGO_DEV_URI,
+  MONGO_TEST_URI: process.env.MONGO_TEST_URI,
+  MONGO_URI: process.env.MONGO_URI,
+})) {
+  if (variable === selectedMongoVariable || !value?.trim()) continue;
+
+  if (getMongoTarget(value.trim()) === selectedMongoTarget) {
+    throw new Error(
+      `${selectedMongoVariable} must not target the same MongoDB host and database as ${variable}`
+    );
+  }
+}
+
+if (nodeEnv === "test") {
+  const databaseName = decodeURIComponent(
+    new URL(selectedMongoUri).pathname.replace(/^\\/+/, "").split("/")[0] || ""
+  );
+
+  if (!/test/i.test(databaseName)) {
+    throw new Error(
+      "MONGO_TEST_URI must target a database whose name includes 'test' (expected school-erp-test)"
+    );
+  }
+}
+
 const requiredEnv = [
-  "MONGO_URI",
   "JWT_ACCESS_SECRET",
   "JWT_REFRESH_SECRET",
 ];
@@ -19,14 +95,6 @@ for (const key of requiredEnv) {
       `Missing required environment variable: ${key}`
     );
   }
-}
-
-const nodeEnv = process.env.NODE_ENV || "development";
-
-if (!["development", "test", "production"].includes(nodeEnv)) {
-  throw new Error(
-    "NODE_ENV must be development, test, or production"
-  );
 }
 
 if (
@@ -82,45 +150,9 @@ if (
   throw new Error("WEB_URL must use HTTPS in production");
 }
 
-const testMongoUri =
-  typeof process.env.MONGO_TEST_URI === "string"
-    ? process.env.MONGO_TEST_URI.trim()
-    : "";
-
-if (nodeEnv === "test" && !testMongoUri) {
-  throw new Error(
-    "MONGO_TEST_URI is required when NODE_ENV=test"
-  );
-}
-
-const selectedMongoUri = (
-  nodeEnv === "test" ? testMongoUri : process.env.MONGO_URI
-)?.trim();
-
-if (!/^mongodb(?:\+srv)?:\/\//.test(selectedMongoUri ?? "")) {
-  throw new Error(
-    `${nodeEnv === "test" ? "MONGO_TEST_URI" : "MONGO_URI"} must start with "mongodb://" or "mongodb+srv://"`
-  );
-}
-
-if (nodeEnv === "test") {
-  const databaseMatch = selectedMongoUri.match(
-    /^mongodb(?:\+srv)?:\/\/[^/]+\/([^?]*)/
-  );
-  const databaseName = databaseMatch?.[1]
-    ? decodeURIComponent(databaseMatch[1])
-    : "";
-
-  if (!databaseName || !/test/i.test(databaseName)) {
-    throw new Error(
-      "MONGO_TEST_URI must target a database whose name includes 'test' (expected school-erp-test)"
-    );
-  }
-}
-
 console.log("Environment diagnostic:", {
   nodeEnv,
-  testUriConfigured: Boolean(testMongoUri),
+  selectedMongoVariable,
   selectedUriConfigured: Boolean(selectedMongoUri),
   selectedUriScheme:
     selectedMongoUri.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)?.[0] ?? "unrecognized",
@@ -134,6 +166,5 @@ const env = Object.freeze({
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   webUrl: parsedWebUrl.origin,
 });
-
 
 export default env;
