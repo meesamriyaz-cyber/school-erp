@@ -14,6 +14,7 @@ describe("CertificatesReports", () => {
       if (path === "/academic-years") return { success: true, data: [{ _id: "year-1", name: "2026-27", status: "active" }] };
       if (path === "/certificates?limit=100") return { success: true, data: [] };
       if (path === "/enrollments?studentId=student-1") return { success: true, data: [{ _id: "enrollment-1", academicYearId: { name: "2026-27" }, classId: { name: "Class 5" }, status: "active" }] };
+      if (path.startsWith("/reports/student-history")) return { success: true, data: { student: { admissionNumber: "A-1", firstName: "Amina", lastName: "Khan", status: "active" }, enrollments: [], academicResults: [] } };
       if (path === "/certificates" && options.method === "POST") return { success: true, data: {
         _id: "certificate-1", certificateNumber: "BON/2026/00001", type: "bonafide",
         issuedAt: "2026-11-10T00:00:00.000Z", verificationCode: "a".repeat(36),
@@ -35,7 +36,7 @@ describe("CertificatesReports", () => {
       method: "POST", accessToken: "test-token",
       body: { studentId: "student-1", enrollmentId: "enrollment-1", type: "bonafide", reason: "", remarks: "" },
     }));
-    expect(screen.getByText(/Amina Khan/)).toBeTruthy();
+    expect(screen.getAllByText(/Amina Khan/).length).toBeGreaterThan(0);
   });
 
   it("switches to reports and requests the selected student's academic history", async () => {
