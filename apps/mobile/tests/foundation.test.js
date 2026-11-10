@@ -30,6 +30,7 @@ test('foundation route files exist for welcome and authentication navigation', a
     '../src/app/index.js',
     '../src/app/(auth)/_layout.js',
     '../src/app/(auth)/login.js',
+    '../src/components/AppScreen.js',
   ];
 
   for (const path of paths) {

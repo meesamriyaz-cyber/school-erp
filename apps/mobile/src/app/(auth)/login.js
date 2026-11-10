@@ -1,11 +1,12 @@
 import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AppScreen } from '../../components/AppScreen';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 
 export default function LoginPlaceholderScreen() {
   return (
-    <View style={styles.screen}>
+    <AppScreen style={styles.screen}>
       <Link href="/" style={styles.backLink}>
         <Text style={styles.backText}>‹  Back</Text>
       </Link>
@@ -30,7 +31,7 @@ export default function LoginPlaceholderScreen() {
       </View>
 
       <Text style={styles.footer}>SCHOOL ERP · MOBILE</Text>
-    </View>
+    </AppScreen>
   );
 }
 

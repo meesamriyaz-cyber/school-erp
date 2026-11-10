@@ -1,12 +1,13 @@
 import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AppScreen } from '../components/AppScreen';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 
 export default function WelcomeScreen() {
   return (
-    <View style={styles.screen}>
+    <AppScreen style={styles.screen}>
       <View style={styles.topLine}>
         <View style={styles.brandMark}>
           <Text style={styles.brandInitials}>SE</Text>
@@ -36,7 +37,7 @@ export default function WelcomeScreen() {
           A connected experience for every school community.
         </Text>
       </View>
-    </View>
+    </AppScreen>
   );
 }
 
