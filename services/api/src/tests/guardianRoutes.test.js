@@ -396,6 +396,41 @@ describe("Guardian API integration tests", () => {
     expect(ids).not.toContain(String(guardianB._id));
   });
 
+  it("paginates and filters the guardian directory on the server", async () => {
+    const target = await createGuardian(adminA.token, {
+      firstName: "Amina",
+      lastName: "Khan",
+      phone: "9000000001",
+      email: "amina@example.test",
+    });
+    await createGuardian(adminA.token, {
+      firstName: "Bilal",
+      lastName: "Khan",
+      phone: "9000000002",
+      email: "bilal@example.test",
+    });
+
+    const response = await request("/guardians?page=1&limit=1&search=amina", {
+      token: adminA.token,
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(String(response.body.data[0]._id)).toBe(String(target._id));
+    expect(response.body.pagination).toMatchObject({
+      page: 1,
+      limit: 1,
+      total: 1,
+      totalPages: 1,
+    });
+  });
+
+  it("rejects invalid guardian directory pagination and filters", async () => {
+    for (const query of ["?page=0", "?limit=101", "?status=pending", "?search=" + "a".repeat(101)]) {
+      const response = await request("/guardians" + query, { token: adminA.token });
+      expect(response.status).toBe(400);
+    }
+  });
+
   it("allows retrieval of a guardian within the same school", async () => {
     const guardian = await createGuardian(adminA.token);
 
