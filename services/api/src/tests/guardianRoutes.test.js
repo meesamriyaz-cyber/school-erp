@@ -541,7 +541,7 @@ describe("Guardian API integration tests", () => {
     expect(studentResponse.status).toBe(201);
     const studentId = studentResponse.body.data._id;
 
-    const directory = await request("/guardians", { token: adminA.token });
+    const directory = await request("/guardians?search=919149410572", { token: adminA.token });
     const guardian = directory.body.data.find(
       (item) => item.phone === "9111111111",
     );
