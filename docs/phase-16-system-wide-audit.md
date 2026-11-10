@@ -12,6 +12,23 @@ The Core School ERP is feature-complete for the implemented web workflows and ha
 
 The system is **not yet release-ready**. The audit found a high-priority teacher-to-guardian privacy exposure, role provisioning/workspace mismatches, a production frontend API-origin configuration hazard, and incomplete operational evidence. These findings do not negate the successful test run; they identify areas the current suite does not adequately protect.
 
+## 2. Remediation progress
+
+The following code-level findings have been addressed on the audit branch:
+
+| Finding | Remediation | Verification |
+|---|---|---|
+| Teacher access to school-wide guardian records | Removed teacher access to global guardian list/detail; student-scoped guardian reads now require an active teaching assignment | Regression tests cover global denial, assigned-student allow and unassigned-student denial |
+| Guardian directory unbounded response | Added server-side page/limit/search/status validation, stable sorting, response projection and bounded offsets; web UI now uses server pagination | API and web tests cover filters, pagination and invalid query inputs |
+| Unsupported roles provisionable | New creation/role assignment of accountant, librarian and transport manager is blocked; legacy roles remain filterable for cleanup | Backend role validation tests |
+| Principal user-management navigation | User Management is hidden and route-guarded for principals; unfinished Settings navigation removed | App role-navigation test |
+| Portal partial failures | Student/parent portal now identifies failed sections and provides a retry action | Partial-failure/retry component test |
+| Production frontend API origin | Production Vite build now requires an HTTPS `VITE_API_BASE_URL` ending in `/api/v1`; CI uses a reserved non-deployable sentinel; example and deployment runbook updated | Frontend lint/build passed with the CI sentinel |
+
+**CI evidence:** run `42813380931` passed backend/MongoDB integration and frontend lint/tests/build on `16af2cd`. Follow-on commits normalize trailing slashes in the API client and remove an unnecessary field from the guardian list projection; the latest branch-head run must also pass before the remediation batch is declared verified.
+
+Existing users already assigned unsupported roles still require a school-by-school review and reassignment or suspension before launch; blocking new assignments does not automatically migrate legacy accounts.
+
 ## 2. Verified strengths
 
 - Authentication re-reads the user record and current role/tenant from the database, checks active account and active school state, and uses access-token versioning.
@@ -27,6 +44,8 @@ The system is **not yet release-ready**. The audit found a high-priority teacher
 ## 3. Findings requiring remediation or release decisions
 
 ### P1 — Teacher access exposes school-wide guardian contact data
+
+**Status: remediated in code; latest branch-head CI verification pending.**
 
 **Affected code**
 - `services/api/src/routes/guardianRoutes.js`
@@ -53,6 +72,8 @@ The system is **not yet release-ready**. The audit found a high-priority teacher
 
 ### P1 — Production web build can silently target localhost
 
+**Status: production build guard and CI configuration implemented; actual production artifact verification remains an external release gate.**
+
 **Affected code**
 - `apps/web/src/lib/api.js`
 - `apps/web/vite.config.js`
@@ -75,6 +96,8 @@ The system is **not yet release-ready**. The audit found a high-priority teacher
 
 ### P1/P2 — Provisionable roles do not have application workspaces
 
+**Status: new provisioning and role assignment of unsupported roles blocked; existing legacy accounts still require review.**
+
 **Affected code**
 - `services/api/src/models/User.js`
 - `services/api/src/controllers/userManagementController.js`
@@ -94,6 +117,8 @@ The system is **not yet release-ready**. The audit found a high-priority teacher
 
 ### P2 — Principal sees school-admin-only user management
 
+**Status: remediated in web navigation and route rendering; covered by an App role test.**
+
 **Affected code**
 - `apps/web/src/App.jsx`
 - `apps/web/src/components/SchoolUserDirectory.jsx`
@@ -110,6 +135,8 @@ The system is **not yet release-ready**. The audit found a high-priority teacher
 
 ### P2 — Student/parent portal silently hides several API failures
 
+**Status: remediated with failed-section reporting and retry; covered by a component regression test.**
+
 **Affected code**
 - `apps/web/src/components/StudentResultsPortal.jsx`
 
@@ -124,6 +151,8 @@ The system is **not yet release-ready**. The audit found a high-priority teacher
 **Required remediation:** preserve independent section loading where appropriate, but surface each failed section with an explicit error and retry path. Do not silently convert a failed request into an empty dataset.
 
 ### P2 — Guardian directory is unbounded
+
+**Status: remediated with server-side pagination, validated filters, stable sorting, bounded offsets and a limited response projection.**
 
 **Affected code**
 - `services/api/src/controllers/guardianController.js`
@@ -158,6 +187,16 @@ The current workflow does not run a backend lint/static-analysis command, enforc
 ### P2 — Authentication rate limiting and proxy configuration need deployment validation
 
 The login/refresh/password-change limiters use the default in-memory rate-limit store. The Express app does not configure `trust proxy`. In a reverse-proxy or multi-replica deployment, client IP handling and rate-limit consistency need explicit validation. A distributed store and correct trusted-proxy configuration may be required by the selected host.
+
+### P2 — Self-service password change and account recovery are incomplete
+
+**Affected code:** `services/api/src/routes/authRoutes.js`, `services/api/src/controllers/authController.js`, `apps/web/src/components/LoginPage.jsx`, `apps/web/src/components/SchoolUserCreation.jsx`.
+
+The API exposes an authenticated change-password endpoint, but no corresponding web workflow was found. The login page has no forgot/reset-password path, and school user creation requires an administrator to provide an initial password.
+
+**Risk:** users cannot conveniently change a known password or recover an account through the web application. This increases support dependency and creates a manual credential hand-off process.
+
+**Release decision:** confirm whether first-release users will receive passwords through a controlled onboarding process. If self-service change/reset is required, treat it as a release requirement rather than silently assuming the API endpoint is a usable UI feature.
 
 ### P3 — In-app notification scope must be explicit
 
