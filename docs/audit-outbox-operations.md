@@ -32,6 +32,27 @@ Investigate:
 3. A growing `failed` count: inspect `lastError`, attempts, timestamps, and database health.
 4. A high delivered-to-pending backlog: check whether the worker is running on every active API deployment and whether MongoDB can sustain the workload.
 
+## API readiness and worker heartbeat
+
+The API readiness endpoint is:
+
+```http
+GET /api/v1/health/ready
+```
+
+Readiness requires a connected MongoDB database and both background workers to
+have completed an initial polling cycle. Each worker refreshes its heartbeat
+when a cycle begins and while it scans a batch. A heartbeat older than 30
+seconds is reported as `stale` and makes the endpoint return HTTP 503. A
+worker that reports an error is `degraded`; a worker that has not completed
+its first cycle is `starting`. The response exposes status and timestamps,
+not raw error messages or connection details.
+
+A stale status should prompt checks of process health, event-loop stalls,
+MongoDB query latency, and deployment resource pressure. Confirm recovery by
+checking that the readiness endpoint returns HTTP 200 and both workers report
+`healthy`.
+
 ## Manual retry
 
 Platform administrators can retry one event that is currently `failed`:
