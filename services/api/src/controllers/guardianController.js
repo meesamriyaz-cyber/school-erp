@@ -40,10 +40,61 @@ const validateBody = (body, res, allowedFields) => {
   return pick(body, allowedFields);
 };
 
-export const listGuardians = async (req, res, next) => {
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\export const listGuardians = async (req, res, next) => {
   try {
     const guardians = await Guardian.find({ tenantId: req.tenantId }).sort({ firstName: 1, lastName: 1, _id: 1 }).lean();
     return res.status(200).json({ success: true, data: guardians });
+  } catch (error) { return next(error); }
+};");
+
+export const listGuardians = async (req, res, next) => {
+  try {
+    const pageValue = req.query.page ?? "1";
+    const limitValue = req.query.limit ?? "20";
+    if (typeof pageValue !== "string" || !/^\\d+$/.test(pageValue)) return invalid(res, "Page must be a positive integer");
+    if (typeof limitValue !== "string" || !/^\\d+$/.test(limitValue)) return invalid(res, "Limit must be between 1 and 100");
+    const page = Number(pageValue);
+    const limit = Number(limitValue);
+    if (!Number.isSafeInteger(page) || page < 1) return invalid(res, "Page must be a positive integer");
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) return invalid(res, "Limit must be between 1 and 100");
+
+    const filter = { tenantId: req.tenantId };
+    if (req.query.status !== undefined) {
+      if (typeof req.query.status !== "string" || !["active", "inactive"].includes(req.query.status)) {
+        return invalid(res, "Status must be active or inactive");
+      }
+      filter.status = req.query.status;
+    }
+    if (req.query.search !== undefined) {
+      if (typeof req.query.search !== "string" || req.query.search.trim().length > 100) {
+        return invalid(res, "Search must not exceed 100 characters");
+      }
+      const search = req.query.search.trim();
+      if (search) {
+        const pattern = new RegExp(escapeRegex(search), "i");
+        filter.$or = [
+          { firstName: pattern },
+          { lastName: pattern },
+          { phone: pattern },
+          { email: pattern },
+        ];
+      }
+    }
+
+    const [guardians, total] = await Promise.all([
+      Guardian.find(filter)
+        .select("_id firstName lastName phone email status userId")
+        .sort({ firstName: 1, lastName: 1, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Guardian.countDocuments(filter),
+    ]);
+    return res.status(200).json({
+      success: true,
+      data: guardians,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
   } catch (error) { return next(error); }
 };
 
