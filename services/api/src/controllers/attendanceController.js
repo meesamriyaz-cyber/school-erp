@@ -238,7 +238,7 @@ export const getAttendanceReports = async (req, res, next) => {
         ...(item.sectionId ? { sectionId: item.sectionId } : {}),
       }));
     }
-    const enrollmentFilter = { tenantId: req.tenantId, academicYearId, status: "active" };
+    const enrollmentFilter = { tenantId: req.tenantId, academicYearId, status: { $in: ["active", "completed", "transferred", "withdrawn"] } };
     if (classId) enrollmentFilter.classId = classId;
     if (teacherReportClauses) enrollmentFilter.$or = teacherReportClauses;
     const enrollments = await Enrollment.find(enrollmentFilter)
@@ -246,7 +246,7 @@ export const getAttendanceReports = async (req, res, next) => {
       .populate("classId", "name")
       .populate("sectionId", "name")
       .lean();
-    const activeEnrollments = enrollments.filter((item) => item.studentId?.status === "active");
+    const reportEnrollments = enrollments.filter((item) => Boolean(item.studentId));
     const recordsFilter = {
       tenantId: req.tenantId, academicYearId,
       date: { $gte: start, $lte: end },
@@ -263,9 +263,11 @@ export const getAttendanceReports = async (req, res, next) => {
       return { ...counts, marked: items.length, considered, attended: counts.present + counts.late,
         percentage: considered ? Math.round(((counts.present + counts.late) / considered) * 1000) / 10 : null };
     };
-    const students = activeEnrollments.map((enrollment) => {
-      const studentRecords = records.filter((item) => String(item.studentId) === String(enrollment.studentId._id));
+    const students = reportEnrollments.map((enrollment) => {
+      const studentRecords = records.filter((item) => String(item.studentId) === String(enrollment.studentId._id) && String(item.classId) === String(enrollment.classId?._id) && String(item.sectionId || "") === String(enrollment.sectionId?._id || ""));
       return {
+        enrollmentId: enrollment._id,
+        enrollmentStatus: enrollment.status,
         studentId: enrollment.studentId._id,
         admissionNumber: enrollment.studentId.admissionNumber,
         name: [enrollment.studentId.firstName, enrollment.studentId.lastName].filter(Boolean).join(" "),
@@ -276,7 +278,7 @@ export const getAttendanceReports = async (req, res, next) => {
       };
     }).sort((a, b) => a.className.localeCompare(b.className) || a.name.localeCompare(b.name));
     const classMap = new Map();
-    activeEnrollments.forEach((item) => {
+    reportEnrollments.forEach((item) => {
       const id = String(item.classId?._id);
       if (!id) return;
       if (!classMap.has(id)) classMap.set(id, { classId: item.classId._id, className: item.classId.name, studentCount: 0 });
@@ -297,7 +299,7 @@ export const getAttendanceReports = async (req, res, next) => {
     })).sort((a, b) => a.month.localeCompare(b.month) || a.className.localeCompare(b.className));
     const overall = tally(records);
     return res.status(200).json({ success: true, range: { from, to }, summary: {
-      students: activeEnrollments.length, ...overall,
+      students: reportEnrollments.length, ...overall,
       classes: classMap.size,
     }, students, monthly });
   } catch (error) { return next(error); }
