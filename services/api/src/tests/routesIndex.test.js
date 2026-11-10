@@ -1,13 +1,15 @@
 import express from "express";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-const { getDatabaseStatus } = vi.hoisted(() => ({
+const { getDatabaseStatus, getBackgroundWorkerHealth } = vi.hoisted(() => ({
   getDatabaseStatus: vi.fn(),
+  getBackgroundWorkerHealth: vi.fn(),
 }));
 
 vi.mock("../config/database.js", () => ({
   getDatabaseStatus,
 }));
+vi.mock("../services/workerHealth.js", () => ({ getBackgroundWorkerHealth }));
 
 vi.mock("../routes/authRoutes.js", () => ({ default: express.Router() }));
 vi.mock("../routes/platformRoutes.js", () => ({ default: express.Router() }));
@@ -27,6 +29,13 @@ describe("API route index", () => {
   let baseUrl;
 
   beforeAll(async () => {
+    getBackgroundWorkerHealth.mockReturnValue({
+      status: "healthy", ready: true,
+      workers: {
+        auditOutbox: { status: "healthy", started: true, running: false, lastErrorName: null },
+        notificationDelivery: { status: "healthy", started: true, running: false, lastErrorName: null },
+      },
+    });
     const app = express();
     app.use(router);
     server = app.listen(0);
@@ -56,8 +65,20 @@ describe("API route index", () => {
     const payload = await response.json();
     expect(getDatabaseStatus).toHaveBeenCalled();
     expect(response.status).toBe(200);
-    expect(payload).toMatchObject({ success: true, status: "ready", database: "connected" });
+    expect(payload).toMatchObject({ success: true, status: "ready", database: "connected", workers: { ready: true } });
     expect(Number.isNaN(Date.parse(payload.timestamp))).toBe(false);
+  });
+
+  it("reports not ready when a background worker is degraded", async () => {
+    getDatabaseStatus.mockReturnValue("connected");
+    getBackgroundWorkerHealth.mockReturnValue({
+      status: "not_ready", ready: false,
+      workers: { auditOutbox: { status: "degraded", started: true, running: false, lastErrorName: "MongoNetworkError" } },
+    });
+    const response = await fetch(`${baseUrl}/health/ready`);
+    const payload = await response.json();
+    expect(response.status).toBe(503);
+    expect(payload).toMatchObject({ success: false, status: "not_ready", database: "connected", workers: { ready: false } });
   });
 
   it.each(["disconnected", "connecting", "disconnecting", "unknown"])(
