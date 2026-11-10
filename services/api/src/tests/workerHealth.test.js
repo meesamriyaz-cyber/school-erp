@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   getBackgroundWorkerHealth,
@@ -7,6 +7,7 @@ import {
   markWorkerCycleSucceeded,
   markWorkerCycleFailed,
   markWorkerStopped,
+  WORKER_HEARTBEAT_TIMEOUT_MS,
 } from "../services/workerHealth.js";
 
 describe("background worker health", () => {
@@ -52,4 +53,32 @@ describe("background worker health", () => {
     expect(getBackgroundWorkerHealth().ready).toBe(false);
     markWorkerStopped("notificationDelivery");
   });
+  it("marks a worker not ready when its heartbeat becomes stale", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-10T10:00:00.000Z"));
+      const worker = "auditOutbox";
+      markWorkerStarted(worker);
+      markWorkerCycleStarted(worker);
+      markWorkerCycleSucceeded(worker, 0);
+      expect(getBackgroundWorkerHealth().workers[worker].status).toBe("healthy");
+
+      vi.advanceTimersByTime(WORKER_HEARTBEAT_TIMEOUT_MS + 1);
+      const health = getBackgroundWorkerHealth();
+      expect(health.workers[worker]).toMatchObject({
+        status: "stale",
+        started: true,
+        running: false,
+      });
+      expect(health.ready).toBe(false);
+
+      markWorkerCycleStarted(worker);
+      markWorkerCycleSucceeded(worker, 2);
+      expect(getBackgroundWorkerHealth().workers[worker].status).toBe("healthy");
+      markWorkerStopped(worker);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
 });
