@@ -4,6 +4,7 @@ import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import Session from "../models/Session.js";
 import { getTestDatabaseUri } from "./utils/testDatabase.js";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 const SCHOOL_ID = "6acb5132ccf1ce038b184068";
 const ADMIN_ID = "6acb5132ccf1ce038b184069";
