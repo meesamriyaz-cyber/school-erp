@@ -155,7 +155,7 @@ describe("environment configuration", () => {
     });
 
     expect(env.webUrl).toBe("https://example.com");
-    expect(env.mongoUri).toBe(validEnv.MONGO_DEV_URI);
+    expect(env.mongoUri).toBe(validEnv.MONGO_URI);
   });
 
   it("does not require the production URI in test mode", async () => {
