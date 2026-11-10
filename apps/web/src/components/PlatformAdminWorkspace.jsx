@@ -813,12 +813,12 @@ export default function PlatformAdminWorkspace() {
       }}
       disabled={updatingUserRole}
     >
+      {["accountant", "librarian", "transport_manager"].includes(selectedRole) && (
+        <option value={selectedRole} disabled>{selectedRole.replaceAll("_", " ")} — unsupported in this release</option>
+      )}
       <option value="school_admin">School admin</option>
       <option value="principal">Principal</option>
       <option value="teacher">Teacher</option>
-      <option value="accountant">Accountant</option>
-      <option value="librarian">Librarian</option>
-      <option value="transport_manager">Transport manager</option>
       <option value="student">Student</option>
       <option value="parent">Parent</option>
     </select>
@@ -942,7 +942,7 @@ export default function PlatformAdminWorkspace() {
                 <label>Email address *<input type="email" name="email" value={userForm.email} onChange={updateUserForm} required maxLength={254} autoComplete="email" /></label>
                 <label>Phone<input type="tel" name="phone" value={userForm.phone} onChange={updateUserForm} maxLength={20} autoComplete="tel" /></label>
                 <label>Role *<select name="role" value={userForm.role} onChange={updateUserForm} required>
-                  <option value="school_admin">School admin</option><option value="principal">Principal</option><option value="teacher">Teacher</option><option value="accountant">Accountant</option><option value="librarian">Librarian</option><option value="transport_manager">Transport manager</option><option value="student">Student</option><option value="parent">Parent</option>
+                  <option value="school_admin">School admin</option><option value="principal">Principal</option><option value="teacher">Teacher</option><option value="student">Student</option><option value="parent">Parent</option>
                 </select></label>
                 <label>Initial password *<input type="password" name="password" value={userForm.password} onChange={updateUserForm} required minLength={8} maxLength={72} autoComplete="new-password" /><small>At least 8 characters and no more than 72 UTF-8 bytes.</small></label>
                 <div className="platform-form-actions">
