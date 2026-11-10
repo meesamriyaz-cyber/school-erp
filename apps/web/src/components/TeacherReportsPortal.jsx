@@ -63,7 +63,7 @@ export default function TeacherReportsPortal({ accessToken, assignments = [] }) 
         <article><strong>{report.summary?.percentage == null ? "—" : `${report.summary.percentage}%`}</strong><span>Attendance rate</span></article>
       </div>
       <div className="teacher-report-table"><table><thead><tr><th>Student</th><th>Section</th><th>Present</th><th>Absent</th><th>Late</th><th>Attendance</th></tr></thead><tbody>
-        {(report.students || []).map((item) => <tr key={item.studentId}><td>{item.name} <small>{item.admissionNumber}</small></td><td>{item.sectionName}</td><td>{item.present}</td><td>{item.absent}</td><td>{item.late}</td><td>{item.percentage == null ? "—" : `${item.percentage}%`}</td></tr>)}
+        {(report.students || []).map((item) => <tr key={item.enrollmentId || item.studentId}><td>{item.name} <small>{item.admissionNumber}</small></td><td>{item.sectionName}</td><td>{item.present}</td><td>{item.absent}</td><td>{item.late}</td><td>{item.percentage == null ? "—" : `${item.percentage}%`}</td></tr>)}
         {!report.students?.length && <tr><td colSpan="6">No attendance records are available for this period.</td></tr>}
       </tbody></table></div>
     </>}
