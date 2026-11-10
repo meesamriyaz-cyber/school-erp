@@ -55,6 +55,8 @@ export const listGuardians = async (req, res, next) => {
     const limit = Number(limitValue);
     if (!Number.isSafeInteger(page) || page < 1) return invalid(res, "Page must be a positive integer");
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) return invalid(res, "Limit must be between 1 and 100");
+    const offset = (page - 1) * limit;
+    if (!Number.isSafeInteger(offset) || offset > 2_147_483_647) return invalid(res, "Page is too large");
 
     const filter = { tenantId: req.tenantId };
     if (req.query.status !== undefined) {
@@ -83,7 +85,7 @@ export const listGuardians = async (req, res, next) => {
       Guardian.find(filter)
         .select("_id firstName lastName phone email status userId")
         .sort({ firstName: 1, lastName: 1, _id: 1 })
-        .skip((page - 1) * limit)
+        .skip(offset)
         .limit(limit)
         .lean(),
       Guardian.countDocuments(filter),
