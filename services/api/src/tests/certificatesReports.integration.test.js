@@ -110,6 +110,16 @@ describe("Certificates and school reports API", () => {
     expect(noPermission.status).toBe(401);
   });
 
+  it("returns only this student's tenant-scoped enrollment history", async () => {
+    const history = await request(`/reports/student-history?studentId=${student._id}`, { token: admin.token });
+    expect(history.status).toBe(200);
+    expect(history.body.data.student.admissionNumber).toBe(student.admissionNumber);
+    expect(history.body.data.enrollments).toHaveLength(1);
+    const hidden = await request(`/reports/student-history?studentId=${student._id}`, { token: otherAdmin.token });
+    expect(hidden.status).toBe(404);
+    expect((await request("/reports/student-history?studentId=bad", { token: admin.token })).status).toBe(400);
+  });
+
   it("lists tenant-scoped enrollment strength and validates report filters", async () => {
     const report = await request(`/reports/enrollment-strength?academicYearId=${year._id}`, { token: admin.token });
     expect(report.status).toBe(200);
