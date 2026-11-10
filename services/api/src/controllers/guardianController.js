@@ -49,8 +49,8 @@ export const listGuardians = async (req, res, next) => {
   try {
     const pageValue = req.query.page ?? "1";
     const limitValue = req.query.limit ?? "20";
-    if (typeof pageValue !== "string" || !/^\\d+$/.test(pageValue)) return invalid(res, "Page must be a positive integer");
-    if (typeof limitValue !== "string" || !/^\\d+$/.test(limitValue)) return invalid(res, "Limit must be between 1 and 100");
+    if (typeof pageValue !== "string" || !/^\d+$/.test(pageValue)) return invalid(res, "Page must be a positive integer");
+    if (typeof limitValue !== "string" || !/^\d+$/.test(limitValue)) return invalid(res, "Limit must be between 1 and 100");
     const page = Number(pageValue);
     const limit = Number(limitValue);
     if (!Number.isSafeInteger(page) || page < 1) return invalid(res, "Page must be a positive integer");
