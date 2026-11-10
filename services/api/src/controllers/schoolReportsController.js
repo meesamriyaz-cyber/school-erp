@@ -21,7 +21,7 @@ export const getStudentAcademicHistory = async (req, res, next) => {
     const { studentId } = req.query;
     if (!validId(studentId)) return fail(res, 400, "A valid student ID is required");
     const student = await Student.findOne({ _id: studentId, tenantId: req.tenantId })
-      .select("admissionNumber firstName lastName dateOfBirth admissionDate status").lean();
+      .select("admissionNumber firstName lastName status").lean();
     if (!student) return fail(res, 404, "Student not found");
     const enrollments = await Enrollment.find({ tenantId: req.tenantId, studentId })
       .populate("academicYearId", "name startDate endDate")
