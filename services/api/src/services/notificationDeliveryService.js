@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
-import { markWorkerStarted, markWorkerCycleStarted, markWorkerCycleSucceeded, markWorkerCycleFailed, markWorkerStopped } from "./workerHealth.js";
+import { markWorkerStarted, markWorkerHeartbeat, markWorkerCycleStarted, markWorkerCycleSucceeded, markWorkerCycleFailed, markWorkerStopped } from "./workerHealth.js";
 
 const MAX_ATTEMPTS = 8;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
@@ -21,6 +21,7 @@ export async function processPendingNotifications({ batchSize = 50, notification
   let processed = 0;
   try {
     for (let index = 0; index < Math.min(Math.max(batchSize, 1), 100); index += 1) {
+      markWorkerHeartbeat("notificationDelivery");
       const now = new Date();
       const processingToken = randomUUID();
       const notification = await Notification.findOneAndUpdate(
