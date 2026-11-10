@@ -5,7 +5,8 @@ const originalEnv = { ...process.env };
 
 const validEnv = {
   NODE_ENV: "test",
-  MONGO_URI: "mongodb://localhost:27017/school-erp",
+  MONGO_DEV_URI: "mongodb://localhost:27017/school-erp-dev",
+  MONGO_URI: "mongodb://localhost:27017/school-erp-production",
   MONGO_TEST_URI: "mongodb://localhost:27017/school-erp-test",
   JWT_ACCESS_SECRET: "a".repeat(32),
   JWT_REFRESH_SECRET: "b".repeat(32),
@@ -61,7 +62,6 @@ describe("environment configuration", () => {
   });
 
   it.each([
-    "MONGO_URI",
     "JWT_ACCESS_SECRET",
     "JWT_REFRESH_SECRET",
   ])("rejects missing required variable %s", async (key) => {
@@ -155,7 +155,12 @@ describe("environment configuration", () => {
     });
 
     expect(env.webUrl).toBe("https://example.com");
-    expect(env.mongoUri).toBe(validEnv.MONGO_URI);
+    expect(env.mongoUri).toBe(validEnv.MONGO_DEV_URI);
+  });
+
+  it("does not require the production URI in test mode", async () => {
+    const { default: env } = await importEnv({ MONGO_URI: "" });
+    expect(env.mongoUri).toBe(validEnv.MONGO_TEST_URI);
   });
 
   it("requires MONGO_TEST_URI in test mode", async () => {
@@ -191,11 +196,26 @@ describe("environment configuration", () => {
     );
   });
 
-  it("uses MONGO_URI outside test mode", async () => {
-    const { default: env } = await importEnv({
-      NODE_ENV: "development",
-    });
+  it("uses MONGO_DEV_URI in development mode", async () => {
+    const { default: env } = await importEnv({ NODE_ENV: "development" });
+    expect(env.mongoUri).toBe(validEnv.MONGO_DEV_URI);
+  });
 
-    expect(env.mongoUri).toBe(validEnv.MONGO_URI);
+  it("requires MONGO_DEV_URI in development mode", async () => {
+    await expect(importEnv({ NODE_ENV: "development", MONGO_DEV_URI: "" }))
+      .rejects.toThrow("MONGO_DEV_URI is required when NODE_ENV=development");
+  });
+
+  it("rejects a development URI that points to the production database", async () => {
+    await expect(importEnv({
+      NODE_ENV: "development",
+      MONGO_DEV_URI: validEnv.MONGO_URI,
+    })).rejects.toThrow("MONGO_DEV_URI must not target the same MongoDB host and database as MONGO_URI");
+  });
+
+  it("rejects a test URI that points to the production database", async () => {
+    await expect(importEnv({
+      MONGO_TEST_URI: validEnv.MONGO_URI,
+    })).rejects.toThrow("MONGO_TEST_URI must not target the same MongoDB host and database as MONGO_URI");
   });
 });
