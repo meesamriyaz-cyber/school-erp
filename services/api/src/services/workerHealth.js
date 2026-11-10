@@ -72,7 +72,7 @@ export function getBackgroundWorkerHealth() {
     }];
   }));
   const ready = Object.values(workers).every((worker) =>
-    worker.started && worker.status !== "degraded" && worker.status !== "stopped"
+    worker.started && worker.status !== "degraded" && worker.status !== "stopped" && worker.status !== "starting"
   );
   return { status: ready ? "healthy" : "not_ready", ready, workers };
 }
