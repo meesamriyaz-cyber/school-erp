@@ -140,7 +140,7 @@ describe("Parent teacher messaging API integration", () => {
     expect(sent.status).toBe(201);
     const refreshed = await Conversation.findById(conversation._id).lean();
     expect(refreshed.parentUnreadCount).toBe(1);
-    const read = await request(`/messaging/conversations/${conversation._id}/read`, { method: "PATCH", token: parent.token, body: {} });
+    const read = await request(`/messaging/conversations/${conversation._id}/read`, { method: "PATCH", token: parent.token });
     expect(read.status).toBe(200);
     const afterRead = await Conversation.findById(conversation._id).lean();
     expect(afterRead.parentUnreadCount).toBe(0);
