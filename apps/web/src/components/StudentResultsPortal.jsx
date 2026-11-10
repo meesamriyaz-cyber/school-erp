@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./StudentResultsPortal.css";
+import MessagingWorkspace from "./MessagingWorkspace.jsx";
 
 const formatDate = (value) => value
   ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
@@ -169,6 +170,7 @@ export default function StudentResultsPortal() {
         <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
         <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
         <button type="button" className={activeTab === "notifications" ? "active" : ""} aria-pressed={activeTab === "notifications"} onClick={() => setActiveTab("notifications")}>Notifications {unreadCount > 0 ? `(${unreadCount})` : ""}</button>
+        {isParent && <button type="button" className={activeTab === "messaging" ? "active" : ""} aria-pressed={activeTab === "messaging"} onClick={() => setActiveTab("messaging")}>Messages</button>}
       </nav>
       {isParent && children.length > 0 && (
         <section className="portal-child-overview" aria-label="Linked children">
@@ -243,6 +245,8 @@ export default function StudentResultsPortal() {
             </article>)}
           </section>
         )
+      ) : activeTab === "messaging" ? (
+        <MessagingWorkspace mode="parent" />
       ) : activeTab === "notifications" ? (
         <section className="portal-notification-panel" aria-label="Notifications">
           <div className="portal-data-heading"><div><h2>Notifications</h2><span>{unreadCount} unread</span></div>
