@@ -39,6 +39,16 @@ export const issueCertificate = async (req, res, next) => {
     return fail(res, 400, "Provide valid student, enrollment, certificate type and permitted remarks");
   }
 
+  const issueYear = new Date().getUTCFullYear();
+  try {
+    await CertificateCounter.updateOne(
+      { tenantId: req.tenantId, year: issueYear, type },
+      { $setOnInsert: { tenantId: req.tenantId, year: issueYear, type, sequence: 0 } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if (error.code !== 11000 || !await CertificateCounter.exists({ tenantId: req.tenantId, year: issueYear, type })) throw error;
+  }
   const session = await mongoose.startSession();
   let created;
   try {
@@ -68,12 +78,12 @@ export const issueCertificate = async (req, res, next) => {
       }).session(session).lean() : null;
       const now = new Date();
       const counter = await CertificateCounter.findOneAndUpdate(
-        { tenantId: req.tenantId, year: now.getUTCFullYear(), type },
-        { $inc: { sequence: 1 }, $setOnInsert: { tenantId: req.tenantId, year: now.getUTCFullYear(), type } },
-        { new: true, upsert: true, setDefaultsOnInsert: true, session },
+        { tenantId: req.tenantId, year: issueYear, type },
+        { $inc: { sequence: 1 } },
+        { new: true, session },
       );
       const prefix = type === "bonafide" ? "BON" : "TC";
-      const certificateNumber = `${prefix}/${now.getUTCFullYear()}/${String(counter.sequence).padStart(5, "0")}`;
+      const certificateNumber = `${prefix}/${issueYear}/${String(counter.sequence).padStart(5, "0")}`;
       [created] = await Certificate.create([{
         tenantId: req.tenantId, studentId, enrollmentId, academicYearId: year._id, type,
         certificateNumber, verificationCode: randomBytes(18).toString("hex"),
