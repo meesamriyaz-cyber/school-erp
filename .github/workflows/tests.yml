@@ -38,6 +38,9 @@ jobs:
 
       - name: Build frontend
         run: pnpm --filter @school-erp/web build
+        env:
+          # Reserved CI-only origin. Production deployments must build with their actual API origin.
+          VITE_API_BASE_URL: https://api.school-erp-ci.invalid/api/v1
 
   backend-tests:
     name: Backend Tests and MongoDB Integration
