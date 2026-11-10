@@ -275,6 +275,15 @@ it("opens announcements from the school administration navigation", async () => 
   expect(screen.getByRole("heading", { name: "Announcement management displayed" })).toBeInTheDocument();
 });
 
+  it("hides school-admin-only user management and unfinished settings from principals", () => {
+    useAuth.mockReturnValue(schoolAdmin({
+      user: { firstName: "Principal", lastName: "User", role: "principal" },
+    }));
+    render(<App />);
+    expect(screen.queryByRole("button", { name: "User Management" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+  });
+
   it("opens the school user directory from the administration navigation", async () => {
   useAuth.mockReturnValue(schoolAdmin());
   const user = userEvent.setup();
