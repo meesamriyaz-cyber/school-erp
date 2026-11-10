@@ -1,25 +1,10 @@
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import Student from "../models/Student.js";
 import { previewLegacyStudentGuardian, syncLegacyStudentGuardian } from "../services/syncLegacyStudentGuardian.js";
-
-dotenv.config();
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 const execute = process.argv.includes("--execute");
 
-const getMigrationMongoUri = () => {
-  const uri = process.env.MONGO_TEST_URI?.trim();
-  const validScheme = uri?.startsWith("mongodb://") || uri?.startsWith("mongodb+srv://");
-  if (!uri || !validScheme) {
-    throw new Error("MONGO_TEST_URI must be configured with a valid MongoDB URI. Migration is restricted to the development test database.");
-  }
-  const authorityAndPath = uri.split("?")[0].slice(uri.indexOf("://") + 3);
-  const databaseName = authorityAndPath.includes("/") ? authorityAndPath.slice(authorityAndPath.indexOf("/") + 1) : "";
-  if (!databaseName || !databaseName.toLowerCase().includes("test")) {
-    throw new Error("Refusing to run guardian migration: MONGO_TEST_URI must target a database whose name includes 'test'.");
-  }
-  return uri;
-};
 const hasLegacyDetails = {
   $or: [
     { guardianName: { $exists: true, $nin: ["", null] } },
@@ -29,8 +14,8 @@ const hasLegacyDetails = {
 };
 
 const run = async () => {
-  const migrationMongoUri = getMigrationMongoUri();
-  console.log("Guardian migration target: MONGO_TEST_URI (test database)");
+  const migrationMongoUri = getTestDatabaseUri();
+  console.log("Guardian migration target: test database");
   await mongoose.connect(migrationMongoUri);
   try {
     const students = await Student.find(hasLegacyDetails).sort({ tenantId: 1, _id: 1 }).lean();
