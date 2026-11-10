@@ -56,7 +56,7 @@ export default function CertificatesReports() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!studentId) { setEnrollments([]); setEnrollmentId(""); return; }
+    if (!studentId) return undefined;
     const controller = new AbortController();
     apiRequest(`/enrollments?studentId=${encodeURIComponent(studentId)}`, { accessToken, signal: controller.signal })
       .then((response) => {
@@ -112,17 +112,18 @@ export default function CertificatesReports() {
 
   const exportRows = () => {
     if (!report) return;
-    let rows = [];
-    if (reportType === "strength") rows = (report.data || []).map(({ academicYear, className, sectionName, active, completed, transferred, withdrawn }) => ({ academicYear, className, sectionName, active, completed, transferred, withdrawn }));
-    else if (reportType === "fees") rows = report.data.map((item) => ({
-      invoiceNumber: item.invoiceNumber, student: nameOf(item.studentId), academicYear: item.academicYearId?.name,
-      totalAmount: item.totalAmount, paidAmount: item.paidAmount, outstanding: Math.max(0, item.totalAmount - item.paidAmount),
-      postedPayments: item.paymentSummary?.posted, reversedPayments: item.paymentSummary?.reversed,
-    }));
-    else rows = report.enrollments.map((item) => ({
-      academicYear: item.academicYearId?.name, className: item.classId?.name, section: item.sectionId?.name || "",
-      enrollmentDate: item.enrollmentDate, status: item.status, endedAt: item.endedAt || "",
-    }));
+    const rows = reportType === "strength"
+      ? (report.data || []).map(({ academicYear, className, sectionName, active, completed, transferred, withdrawn }) => ({ academicYear, className, sectionName, active, completed, transferred, withdrawn }))
+      : reportType === "fees"
+        ? (report.data || []).map((item) => ({
+          invoiceNumber: item.invoiceNumber, student: nameOf(item.studentId), academicYear: item.academicYearId?.name,
+          totalAmount: item.totalAmount, paidAmount: item.paidAmount, outstanding: Math.max(0, item.totalAmount - item.paidAmount),
+          postedPayments: item.paymentSummary?.posted, reversedPayments: item.paymentSummary?.reversed,
+        }))
+        : (report.enrollments || []).map((item) => ({
+          academicYear: item.academicYearId?.name, className: item.classId?.name, section: item.sectionId?.name || "",
+          enrollmentDate: item.enrollmentDate, status: item.status, endedAt: item.endedAt || "",
+        }));
     downloadCsv(`school-report-${reportType}.csv`, rows);
   };
 
@@ -140,7 +141,7 @@ export default function CertificatesReports() {
     {tab === "certificates" ? <>
       <form className="cr-panel cr-form" onSubmit={issue}>
         <h3>Issue a certificate</h3>
-        <label>Student<select required value={studentId} onChange={(event) => { setStudentId(event.target.value); setIssued(null); }}><option value="">Select student</option>{students.map((item) => <option key={id(item)} value={id(item)}>{item.admissionNumber} — {nameOf(item)}</option>)}</select></label>
+        <label>Student<select required value={studentId} onChange={(event) => { setStudentId(event.target.value); setEnrollments([]); setEnrollmentId(""); setIssued(null); }}><option value="">Select student</option>{students.map((item) => <option key={id(item)} value={id(item)}>{item.admissionNumber} — {nameOf(item)}</option>)}</select></label>
         <label>Certificate type<select value={certificateType} onChange={(event) => setCertificateType(event.target.value)}><option value="bonafide">Bonafide certificate</option><option value="transfer">Transfer certificate</option></select></label>
         <label>Enrollment<select required value={enrollmentId} onChange={(event) => setEnrollmentId(event.target.value)}><option value="">Select enrollment record</option>{enrollments.map((item) => <option key={id(item)} value={id(item)}>{item.academicYearId?.name} · {item.classId?.name}{item.sectionId?.name ? ` / ${item.sectionId.name}` : ""} · {item.status}</option>)}</select></label>
         {certificateType === "transfer" && <label>Reason for leaving / transfer<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} required /></label>}
