@@ -18,6 +18,7 @@ export default function SchoolDashboard({ accessToken, academicYearId, onNavigat
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!accessToken) return undefined;
@@ -38,7 +39,7 @@ export default function SchoolDashboard({ accessToken, academicYearId, onNavigat
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [accessToken, academicYearId]);
+  }, [accessToken, academicYearId, retryCount]);
 
   const trendMax = useMemo(() => Math.max(1, ...(report?.attendance?.trend || []).map((item) => item.marked || 0)), [report]);
   const trend = report?.attendance?.trend || [];
@@ -46,7 +47,7 @@ export default function SchoolDashboard({ accessToken, academicYearId, onNavigat
 
   if (loading && !report) return <section className="school-dashboard-state" aria-live="polite">Loading institutional analytics…</section>;
   if (error && !report) return <section className="school-dashboard-state school-dashboard-error" role="alert">
-    <p>{error}</p><button type="button" onClick={() => setReport(null)}>Retry by reopening Overview</button>
+    <p>{error}</p><button type="button" onClick={() => setRetryCount((count) => count + 1)}>Retry</button>
   </section>;
 
   return <section className="school-dashboard" aria-label="Institutional analytics">
@@ -60,7 +61,7 @@ export default function SchoolDashboard({ accessToken, academicYearId, onNavigat
 
     <div className="school-dashboard-stats">
       <StatCard label="Active students" value={number(report?.students?.active)} note={`${number(report?.students?.total)} student records`} icon="♙" tone="blue" />
-      <StatCard label="Present today" value={number(report?.attendance?.today?.present + report?.attendance?.today?.late)} note={report?.attendance?.today?.percentage == null ? "No attendance marked today" : `${report.attendance.today.percentage}% attendance rate`} icon="✓" tone="green" />
+      <StatCard label="Present today" value={number(report?.attendance?.today?.present)} note={report?.attendance?.today?.percentage == null ? "No attendance marked today" : `${number(report?.attendance?.today?.late)} late · ${report.attendance.today.percentage}% attendance` } icon="✓" tone="green" />
       <StatCard label="Teaching staff" value={number(report?.staff?.teaching)} note={`${number(report?.staff?.totalActive)} active staff members`} icon="♧" tone="violet" />
       <StatCard label="Net fee collection" value={money(report?.fees?.net)} note={`${money(report?.fees?.outstanding)} outstanding`} icon="₹" tone="amber" />
     </div>
