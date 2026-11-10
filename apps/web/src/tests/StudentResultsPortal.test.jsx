@@ -240,4 +240,34 @@ describe("StudentResultsPortal family overview", () => {
     });
   });
 
+  it("shows teacher marks and feedback on a parent's homework portal", async () => {
+    mocks.apiRequest.mockImplementation((path) => {
+      if (path === "/portal/homework") return Promise.resolve({ data: [{
+        homework: {
+          _id: "homework-reviewed", title: "Fractions worksheet", instructions: "Solve all questions.",
+          dueDate: "2026-11-12", assignedDate: "2026-11-01",
+          subjectId: { name: "Mathematics" }, classId: { name: "Class 5" },
+          teacherId: { firstName: "Ayaan", lastName: "Khan" },
+        },
+        student: { _id: "student-a", firstName: "Amina", lastName: "Khan" },
+      }] });
+      if (path === "/portal/homework-submissions") return Promise.resolve({ data: [{
+        _id: "submission-reviewed", homeworkId: { _id: "homework-reviewed" },
+        studentId: { _id: "student-a" }, answer: "Completed worksheet",
+        status: "reviewed", marksObtained: 9, maxMarks: 10,
+        feedback: "Excellent understanding.", submittedAt: "2026-11-08T10:00:00.000Z",
+      }] });
+      return Promise.resolve({ success: true, data: [] });
+    });
+
+    render(<StudentResultsPortal />);
+    expect(await screen.findByText("Family learning overview")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Homework/ }));
+    expect(await screen.findByText("Fractions worksheet")).toBeTruthy();
+    expect(screen.getByText("Completed worksheet")).toBeTruthy();
+    expect(screen.getByText(/Marks: 9\/10/)).toBeTruthy();
+    expect(screen.getByText("Excellent understanding.")).toBeTruthy();
+  });
+
+
 });

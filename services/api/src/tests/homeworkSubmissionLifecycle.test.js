@@ -94,6 +94,28 @@ describe("homework submission lifecycle", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("hides homework from a teacher who no longer has the matching active assignment", async () => {
+    req.auth = { userId: "teacher-a", role: "teacher" };
+    mocks.homeworkFindOne.mockReturnValue(query({
+      _id: homeworkId, tenantId: "tenant-a", teacherId: "teacher-a",
+      academicYearId: "year-a", classId: "class-a", subjectId: "subject-a", sectionId: null,
+    }));
+    mocks.teacherAssignmentExists.mockResolvedValue(false);
+
+    await listHomeworkSubmissions(req, res, next);
+
+    expect(mocks.homeworkFindOne).toHaveBeenCalledWith({
+      _id: homeworkId, tenantId: "tenant-a", teacherId: "teacher-a",
+    });
+    expect(mocks.teacherAssignmentExists).toHaveBeenCalledWith(expect.objectContaining({
+      tenantId: "tenant-a", teacherId: "teacher-a", academicYearId: "year-a",
+      classId: "class-a", subjectId: "subject-a", status: "active", sectionId: null,
+    }));
+    expect(mocks.enrollmentFind).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it("uses an atomic submitted-only transition when a teacher reviews work", async () => {
     req.body = { marksObtained: 8, maxMarks: 10, feedback: "Good work" };
     mocks.homeworkFindOne.mockReturnValue(query({ _id: homeworkId, tenantId: "tenant-a" }));

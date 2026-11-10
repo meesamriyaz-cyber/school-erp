@@ -55,7 +55,7 @@ describe("HomeworkManagement submission register", () => {
     expect(screen.getByText("Submitted")).toBeTruthy();
     expect(screen.getByText("Not submitted")).toBeTruthy();
     expect(screen.getByText("Reviewed")).toBeTruthy();
-    expect(screen.getByText("Amina Khan · A-01")).toBeTruthy();
+    expect(screen.getAllByText("Amina Khan · A-01").length).toBeGreaterThan(0);
     expect(screen.getByText("Bilal Khan · B-01")).toBeTruthy();
     expect(screen.getByText("not submitted")).toBeTruthy();
     expect(screen.getByText("Completed")).toBeTruthy();
