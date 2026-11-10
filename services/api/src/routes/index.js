@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { getDatabaseStatus } from "../config/database.js";
+import { getBackgroundWorkerHealth } from "../services/workerHealth.js";
 import authRoutes from "./authRoutes.js";
 import platformRoutes from "./platformRoutes.js";
 import schoolRoutes from "./schoolRoutes.js";
@@ -39,8 +40,15 @@ router.get("/health", (req, res) => {
 
 router.get("/health/ready", (req, res) => {
   const database = getDatabaseStatus();
-  const ready = database === "connected";
-  res.status(ready ? 200 : 503).json({ success: ready, status: ready ? "ready" : "not_ready", database, timestamp: new Date().toISOString() });
+  const workers = getBackgroundWorkerHealth();
+  const ready = database === "connected" && workers.ready;
+  res.status(ready ? 200 : 503).json({
+    success: ready,
+    status: ready ? "ready" : "not_ready",
+    database,
+    workers,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 router.use("/auth", authRoutes);
