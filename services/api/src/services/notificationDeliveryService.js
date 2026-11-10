@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
+import { markWorkerStarted, markWorkerCycleStarted, markWorkerCycleSucceeded, markWorkerCycleFailed, markWorkerStopped } from "./workerHealth.js";
 
 const MAX_ATTEMPTS = 8;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
@@ -16,6 +17,7 @@ const safeError = (error) => typeof error?.message === "string"
 export async function processPendingNotifications({ batchSize = 50, notificationId = null } = {}) {
   if (workerRunning) return { processed: 0, skipped: true };
   workerRunning = true;
+  markWorkerCycleStarted("notificationDelivery");
   let processed = 0;
   try {
     for (let index = 0; index < Math.min(Math.max(batchSize, 1), 100); index += 1) {
@@ -105,8 +107,10 @@ export async function processPendingNotifications({ batchSize = 50, notification
         );
       }
     }
+    markWorkerCycleSucceeded("notificationDelivery", processed);
     return { processed, skipped: false };
   } catch (error) {
+    markWorkerCycleFailed("notificationDelivery", error);
     console.error("Notification delivery worker failed", {
       errorName: error?.name || "Error",
       errorMessage: safeError(error),
@@ -119,6 +123,7 @@ export async function processPendingNotifications({ batchSize = 50, notification
 
 export function startNotificationDeliveryWorker() {
   if (workerTimer) return;
+  markWorkerStarted("notificationDelivery");
   void processPendingNotifications();
   workerTimer = setInterval(() => { void processPendingNotifications(); }, POLL_INTERVAL_MS);
   workerTimer.unref?.();
@@ -128,6 +133,7 @@ export async function stopNotificationDeliveryWorker() {
   if (workerTimer) clearInterval(workerTimer);
   workerTimer = null;
   while (workerRunning) await new Promise((resolve) => setTimeout(resolve, 25));
+  markWorkerStopped("notificationDelivery");
 }
 
 export const notificationRetryPolicy = Object.freeze({
