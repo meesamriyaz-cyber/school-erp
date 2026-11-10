@@ -57,7 +57,6 @@ const navigation = [
   { label: "Fees & Payments", icon: "₹", section: "FINANCE" },
   { label: "Reports", icon: "▥", section: "FINANCE" },
   { label: "User Management", icon: "♙", section: "SYSTEM" },
-  { label: "Settings", icon: "⚙", section: "SYSTEM" },
 ];
 
 
@@ -196,6 +195,7 @@ function DashboardApp() {
               <div className="nav-heading">{section}</div>
               {navigation
                 .filter((item) => item.section === section)
+                .filter((item) => item.label !== "User Management" || user?.role === "school_admin")
                 .map((item) => (
                   <button
                     key={item.label}
@@ -331,7 +331,7 @@ function DashboardApp() {
   <MessagingWorkspace mode="admin" />
 ) : activePage === "Fees & Payments" ? (
   <FeeManagement />
-) : activePage === "User Management" ? (
+ ) : activePage === "User Management" && user?.role === "school_admin" ? (
   <SchoolUserDirectory />
 ) : (
   <section className="content-card placeholder-page">
