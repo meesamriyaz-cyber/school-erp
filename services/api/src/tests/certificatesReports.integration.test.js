@@ -146,7 +146,7 @@ describe("Certificates and school reports API", () => {
     ]);
     const report = await request(`/reports/fees?academicYearId=${year._id}`, { token: admin.token });
     expect(report.status).toBe(200);
-    expect(report.body.summary).toMatchObject({ invoiced: 500, outstanding: 425, postedPayments: 100, reversedPayments: 25, postedPaymentsCount: 1, reversedPaymentsCount: 1 });
+    expect(report.body.summary).toMatchObject({ invoiced: 500, outstanding: 425, postedPayments: 100, reversedPayments: 25, netPayments: 75, postedPaymentsCount: 1, reversedPaymentsCount: 1 });
     expect((await request(`/reports/fees?academicYearId=${year._id}`, { token: otherAdmin.token })).status).toBe(404);
   });
 
