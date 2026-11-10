@@ -139,14 +139,14 @@ describe("Certificates and school reports API", () => {
 
   it("separates posted and reversed fee collections in the financial report", async () => {
     const structure = await FeeStructure.create({ tenantId: school._id, academicYearId: year._id, classId: schoolClass._id, name: `Report Fee ${randomUUID().slice(0, 6)}`, items: [{ name: "Tuition", amount: 500, frequency: "annually" }] });
-    const invoice = await FeeInvoice.create({ tenantId: school._id, enrollmentId: activeEnrollment._id, studentId: student._id, academicYearId: year._id, feeStructureId: structure._id, invoiceNumber: `RPT-${randomUUID().slice(0, 8)}`, items: [{ name: "Tuition", amount: 500 }], totalAmount: 500, paidAmount: 100, dueDate: "2026-12-01", status: "partial" });
+    const invoice = await FeeInvoice.create({ tenantId: school._id, enrollmentId: activeEnrollment._id, studentId: student._id, academicYearId: year._id, feeStructureId: structure._id, invoiceNumber: `RPT-${randomUUID().slice(0, 8)}`, items: [{ name: "Tuition", amount: 500 }], totalAmount: 500, paidAmount: 75, dueDate: "2026-12-01", status: "partial" });
     await FeePayment.create([
       { tenantId: school._id, invoiceId: invoice._id, receiptNumber: `POST-${randomUUID().slice(0, 8)}`, amount: 100, paymentDate: "2026-11-01", method: "cash", receivedBy: admin.user._id, status: "posted" },
       { tenantId: school._id, invoiceId: invoice._id, receiptNumber: `REV-${randomUUID().slice(0, 8)}`, amount: 25, paymentDate: "2026-11-02", method: "cash", receivedBy: admin.user._id, status: "reversed", reversedAt: new Date("2026-11-03"), reversedBy: admin.user._id, reversalReason: "Duplicate entry" },
     ]);
     const report = await request(`/reports/fees?academicYearId=${year._id}`, { token: admin.token });
     expect(report.status).toBe(200);
-    expect(report.body.summary).toMatchObject({ invoiced: 500, outstanding: 400, postedPayments: 100, reversedPayments: 25, postedPaymentsCount: 1, reversedPaymentsCount: 1 });
+    expect(report.body.summary).toMatchObject({ invoiced: 500, outstanding: 425, postedPayments: 100, reversedPayments: 25, postedPaymentsCount: 1, reversedPaymentsCount: 1 });
     expect((await request(`/reports/fees?academicYearId=${year._id}`, { token: otherAdmin.token })).status).toBe(404);
   });
 
