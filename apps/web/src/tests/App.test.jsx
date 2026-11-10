@@ -25,6 +25,8 @@ vi.mock("../components/GradingScaleManagement.jsx", () => ({ default: () => <h2>
 vi.mock("../components/PlatformAdminWorkspace.jsx", () => ({ default: () => <h1>Platform Administrator workspace displayed</h1> }));
 vi.mock("../components/SchoolUserDirectory.jsx", () => ({ default: () => <h2>School user directory displayed</h2> }));
 vi.mock("../components/AnnouncementManagement.jsx", () => ({ default: () => <h2>Announcement management displayed</h2> }));
+vi.mock("../components/SchoolDashboard.jsx", () => ({ default: ({ onNavigate }) => <section><button onClick={() => onNavigate("Students")}>Explore students</button><button onClick={() => onNavigate("Students")}>Student management</button></section> }));
+
 
 const schoolAdmin = (overrides = {}) => ({
   status: "authenticated",
