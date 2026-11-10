@@ -11,6 +11,7 @@ Set these values in `services/api/.env`:
 
 ```dotenv
 NODE_ENV=test
+MONGO_DEV_URI=mongodb://127.0.0.1:27017/school-erp-dev?replicaSet=rs0
 MONGO_TEST_URI=mongodb://127.0.0.1:27017/school-erp-test?replicaSet=rs0
 JWT_ACCESS_SECRET=replace-with-a-random-secret-at-least-32-bytes
 JWT_REFRESH_SECRET=use-a-different-random-secret-at-least-32-bytes
@@ -44,9 +45,14 @@ production password-hashing settings without identifying the underlying cause.
 
 ## Environment safety
 
-- `MONGO_URI` is for development/runtime use.
-- `MONGO_TEST_URI` is mandatory when `NODE_ENV=test` and is the URI selected by
+- `MONGO_DEV_URI` is mandatory when `NODE_ENV=development` and is selected by
   the API environment loader.
+- `MONGO_TEST_URI` is mandatory when `NODE_ENV=test` and is selected by the
+  API environment loader.
+- `MONGO_URI` is reserved for `NODE_ENV=production`; do not place its value in
+  development or test CI configuration.
+- The loader rejects a selected URI that resolves to the same MongoDB host and
+  database as another configured environment URI.
 - The database name must be exactly `school-erp-test` for database-backed
   integration suites.
 - Use disposable test data. Suites should create uniquely named records and
