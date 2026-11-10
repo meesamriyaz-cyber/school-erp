@@ -15,31 +15,28 @@ function StatCard({ label, value, note, icon, tone }) {
 }
 
 export default function SchoolDashboard({ accessToken, academicYearId, onNavigate }) {
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const requestKey = `${accessToken || "anonymous"}:${academicYearId || "active"}:${retryCount}`;
+  const loading = result?.key !== requestKey;
+  const report = result?.key === requestKey ? result.data : null;
+  const error = result?.key === requestKey ? result.error || "" : "";
 
   useEffect(() => {
     if (!accessToken) return undefined;
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
     const query = academicYearId ? `?academicYearId=${encodeURIComponent(academicYearId)}` : "";
     apiRequest(`/reports/dashboard${query}`, { accessToken, signal: controller.signal })
       .then((response) => {
-        if (!controller.signal.aborted) setReport(response?.data || null);
+        if (!controller.signal.aborted) setResult({ key: requestKey, data: response?.data || null, error: "" });
       })
       .catch((requestError) => {
         if (!controller.signal.aborted && requestError.name !== "AbortError") {
-          setError(requestError.message || "Unable to load school analytics.");
+          setResult({ key: requestKey, data: null, error: requestError.message || "Unable to load school analytics." });
         }
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
     return () => controller.abort();
-  }, [accessToken, academicYearId, retryCount]);
+  }, [accessToken, academicYearId, retryCount, requestKey]);
 
   const trendMax = useMemo(() => Math.max(1, ...(report?.attendance?.trend || []).map((item) => item.marked || 0)), [report]);
   const trend = report?.attendance?.trend || [];
