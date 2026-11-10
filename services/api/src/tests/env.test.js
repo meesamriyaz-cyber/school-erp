@@ -213,6 +213,23 @@ describe("environment configuration", () => {
     );
   });
 
+
+  it("accepts an Atlas replica-set URI with multiple hosts", async () => {
+    const uri = "mongodb://user:password@ac-dnqkga2-shard-00-00.b59l9ir.mongodb.net:27017,ac-dnqkga2-shard-00-01.b59l9ir.mongodb.net:27017,ac-dnqkga2-shard-00-02.b59l9ir.mongodb.net:27017/school-erp-test?ssl=true&replicaSet=atlas-g29nf4-shard-0&authSource=admin&appName=Cluster0";
+    const { default: env } = await importEnv({ MONGO_TEST_URI: uri });
+    expect(env.mongoUri).toBe(uri);
+  });
+
+  it("detects a duplicate Atlas replica-set target across environments", async () => {
+    const uri = "mongodb://user:password@ac-dnqkga2-shard-00-00.b59l9ir.mongodb.net:27017,ac-dnqkga2-shard-00-01.b59l9ir.mongodb.net:27017,ac-dnqkga2-shard-00-02.b59l9ir.mongodb.net:27017/school-erp-test?ssl=true&replicaSet=atlas-g29nf4-shard-0&authSource=admin&appName=Cluster0";
+    await expect(importEnv({
+      MONGO_TEST_URI: uri,
+      MONGO_DEV_URI: uri,
+    })).rejects.toThrow(
+      "MONGO_TEST_URI must not target the same MongoDB host and database as MONGO_DEV_URI",
+    );
+  });
+
   it("uses MONGO_DEV_URI in development mode", async () => {
     const { default: env } = await importEnv({ NODE_ENV: "development" });
     expect(env.mongoUri).toBe(validEnv.MONGO_DEV_URI);
