@@ -1,30 +1,11 @@
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
-
-dotenv.config();
-
-const getAuditMongoUri = () => {
-  const uri = process.env.MONGO_TEST_URI?.trim();
-  const validScheme = uri?.startsWith("mongodb://") || uri?.startsWith("mongodb+srv://");
-  if (!uri || !validScheme) {
-    throw new Error("MONGO_TEST_URI must be configured with a valid MongoDB URI. Guardian integrity audit is restricted to the development test database.");
-  }
-
-  const authorityAndPath = uri.split("?")[0].slice(uri.indexOf("://") + 3);
-  const databaseName = authorityAndPath.includes("/")
-    ? authorityAndPath.slice(authorityAndPath.indexOf("/") + 1)
-    : "";
-  if (!databaseName || !databaseName.toLowerCase().includes("test")) {
-    throw new Error("Refusing to audit guardian relationships: MONGO_TEST_URI must target a database whose name includes 'test'.");
-  }
-  return uri;
-};
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 const run = async () => {
-  await mongoose.connect(getAuditMongoUri());
+  await mongoose.connect(getTestDatabaseUri());
   try {
     const [students, guardians, relationships] = await Promise.all([
       Student.find({}).select("_id tenantId admissionNumber status").lean(),
