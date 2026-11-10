@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
-import env from "../config/env.js";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 import User from "../models/User.js";
 
 const tenantId = "6acb564cde0c5106698095de";
 const email = "isolation-admin-1383375035@example.com";
 
 try {
-  await mongoose.connect(env.mongoUri);
+  await mongoose.connect(getTestDatabaseUri());
 
   const user = await User.findOne({
     tenantId,
