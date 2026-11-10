@@ -3,6 +3,8 @@ import Notification from "../models/Notification.js";
 import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
+import Enrollment from "../models/Enrollment.js";
+import TeacherAssignment from "../models/TeacherAssignment.js";
 import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
 
 const validId = mongoose.isValidObjectId;
@@ -10,6 +12,24 @@ const invalid = (res, message) => res.status(400).json({ success: false, message
 const PAGE_SIZE = 100;
 
 const getAuthorizedStudentIds = async (req) => {
+  if (req.auth.role === "teacher") {
+    const assignments = await TeacherAssignment.find({
+      tenantId: req.tenantId, teacherId: req.auth.userId, status: "active",
+    }).select("academicYearId classId sectionId").lean();
+    if (!assignments.length) return { ids: [] };
+    const enrollments = await Enrollment.find({
+      tenantId: req.tenantId, status: "active",
+      $or: assignments.map((item) => ({
+        academicYearId: item.academicYearId, classId: item.classId,
+        ...(item.sectionId ? { sectionId: item.sectionId } : {}),
+      })),
+    }).select("studentId").lean();
+    if (!enrollments.length) return { ids: [] };
+    const students = await Student.find({
+      tenantId: req.tenantId, _id: { $in: enrollments.map((item) => item.studentId) }, status: "active",
+    }).select("_id").lean();
+    return { ids: students.map((item) => String(item._id)) };
+  }
   if (req.auth.role === "student") {
     const student = await Student.findOne({
       tenantId: req.tenantId, userId: req.auth.userId, status: "active",
@@ -137,7 +157,7 @@ export const listNotificationDelivery = async (req, res, next) => {
       filter.deliveryStatus = req.query.status;
     }
     if (req.query.eventType !== undefined) {
-      if (req.query.eventType !== "announcement_published") return invalid(res, "Invalid notification event type");
+      if (!["announcement_published", "homework_published", "attendance_absence", "examination_scheduled", "examination_results_published", "fee_invoice_created", "fee_payment_received", "fee_payment_reversed", "message_received"].includes(req.query.eventType)) return invalid(res, "Invalid notification event type");
       filter.eventType = req.query.eventType;
     }
     if (req.query.recipientUserId !== undefined) {
