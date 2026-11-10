@@ -28,7 +28,7 @@ const makeSchool = async (label) => {
 };
 const makeUser = async (tenant, role) => {
   const doc = await User.create({ tenantId: tenant._id, firstName: "Test", lastName: "User", email: `class-test-${randomUUID()}@example.test`, passwordHash: "test-only", role, status: "active", authVersion: 0 });
-  userIds.push(doc._id); return { token: createAccessToken(doc) };
+  userIds.push(doc._id); return { get token() { return createAccessToken(doc); } };
 };
 
 describe("Classes and Sections API", () => {
