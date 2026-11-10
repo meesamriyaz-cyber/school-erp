@@ -8,5 +8,5 @@ const router = Router();
 router.use(authenticate, requireActiveTenant);
 router.get("/student-history", authorizeRoles("school_admin", "principal", "teacher"), getStudentAcademicHistory);
 router.get("/enrollment-strength", authorizeRoles("school_admin", "principal", "teacher"), getEnrollmentStrengthReport);
-router.get("/fees", authorizeRoles("school_admin", "principal", "teacher"), getFeeCollectionReport);
+router.get("/fees", authorizeRoles("school_admin", "principal"), getFeeCollectionReport);
 export default router;
