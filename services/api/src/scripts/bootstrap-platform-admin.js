@@ -21,7 +21,7 @@ const getDatabaseName = (uri) => {
 const databaseName = getDatabaseName(env.mongoUri);
 
 if (
-  env.nodeEnv === "production" ||
+  env.nodeEnv !== "test" ||
   !databaseName ||
   !/test/i.test(databaseName)
 ) {
