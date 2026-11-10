@@ -75,7 +75,7 @@ describe("Certificates and school reports API", () => {
     expect(issued.status).toBe(201);
     expect(issued.body.data.certificateNumber).toMatch(/^BON\/\d{4}\/\d{5}$/);
     expect(issued.body.data.snapshot).toMatchObject({ studentName: "Amina Khan", admissionNumber: student.admissionNumber, className: "Class 7" });
-    expect(issued.body.data.verificationCode).toBeUndefined();
+    expect(issued.body.data.verificationCode).toMatch(/^[a-f0-9]{36}$/);
     const stored = await Certificate.findById(issued.body.data._id).select("+verificationCode").lean();
     const verified = await request(`/certificates/verify/${stored.verificationCode}`);
     expect(verified.status).toBe(200);
