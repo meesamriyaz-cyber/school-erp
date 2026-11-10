@@ -30,21 +30,24 @@ async function parentContext(req, studentId = null) {
 }
 
 async function teacherCanAccessConversation(req, conversation) {
-  const [enrollment, assignment, student] = await Promise.all([
+  const [enrollment, student] = await Promise.all([
     Enrollment.findOne({
-      _id: conversation.enrollmentId, tenantId: req.tenantId, studentId: conversation.studentId,
-      status: "active",
+      _id: conversation.enrollmentId, tenantId: req.tenantId,
+      studentId: conversation.studentId, status: "active",
     }).select("_id classId sectionId academicYearId").lean(),
-    TeacherAssignment.findOne({
-      _id: conversation.teacherAssignmentId, tenantId: req.tenantId,
-      teacherId: req.auth.userId, status: "active",
-    }).select("_id classId sectionId academicYearId").lean(),
-    Student.findOne({ _id: conversation.studentId, tenantId: req.tenantId, status: "active" }).select("_id").lean(),
+    Student.findOne({
+      _id: conversation.studentId, tenantId: req.tenantId, status: "active",
+    }).select("_id").lean(),
   ]);
-  if (!enrollment || !assignment || !student) return false;
-  return String(enrollment.classId) === String(assignment.classId)
-    && String(enrollment.academicYearId) === String(assignment.academicYearId)
-    && (!assignment.sectionId || String(assignment.sectionId) === String(enrollment.sectionId));
+  if (!enrollment || !student) return false;
+  return Boolean(await TeacherAssignment.exists({
+    tenantId: req.tenantId, teacherId: req.auth.userId,
+    academicYearId: enrollment.academicYearId, classId: enrollment.classId,
+    status: "active",
+    ...(enrollment.sectionId
+      ? { $or: [{ sectionId: null }, { sectionId: enrollment.sectionId }] }
+      : { sectionId: null }),
+  }));
 }
 
 async function authorizeConversation(req, conversation) {
