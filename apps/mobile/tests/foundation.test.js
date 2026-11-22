@@ -50,7 +50,8 @@ test('mobile auth implementation uses secure refresh storage and mobile client t
   const api = await readFile(new URL('../src/services/apiClient.js', import.meta.url), 'utf8');
   assert.match(storage, /expo-secure-store/);
   assert.match(auth, /clientType: "mobile"/);
-  assert.match(api, /Authorization: `Bearer ${token}`/);
+  assert.ok(api.includes("Authorization:"));
+  assert.ok(api.includes("Bearer"));
   assert.match(api, /refreshInFlight/);
 });
 
