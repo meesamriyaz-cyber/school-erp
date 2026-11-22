@@ -4,7 +4,6 @@ import SchoolClass from "../models/SchoolClass.js";
 import AcademicYear from "../models/AcademicYear.js";
 import Enrollment from "../models/Enrollment.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
-import TeacherAssignment from "../models/TeacherAssignment.js";
 
 const CREATE_FIELDS = ["classId", "name", "capacity", "status"];
 const UPDATE_FIELDS = ["name", "capacity", "status"];

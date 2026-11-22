@@ -140,17 +140,7 @@ export const getFeeCollectionReport = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-import mongoose from "mongoose";
-import Student from "../models/Student.js";
-import Enrollment from "../models/Enrollment.js";
-import AcademicYear from "../models/AcademicYear.js";
-import TeacherAssignment from "../models/TeacherAssignment.js";
-import Examination from "../models/Examination.js";
-import Attendance from "../models/Attendance.js";
-import Staff from "../models/Staff.js";
-import FeeInvoice from "../models/FeeInvoice.js";
-import FeePayment from "../models/FeePayment.js";
-import { loadResultContext } from "./examResultController.js";
+
 
 
 export const getDashboardOverview = async (req, res, next) => {
