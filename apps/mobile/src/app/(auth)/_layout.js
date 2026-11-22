@@ -1,15 +1,3 @@
-import { Stack } from 'expo-router';
-
-import { colors } from '../../theme/tokens';
-
-export default function AuthLayout() {
-  return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-        animation: 'slide_from_right',
-      }}
-    />
-  );
-}
+import { Stack, Redirect } from "expo-router";
+import { useAuth } from "../../auth/AuthProvider";
+export default function AuthLayout() { const {status}=useAuth(); if(status==="loading") return null; if(status==="authenticated") return <Redirect href="/(app)"/>; return <Stack screenOptions={{headerShown:false}}/>; }
