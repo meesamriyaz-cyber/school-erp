@@ -1,109 +1,13 @@
-import { Link } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
-
-import { AppScreen } from '../../components/AppScreen';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
-
-export default function LoginPlaceholderScreen() {
-  return (
-    <AppScreen style={styles.screen}>
-      <Link href="/" style={styles.backLink}>
-        <Text style={styles.backText}>‹  Back</Text>
-      </Link>
-
-      <View style={styles.content}>
-        <View style={styles.brandMark}>
-          <Text style={styles.brandInitials}>SE</Text>
-        </View>
-        <Text style={styles.kicker}>WELCOME BACK</Text>
-        <Text style={styles.title}>Sign in to your school</Text>
-        <Text style={styles.description}>
-          Secure access for school administrators, teachers, students and
-          parents.
-        </Text>
-        <View style={styles.notice}>
-          <Text style={styles.noticeTitle}>Sign-in is the next batch</Text>
-          <Text style={styles.noticeBody}>
-            The authentication flow, school identification and secure session
-            handling will be implemented in Mobile Batch M2.
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.footer}>SCHOOL ERP · MOBILE</Text>
-    </AppScreen>
-  );
+import { useState } from "react";
+import { Link, router } from "expo-router";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View, Pressable } from "react-native";
+import { useAuth } from "../../auth/AuthProvider";
+import { AppScreen } from "../../components/AppScreen";
+import { PrimaryButton } from "../../components/PrimaryButton";
+import { colors, radius, spacing, typography } from "../../theme/tokens";
+export default function LoginScreen() {
+ const {signIn}=useAuth(); const [accountType,setAccountType]=useState("school"); const [tenantSlug,setTenantSlug]=useState(""); const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [showPassword,setShowPassword]=useState(false); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
+ const submit=async()=>{setError("");if(!email.trim()||!password||(accountType==="school"&&!tenantSlug.trim())){setError(accountType==="school"?"School code, email and password are required.":"Email and password are required.");return;}setBusy(true);try{await signIn({email,password,tenantSlug,accountType});router.replace("/(app)");}catch(err){setError(err?.message||"Unable to sign in. Please try again.");}finally{setBusy(false);}};
+ return <AppScreen style={styles.screen}><KeyboardAvoidingView style={styles.flex} behavior={Platform.OS==="ios"?"padding":undefined}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}><Link href="/" style={styles.backLink}>‹  Back</Link><View style={styles.header}><View style={styles.brandMark}><Text style={styles.brandInitials}>SE</Text></View><Text style={styles.kicker}>WELCOME BACK</Text><Text style={styles.title}>Sign in to your school</Text><Text style={styles.description}>Secure access to your school community.</Text></View><View style={styles.accountToggle}><Pressable onPress={()=>{setAccountType("school");setError("");}} style={[styles.toggleOption,accountType==="school"&&styles.toggleActive]}><Text style={[styles.toggleText,accountType==="school"&&styles.toggleTextActive]}>School account</Text></Pressable><Pressable onPress={()=>{setAccountType("platform");setError("");}} style={[styles.toggleOption,accountType==="platform"&&styles.toggleActive]}><Text style={[styles.toggleText,accountType==="platform"&&styles.toggleTextActive]}>Platform admin</Text></Pressable></View>{accountType==="school"&&<View style={styles.field}><Text style={styles.label}>School code</Text><TextInput value={tenantSlug} onChangeText={setTenantSlug} autoCapitalize="none" autoCorrect={false} placeholder="your-school" placeholderTextColor={colors.muted} style={styles.input} returnKeyType="next"/></View>}<View style={styles.field}><Text style={styles.label}>Email address</Text><TextInput value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} placeholder="name@example.com" placeholderTextColor={colors.muted} style={styles.input} returnKeyType="next"/></View><View style={styles.field}><Text style={styles.label}>Password</Text><View style={styles.passwordRow}><TextInput value={password} onChangeText={setPassword} secureTextEntry={!showPassword} placeholder="Enter your password" placeholderTextColor={colors.muted} style={[styles.input,styles.passwordInput]} returnKeyType="go" onSubmitEditing={submit}/><Pressable onPress={()=>setShowPassword(v=>!v)} accessibilityRole="button" style={styles.showPassword}><Text style={styles.showText}>{showPassword?"Hide":"Show"}</Text></Pressable></View></View>{error?<Text accessibilityRole="alert" style={styles.error}>{error}</Text>:null}<PrimaryButton label={busy?"Signing in…":"Sign in"} disabled={busy} onPress={submit}/><Text style={styles.footnote}>Your credentials are sent securely to your school ERP server.</Text></ScrollView></KeyboardAvoidingView></AppScreen>;
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xl,
-    justifyContent: 'space-between',
-  },
-  backLink: { alignSelf: 'flex-start', paddingVertical: spacing.sm },
-  backText: {
-    color: colors.primary,
-    fontSize: typography.md,
-    fontWeight: '700',
-  },
-  content: { gap: spacing.md, paddingBottom: spacing.xxl },
-  brandMark: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    marginBottom: spacing.sm,
-  },
-  brandInitials: {
-    color: colors.white,
-    fontSize: typography.md,
-    fontWeight: '800',
-  },
-  kicker: {
-    color: colors.accent,
-    fontSize: typography.xs,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: typography.xxl,
-    lineHeight: 36,
-    fontWeight: '800',
-  },
-  description: {
-    color: colors.muted,
-    fontSize: typography.md,
-    lineHeight: 25,
-  },
-  notice: {
-    marginTop: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    gap: spacing.xs,
-  },
-  noticeTitle: {
-    color: colors.ink,
-    fontSize: typography.md,
-    fontWeight: '800',
-  },
-  noticeBody: {
-    color: colors.muted,
-    fontSize: typography.sm,
-    lineHeight: 22,
-  },
-  footer: {
-    color: colors.muted,
-    fontSize: typography.xs,
-    fontWeight: '700',
-    letterSpacing: 1.3,
-  },
-});
+const styles=StyleSheet.create({screen:{flex:1,paddingHorizontal:spacing.xl,paddingTop:spacing.lg},flex:{flex:1},scroll:{flexGrow:1,paddingBottom:spacing.xl,gap:spacing.lg},backLink:{color:colors.primary,fontSize:typography.md,fontWeight:"700",paddingVertical:spacing.sm},header:{gap:spacing.sm},brandMark:{width:48,height:48,borderRadius:radius.md,backgroundColor:colors.primary,alignItems:"center",justifyContent:"center",marginBottom:spacing.sm},brandInitials:{color:colors.white,fontSize:typography.md,fontWeight:"800"},kicker:{color:colors.accent,fontSize:typography.xs,fontWeight:"800",letterSpacing:1.5},title:{color:colors.ink,fontSize:typography.xxl,fontWeight:"800",lineHeight:36},description:{color:colors.muted,fontSize:typography.md,lineHeight:24},accountToggle:{flexDirection:"row",backgroundColor:colors.primarySoft,padding:4,borderRadius:radius.md,gap:4},toggleOption:{flex:1,paddingVertical:11,borderRadius:radius.sm,alignItems:"center"},toggleActive:{backgroundColor:colors.surface},toggleText:{color:colors.muted,fontSize:typography.sm,fontWeight:"700"},toggleTextActive:{color:colors.primary},field:{gap:spacing.sm},label:{color:colors.ink,fontSize:typography.sm,fontWeight:"700"},input:{minHeight:54,borderWidth:1,borderColor:colors.border,borderRadius:radius.md,paddingHorizontal:spacing.md,color:colors.ink,backgroundColor:colors.surface,fontSize:typography.md},passwordRow:{flexDirection:"row",alignItems:"center"},passwordInput:{flex:1,paddingRight:62},showPassword:{position:"absolute",right:spacing.md,paddingVertical:spacing.sm},showText:{color:colors.primary,fontWeight:"700"},error:{color:colors.danger,backgroundColor:"#FDECEC",padding:spacing.md,borderRadius:radius.md,lineHeight:20},footnote:{color:colors.muted,fontSize:typography.xs,textAlign:"center",lineHeight:18}});
