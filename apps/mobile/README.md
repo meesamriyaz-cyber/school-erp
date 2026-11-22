@@ -1,34 +1,25 @@
 # School ERP Mobile
 
-Expo / React Native application in the School ERP pnpm workspace.
+Expo SDK 57 / React Native 0.86 / JavaScript / Expo Router.
 
-## Development
+## API configuration
 
-Run commands from the repository root:
+Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE_URL`.
 
-```bash
-pnpm install --frozen-lockfile
-pnpm dev:mobile
+- Android emulator: `http://10.0.2.2:5000/api/v1`
+- Physical device: use the host machine's LAN IP and ensure the API is reachable from the device.
+- Production: use the HTTPS API origin.
+
+Start the app from the monorepo root:
+
+```sh
+pnpm --filter @school-erp/mobile start
 ```
 
-Then use the Expo CLI to open Android, iOS or web. SDK-compatible native packages
-are managed with `pnpm --filter @school-erp/mobile exec expo install`.
+## Authentication
 
-## Foundation structure
+School accounts sign in with school slug, email and password. Platform administrators use the global email/password account mode.
 
-- `src/app/` — Expo Router routes and layouts.
-- `src/components/` — reusable mobile UI components.
-- `src/theme/` — shared design tokens.
-- `tests/` — Node.js foundation/configuration regression tests.
+Refresh tokens are stored using Expo SecureStore. Access tokens remain in memory. The API client refreshes the session after a 401 and retries the request once. Logout revokes the server session when possible and always clears local credentials.
 
-## Checks
-
-```bash
-pnpm --filter @school-erp/mobile test
-pnpm --filter @school-erp/mobile exec expo-doctor
-pnpm --filter @school-erp/mobile exec expo config --type public
-```
-
-Authentication, role-aware workspaces and ERP feature screens are intentionally
-not implemented in M1. They will be introduced in their respective batches
-against the existing API and authorization model.
+Do not commit real environment values or credentials.
