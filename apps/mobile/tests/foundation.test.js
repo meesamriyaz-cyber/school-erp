@@ -1,45 +1,60 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-
 import { colors, radius, spacing, typography } from '../src/theme/tokens.js';
 
 const readJson = async (url) => JSON.parse(await readFile(url, 'utf8'));
 
-test('mobile app uses the Expo Router entry point and SDK-compatible dependencies', async () => {
+test('mobile app uses Expo Router and SDK-compatible dependencies', async () => {
   const packageJson = await readJson(new URL('../package.json', import.meta.url));
-
   assert.equal(packageJson.main, 'expo-router/entry');
   assert.equal(packageJson.dependencies.expo, '~57.0.27');
   assert.equal(packageJson.dependencies['expo-router'], '~57.0.25');
+  assert.equal(packageJson.dependencies['expo-secure-store'], '~57.0.4');
   assert.equal(packageJson.dependencies['react-native-safe-area-context'], '5.7.0');
   assert.equal(packageJson.dependencies['react-native-screens'], '4.26.2');
 });
 
-test('Expo config registers the router plugin and a stable deep-link scheme', async () => {
-  const appConfig = await readJson(new URL('../app.json', import.meta.url));
-
-  assert.ok(appConfig.expo.plugins.includes('expo-router'));
-  assert.equal(appConfig.expo.scheme, 'schoolerp');
-  assert.equal(appConfig.expo.name, 'School ERP');
+test('Expo config registers Router and SecureStore with a stable deep-link scheme', async () => {
+  const config = await readJson(new URL('../app.json', import.meta.url));
+  assert.ok(config.expo.plugins.includes('expo-router'));
+  assert.ok(config.expo.plugins.includes('expo-secure-store'));
+  assert.equal(config.expo.scheme, 'schoolerp');
+  assert.equal(config.expo.name, 'School ERP');
 });
 
-test('foundation route files exist for welcome and authentication navigation', async () => {
+test('auth infrastructure and protected routes are present', async () => {
   const paths = [
     '../src/app/_layout.js',
     '../src/app/index.js',
     '../src/app/(auth)/_layout.js',
     '../src/app/(auth)/login.js',
+    '../src/app/(app)/_layout.js',
+    '../src/app/(app)/index.js',
+    '../src/auth/AuthProvider.js',
+    '../src/auth/secureStorage.js',
+    '../src/services/apiClient.js',
+    '../src/services/authService.js',
+    '../src/config/environment.js',
     '../src/components/AppScreen.js',
   ];
-
   for (const path of paths) {
     const source = await readFile(new URL(path, import.meta.url), 'utf8');
     assert.ok(source.length > 0, path + ' should not be empty');
   }
 });
 
-test('design tokens expose valid palette, spacing, radius and typography scales', () => {
+test('mobile auth implementation uses secure refresh storage and mobile client type', async () => {
+  const storage = await readFile(new URL('../src/auth/secureStorage.js', import.meta.url), 'utf8');
+  const auth = await readFile(new URL('../src/services/authService.js', import.meta.url), 'utf8');
+  const api = await readFile(new URL('../src/services/apiClient.js', import.meta.url), 'utf8');
+  assert.match(storage, /expo-secure-store/);
+  assert.match(auth, /clientType: "mobile"/);
+  assert.match(api, /Authorization: `Bearer ${token}`/);
+  assert.match(api, /refreshInFlight/);
+});
+
+test('design tokens expose valid palette and scales', () => {
   assert.match(colors.primary, /^#[0-9A-F]{6}$/i);
   assert.match(colors.background, /^#[0-9A-F]{6}$/i);
   assert.ok(spacing.xxl > spacing.xl && spacing.xl > spacing.lg);
