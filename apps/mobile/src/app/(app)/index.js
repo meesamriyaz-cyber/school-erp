@@ -13,7 +13,7 @@ const tabs = [
   { key: "more", label: "More", icon: "•••" },
 ];
 const formatNumber = (value) => Number(value || 0).toLocaleString("en-IN");
-const formatMoney = (value) => `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })};
+const formatMoney = (value) => "₹" + Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
 function MetricCard({ icon, label, value, note, tint }) {
   return <View style={styles.metricCard}>
