@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { useAuth } from "../../auth/AuthProvider";
 import { AppScreen } from "../../components/AppScreen";
 import { getDashboardOverview } from "../../services/dashboardService";
-import { colors, radius, spacing, typography } from "../../theme/tokens";
+import { colors, radius, spacing } from "../../theme/tokens";
 
 const tabs = [
   { key: "home", label: "Home", icon: "⌂" },
