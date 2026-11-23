@@ -20,7 +20,7 @@ function StateCard({ title, message, action, onAction }) {
   return <View style={styles.stateCard}><Text style={styles.stateTitle}>{title}</Text><Text style={styles.stateMessage}>{message}</Text>{action ? <TouchableOpacity style={styles.actionButton} onPress={onAction}><Text style={styles.actionText}>{action}</Text></TouchableOpacity> : null}</View>;
 }
 
-export function StudentsScreen({ onHome }) {
+export function StudentsScreen({ onHome, onAddStudent }) {
   const [students, setStudents] = useState([]);
   const [pagination, setPagination] = useState(null);
   const paginationRef = useRef(null);
@@ -107,7 +107,7 @@ export function StudentsScreen({ onHome }) {
   }
 
   return <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load({ refresh: true })} tintColor={colors.primary} />}>
-    <View style={styles.headerRow}><View style={{ flex: 1 }}><Text style={styles.kicker}>SCHOOL DIRECTORY</Text><Text style={styles.heading}>Students</Text><Text style={styles.subheading}>{pagination?.total ?? students.length} records</Text></View><TouchableOpacity onPress={onHome} style={styles.homeButton}><Text style={styles.homeButtonText}>Home</Text></TouchableOpacity></View>
+    <View style={styles.headerRow}><View style={{ flex: 1 }}><Text style={styles.kicker}>SCHOOL DIRECTORY</Text><Text style={styles.heading}>Students</Text><Text style={styles.subheading}>{pagination?.total ?? students.length} records</Text></View><View style={styles.headerActions}><TouchableOpacity onPress={onAddStudent} style={styles.addButton}><Text style={styles.addButtonText}>+ Add</Text></TouchableOpacity><TouchableOpacity onPress={onHome} style={styles.homeButton}><Text style={styles.homeButtonText}>Home</Text></TouchableOpacity></View></View>
     <View style={styles.searchRow}><TextInput style={styles.searchInput} value={searchInput} onChangeText={setSearchInput} placeholder="Name or admission number" placeholderTextColor={colors.muted} returnKeyType="search" onSubmitEditing={submitSearch} autoCapitalize="none"/><TouchableOpacity style={styles.searchButton} onPress={submitSearch}><Text style={styles.searchButtonText}>Search</Text></TouchableOpacity></View>
     <View style={styles.statusRow}>{statuses.map((item) => <TouchableOpacity key={item.key} style={[styles.filterChip, status === item.key && styles.filterChipActive]} onPress={() => setStatus(item.key)}><Text style={[styles.filterText, status === item.key && styles.filterTextActive]}>{item.label}</Text></TouchableOpacity>)}</View>
     {loading ? <View style={styles.loading}><ActivityIndicator size="large" color={colors.primary}/><Text style={styles.stateMessage}>Loading students…</Text></View> : null}
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   kicker: { color: colors.accent, fontSize: 11, fontWeight: "900", letterSpacing: 1.3 },
   heading: { color: colors.ink, fontSize: 26, fontWeight: "900", marginTop: 3 },
   subheading: { color: colors.muted, fontSize: 12, marginTop: 3 },
-  homeButton: { backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10 },
+  headerActions: { flexDirection: "row", gap: 8 },\n  addButton: { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10 },\n  addButtonText: { color: colors.white, fontWeight: "800" },\n  homeButton: { backgroundColor: colors.primarySoft, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10 },
   homeButtonText: { color: colors.primary, fontWeight: "800" },
   searchRow: { flexDirection: "row", gap: 8 },
   searchInput: { flex: 1, minWidth: 0, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 11, color: colors.ink, fontSize: 14 },
