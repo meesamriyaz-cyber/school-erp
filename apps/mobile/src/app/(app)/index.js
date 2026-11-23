@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { useAuth } from "../../auth/AuthProvider";
 import { AppScreen } from "../../components/AppScreen";
 import { getDashboardOverview } from "../../services/dashboardService";
-import { StudentsScreen } from "../../components/StudentsScreen";
+import { StudentsScreen } from "../../components/StudentsScreen";\nimport { StudentAdmissionScreen } from "../../components/StudentAdmissionScreen";
 import { AttendanceScreen } from "../../components/AttendanceScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
@@ -142,7 +142,7 @@ export default function AppHomeScreen() {
         </View>
         <View style={styles.dashboardFooter}><Text>Updated {report.generatedAt ? new Date(report.generatedAt).toLocaleTimeString() : "recently"}</Text><Text>{formatNumber(report.examinations?.published)} published exams</Text></View>
       </> : null}
-    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
+    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => setActiveTab("students")}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
       {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <ComingSoon title="Staff directory" description="Teacher and staff profiles, roles, contact details and staff management are coming next." onHome={onHome}/> :
