@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   topHeader: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.background },
   brand: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  brandMark: { width: 46, height: 46, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center },
+  brandMark: { width: 46, height: 46, borderRadius: 14, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   brandMarkText: { color: colors.white, fontWeight: "900", fontSize: 15 },
   brandName: { color: colors.ink, fontWeight: "900", letterSpacing: 1.6, fontSize: 14 },
   brandCaption: { color: colors.muted, letterSpacing: 1.1, fontSize: 9, marginTop: 3, fontWeight: "700" },
