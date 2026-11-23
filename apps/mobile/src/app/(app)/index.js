@@ -3,7 +3,8 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { useAuth } from "../../auth/AuthProvider";
 import { AppScreen } from "../../components/AppScreen";
 import { getDashboardOverview } from "../../services/dashboardService";
-import { StudentsScreen } from "../../components/StudentsScreen";\nimport { StudentAdmissionScreen } from "../../components/StudentAdmissionScreen";
+import { StudentsScreen } from "../../components/StudentsScreen";
+import { StudentAdmissionScreen } from "../../components/StudentAdmissionScreen";
 import { AttendanceScreen } from "../../components/AttendanceScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
