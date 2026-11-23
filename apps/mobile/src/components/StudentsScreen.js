@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { getStudentById, getStudents } from "../services/studentService";
 import { colors, radius, spacing } from "../theme/tokens";
@@ -23,6 +23,7 @@ function StateCard({ title, message, action, onAction }) {
 export function StudentsScreen({ onHome }) {
   const [students, setStudents] = useState([]);
   const [pagination, setPagination] = useState(null);
+  const paginationRef = useRef(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -40,9 +41,10 @@ export function StudentsScreen({ onHome }) {
     else setLoading(true);
     setError("");
     try {
-      const page = nextPage ? (pagination?.page || 1) + 1 : 1;
+      const page = nextPage ? (paginationRef.current?.page || 1) + 1 : 1;
       const result = await getStudents({ page, limit: 20, search, status });
       setStudents((current) => nextPage ? [...current, ...result.students] : result.students);
+      paginationRef.current = result.pagination;
       setPagination(result.pagination);
     } catch (requestError) {
       setError(requestError?.message || "Unable to load students.");
@@ -52,7 +54,7 @@ export function StudentsScreen({ onHome }) {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, [pagination?.page, search, status]);
+  }, [search, status]);
 
   useEffect(() => { load(); }, [load]);
 
