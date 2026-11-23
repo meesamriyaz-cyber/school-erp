@@ -76,7 +76,7 @@ export function StudentAdmissionScreen({ onCancel, onComplete }) {
           guardianRelationship: form.guardianRelationship,
           guardianPhone: form.guardianPhone.trim() || undefined,
           guardianEmail: form.guardianEmail.trim() || undefined,
-          address: form.address.trim() || undefined,
+          address: form.address.trim() ? { line1: form.address.trim() } : undefined,
         });
         studentId = idOf(student);
         if (!studentId) throw new Error("Student was created, but the API did not return an ID. Please contact support before retrying.");
