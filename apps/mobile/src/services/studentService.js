@@ -12,3 +12,8 @@ export async function getStudentById(studentId) {
   const response = await apiRequest(`/students/${encodeURIComponent(studentId)}`);
   return response?.data ?? null;
 }
+
+export async function createStudent(body) {
+  const response = await apiRequest("/students", { method: "POST", body });
+  return response?.data ?? null;
+}
