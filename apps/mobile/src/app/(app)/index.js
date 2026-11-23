@@ -4,6 +4,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { AppScreen } from "../../components/AppScreen";
 import { getDashboardOverview } from "../../services/dashboardService";
 import { StudentsScreen } from "../../components/StudentsScreen";
+import { AttendanceScreen } from "../../components/AttendanceScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
 const tabs = [
@@ -143,7 +144,7 @@ export default function AppHomeScreen() {
       </> : null}
     </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
       {
-       activeTab === "attendance" ? <ComingSoon title="Attendance" description="Daily attendance marking, class rosters, attendance history and reports are next in the mobile roadmap." onHome={onHome}/> :
+       activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <ComingSoon title="Staff directory" description="Teacher and staff profiles, roles, contact details and staff management are coming next." onHome={onHome}/> :
        <View style={styles.profileCard}><View style={styles.profileLarge}><Text style={styles.profileLargeText}>{fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</Text></View><Text style={styles.profileName}>{fullName}</Text><Text style={styles.profileRole}>{role}</Text><Text style={styles.profileSchool}>School ERP mobile account</Text><TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
     </ScrollView>}
