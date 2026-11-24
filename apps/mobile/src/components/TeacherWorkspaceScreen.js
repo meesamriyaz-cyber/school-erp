@@ -22,6 +22,13 @@ export function TeacherWorkspaceScreen() {
   const [homework,setHomework]=useState([]);
   const [exams,setExams]=useState([]);
   const [report,setReport]=useState(null);
+  const [homeworkTitle,setHomeworkTitle]=useState("");
+  const [homeworkInstructions,setHomeworkInstructions]=useState("");
+  const [assignedDate,setAssignedDate]=useState(today());
+  const [dueDate,setDueDate]=useState(today());
+  const [activeHomework,setActiveHomework]=useState("");
+  const [submissions,setSubmissions]=useState(null);
+  const [reviewDrafts,setReviewDrafts]=useState({});
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -77,6 +84,30 @@ export function TeacherWorkspaceScreen() {
     }catch(err){setError(err.message||"Unable to save attendance.");}
     finally{setBusy(false);}
   };
+  const createHomework=async()=>{
+    if(!selected||!homeworkTitle.trim()||!homeworkInstructions.trim()){setError("Choose an assignment and enter a title and instructions.");return;}
+    setBusy(true);setError("");setNotice("");
+    try{
+      const body={academicYearId:id(selected.academicYearId),classId:id(selected.classId),sectionId:selected.sectionId?id(selected.sectionId):null,subjectId:id(selected.subjectId),title:homeworkTitle.trim(),instructions:homeworkInstructions.trim(),assignedDate,dueDate,status:"published"};
+      const r=await apiRequest("/homework",{method:"POST",body});
+      setHomework(items=>[r.data,...items]);setHomeworkTitle("");setHomeworkInstructions("");setNotice("Homework published to the assigned class.");
+    }catch(err){setError(err.message||"Unable to create homework.");}
+    finally{setBusy(false);}
+  };
+  const loadSubmissions=async homeworkId=>{
+    setActiveHomework(homeworkId);setBusy(true);setError("");
+    try{const r=await apiRequest("/homework/"+homeworkId+"/submissions");setSubmissions(r);}
+    catch(err){setError(err.message||"Unable to load submissions.");setSubmissions(null);}
+    finally{setBusy(false);}
+  };
+  const reviewSubmission=async(homeworkId,submissionId)=>{
+    const draft=reviewDrafts[submissionId]||{};setBusy(true);setError("");setNotice("");
+    try{
+      await apiRequest("/homework/"+homeworkId+"/submissions/"+submissionId+"/review",{method:"PATCH",body:{marksObtained:draft.marks||"",maxMarks:draft.max||"",feedback:draft.feedback||""}});
+      setNotice("Submission reviewed.");await loadSubmissions(homeworkId);
+    }catch(err){setError(err.message||"Unable to review submission.");}
+    finally{setBusy(false);}
+  };
   const runReport=async()=>{
     if(!selected)return;
     setBusy(true);setError("");
@@ -107,7 +138,7 @@ export function TeacherWorkspaceScreen() {
       {students.length>0?<><TouchableOpacity style={s.secondary} onPress={()=>setMarks(Object.fromEntries(students.map(x=>[id(x.studentId),{...marks[id(x.studentId)],status:"present"}])))}><Text style={s.secondaryText}>Mark all present</Text></TouchableOpacity><TouchableOpacity disabled={busy} style={s.primary} onPress={saveAttendance}><Text style={s.primaryText}>{busy?"Saving…":"Save attendance"}</Text></TouchableOpacity></>:<Text style={s.muted}>No students found for this assignment.</Text>}
     </View>:null}
     {tab==="students"&&!loading?<View style={s.panel}><Text style={s.panelTitle}>My assigned students</Text>{students.map(row=>{const student=row.studentId;return <View key={row._id} style={s.studentRow}><View style={{flex:1}}><Text style={s.name}>{name(student)}</Text><Text style={s.muted}>{student?.admissionNumber||"—"} · {row.sectionId?.name||"No section"}</Text></View><Text style={s.badge}>{row.status||"active"}</Text></View>})}{!students.length?<Text style={s.muted}>No students found in this assigned class.</Text>:null}</View>:null}
-    {tab==="homework"?<View style={s.panel}><Text style={s.panelTitle}>Homework & classwork</Text><Text style={s.muted}>Your assignments and submission review.</Text>{homework.map(item=><View key={item._id} style={s.studentRow}><View style={{flex:1}}><Text style={s.name}>{item.title}</Text><Text style={s.muted}>{item.classId?.name||"Class"} · {item.subjectId?.name||"Subject"} · Due {item.dueDate?new Date(item.dueDate).toLocaleDateString():"—"}</Text></View><Text style={s.badge}>{item.status}</Text></View>)}{!homework.length?<Text style={s.muted}>No homework assignments yet.</Text>:null}</View>:null}
+    {tab==="homework"?<><View style={s.panel}><Text style={s.panelTitle}>Create homework</Text><Text style={s.muted}>Publish work for the selected assigned class and subject.</Text><TextInput value={homeworkTitle} onChangeText={setHomeworkTitle} style={s.input} placeholder="Homework title"/><TextInput value={homeworkInstructions} onChangeText={setHomeworkInstructions} style={[s.input,{minHeight:90,textAlignVertical:"top"}]} multiline placeholder="Instructions for students"/><Text style={s.label}>Assigned date (YYYY-MM-DD)</Text><TextInput value={assignedDate} onChangeText={setAssignedDate} style={s.input}/><Text style={s.label}>Due date (YYYY-MM-DD)</Text><TextInput value={dueDate} onChangeText={setDueDate} style={s.input}/><TouchableOpacity disabled={busy||!selected} style={s.primary} onPress={createHomework}><Text style={s.primaryText}>{busy?"Saving…":"Publish homework"}</Text></TouchableOpacity></View><View style={s.panel}><Text style={s.panelTitle}>Homework & submissions</Text>{homework.map(item=><View key={item._id} style={s.studentRow}><View style={{flex:1}}><Text style={s.name}>{item.title}</Text><Text style={s.muted}>{item.classId?.name||"Class"} · {item.subjectId?.name||"Subject"} · Due {item.dueDate?new Date(item.dueDate).toLocaleDateString():"—"}</Text></View><TouchableOpacity onPress={()=>loadSubmissions(item._id)} style={s.secondary}><Text style={s.secondaryText}>Review</Text></TouchableOpacity></View>)}{!homework.length?<Text style={s.muted}>No homework assignments yet.</Text>:null}{submissions&&activeHomework?<><Text style={s.name}>Submission summary: {submissions.summary?.submitted||0} submitted · {submissions.summary?.pending||0} pending · {submissions.summary?.reviewed||0} reviewed</Text>{(submissions.data||[]).map(item=><View key={item._id} style={s.studentRow}><Text style={s.name}>{name(item.studentId)} · {item.status}</Text><Text style={s.muted}>{item.answer||"No written answer"}</Text>{item.status==="submitted"?<><TextInput style={s.input} placeholder="Marks obtained (optional)" keyboardType="decimal-pad" value={reviewDrafts[item._id]?.marks||""} onChangeText={v=>setReviewDrafts(d=>({...d,[item._id]:{...d[item._id],marks:v}}))}/><TextInput style={s.input} placeholder="Maximum marks (optional)" keyboardType="decimal-pad" value={reviewDrafts[item._id]?.max||""} onChangeText={v=>setReviewDrafts(d=>({...d,[item._id]:{...d[item._id],max:v}}))}/><TextInput style={s.input} placeholder="Feedback" value={reviewDrafts[item._id]?.feedback||""} onChangeText={v=>setReviewDrafts(d=>({...d,[item._id]:{...d[item._id],feedback:v}}))}/><TouchableOpacity disabled={busy} style={s.secondary} onPress={()=>reviewSubmission(activeHomework,item._id)}><Text style={s.secondaryText}>Submit review</Text></TouchableOpacity></>:<Text style={s.muted}>Reviewed · {item.marksObtained==null?"No marks":item.marksObtained+" / "+item.maxMarks}</Text>}</View>)}</>:null}</View></>:null}
     {tab==="exams"?<View style={s.panel}><Text style={s.panelTitle}>Examinations</Text><Text style={s.muted}>Examination marks entry is restricted to your assigned subjects and students.</Text>{exams.map(item=><View key={item._id} style={s.studentRow}><View style={{flex:1}}><Text style={s.name}>{item.name}</Text><Text style={s.muted}>{item.status} · {item.startDate?new Date(item.startDate).toLocaleDateString():"Schedule not set"}</Text></View><Text style={s.badge}>{item.status}</Text></View>)}{!exams.length?<Text style={s.muted}>No examinations available.</Text>:null}</View>:null}
     {tab==="reports"?<View style={s.panel}><Text style={s.panelTitle}>My class reports</Text><Text style={s.muted}>Attendance summaries for your assigned class.</Text><TouchableOpacity style={s.primary} disabled={busy||!selected} onPress={runReport}><Text style={s.primaryText}>{busy?"Loading…":"Generate attendance report"}</Text></TouchableOpacity>{report?<><Text style={s.name}>Attendance report</Text><Text style={s.muted}>Marked records: {report.summary?.marked??0} · Students: {report.summary?.students??0} · Attendance: {report.summary?.percentage==null?"—":report.summary.percentage+"%"}</Text>{(report.summary?.byStatus||[]).map(x=><Text key={x.status} style={s.muted}>{x.status}: {x.count}</Text>)}</>:null}</View>:null}
     {scopes.length===0&&!loading?<View style={s.panel}><Text style={s.panelTitle}>No active teaching assignments</Text><Text style={s.muted}>Your school administrator needs to assign your classes and subjects.</Text></View>:null}
