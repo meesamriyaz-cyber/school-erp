@@ -9,6 +9,7 @@ import { StudentAdmissionScreen } from "../../components/StudentAdmissionScreen"
 import { AttendanceScreen } from "../../components/AttendanceScreen";
 import { StaffScreen } from "../../components/StaffScreen";
 import { TimetableScreen } from "../../components/TimetableScreen";
+import { TeacherWorkspaceScreen } from "../../components/TeacherWorkspaceScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
 const tabs = [
@@ -57,7 +58,10 @@ export default function AppHomeScreen() {
   const [activeTab, setActiveTab] = useState("home");
 
   const isTeacher = user?.role === "teacher";
-  const visibleTabs = isTeacher ? tabs.filter(tab => ["home", "timetable", "more"].includes(tab.key)) : tabs;
+  const visibleTabs = isTeacher ? [
+    ...tabs.filter(tab => ["home", "timetable", "more"].includes(tab.key)),
+    { key: "teacher", label: "Teaching", icon: "✎" },
+  ] : tabs;
 
   const loadTeacherHome = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
