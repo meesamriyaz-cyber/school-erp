@@ -57,6 +57,7 @@ export default function AppHomeScreen() {
   const [activeTab, setActiveTab] = useState("home");
 
   const isTeacher = user?.role === "teacher";
+  const visibleTabs = isTeacher ? tabs.filter(tab => ["home", "timetable", "more"].includes(tab.key)) : tabs;
 
   const loadTeacherHome = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -204,7 +205,7 @@ export default function AppHomeScreen() {
     </ScrollView>}
 
     <View style={styles.bottomNav}>
-      {tabs.map((tab) => <TouchableOpacity key={tab.key} style={styles.navItem} onPress={() => setActiveTab(tab.key)}><Text style={[styles.navIcon, activeTab === tab.key && styles.navIconActive]}>{tab.icon}</Text><Text style={[styles.navLabel, activeTab === tab.key && styles.navLabelActive]}>{tab.label}</Text>{activeTab === tab.key ? <View style={styles.navIndicator}/> : null}</TouchableOpacity>)}
+      {visibleTabs.map((tab) => <TouchableOpacity key={tab.key} style={styles.navItem} onPress={() => setActiveTab(tab.key)}><Text style={[styles.navIcon, activeTab === tab.key && styles.navIconActive]}>{tab.icon}</Text><Text style={[styles.navLabel, activeTab === tab.key && styles.navLabelActive]}>{tab.label}</Text>{activeTab === tab.key ? <View style={styles.navIndicator}/> : null}</TouchableOpacity>)}
     </View>
   </AppScreen>;
 }
