@@ -32,7 +32,7 @@ function parseFields(body, allowed, res, partial = false) {
   if (Object.hasOwn(fields, "firstName") && (!fields.firstName.trim() || fields.firstName.trim().length > 80)) return invalid(res, "First name is required and must not exceed 80 characters"), null;
   if (Object.hasOwn(fields, "lastName") && (fields.lastName || "").trim().length > 80) return invalid(res, "Last name must not exceed 80 characters"), null;
   if (Object.hasOwn(fields, "employeeCode") && fields.employeeCode != null && fields.employeeCode.trim().length > 30) return invalid(res, "Employee code must not exceed 30 characters"), null;
-  if (Object.hasOwn(fields, "email") && fields.email != null && fields.email && (fields.email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(fields.email.trim()))) return invalid(res, "Provide a valid email address"), null;
+  if (Object.hasOwn(fields, "email") && fields.email != null && fields.email && (fields.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim()))) return invalid(res, "Provide a valid email address"), null;
   if (Object.hasOwn(fields, "phone") && fields.phone != null && fields.phone.length > 20) return invalid(res, "Phone must not exceed 20 characters"), null;
   if (Object.hasOwn(fields, "employeeType") && !["teaching", "non_teaching"].includes(fields.employeeType)) return invalid(res, "Staff category must be teaching or non-teaching"), null;
   if (Object.hasOwn(fields, "employmentType") && !["full_time", "part_time", "contractual", "temporary"].includes(fields.employmentType)) return invalid(res, "Invalid employment type"), null;
