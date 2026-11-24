@@ -50,6 +50,7 @@ export function TimetableScreen({ user, onHome }) {
             const classData = await getTimetableClasses(active._id);
             if (!alive) return;
             setYearId(active._id); setClasses(classData); setClassId(classData[0]?._id || "");
+            if (!classData.length) setLoading(false);
           } else { setLoading(false); }
         }
       } catch (e) { if (alive) { setError(e.message || "Unable to load timetable setup."); setLoading(false); } }
