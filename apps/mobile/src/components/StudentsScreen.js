@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { getStudentById, getStudents } from "../services/studentService";
+import { apiRequest } from "../services/apiClient";
 import { colors, radius, spacing } from "../theme/tokens";
 
 const statuses = [
@@ -34,6 +35,8 @@ export function StudentsScreen({ onHome, onAddStudent }) {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [currentPlacement, setCurrentPlacement] = useState(null);
+  const [placementError, setPlacementError] = useState("");
 
   const load = useCallback(async ({ refresh = false, nextPage = false } = {}) => {
     if (refresh) setRefreshing(true);
@@ -63,9 +66,17 @@ export function StudentsScreen({ onHome, onAddStudent }) {
     setSelectedStudent(student);
     setDetailLoading(true);
     setDetailError("");
+    setCurrentPlacement(null);
+    setPlacementError("");
     try {
       const fullStudent = await getStudentById(student._id);
       if (fullStudent) setSelectedStudent(fullStudent);
+      try {
+        const response = await apiRequest(`/enrollments?studentId=${encodeURIComponent(student._id)}&status=active`);
+        if (Array.isArray(response?.data)) setCurrentPlacement(response.data[0] || null);
+      } catch (placementRequestError) {
+        setPlacementError(placementRequestError?.message || "Unable to load academic placement.");
+      }
     } catch (requestError) {
       setDetailError(requestError?.message || "Unable to load student details.");
     } finally {
@@ -91,6 +102,15 @@ export function StudentsScreen({ onHome, onAddStudent }) {
         <InfoRow label="Date of birth" value={displayDate(selectedStudent.dateOfBirth)} />
         <InfoRow label="Gender" value={selectedStudent.gender?.replaceAll("_", " ") || "Not provided"} />
         <InfoRow label="Admission date" value={displayDate(selectedStudent.admissionDate)} />
+      </View>
+      <View style={styles.infoCard}>
+        <Text style={styles.infoHeading}>Current academic placement</Text>
+        {currentPlacement ? <>
+          <InfoRow label="Academic year" value={currentPlacement.academicYearId?.name || "Not available"} />
+          <InfoRow label="Class" value={currentPlacement.classId?.name || "Not assigned"} />
+          <InfoRow label="Section" value={currentPlacement.sectionId?.name || "Not assigned"} />
+          <InfoRow label="Enrollment date" value={displayDate(currentPlacement.enrollmentDate)} />
+        </> : <Text style={styles.addressText}>{placementError || "No active class placement recorded."}</Text>}
       </View>
       <View style={styles.infoCard}>
         <Text style={styles.infoHeading}>Guardian information</Text>
