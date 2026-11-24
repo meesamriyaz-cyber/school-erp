@@ -60,8 +60,9 @@ export default function AppHomeScreen() {
 
   const isTeacher = user?.role === "teacher";
   const visibleTabs = isTeacher ? [
-    ...tabs.filter(tab => ["home", "timetable", "more"].includes(tab.key)),
+    ...tabs.filter(tab => ["home", "timetable"].includes(tab.key)),
     { key: "teacher", label: "Teaching", icon: "✎" },
+    ...tabs.filter(tab => tab.key === "more"),
   ] : tabs;
 
   const loadTeacherHome = useCallback(async (isRefresh = false) => {
