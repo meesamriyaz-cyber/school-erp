@@ -3,6 +3,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, Toucha
 import { useAuth } from "../../auth/AuthProvider";
 import { AppScreen } from "../../components/AppScreen";
 import { getDashboardOverview } from "../../services/dashboardService";
+import { getTimetable } from "../../services/timetableService";
 import { StudentsScreen } from "../../components/StudentsScreen";
 import { StudentAdmissionScreen } from "../../components/StudentAdmissionScreen";
 import { AttendanceScreen } from "../../components/AttendanceScreen";
@@ -49,10 +50,28 @@ function ComingSoon({ title, description, onHome }) {
 export default function AppHomeScreen() {
   const { user, signOut } = useAuth();
   const [report, setReport] = useState(null);
+  const [teacherEntries, setTeacherEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("home");
+
+  const isTeacher = user?.role === "teacher";
+
+  const loadTeacherHome = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    setError("");
+    try {
+      const response = await getTimetable();
+      if (!response?.success || !Array.isArray(response.data)) throw new Error(response?.message || "Unable to load your teaching schedule.");
+      setTeacherEntries(response.data);
+    } catch (requestError) {
+      setError(requestError?.message || "Unable to load your teaching schedule.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   const loadDashboard = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -68,7 +87,11 @@ export default function AppHomeScreen() {
     }
   }, []);
 
-  useEffect(() => { if (activeTab === "home") loadDashboard(true); }, [activeTab, loadDashboard]);
+  useEffect(() => {
+    if (activeTab !== "home") return;
+    if (isTeacher) loadTeacherHome(true);
+    else loadDashboard(true);
+  }, [activeTab, isTeacher, loadDashboard, loadTeacherHome]);
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Administrator";
   const role = (user?.role || "school user").replaceAll("_", " ");
@@ -94,6 +117,32 @@ export default function AppHomeScreen() {
         <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>{yearName}</Text></View>
       </View>
 
+      {isTeacher ? <>
+        {loading && teacherEntries.length === 0 ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your teaching schedule…</Text></View> : null}
+        {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={() => loadTeacherHome()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
+        {!loading && !error ? <>
+          <View style={styles.welcomeBlock}>
+            <Text style={styles.kicker}>TEACHER WORKSPACE</Text>
+            <Text style={styles.welcomeTitle}>Good day, {user?.firstName || "Teacher"}.</Text>
+            <Text style={styles.welcomeText}>Here’s your teaching overview for today.</Text>
+            <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>Your assigned classes and periods</Text></View>
+          </View>
+          <View style={styles.metricsGrid}>
+            <MetricCard icon="▦" label="Weekly periods" value={formatNumber(teacherEntries.length)} note="Active timetable entries" tint="#E8F1FC"/>
+            <MetricCard icon="▣" label="Subjects" value={formatNumber(new Set(teacherEntries.map(e => String(e.assignmentId?.subjectId?._id || e.assignmentId?.subjectId?.id || e.assignmentId?.subjectId || ""))).size)} note="Assigned subjects" tint="#E6F5ED"/>
+            <MetricCard icon="♙" label="Classes" value={formatNumber(new Set(teacherEntries.map(e => String(e.classId?._id || e.classId?.id || e.classId || ""))).size)} note="Assigned classes" tint="#F0EAFE"/>
+          </View>
+          <View style={styles.panel}>
+            <SectionHeader title="Today's timetable" subtitle={new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}/>
+            {teacherEntries.filter(e => e.dayOfWeek === (new Date().getDay() === 0 ? 7 : new Date().getDay())).sort((a,b) => a.startTime.localeCompare(b.startTime)).map(entry => <View key={entry._id} style={styles.teacherPeriod}>
+              <View style={styles.teacherTime}><Text style={styles.teacherPeriodTime}>{entry.startTime}–{entry.endTime}</Text><Text style={styles.metricNote}>Period {entry.periodNumber}</Text></View>
+              <View style={{flex:1,gap:3}}><Text style={styles.examName}>{entry.assignmentId?.subjectId?.name || "Subject"}</Text><Text style={styles.detailText}>{entry.classId?.name || "Class"}{entry.sectionId?.name ? " · " + entry.sectionId.name : ""}</Text><Text style={styles.metricNote}>{entry.room ? "Room " + entry.room : "Room not assigned"}</Text></View>
+            </View>)}
+            {teacherEntries.filter(e => e.dayOfWeek === (new Date().getDay() === 0 ? 7 : new Date().getDay())).length === 0 ? <Text style={styles.emptyText}>No periods are scheduled for you today.</Text> : null}
+          </View>
+          <TouchableOpacity style={styles.teacherTimetableButton} onPress={() => setActiveTab("timetable")}><Text style={styles.teacherTimetableText}>View full weekly timetable  →</Text></TouchableOpacity>
+        </> : null}
+      </> : <>
       {loading && !report ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your school dashboard…</Text></View> : null}
       {error && !report ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={() => loadDashboard()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
 
@@ -146,6 +195,7 @@ export default function AppHomeScreen() {
         </View>
         <View style={styles.dashboardFooter}><Text>Updated {report.generatedAt ? new Date(report.generatedAt).toLocaleTimeString() : "recently"}</Text><Text>{formatNumber(report.examinations?.published)} published exams</Text></View>
       </> : null}
+      </>}
     </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : activeTab === "timetable" ? <TimetableScreen user={user} onHome={onHome}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
       {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
@@ -225,6 +275,12 @@ const styles = StyleSheet.create({
   quickArrow: { color: colors.accent, fontWeight: "900" },
   dashboardFooter: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
   dashboardFooterText: { color: colors.muted, fontSize: 10 },
+  teacherPeriod: { flexDirection: "row", gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  teacherTime: { width: 105, gap: 4 },
+  teacherPeriodTime: { color: colors.primary, fontSize: 12, fontWeight: "900" },
+  detailText: { color: colors.muted, fontSize: 12 },
+  teacherTimetableButton: { backgroundColor: colors.primary, borderRadius: radius.md, padding: 16, alignItems: "center" },
+  teacherTimetableText: { color: colors.white, fontWeight: "800" },
   stateCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 24, alignItems: "center", gap: 10 },
   stateText: { color: colors.muted, fontSize: 13 },
   errorCard: { backgroundColor: "#FDECEC", borderRadius: radius.md, padding: 16, gap: 10 },
