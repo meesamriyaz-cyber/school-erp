@@ -14,6 +14,7 @@ export function FeesScreen({ onHome }) {
   const [years, setYears] = useState([]);
   const [yearId, setYearId] = useState("");
   const [classes, setClasses] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
   const [sections, setSections] = useState([]);
   const [structures, setStructures] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -27,6 +28,8 @@ export function FeesScreen({ onHome }) {
   const [structureModal, setStructureModal] = useState(false);
   const [structureForm, setStructureForm] = useState({ classId: "", name: "", headName: "Tuition Fee", amount: "", frequency: "monthly", items: [] });
   const [bulkModal, setBulkModal] = useState(false);
+  const [individualModal, setIndividualModal] = useState(false);
+  const [individualForm, setIndividualForm] = useState({ enrollmentId: "", feeStructureId: "", invoiceNumber: "", dueDate: "" });
   const [bulkForm, setBulkForm] = useState({ classId: "", sectionId: "", feeStructureId: "", dueDate: "", invoiceNumberPrefix: "FEE" });
   const [bulkSections, setBulkSections] = useState([]);
   const [bulkResult, setBulkResult] = useState(null);
@@ -39,9 +42,9 @@ export function FeesScreen({ onHome }) {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [yr, cls] = await Promise.all([apiRequest("/academic-years"), apiRequest("/classes")]);
+      const [yr, cls, enr] = await Promise.all([apiRequest("/academic-years"), apiRequest("/classes"), apiRequest("/enrollments?status=active")]);
       const yearList = Array.isArray(yr?.data) ? yr.data : [];
-      setYears(yearList); setClasses(Array.isArray(cls?.data) ? cls.data : []);
+      setYears(yearList); setClasses(Array.isArray(cls?.data) ? cls.data : []); setEnrollments(Array.isArray(enr?.data) ? enr.data : []);
       const active = yearList.find((item) => item.status === "active") || yearList[0];
       const effectiveYear = yearId || active?._id || "";
       if (!yearId && effectiveYear) setYearId(effectiveYear);
@@ -70,6 +73,9 @@ export function FeesScreen({ onHome }) {
 
   const currentClasses = classes.filter((item) => idOf(item.academicYearId) === yearId && item.status === "active");
   const structureOptions = structures.filter((item) => item.status === "active" && idOf(item.classId) === bulkForm.classId);
+  const eligibleEnrollments = enrollments.filter((item) => idOf(item.academicYearId) === yearId && item.status === "active");
+  const selectedEnrollment = eligibleEnrollments.find((item) => idOf(item._id) === individualForm.enrollmentId);
+  const individualStructureOptions = selectedEnrollment ? structures.filter((item) => item.status === "active" && idOf(item.classId) === idOf(selectedEnrollment.classId)) : [];
   const addHead = () => {
     if (!structureForm.headName.trim() || structureForm.amount === "" || !Number.isFinite(Number(structureForm.amount)) || Number(structureForm.amount) < 0) {
       setError("Enter a fee head and a valid non-negative amount."); return;
@@ -90,6 +96,18 @@ export function FeesScreen({ onHome }) {
       setStructureForm({ classId: "", name: "", headName: "Tuition Fee", amount: "", frequency: "monthly", items: [] });
       await load();
     } catch (e) { setError(e.message || "Unable to create fee structure."); }
+    finally { setSaving(false); }
+  };
+
+  const createIndividualInvoice = async () => {
+    if (!individualForm.enrollmentId || !individualForm.feeStructureId || !individualForm.invoiceNumber.trim() || !individualForm.dueDate) { setError("Select a student, fee structure, invoice number and due date."); return; }
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const r = await apiRequest("/fees/invoices", { method: "POST", body: { ...individualForm, invoiceNumber: individualForm.invoiceNumber.trim() } });
+      setNotice("Student-specific invoice " + r.data.invoiceNumber + " created for " + studentName(selectedEnrollment?.studentId) + ".");
+      setIndividualModal(false); setIndividualForm({ enrollmentId: "", feeStructureId: "", invoiceNumber: "", dueDate: "" });
+      await load();
+    } catch (e) { setError(e.message || "Unable to create student invoice."); }
     finally { setSaving(false); }
   };
 
@@ -136,13 +154,18 @@ export function FeesScreen({ onHome }) {
   };
 
   const selectedClass = currentClasses.find((v) => v._id === structureForm.classId);
-  const pickerOptions = picker === "structureClass" ? currentClasses : picker === "bulkClass" ? currentClasses : picker === "bulkSection" ? [{ _id: "", name: "All sections" }, ...bulkSections] : picker === "bulkStructure" ? structureOptions : [];
-  const pickerTitle = picker === "structureClass" || picker === "bulkClass" ? "Select class" : picker === "bulkSection" ? "Select section" : "Select fee structure";
+  const pickerOptions = picker === "structureClass" ? currentClasses : picker === "bulkClass" ? currentClasses : picker === "bulkSection" ? [{ _id: "", name: "All sections" }, ...bulkSections] : picker === "bulkStructure" ? structureOptions : picker === "individualStudent" ? eligibleEnrollments : picker === "individualStructure" ? individualStructureOptions : [];
+  const pickerTitle = picker === "structureClass" || picker === "bulkClass" ? "Select class" : picker === "bulkSection" ? "Select section" : picker === "individualStudent" ? "Select student" : "Select fee structure";
   const Picker = () => <Modal visible={!!picker} transparent animationType="fade" onRequestClose={() => setPicker("")}><View style={s.backdrop}><View style={s.modal}><Text style={s.modalTitle}>{pickerTitle}</Text><ScrollView style={{ maxHeight: 340 }}>{pickerOptions.map((item) => <TouchableOpacity key={item._id || "none"} style={s.option} onPress={() => {
     if (picker === "structureClass") setStructureForm((v) => ({ ...v, classId: item._id }));
     if (picker === "bulkClass") setBulkForm((v) => ({ ...v, classId: item._id, sectionId: "", feeStructureId: "" }));
     if (picker === "bulkSection") setBulkForm((v) => ({ ...v, sectionId: item._id }));
     if (picker === "bulkStructure") setBulkForm((v) => ({ ...v, feeStructureId: item._id }));
+    if (picker === "individualStudent") {
+      const admission = item.studentId?.admissionNumber || "STUDENT";
+      setIndividualForm((v) => ({ ...v, enrollmentId: item._id, feeStructureId: "", invoiceNumber: "IND-" + String(admission).replace(/[^A-Za-z0-9-]/g, "").slice(0, 18) + "-" + Date.now().toString().slice(-6) }));
+    }
+    if (picker === "individualStructure") setIndividualForm((v) => ({ ...v, feeStructureId: item._id }));
     setPicker("");
   }}><Text style={s.optionText}>{item.name}{item.totalAmount ? " · " + money(item.totalAmount) : ""}</Text></TouchableOpacity>)}</ScrollView><TouchableOpacity style={s.cancel} onPress={() => setPicker("")}><Text style={s.link}>Cancel</Text></TouchableOpacity></View></View></Modal>;
 
@@ -158,7 +181,8 @@ export function FeesScreen({ onHome }) {
       {structures.length === 0 ? <Text style={s.empty}>No fee structures for this academic year yet.</Text> : structures.map((v) => <View key={v._id} style={s.card}><View style={s.row}><Text style={s.cardTitle}>{v.name}</Text><Text style={[s.status, v.status === "active" ? s.good : s.bad]}>{v.status}</Text></View><Text style={s.muted}>{v.classId?.name || "Class"} · {v.academicYearId?.name || "Academic year"}</Text>{(v.items || []).map((item, i) => <View key={i} style={s.line}><Text style={s.body}>{item.name} · {item.frequency.replaceAll("_"," ")}</Text><Text style={s.amount}>{money(item.amount)}</Text></View>)}<View style={s.line}><Text style={s.label}>Total per cycle</Text><Text style={s.total}>{money((v.items || []).reduce((sum,x)=>sum+Number(x.amount||0),0))}</Text></View></View>)}
     </> : null}
     {tab === "invoices" ? <>
-      <TouchableOpacity style={s.primaryButton} onPress={() => { setError(""); setBulkModal(true); }}><Text style={s.primaryText}>＋ Generate class invoices</Text></TouchableOpacity>
+      <TouchableOpacity style={s.primaryButton} onPress={() => { setError(""); setIndividualModal(true); }}><Text style={s.primaryText}>＋ Create invoice for one student</Text></TouchableOpacity>
+      <TouchableOpacity style={s.secondaryButton} onPress={() => { setError(""); setBulkModal(true); }}><Text style={s.secondaryText}>Generate class invoices</Text></TouchableOpacity>
       {invoices.length === 0 ? <Text style={s.empty}>No invoices issued for this academic year.</Text> : invoices.map((v) => <View key={v._id} style={s.card}><View style={s.row}><Text style={s.cardTitle}>{v.invoiceNumber}</Text><Text style={[s.status, v.status === "paid" ? s.good : s.bad]}>{v.status}</Text></View><Text style={s.body}>{studentName(v.studentId)} · {v.studentId?.admissionNumber || "—"}</Text><Text style={s.muted}>{v.enrollmentId?.classId?.name || "Student invoice"} · Due {dateOf(v.dueDate)}</Text><View style={s.line}><Text style={s.body}>Total {money(v.totalAmount)}</Text><Text style={s.body}>Paid {money(v.paidAmount)}</Text></View><View style={s.line}><Text style={s.label}>Balance</Text><Text style={s.total}>{money(Math.max(0,Number(v.totalAmount||0)-Number(v.paidAmount||0)))}</Text></View><TouchableOpacity style={s.secondaryButton} onPress={() => openPayment(v)}><Text style={s.secondaryText}>Payments & receipts</Text></TouchableOpacity></View>)}
     </> : null}
     {tab === "outstanding" ? <>
@@ -167,6 +191,8 @@ export function FeesScreen({ onHome }) {
     </> : null}
 
     <Modal visible={structureModal} transparent animationType="slide" onRequestClose={() => setStructureModal(false)}><View style={s.backdrop}><ScrollView contentContainerStyle={s.modalScroll}><View style={s.modal}><Text style={s.modalTitle}>Create fee structure</Text><Text style={s.label}>Class *</Text><TouchableOpacity style={s.select} onPress={() => setPicker("structureClass")}><Text style={s.optionText}>{selectedClass?.name || "Choose class"}</Text></TouchableOpacity><Text style={s.label}>Structure name *</Text><TextInput style={s.input} value={structureForm.name} onChangeText={(v) => setStructureForm((x) => ({...x,name:v}))} placeholder="e.g. Class 5 annual plan"/><Text style={s.label}>Fee head</Text><TextInput style={s.input} value={structureForm.headName} onChangeText={(v) => setStructureForm((x) => ({...x,headName:v}))} placeholder="Tuition fee"/><Text style={s.label}>Amount (₹)</Text><TextInput style={s.input} keyboardType="decimal-pad" value={structureForm.amount} onChangeText={(v) => setStructureForm((x) => ({...x,amount:v}))} placeholder="Amount"/><Text style={s.label}>Frequency</Text><View style={s.chips}>{frequencies.map((v) => <TouchableOpacity key={v} style={[s.chip,structureForm.frequency===v&&s.activeChip]} onPress={() => setStructureForm((x)=>({...x,frequency:v}))}><Text style={[s.chipText,structureForm.frequency===v&&s.activeText]}>{v.replaceAll("_"," ")}</Text></TouchableOpacity>)}</View><TouchableOpacity style={s.secondaryButton} onPress={addHead}><Text style={s.secondaryText}>Add fee head to plan</Text></TouchableOpacity>{structureForm.items.map((v,i)=><Text key={i} style={s.body}>• {v.name}: {money(v.amount)} ({v.frequency.replaceAll("_"," ")})</Text>)}<TouchableOpacity style={s.primaryButton} disabled={saving} onPress={createStructure}><Text style={s.primaryText}>{saving ? "Saving…" : "Save fee structure"}</Text></TouchableOpacity><TouchableOpacity style={s.cancel} onPress={() => setStructureModal(false)}><Text style={s.link}>Cancel</Text></TouchableOpacity></View></ScrollView></View></Modal>
+
+    <Modal visible={individualModal} transparent animationType="slide" onRequestClose={() => setIndividualModal(false)}><View style={s.backdrop}><ScrollView contentContainerStyle={s.modalScroll}><View style={s.modal}><Text style={s.modalTitle}>Student-specific fee invoice</Text><Text style={s.muted}>Use this for optional charges such as Transport Fee. Only the selected student's enrollment will be invoiced.</Text><Text style={s.label}>Student *</Text><TouchableOpacity style={s.select} onPress={() => setPicker("individualStudent")}><Text style={s.optionText}>{selectedEnrollment ? studentName(selectedEnrollment.studentId) + " · " + (selectedEnrollment.studentId?.admissionNumber || "") + " · " + (selectedEnrollment.classId?.name || "Class") : "Choose student"}</Text></TouchableOpacity><Text style={s.label}>Fee structure *</Text><TouchableOpacity style={s.select} disabled={!selectedEnrollment} onPress={() => setPicker("individualStructure")}><Text style={s.optionText}>{individualStructureOptions.find((v) => v._id === individualForm.feeStructureId)?.name || "Choose fee structure"}</Text></TouchableOpacity><Text style={s.label}>Invoice number *</Text><TextInput style={s.input} value={individualForm.invoiceNumber} onChangeText={(v) => setIndividualForm((x) => ({ ...x, invoiceNumber: v }))} placeholder="Unique invoice number"/><Text style={s.label}>Due date (YYYY-MM-DD) *</Text><TextInput style={s.input} value={individualForm.dueDate} onChangeText={(v) => setIndividualForm((x) => ({ ...x, dueDate: v }))} placeholder="2026-12-31"/><TouchableOpacity style={s.primaryButton} disabled={saving} onPress={createIndividualInvoice}><Text style={s.primaryText}>{saving ? "Creating…" : "Create student invoice"}</Text></TouchableOpacity><TouchableOpacity style={s.cancel} onPress={() => setIndividualModal(false)}><Text style={s.link}>Cancel</Text></TouchableOpacity></View></ScrollView></View></Modal>
 
     <Modal visible={bulkModal} transparent animationType="slide" onRequestClose={() => setBulkModal(false)}><View style={s.backdrop}><ScrollView contentContainerStyle={s.modalScroll}><View style={s.modal}><Text style={s.modalTitle}>Generate class invoices</Text><Text style={s.label}>Class *</Text><TouchableOpacity style={s.select} onPress={() => setPicker("bulkClass")}><Text style={s.optionText}>{currentClasses.find((v)=>v._id===bulkForm.classId)?.name || "Choose class"}</Text></TouchableOpacity><Text style={s.label}>Section</Text><TouchableOpacity style={s.select} disabled={!bulkForm.classId} onPress={() => setPicker("bulkSection")}><Text style={s.optionText}>{bulkSections.find((v)=>v._id===bulkForm.sectionId)?.name || "All sections"}</Text></TouchableOpacity><Text style={s.label}>Fee structure *</Text><TouchableOpacity style={s.select} disabled={!bulkForm.classId} onPress={() => setPicker("bulkStructure")}><Text style={s.optionText}>{structureOptions.find((v)=>v._id===bulkForm.feeStructureId)?.name || "Choose fee structure"}</Text></TouchableOpacity><Text style={s.label}>Due date (YYYY-MM-DD) *</Text><TextInput style={s.input} value={bulkForm.dueDate} onChangeText={(v)=>setBulkForm((x)=>({...x,dueDate:v}))} placeholder="2026-12-31"/><Text style={s.label}>Invoice number prefix *</Text><TextInput style={s.input} value={bulkForm.invoiceNumberPrefix} onChangeText={(v)=>setBulkForm((x)=>({...x,invoiceNumberPrefix:v}))} placeholder="FEE"/><TouchableOpacity style={s.primaryButton} disabled={saving} onPress={createBulkInvoices}><Text style={s.primaryText}>{saving?"Generating…":"Generate invoices"}</Text></TouchableOpacity><TouchableOpacity style={s.cancel} onPress={()=>setBulkModal(false)}><Text style={s.link}>Cancel</Text></TouchableOpacity></View></ScrollView></View></Modal>
 
