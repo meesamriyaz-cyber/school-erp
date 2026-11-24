@@ -143,7 +143,7 @@ export default function AppHomeScreen() {
         </View>
         <View style={styles.dashboardFooter}><Text>Updated {report.generatedAt ? new Date(report.generatedAt).toLocaleTimeString() : "recently"}</Text><Text>{formatNumber(report.examinations?.published)} published exams</Text></View>
       </> : null}
-    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => setActiveTab("students")}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
+    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
       {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <ComingSoon title="Staff directory" description="Teacher and staff profiles, roles, contact details and staff management are coming next." onHome={onHome}/> :
