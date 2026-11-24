@@ -7,12 +7,14 @@ import { StudentsScreen } from "../../components/StudentsScreen";
 import { StudentAdmissionScreen } from "../../components/StudentAdmissionScreen";
 import { AttendanceScreen } from "../../components/AttendanceScreen";
 import { StaffScreen } from "../../components/StaffScreen";
+import { TimetableScreen } from "../../components/TimetableScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
 const tabs = [
   { key: "home", label: "Home", icon: "⌂" },
   { key: "students", label: "Students", icon: "♙" },
   { key: "attendance", label: "Attendance", icon: "✓" },
+  { key: "timetable", label: "Timetable", icon: "▦" },
   { key: "staff", label: "Staff", icon: "♧" },
   { key: "more", label: "More", icon: "•••" },
 ];
@@ -144,7 +146,7 @@ export default function AppHomeScreen() {
         </View>
         <View style={styles.dashboardFooter}><Text>Updated {report.generatedAt ? new Date(report.generatedAt).toLocaleTimeString() : "recently"}</Text><Text>{formatNumber(report.examinations?.published)} published exams</Text></View>
       </> : null}
-    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
+    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : activeTab === "timetable" ? <TimetableScreen user={user} onHome={onHome}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
       {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <StaffScreen onHome={onHome}/> :
