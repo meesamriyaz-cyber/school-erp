@@ -175,7 +175,8 @@ export const saveAttendance = async (req, res, next) => {
           upsert: true,
         }};
       });
-      await Attendance.bulkWrite(operations, { ordered: true, session });
+      const writeResult = await Attendance.bulkWrite(operations, { ordered: true, session });
+      saved = { count: writeResult.matchedCount + writeResult.upsertedCount };
       saved = await Attendance.find({
         tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids },
       }).session(session).lean();
@@ -194,11 +195,10 @@ export const saveAttendance = async (req, res, next) => {
         });
       }
     });
-    // Read the committed records after the transaction so the response count reflects persisted attendance.
-    saved = await Attendance.find({
+    const savedRecords = await Attendance.find({
       tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids },
     }).lean();
-    return res.status(200).json({ success: true, data: saved, savedCount: saved.length });
+    return res.status(200).json({ success: true, data: savedRecords, savedCount: saved.count });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
     if (error.code === 11000) return res.status(409).json({ success: false, message: "Attendance was updated concurrently. Reload the register and try again." });
