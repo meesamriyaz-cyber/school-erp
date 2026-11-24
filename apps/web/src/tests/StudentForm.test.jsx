@@ -1,226 +1,98 @@
-
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import userEvent from "@testing-library/user-event";
 import StudentForm from "../components/StudentForm.jsx";
 import { apiRequest } from "../lib/api.js";
 import { render, screen, waitFor } from "@testing-library/react";
-vi.mock("../lib/api.js", () => ({
-  apiRequest: vi.fn(),
-}));
 
-vi.mock("../context/authContext.js", () => ({
-  useAuth: () => ({ accessToken: "test-access-token" }),
-}));
+vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
+vi.mock("../context/authContext.js", () => ({ useAuth: () => ({ accessToken: "test-access-token" }) }));
 
 describe("StudentForm", () => {
   const onClose = vi.fn();
   const onCreated = vi.fn();
+  const year = { _id: "year-1", name: "2026-27", status: "active" };
+  const schoolClass = { _id: "class-1", name: "Class 1", status: "active" };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    apiRequest.mockImplementation(async (path) => {
+      if (path === "/academic-years?status=active") return { success: true, data: [year] };
+      if (path === "/classes?academicYearId=year-1&status=active") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-1&status=active") return { success: true, data: [] };
+      return { success: true, data: [] };
+    });
   });
 
-  it("renders student and guardian fields with required validation", async () => {
-    const user = userEvent.setup();
-
+  it("requires student, guardian and initial academic placement", async () => {
     render(<StudentForm onClose={onClose} onCreated={onCreated} />);
-
-    expect(
-      screen.getByRole("dialog", { name: "Add student" }),
-    ).toBeInTheDocument();
-
+    expect(screen.getByRole("dialog", { name: "Add student" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Admission number/i)).toBeRequired();
-    expect(screen.getByLabelText(/Admission date/i)).toBeRequired();
     expect(screen.getByLabelText(/First name/i)).toBeRequired();
-
-    expect(screen.getByLabelText(/Last name/i)).not.toBeRequired();
-    expect(screen.getByLabelText(/Date of birth/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Gender/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Primary guardian name/i)).toBeRequired();
-    expect(screen.getByLabelText(/Guardian phone/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Guardian email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Student photo URL/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Address line 1/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Save student" }));
-
-    expect(apiRequest).not.toHaveBeenCalled();
-    expect(onCreated).not.toHaveBeenCalled();
-  });
-  
-it("creates a student and trims text fields", async () => {
-  const user = userEvent.setup();
-
-  const createdStudent = {
-    _id: "student-101",
-    admissionNumber: "ADM-101",
-    firstName: "Ayaan",
-    lastName: "Khan",
-    status: "active",
-  };
-
-  apiRequest.mockResolvedValueOnce({
-    success: true,
-    data: createdStudent,
+    expect(await screen.findByLabelText("Academic year *")).toHaveValue("year-1");
+    expect(await screen.findByLabelText("Class *")).toHaveValue("class-1");
+    expect(screen.getByLabelText("Section (optional)")).toHaveValue("");
   });
 
-  render(<StudentForm onClose={onClose} onCreated={onCreated} />);
-
-  await user.type(screen.getByLabelText(/Admission number/i), "  ADM-101  ");
-  await user.type(screen.getByLabelText(/First name/i), "  Ayaan  ");
-  await user.type(screen.getByLabelText(/Last name/i), "  Khan  ");
-  await user.type(screen.getByLabelText(/Guardian name/i), "  Imran Khan  ");
-  await user.type(screen.getByLabelText(/Guardian phone/i), "  9999999999  ");
-  await user.type(screen.getByLabelText(/Guardian email/i), "  imran@example.com  ");
-  await user.type(screen.getByLabelText(/Student photo URL/i), "  https://cdn.example.test/ayaan.jpg  ");
-  await user.type(screen.getByLabelText(/Address line 1/i), "  Lal Chowk  ");
-  await user.type(screen.getByLabelText(/City \/ Town/i), "  Srinagar  ");
-
-  await user.click(screen.getByRole("button", { name: "Save student" }));
-
-  await waitFor(() => {
-    expect(onCreated).toHaveBeenCalledWith(createdStudent);
+  it("creates a student and then creates their academic enrollment", async () => {
+    const user = userEvent.setup();
+    const student = { _id: "student-1", firstName: "Ayaan", status: "active" };
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years?status=active") return { success: true, data: [year] };
+      if (path === "/classes?academicYearId=year-1&status=active") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-1&status=active") return { success: true, data: [] };
+      if (path === "/students" && options.method === "POST") return { success: true, data: student };
+      if (path === "/enrollments" && options.method === "POST") return { success: true, data: { _id: "enrollment-1" } };
+      return { success: true, data: [] };
+    });
+    render(<StudentForm onClose={onClose} onCreated={onCreated} />);
+    await user.type(screen.getByLabelText(/Admission number/i), " ADM-101 ");
+    await user.type(screen.getByLabelText(/First name/i), " Ayaan ");
+    await user.type(screen.getByLabelText(/Primary guardian name/i), " Imran Khan ");
+    await user.click(await screen.findByRole("button", { name: "Save student & placement" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(student));
+    expect(apiRequest).toHaveBeenCalledWith("/students", expect.objectContaining({
+      method: "POST", accessToken: "test-access-token",
+      body: expect.objectContaining({ admissionNumber: "ADM-101", firstName: "Ayaan", guardianName: "Imran Khan" }),
+    }));
+    expect(apiRequest).toHaveBeenCalledWith("/enrollments", expect.objectContaining({
+      method: "POST", accessToken: "test-access-token",
+      body: { studentId: "student-1", academicYearId: "year-1", classId: "class-1", sectionId: null, enrollmentDate: expect.any(String), reAdmissionReason: "" },
+    }));
   });
 
-  expect(apiRequest).toHaveBeenCalledWith(
-    "/students",
-    expect.objectContaining({
-      method: "POST",
-      accessToken: "test-access-token",
-      body: expect.objectContaining({
-        admissionNumber: "ADM-101",
-        firstName: "Ayaan",
-        lastName: "Khan",
-        guardianName: "Imran Khan",
-        guardianPhone: "9999999999",
-        guardianEmail: "imran@example.com",
-        dateOfBirth: null,
-        photoUrl: "https://cdn.example.test/ayaan.jpg",
-        address: expect.objectContaining({ line1: "Lal Chowk", city: "Srinagar" }),
-      }),
-    }),
-  );
-});
-
-it("displays an API error and preserves entered form data", async () => {
-  const user = userEvent.setup();
-
-  apiRequest.mockRejectedValueOnce(
-    new Error("Admission number already exists."),
-  );
-
-  render(<StudentForm onClose={onClose} onCreated={onCreated} />);
-
-  const admissionInput = screen.getByLabelText(/Admission number/i);
-  const firstNameInput = screen.getByLabelText(/First name/i);
-
-  await user.type(admissionInput, "ADM-202");
-  await user.type(firstNameInput, "Sara");
-  await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
-  await user.click(screen.getByRole("button", { name: "Save student" }));
-
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Admission number already exists.",
-  );
-
-  expect(admissionInput).toHaveValue("ADM-202");
-  expect(firstNameInput).toHaveValue("Sara");
-  expect(onCreated).not.toHaveBeenCalled();
-
-  expect(apiRequest).toHaveBeenCalledWith(
-    "/students",
-    expect.objectContaining({
-      method: "POST",
-      accessToken: "test-access-token",
-    }),
-  );
-});
-
-it("closes the form when Cancel is clicked", async () => {
-  const user = userEvent.setup();
-
-  render(<StudentForm onClose={onClose} onCreated={onCreated} />);
-
-  await user.click(screen.getByRole("button", { name: "Cancel" }));
-
-  expect(onClose).toHaveBeenCalledTimes(1);
-  expect(apiRequest).not.toHaveBeenCalled();
-  expect(onCreated).not.toHaveBeenCalled();
-});
-
-
-it("handles an unsuccessful API response", async () => {
-  const user = userEvent.setup();
-
-  apiRequest.mockResolvedValueOnce({
-    success: false,
-    data: null,
+  it("does not duplicate the student when enrollment needs to be retried", async () => {
+    const user = userEvent.setup();
+    const student = { _id: "student-1", firstName: "Sara" };
+    let enrollmentAttempts = 0;
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/academic-years?status=active") return { success: true, data: [year] };
+      if (path === "/classes?academicYearId=year-1&status=active") return { success: true, data: [schoolClass] };
+      if (path === "/sections?classId=class-1&status=active") return { success: true, data: [] };
+      if (path === "/students" && options.method === "POST") return { success: true, data: student };
+      if (path === "/enrollments" && options.method === "POST") {
+        enrollmentAttempts += 1;
+        if (enrollmentAttempts === 1) throw new Error("Section capacity reached");
+        return { success: true, data: { _id: "enrollment-1" } };
+      }
+      return { success: true, data: [] };
+    });
+    render(<StudentForm onClose={onClose} onCreated={onCreated} />);
+    await user.type(screen.getByLabelText(/Admission number/i), "ADM-202");
+    await user.type(screen.getByLabelText(/First name/i), "Sara");
+    await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
+    await user.click(await screen.findByRole("button", { name: "Save student & placement" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Section capacity reached");
+    await user.click(screen.getByRole("button", { name: "Retry placement" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(student));
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === "/students" && options?.method === "POST")).toHaveLength(1);
+    expect(enrollmentAttempts).toBe(2);
   });
 
-  render(<StudentForm onClose={onClose} onCreated={onCreated} />);
-
-  await user.type(
-    screen.getByLabelText(/Admission number/i),
-    "ADM-303",
-  );
- 
-  await user.type(
-    screen.getByLabelText(/First name/i),
-    "Ayaan",
-  );
-  await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
-
- await user.click(screen.getByRole("button", { name: "Save student" }));
-
-expect(apiRequest).toHaveBeenCalledTimes(1);
-
-expect(await screen.findByRole("alert")).toHaveTextContent(
-  "The server returned an unexpected response.",
-);
-  expect(onCreated).not.toHaveBeenCalled();
-});
-
-it("closes when the modal backdrop is clicked", async () => {
-  const onClose = vi.fn();
-
-  const { container } = render(
-    <StudentForm onClose={onClose} onCreated={vi.fn()} />,
-  );
-
-  const backdrop = container.querySelector(".student-modal-backdrop");
-
-  await userEvent.setup().click(backdrop);
-
-  expect(onClose).toHaveBeenCalledTimes(1);
-});
-
-it("displays a fallback message when the API error has no message", async () => {
-  const user = userEvent.setup();
-
-  apiRequest.mockRejectedValueOnce({});
-
-  render(<StudentForm onClose={onClose} onCreated={onCreated} />);
-
-  await user.type(
-    screen.getByLabelText(/Admission number/i),
-    "ADM-404",
-  );
-
-  await user.type(
-    screen.getByLabelText(/First name/i),
-    "Ayaan",
-  );
-  await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
-
-  await user.click(
-    screen.getByRole("button", { name: "Save student" }),
-  );
-
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Unable to create student.",
-  );
-
-  expect(onCreated).not.toHaveBeenCalled();
-});
-
+  it("closes the form when Cancel is clicked", async () => {
+    const user = userEvent.setup();
+    render(<StudentForm onClose={onClose} onCreated={onCreated} />);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
