@@ -96,7 +96,10 @@ export default function AppHomeScreen() {
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Administrator";
   const role = (user?.role || "school user").replaceAll("_", " ");
-  const yearName = report?.academicYear?.name || "Academic year not set";
+  const teacherYearNames = [...new Set(teacherEntries.map((entry) => entry.academicYearId?.name).filter(Boolean))];
+  const yearName = isTeacher
+    ? (teacherYearNames.length === 1 ? teacherYearNames[0] : teacherYearNames.length > 1 ? "Multiple academic years" : "Academic year not available")
+    : report?.academicYear?.name || "Academic year not set";
   const onHome = () => setActiveTab("home");
 
   return <AppScreen style={styles.screen} edges={["top", "bottom"]}>
@@ -110,13 +113,13 @@ export default function AppHomeScreen() {
       </TouchableOpacity>
     </View>
 
-    {activeTab === "home" ? <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadDashboard(true)} tintColor={colors.primary} />}>
-      <View style={styles.welcomeBlock}>
+    {activeTab === "home" ? <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => isTeacher ? loadTeacherHome(true) : loadDashboard(true)} tintColor={colors.primary} />}>
+      {!isTeacher ? <View style={styles.welcomeBlock}>
         <Text style={styles.kicker}>SCHOOL OVERVIEW</Text>
         <Text style={styles.welcomeTitle}>Good day, {user?.firstName || "Administrator"}.</Text>
         <Text style={styles.welcomeText}>Here’s what’s happening at your school today.</Text>
         <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>{yearName}</Text></View>
-      </View>
+      </View> : null}
 
       {isTeacher ? <>
         {loading && teacherEntries.length === 0 ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your teaching schedule…</Text></View> : null}
@@ -126,7 +129,7 @@ export default function AppHomeScreen() {
             <Text style={styles.kicker}>TEACHER WORKSPACE</Text>
             <Text style={styles.welcomeTitle}>Good day, {user?.firstName || "Teacher"}.</Text>
             <Text style={styles.welcomeText}>Here’s your teaching overview for today.</Text>
-            <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>Your assigned classes and periods</Text></View>
+            <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>{yearName}</Text></View>
           </View>
           <View style={styles.metricsGrid}>
             <MetricCard icon="▦" label="Weekly periods" value={formatNumber(teacherEntries.length)} note="Active timetable entries" tint="#E8F1FC"/>
