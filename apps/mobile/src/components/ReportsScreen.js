@@ -16,7 +16,7 @@ export function ReportsScreen({onHome}){
  const [years,setYears]=useState([]),[classes,setClasses]=useState([]),[yearId,setYearId]=useState(""),[classId,setClassId]=useState("");
  const [tab,setTab]=useState("overview"),[dashboard,setDashboard]=useState(null),[attendance,setAttendance]=useState(null),[enrollment,setEnrollment]=useState(null),[fees,setFees]=useState(null);
  const [from,setFrom]=useState(""),[to,setTo]=useState(dateNow()),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const loadSetup=useCallback(async()=>{try{const [y,c]=await Promise.all([apiRequest("/academic-years"),apiRequest("/classes")]);const ys=y.data||[];setYears(ys);setClasses(c.data||[]);const active=ys.find(v=>v.status==="active")||ys[0];if(!yearId&&active){setYearId(active._id);setFrom(new Date(active.startDate).toISOString().slice(0,10));setTo(dateNow()>new Date(active.endDate).toISOString().slice(0,10)?new Date(active.endDate).toISOString().slice(0,10):dateNow());}}catch(e){setError(e.message||"Unable to load report filters.");}},[]);
+ const loadSetup=useCallback(async()=>{try{const [y,c]=await Promise.all([apiRequest("/academic-years"),apiRequest("/classes")]);const ys=y.data||[];setYears(ys);setClasses(c.data||[]);const active=ys.find(v=>v.status==="active")||ys[0];if(!yearId&&active){setYearId(active._id);const start=new Date(active.startDate).toISOString().slice(0,10),end=new Date(active.endDate).toISOString().slice(0,10),today=dateNow();setFrom(start);setTo(today<start?start:today>end?end:today);}}catch(e){setError(e.message||"Unable to load report filters.");}},[]);
  useEffect(()=>{loadSetup();},[loadSetup]);
  const loadDashboard=useCallback(async()=>{const r=await apiRequest("/reports/dashboard"+(yearId?"?academicYearId="+encodeURIComponent(yearId):""));setDashboard(r.data||null);},[yearId]);
  const loadReports=useCallback(async()=>{if(!yearId)return;setError("");setNotice("");if(!from||!to||from>to){setError("Choose a valid report date range.");return;}setLoading(true);try{const [d,a,e,f]=await Promise.all([
@@ -30,7 +30,7 @@ export function ReportsScreen({onHome}){
  const reportSummary=attendance?.summary||{};
  const feeSummary=fees?.summary||{};
  const currencyFields=[["Invoiced",feeSummary.invoiced],["Net payments",feeSummary.netPayments],["Outstanding",feeSummary.outstanding],["Reversed",feeSummary.reversed]];
- const changeYear=v=>{const y=years.find(x=>x._id===v);setYearId(v);setClassId("");if(y){const start=new Date(y.startDate).toISOString().slice(0,10),end=new Date(y.endDate).toISOString().slice(0,10);setFrom(start);setTo(dateNow()<end?dateNow():end);}};
+ const changeYear=v=>{const y=years.find(x=>x._id===v);setYearId(v);setClassId("");if(y){const start=new Date(y.startDate).toISOString().slice(0,10),end=new Date(y.endDate).toISOString().slice(0,10),today=dateNow();setFrom(start);setTo(today<start?start:today>end?end:today);}};
  return <ScrollView contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);loadReports();}} tintColor={colors.primary}/>}>
   <View style={s.header}><View style={{flex:1}}><Text style={s.kicker}>SCHOOL INTELLIGENCE</Text><Text style={s.title}>Reports & Analytics</Text><Text style={s.muted}>Attendance, enrollment, finance and academic indicators</Text></View><TouchableOpacity onPress={onHome}><Text style={s.link}>Home</Text></TouchableOpacity></View>
   <Section title="Report filters">
