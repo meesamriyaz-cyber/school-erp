@@ -204,7 +204,7 @@ export default function AppHomeScreen() {
         <View style={styles.dashboardFooter}><Text>Updated {report.generatedAt ? new Date(report.generatedAt).toLocaleTimeString() : "recently"}</Text><Text>{formatNumber(report.examinations?.published)} published exams</Text></View>
       </> : null}
       </>}
-    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : activeTab === "timetable" ? <TimetableScreen user={user} onHome={onHome}/> : <ScrollView contentContainerStyle={styles.scrollContent}>
+    </ScrollView> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : activeTab === "timetable" ? <TimetableScreen user={user} onHome={onHome}/> : activeTab === "teacher" ? <TeacherWorkspaceScreen/> : <ScrollView contentContainerStyle={styles.scrollContent}>
       {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <StaffScreen onHome={onHome}/> :
