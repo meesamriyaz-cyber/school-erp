@@ -65,7 +65,7 @@ export default function AppHomeScreen() {
     }
   }, []);
 
-  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => { if (activeTab === "home") loadDashboard(true); }, [activeTab, loadDashboard]);
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Administrator";
   const role = (user?.role || "school user").replaceAll("_", " ");
