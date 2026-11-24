@@ -8,6 +8,7 @@ import { StudentsScreen } from "../../components/StudentsScreen";
 import { StudentAdmissionScreen } from "../../components/StudentAdmissionScreen";
 import { EnrollmentsScreen } from "../../components/EnrollmentsScreen";
 import { FeesScreen } from "../../components/FeesScreen";
+import { ExaminationsScreen } from "../../components/ExaminationsScreen";
 import { AttendanceScreen } from "../../components/AttendanceScreen";
 import { StaffScreen } from "../../components/StaffScreen";
 import { TimetableScreen } from "../../components/TimetableScreen";
@@ -207,12 +208,12 @@ export default function AppHomeScreen() {
         <View style={styles.dashboardFooter}><Text>Updated {report.generatedAt ? new Date(report.generatedAt).toLocaleTimeString() : "recently"}</Text><Text>{formatNumber(report.examinations?.published)} published exams</Text></View>
       </> : null}
       </>}
-    </ScrollView> : activeTab === "fees" ? <FeesScreen onHome={onHome}/> : activeTab === "enrollments" ? <EnrollmentsScreen onHome={() => setActiveTab("home")}/> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : activeTab === "timetable" ? <TimetableScreen user={user} onHome={onHome}/> : activeTab === "teacher" ? <TeacherWorkspaceScreen/> : <ScrollView contentContainerStyle={styles.scrollContent}>
+    </ScrollView> : activeTab === "fees" ? <FeesScreen onHome={onHome}/> : activeTab === "examinations" ? <ExaminationsScreen onHome={onHome}/> : activeTab === "enrollments" ? <EnrollmentsScreen onHome={() => setActiveTab("home")}/> : activeTab === "students" ? <StudentsScreen onHome={onHome} onAddStudent={() => setActiveTab("admission")}/> : activeTab === "admission" ? <StudentAdmissionScreen onCancel={() => setActiveTab("students")} onComplete={() => { setActiveTab("students"); loadDashboard(true); }}/> : activeTab === "timetable" ? <TimetableScreen user={user} onHome={onHome}/> : activeTab === "teacher" ? <TeacherWorkspaceScreen/> : <ScrollView contentContainerStyle={styles.scrollContent}>
       {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <StaffScreen onHome={onHome}/> :
        <View style={styles.profileCard}><View style={styles.profileLarge}><Text style={styles.profileLargeText}>{fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</Text></View><Text style={styles.profileName}>{fullName}</Text><Text style={styles.profileRole}>{role}</Text><Text style={styles.profileSchool}>School ERP mobile account</Text>
-        {!isTeacher ? <><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("enrollments")}><Text style={styles.secondaryButtonText}>Manage enrollments & class placements</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("fees")}><Text style={styles.secondaryButtonText}>Fees & Payments</Text></TouchableOpacity></> : null}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
+        {!isTeacher ? <><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("enrollments")}><Text style={styles.secondaryButtonText}>Manage enrollments & class placements</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("fees")}><Text style={styles.secondaryButtonText}>Fees & Payments</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("examinations")}><Text style={styles.secondaryButtonText}>Examinations & Results</Text></TouchableOpacity></> : null}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
     </ScrollView>}
 
     <View style={styles.bottomNav}>
