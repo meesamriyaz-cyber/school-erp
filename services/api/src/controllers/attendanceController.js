@@ -194,6 +194,10 @@ export const saveAttendance = async (req, res, next) => {
         });
       }
     });
+    // Read the committed records after the transaction so the response count reflects persisted attendance.
+    saved = await Attendance.find({
+      tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids },
+    }).lean();
     return res.status(200).json({ success: true, data: saved, savedCount: saved.length });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
