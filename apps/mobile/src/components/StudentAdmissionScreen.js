@@ -26,8 +26,9 @@ export function StudentAdmissionScreen({ onCancel, onComplete }) {
 
   useEffect(() => {
     getAdmissionAcademicYears().then((items) => {
-      setYears(items);
-      const active = items.find((item) => item.status === "active" || item.isActive) || items[0] || null;
+      const activeYears = items.filter((item) => item.status === "active" || item.isActive);
+      setYears(activeYears);
+      const active = activeYears[0] || null;
       setYear(active);
     }).catch((e) => setError(e.message || "Unable to load academic years.")).finally(() => setLoadingOptions(false));
   }, []);
