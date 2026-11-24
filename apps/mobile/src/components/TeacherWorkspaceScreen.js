@@ -92,9 +92,9 @@ export function TeacherWorkspaceScreen() {
   const loadExamRoster=async exam=>{
     setSelectedExam(exam);setExamRoster(null);setExamMarks({});setError("");setBusy(true);
     try{
-      const [roster,existing]=await Promise.all([apiRequest("/examinations/"+exam._id+"/teacher-roster"),apiRequest("/examinations/"+exam._id+"/marks")]);
+      const roster=await apiRequest("/examinations/"+exam._id+"/teacher-roster");
       setExamRoster(roster.data);const first=(roster.data?.subjects||[])[0];setExamSubjectId(first?._id||"");
-      setExamMarks(Object.fromEntries((existing.data||[]).map(mark=>[id(mark.enrollmentId),{value:mark.absent?"":String(mark.marksObtained??""),absent:Boolean(mark.absent),remarks:mark.remarks||"",existing:true}])));
+      if(first){const existing=await apiRequest("/examinations/"+exam._id+"/marks?examSubjectId="+encodeURIComponent(first._id));setExamMarks(Object.fromEntries((existing.data||[]).map(mark=>[id(mark.enrollmentId),{value:mark.absent?"":String(mark.marksObtained??""),absent:Boolean(mark.absent),remarks:mark.remarks||"",existing:true}])));}
     }catch(err){setError(err.message||"Unable to load examination roster.");}
     finally{setBusy(false);}
   };
