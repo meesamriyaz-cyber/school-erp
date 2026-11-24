@@ -167,7 +167,7 @@ export function FeesScreen({ onHome }) {
     }
     if (picker === "individualStructure") setIndividualForm((v) => ({ ...v, feeStructureId: item._id }));
     setPicker("");
-  }}><Text style={s.optionText}>{item.name}{item.totalAmount ? " · " + money(item.totalAmount) : ""}</Text></TouchableOpacity>)}</ScrollView><TouchableOpacity style={s.cancel} onPress={() => setPicker("")}><Text style={s.link}>Cancel</Text></TouchableOpacity></View></View></Modal>;
+  }}><Text style={s.optionText}>{picker === "individualStudent" ? studentName(item.studentId) + " · " + (item.studentId?.admissionNumber || "No admission number") + " · " + (item.classId?.name || "Class not set") + (item.sectionId?.name ? " / " + item.sectionId.name : "") : item.name + (item.totalAmount ? " · " + money(item.totalAmount) : "")}</Text></TouchableOpacity>)}</ScrollView>{picker === "individualStudent" && pickerOptions.length === 0 ? <Text style={s.muted}>No active student enrollments found for this academic year. Check Student Placements.</Text> : null}<TouchableOpacity style={s.cancel} onPress={() => setPicker("")}><Text style={s.link}>Cancel</Text></TouchableOpacity></View></View></Modal>;
 
   return <ScrollView contentContainerStyle={s.content}>
     <View style={s.header}><View style={{ flex: 1 }}><Text style={s.kicker}>SCHOOL FINANCE</Text><Text style={s.heading}>Fees & Payments</Text><Text style={s.muted}>Fee plans, invoices, collections and balances</Text></View><TouchableOpacity onPress={onHome}><Text style={s.link}>Home</Text></TouchableOpacity></View>
