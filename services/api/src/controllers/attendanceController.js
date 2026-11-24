@@ -112,6 +112,7 @@ export const saveAttendance = async (req, res, next) => {
   if (academicTermId) await AcademicTerm.init();
   const session = await mongoose.startSession();
   let saved = [];
+  let savedCount = 0;
   try {
     await session.withTransaction(async () => {
       const year = await AcademicYear.findOneAndUpdate(
@@ -176,7 +177,7 @@ export const saveAttendance = async (req, res, next) => {
         }};
       });
       const writeResult = await Attendance.bulkWrite(operations, { ordered: true, session });
-      saved = { count: writeResult.matchedCount + writeResult.upsertedCount };
+      savedCount = writeResult.matchedCount + writeResult.upsertedCount;
       saved = await Attendance.find({
         tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids },
       }).session(session).lean();
@@ -198,7 +199,7 @@ export const saveAttendance = async (req, res, next) => {
     const savedRecords = await Attendance.find({
       tenantId: req.tenantId, academicYearId, classId, date: day, studentId: { $in: ids },
     }).lean();
-    return res.status(200).json({ success: true, data: savedRecords, savedCount: saved.count });
+    return res.status(200).json({ success: true, data: savedRecords, savedCount });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
     if (error.code === 11000) return res.status(409).json({ success: false, message: "Attendance was updated concurrently. Reload the register and try again." });
