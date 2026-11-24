@@ -60,8 +60,8 @@ export function StudentAdmissionScreen({ onCancel, onComplete }) {
       return;
     }
     if (!year || !schoolClass) { setError("Select an academic year and class."); return; }
-    if (form.dateOfBirth && !/^\\d{4}-\\d{2}-\\d{2}$/.test(form.dateOfBirth)) { setError("Date of birth must use YYYY-MM-DD."); return; }
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(form.admissionDate)) { setError("Admission date must use YYYY-MM-DD."); return; }
+    if (form.dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(form.dateOfBirth)) { setError("Date of birth must use YYYY-MM-DD."); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.admissionDate)) { setError("Admission date must use YYYY-MM-DD."); return; }
     setSaving(true);
     try {
       let studentId = createdStudentId;
