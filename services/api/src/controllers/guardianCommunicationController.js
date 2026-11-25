@@ -78,8 +78,6 @@ export const sendGuardianCommunication = async (req, res, next) => {
           outcomes.push({
             channel, recipient, status: "accepted",
             providerMessageId: providerResult?.messageId || null,
-            providerRequestId: providerResult?.providerRequestId || null,
-            providerName: channel === "sms" ? "msg91" : channel === "whatsapp" ? "twilio" : "resend",
             providerStatus: providerResult?.providerStatus || "accepted",
             providerErrorCode: providerResult?.providerErrorCode || null,
             providerErrorMessage: providerResult?.providerErrorMessage || null,
