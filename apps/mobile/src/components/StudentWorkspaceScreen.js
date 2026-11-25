@@ -64,7 +64,7 @@ export function StudentWorkspaceScreen({ user }) {
       });
       setData((previous) => ({ ...previous, ...next }));
       setPartialErrors(failures);
-      if (failures.includes("profile")) setError("Unable to load your student profile. Please try again.");
+
     } catch (requestError) {
       setError(requestError?.message || "Unable to load your student workspace.");
     } finally {
