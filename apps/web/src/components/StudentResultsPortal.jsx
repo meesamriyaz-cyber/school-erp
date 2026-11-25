@@ -42,6 +42,21 @@ export default function StudentResultsPortal() {
     }
   }, [isParent, activeTab]);
 
+  // Refresh the timetable when the student opens that section. The dashboard may
+  // remain mounted while timetable changes are made elsewhere in the school workspace.
+  useEffect(() => {
+    if (!accessToken || activeTab !== "timetable") return undefined;
+    const controller = new AbortController();
+    apiRequest("/portal/timetable", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted && Array.isArray(response?.data)) setTimetable(response.data);
+      })
+      .catch(() => {
+        // Keep the last successful timetable visible if a background refresh fails.
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab]);
+
   useEffect(() => {
     if (!accessToken) return undefined;
     const controller = new AbortController();
