@@ -5,8 +5,8 @@ const cleanEnv = (value) => (value || "").trim();
 function normalizeE164(value, label) {
   const raw = String(value || "").trim().replace(/^whatsapp:/i, "");
   // Permit common visual separators, but never guess a country calling code.
-  const normalized = raw.replace(/[\\s().-]/g, "");
-  if (!/^\\+[1-9]\\d{7,14}$/.test(normalized)) {
+  const normalized = raw.replace(/[\s().-]/g, "");
+  if (!/^\+[1-9]\d{7,14}$/.test(normalized)) {
     throw new Error(`${label} must use international E.164 format (for example +919876543210)`);
   }
   return normalized;
@@ -82,7 +82,7 @@ export async function sendGuardianChannel({ channel, recipient, message, subject
       ? normalizeWhatsAppAddress(configuredFrom, "TWILIO_WHATSAPP_FROM")
       : configuredFrom;
 
-    if (channel === "sms" && !/^\\+[1-9]\\d{7,14}$/.test(from)) {
+    if (channel === "sms" && !/^\+[1-9]\d{7,14}$/.test(from)) {
       throw new Error("TWILIO_SMS_FROM must be a Twilio phone number in E.164 format (for example +15017122661)");
     }
 
