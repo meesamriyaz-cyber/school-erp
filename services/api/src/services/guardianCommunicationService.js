@@ -26,6 +26,18 @@ async function twilioSend({ to, body, from, accountSid, authToken, contentSid })
     payload.Body = body;
   }
 
+  const callbackUrl = cleanEnv(process.env.TWILIO_STATUS_CALLBACK_URL);
+  if (callbackUrl) {
+    let parsedCallback;
+    try { parsedCallback = new URL(callbackUrl); } catch {
+      throw new Error("TWILIO_STATUS_CALLBACK_URL must be a valid absolute URL");
+    }
+    if (parsedCallback.protocol !== "https:" && process.env.NODE_ENV === "production") {
+      throw new Error("TWILIO_STATUS_CALLBACK_URL must use HTTPS in production");
+    }
+    payload.StatusCallback = callbackUrl;
+  }
+
   let response;
   try {
     response = await fetch(endpoint, {
@@ -50,7 +62,7 @@ async function twilioSend({ to, body, from, accountSid, authToken, contentSid })
     const code = result.code ? ` (Twilio code ${result.code})` : "";
     throw new Error(`${result.message || `Twilio request failed (${response.status})`}${code}`);
   }
-  return result.sid || null;
+  return {\n    messageId: result.sid || null,\n    providerStatus: result.status || "accepted",\n    providerErrorCode: result.error_code == null ? null : String(result.error_code),\n    providerErrorMessage: result.error_message || null,\n  };
 }
 
 export async function sendGuardianChannel({ channel, recipient, message, subject }) {
@@ -114,7 +126,7 @@ export async function sendGuardianChannel({ channel, recipient, message, subject
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.message || `Email provider request failed (${response.status})`);
-    return result.id || null;
+    return { messageId: result.id || null, providerStatus: "accepted", providerErrorCode: null, providerErrorMessage: null };
   }
   throw new Error("Unsupported communication channel");
 }
