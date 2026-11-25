@@ -5,6 +5,7 @@ import authenticate from "../middleware/authenticate.js";
 import requireActiveTenant from "../middleware/requireActiveTenant.js";
 import { authorizeRoles } from "../middleware/authorizeRoles.js";
 import { linkStudentAccount } from "../controllers/studentResultPortalController.js";
+import { createStudentDocumentSignature, listStudentDocuments, createStudentDocument, deleteStudentDocument } from "../controllers/studentDocumentController.js";
 
 import {
   listStudents,
@@ -32,6 +33,11 @@ router.post(
   authorizeRoles("school_admin", "principal"),
   createStudent
 );
+
+router.post("/:studentId/documents/signature", authorizeRoles("school_admin", "principal"), createStudentDocumentSignature);
+router.get("/:studentId/documents", authorizeRoles("school_admin", "principal"), listStudentDocuments);
+router.post("/:studentId/documents", authorizeRoles("school_admin", "principal"), createStudentDocument);
+router.delete("/:studentId/documents/:documentId", authorizeRoles("school_admin", "principal"), deleteStudentDocument);
 
 // Retrieve one student.
 router.get(
