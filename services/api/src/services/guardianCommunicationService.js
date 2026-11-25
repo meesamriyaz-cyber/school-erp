@@ -86,9 +86,15 @@ export async function sendGuardianChannel({ channel, recipient, message, subject
       throw new Error("TWILIO_SMS_FROM must be a Twilio phone number in E.164 format (for example +15017122661)");
     }
 
+    // Twilio Console trial examples may only accept a predefined body token.
+    // Set this override only for trial testing; leave it blank for normal custom SMS.
+    const smsBody = channel === "sms"
+      ? (cleanEnv(process.env.TWILIO_SMS_BODY_OVERRIDE) || message)
+      : message;
+
     return twilioSend({
       to,
-      body: message,
+      body: smsBody,
       from,
       accountSid,
       authToken,
