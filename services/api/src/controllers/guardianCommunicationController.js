@@ -21,6 +21,8 @@ export const listStudentGuardianCommunication = async (req, res, next) => {
       relationshipId: item._id, guardian: item.guardianId, relationship: item.relationship,
       isPrimary: item.isPrimary, isEmergencyContact: item.isEmergencyContact,
       receivesCommunication: item.receivesCommunication,
+      communicationChannels: item.communicationChannels || [],
+      preferredLanguage: item.preferredLanguage || "en",
       availableChannels: [
         ...(item.guardianId.phone ? ["sms", "whatsapp"] : []),
         ...(item.guardianId.email ? ["email"] : []),
@@ -61,6 +63,10 @@ export const sendGuardianCommunication = async (req, res, next) => {
       const outcomes = [];
       for (const channel of body.channels) {
         const recipient = channel === "email" ? guardian.email : guardian.phone;
+        if (!(relationship.communicationChannels || []).includes(channel)) {
+          outcomes.push({ channel, recipient: recipient || "", status: "skipped", error: "Channel is not enabled in guardian preferences", attemptedAt: new Date() });
+          continue;
+        }
         if (!recipient) {
           outcomes.push({ channel, recipient: "", status: "skipped", error: "No contact detail available", attemptedAt: new Date() });
           continue;
