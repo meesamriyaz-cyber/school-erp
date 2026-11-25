@@ -29,10 +29,10 @@ export const createStudentDocumentSignature = async (req, res, next) => {
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = `school-erp/${req.tenantId}/students/${student._id}/documents`;
     const publicId = `${Date.now()}-${crypto.randomUUID()}`;
-    const params = { folder, public_id: publicId, timestamp };
+    const params = { allowed_formats: "pdf,jpg,jpeg,png", folder, public_id: publicId, timestamp };
     const signatureBase = Object.keys(params).sort().map((key) => `${key}=${params[key]}`).join("&");
     const signature = crypto.createHash("sha1").update(signatureBase + apiSecret).digest("hex");
-    return res.json({ success: true, data: { cloudName, apiKey, timestamp, folder, publicId, signature, resourceType: "auto" } });
+    return res.json({ success: true, data: { cloudName, apiKey, timestamp, folder, publicId, signature, allowedFormats: params.allowed_formats, resourceType: "auto" } });
   } catch (error) { return next(error); }
 };
 
@@ -58,7 +58,7 @@ export const createStudentDocument = async (req, res, next) => {
     const { cloudName } = cloudinaryConfig();
     if (!cloudName || !parsedUrl.pathname.startsWith(`/${cloudName}/`)) return fail(res, 400, "Document URL does not belong to the configured Cloudinary account");
     if (typeof publicId !== "string" || !publicId.startsWith(`school-erp/${req.tenantId}/students/${student._id}/documents/`) || publicId.length > 255) return fail(res, 400, "Invalid Cloudinary public ID");
-    if (!["image", "raw", "video"].includes(resourceType)) return fail(res, 400, "Invalid Cloudinary resource type");
+    if (!["image", "raw"].includes(resourceType)) return fail(res, 400, "Invalid Cloudinary resource type");
     if (typeof format !== "string" || !/^[a-z0-9]{1,20}$/i.test(format)) return fail(res, 400, "Invalid file format");
     if (!Number.isInteger(bytes) || bytes < 1 || bytes > 10485760) return fail(res, 400, "File size must not exceed 10 MB");
     if (typeof notes !== "string" || notes.length > 500) return fail(res, 400, "Notes must not exceed 500 characters");
@@ -73,10 +73,22 @@ export const createStudentDocument = async (req, res, next) => {
 export const deleteStudentDocument = async (req, res, next) => {
   try {
     if (!mongoose.isValidObjectId(req.params.documentId)) return fail(res, 400, "Invalid document ID");
-    const document = await StudentDocument.findOneAndDelete({
+    const document = await StudentDocument.findOne({
       _id: req.params.documentId, tenantId: req.tenantId, studentId: req.params.studentId,
     });
     if (!document) return fail(res, 404, "Document not found");
-    return res.json({ success: true, message: "Document record deleted" });
+    const { cloudName, apiKey, apiSecret } = cloudinaryConfig();
+    if (!cloudName || !apiKey || !apiSecret) return fail(res, 503, "Cloudinary is not configured on the API server");
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signatureBase = `public_id=${document.publicId}&timestamp=${timestamp}`;
+    const signature = crypto.createHash("sha1").update(signatureBase + apiSecret).digest("hex");
+    const form = new URLSearchParams({ public_id: document.publicId, timestamp: String(timestamp), api_key: apiKey, signature });
+    const cloudResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${document.resourceType}/destroy`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form });
+    const cloudResult = await cloudResponse.json();
+    if (!cloudResponse.ok || !["ok", "not found"].includes(cloudResult.result)) {
+      return fail(res, 502, cloudResult.error?.message || "Cloudinary could not delete the file");
+    }
+    await document.deleteOne();
+    return res.json({ success: true, message: "Document and Cloudinary file deleted" });
   } catch (error) { return next(error); }
 };
