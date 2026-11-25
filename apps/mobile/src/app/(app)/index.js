@@ -58,13 +58,17 @@ export default function AppHomeScreen() {
   const { user, signOut } = useAuth();
   const [report, setReport] = useState(null);
   const [teacherEntries, setTeacherEntries] = useState([]);
+  const [portalChildren, setPortalChildren] = useState([]);
+  const [portalAnnouncements, setPortalAnnouncements] = useState([]);
+  const [portalNotifications, setPortalNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("home");
 
   const isTeacher = user?.role === "teacher";
-  const visibleTabs = isTeacher ? [
+  const isLearnerAccount = user?.role === "student" || user?.role === "parent";
+  const visibleTabs = isLearnerAccount ? tabs.filter(tab => ["home", "more"].includes(tab.key)) : isTeacher ? [
     ...tabs.filter(tab => ["home", "timetable"].includes(tab.key)),
     { key: "teacher", label: "Teaching", icon: "✎" },
     ...tabs.filter(tab => tab.key === "more"),
@@ -85,6 +89,21 @@ export default function AppHomeScreen() {
     }
   }, []);
 
+  const loadPortalHome = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    setError("");
+    try {
+      const [childrenResponse, announcementsResponse, notificationsResponse] = await Promise.all([
+        apiRequest("/portal/children"), apiRequest("/portal/announcements"), apiRequest("/portal/notifications"),
+      ]);
+      if (!childrenResponse?.success || !Array.isArray(childrenResponse.data)) throw new Error(childrenResponse?.message || "Unable to load your linked student account.");
+      setPortalChildren(childrenResponse.data);
+      setPortalAnnouncements(Array.isArray(announcementsResponse?.data) ? announcementsResponse.data : []);
+      setPortalNotifications(Array.isArray(notificationsResponse?.data) ? notificationsResponse.data : []);
+    } catch (requestError) { setError(requestError?.message || "Unable to load your student portal."); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, []);
+
   const loadDashboard = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError("");
@@ -102,10 +121,11 @@ export default function AppHomeScreen() {
   useEffect(() => {
     if (activeTab !== "home") return;
     if (isTeacher) loadTeacherHome(true);
+    else if (isLearnerAccount) loadPortalHome(true);
     else loadDashboard(true);
-  }, [activeTab, isTeacher, loadDashboard, loadTeacherHome]);
+  }, [activeTab, isTeacher, isLearnerAccount, loadDashboard, loadTeacherHome, loadPortalHome]);
 
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Administrator";
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || (isLearnerAccount ? "Student" : "Administrator");
   const role = (user?.role || "school user").replaceAll("_", " ");
   const teacherYearNames = [...new Set(teacherEntries.map((entry) => entry.academicYearId?.name).filter(Boolean))];
   const yearName = isTeacher
@@ -124,14 +144,31 @@ export default function AppHomeScreen() {
       </TouchableOpacity>
     </View>
 
-    {activeTab === "home" ? <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => isTeacher ? loadTeacherHome(true) : loadDashboard(true)} tintColor={colors.primary} />}>
-      {!isTeacher ? <View style={styles.welcomeBlock}>
+    {activeTab === "home" ? <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => isTeacher ? loadTeacherHome(true) : isLearnerAccount ? loadPortalHome(true) : loadDashboard(true)} tintColor={colors.primary} />}>
+      {!isTeacher && !isLearnerAccount ? <View style={styles.welcomeBlock}>
         <Text style={styles.kicker}>SCHOOL OVERVIEW</Text>
         <Text style={styles.welcomeTitle}>Good day, {user?.firstName || "Administrator"}.</Text>
         <Text style={styles.welcomeText}>Here’s what’s happening at your school today.</Text>
         <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>{yearName}</Text></View>
       </View> : null}
 
+      {isLearnerAccount ? <>
+        {loading && portalChildren.length === 0 && !error ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your student portal…</Text></View> : null}
+        {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={() => loadPortalHome()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
+        {!loading && !error ? <>
+          <View style={styles.welcomeBlock}><Text style={styles.kicker}>{user?.role === "parent" ? "FAMILY COMMUNICATION" : "STUDENT WORKSPACE"}</Text><Text style={styles.welcomeTitle}>Good day, {user?.firstName || "Student"}.</Text><Text style={styles.welcomeText}>{user?.role === "parent" ? "School updates for your linked student accounts." : "Your school information and updates."}</Text></View>
+          <View style={styles.panel}><SectionHeader title={user?.role === "parent" ? "Linked students" : "My student account"} subtitle={portalChildren.length ? `${portalChildren.length} linked record(s)` : "No linked student record yet"}/>
+            {portalChildren.map(item => <View key={item.student?._id} style={styles.teacherPeriod}><View style={{flex:1,gap:3}}><Text style={styles.examName}>{[item.student?.firstName,item.student?.lastName].filter(Boolean).join(" ") || "Student"}</Text><Text style={styles.detailText}>{item.student?.admissionNumber || "Admission number unavailable"}</Text><Text style={styles.metricNote}>{[item.currentEnrollment?.classId?.name,item.currentEnrollment?.sectionId?.name].filter(Boolean).join(" · ") || "Class placement not available"}</Text></View></View>)}
+          </View>
+          <View style={styles.panel}><SectionHeader title="School notices" subtitle="Published updates for your class or school"/>
+            {portalAnnouncements.length ? portalAnnouncements.slice(0,8).map(item => <View key={item._id} style={styles.teacherPeriod}><View style={{flex:1,gap:3}}><Text style={styles.examName}>{item.title}</Text><Text style={styles.detailText}>{item.body}</Text><Text style={styles.metricNote}>{(item.category || "general").replaceAll("_"," ")}</Text></View></View>) : <Text style={styles.emptyText}>No current school notices.</Text>}
+          </View>
+          <View style={styles.panel}><SectionHeader title="Notifications" subtitle={`${portalNotifications.filter(item => !item.readAt).length} unread`}/>
+            {portalNotifications.slice(0,5).map(item => <View key={item._id} style={styles.teacherPeriod}><View style={{flex:1,gap:3}}><Text style={styles.examName}>{item.title}</Text><Text style={styles.detailText}>{item.body}</Text></View></View>)}
+            {!portalNotifications.length ? <Text style={styles.emptyText}>No new notifications.</Text> : null}
+          </View>
+        </> : null}
+      </> : null}
       {isTeacher ? <>
         {loading && teacherEntries.length === 0 ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your teaching schedule…</Text></View> : null}
         {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={() => loadTeacherHome()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
@@ -216,7 +253,7 @@ export default function AppHomeScreen() {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <StaffScreen onHome={onHome}/> :
        <View style={styles.profileCard}><View style={styles.profileLarge}><Text style={styles.profileLargeText}>{fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</Text></View><Text style={styles.profileName}>{fullName}</Text><Text style={styles.profileRole}>{role}</Text><Text style={styles.profileSchool}>School ERP mobile account</Text>
-        {!isTeacher ? <><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("enrollments")}><Text style={styles.secondaryButtonText}>Manage enrollments & class placements</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("fees")}><Text style={styles.secondaryButtonText}>Fees & Payments</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("examinations")}><Text style={styles.secondaryButtonText}>Examinations & Results</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("reports")}><Text style={styles.secondaryButtonText}>Reports & Analytics</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("certificates")}><Text style={styles.secondaryButtonText}>Certificates & Documents</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("documents")}><Text style={styles.secondaryButtonText}>Student Document Management</Text></TouchableOpacity></> : null}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
+        {!isTeacher && !isLearnerAccount ? <><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("enrollments")}><Text style={styles.secondaryButtonText}>Manage enrollments & class placements</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("fees")}><Text style={styles.secondaryButtonText}>Fees & Payments</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("examinations")}><Text style={styles.secondaryButtonText}>Examinations & Results</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("reports")}><Text style={styles.secondaryButtonText}>Reports & Analytics</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("certificates")}><Text style={styles.secondaryButtonText}>Certificates & Documents</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("documents")}><Text style={styles.secondaryButtonText}>Student Document Management</Text></TouchableOpacity></> : null}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
     </ScrollView>}
 
     <View style={styles.bottomNav}>
