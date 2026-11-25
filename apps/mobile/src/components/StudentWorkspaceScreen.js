@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Linking, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { apiRequest } from "../services/apiClient";
 import { colors, radius, spacing } from "../theme/tokens";
 
@@ -179,6 +179,24 @@ export function StudentWorkspaceScreen({ user }) {
     </> : null}
 
     {!loading && !error && section === "profile" ? <Panel title="Student profile" subtitle="Your school identity and current academic placement">
+      <View style={styles.familyPhotos}>
+        {[{ key: "student", label: "Student", name: [student?.firstName, student?.lastName].filter(Boolean).join(" "), photoUrl: student?.photoUrl }, ...["father", "mother"].map((relationship) => {
+          const parent = (profile?.parents || []).find((item) => item.relationship === relationship);
+          return { key: relationship, label: relationship === "father" ? "Father" : "Mother", name: parent?.name || "Details not added", photoUrl: parent?.photoUrl, phone: parent?.phone, phoneVerified: parent?.phoneVerified };
+        })].map((person) => <View key={person.key} style={styles.familyPerson}>
+          <View style={styles.avatarCircle}>{person.photoUrl ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage}/> : <Text style={styles.avatarInitial}>{person.key === "student" ? "S" : person.key === "father" ? "F" : "M"}</Text>}</View>
+          <Text style={styles.familyLabel}>{person.label}</Text>
+          <Text style={styles.familyName} numberOfLines={2}>{person.name || "Not available"}</Text>
+        </View>)}
+      </View>
+      {["father", "mother"].map((relationship) => {
+        const parent = (profile?.parents || []).find((item) => item.relationship === relationship);
+        const label = relationship === "father" ? "Father" : "Mother";
+        return <View key={relationship} style={styles.parentContact}>
+          <DataRow title={label} subtitle={parent?.name || "Details not added by school"}/>
+          <DataRow title={label + " contact"} subtitle={parent?.phone ? parent.phone + (parent.phoneVerified ? " · Verified" : " · Not verified") : "Not provided"}/>
+        </View>;
+      })}
       <DataRow title="Full name" subtitle={[student?.firstName, student?.lastName].filter(Boolean).join(" ") || "Not available"}/>
       <DataRow title="Admission number" subtitle={student?.admissionNumber || "Not available"}/>
       <DataRow title="Date of birth" subtitle={dateOf(student?.dateOfBirth) || "Not available"}/>
@@ -345,6 +363,14 @@ const styles = StyleSheet.create({
   rowSubtitle: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   rowTrailing: { color: colors.primary, fontSize: 11, fontWeight: "800", textTransform: "capitalize" },
   empty: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  familyPhotos: { flexDirection: "row", justifyContent: "space-around", gap: 8, paddingVertical: 12 },
+  familyPerson: { flex: 1, alignItems: "center", gap: 5 },
+  avatarCircle: { width: 68, height: 68, borderRadius: 34, overflow: "hidden", backgroundColor: "#EEF1F7", borderWidth: 1, borderColor: "#DDE3EE", alignItems: "center", justifyContent: "center" },
+  avatarImage: { width: "100%", height: "100%" },
+  avatarInitial: { color: "#74809A", fontSize: 23, fontWeight: "800" },
+  familyLabel: { color: colors.muted, fontSize: 10, fontWeight: "800" },
+  familyName: { color: colors.ink, fontSize: 11, fontWeight: "700", textAlign: "center" },
+  parentContact: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 4 },
   profileReadOnly: { color: "#778196", backgroundColor: "#F5F7FB", borderRadius: 10, padding: 12, fontSize: 11, lineHeight: 16 },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   metric: { flex: 1, minWidth: "22%", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7EBF2", borderRadius: 13, padding: 13, gap: 5, alignItems: "center" },
