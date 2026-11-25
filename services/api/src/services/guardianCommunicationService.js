@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 const cleanEnv = (value) => (value || "").trim();
 
 function normalizeE164(value, label) {
-  const normalized = String(value || "").trim().replace(/^whatsapp:/i, "").replace(/[\\s().-]/g, "");
-  if (!/^\\+[1-9]\\d{7,14}$/.test(normalized)) throw new Error(`${label} must use international E.164 format (for example +919876543210)`);
+  const normalized = String(value || "").trim().replace(/^whatsapp:/i, "").replace(/[().-]/g, "").split(" ").join("");
+  const digits = normalized.startsWith("+") ? normalized.slice(1) : "";
+  if (digits.length < 8 || digits.length > 15 || digits[0] < "1" || digits[0] > "9" || ![...digits].every((char) => char >= "0" && char <= "9")) throw new Error(`${label} must use international E.164 format (for example +919876543210)`);
   return normalized;
 }
 const normalizeWhatsAppAddress = (value, label) => `whatsapp:${normalizeE164(value, label)}`;
