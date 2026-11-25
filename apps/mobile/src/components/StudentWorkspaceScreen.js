@@ -44,6 +44,7 @@ export function StudentWorkspaceScreen({ user }) {
   const [submitting, setSubmitting] = useState(false);
   const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
   const [resultsRefreshing, setResultsRefreshing] = useState(false);
+  const [sectionRefreshing, setSectionRefreshing] = useState("");
   const [noticesRefreshing, setNoticesRefreshing] = useState(false);
   const [data, setData] = useState({ profile: [], homework: [], submissions: [], attendance: [], fees: [], results: [], timetable: [], documents: [], notices: [], notifications: [] });
 
@@ -76,6 +77,28 @@ export function StudentWorkspaceScreen({ user }) {
       setRefreshing(false);
     }
   }, []);
+
+  const refreshSection = async (key) => {
+    const requests = key === "learning"
+      ? [["homework", "/portal/homework"], ["submissions", "/portal/homework-submissions"]]
+      : key === "attendance" ? [["attendance", "/portal/attendance"]]
+      : key === "fees" ? [["fees", "/portal/fees"]] : [];
+    if (!requests.length) return;
+    setSectionRefreshing(key);
+    const responses = await Promise.allSettled(requests.map(([, endpoint]) => apiRequest(endpoint)));
+    const failed = [];
+    setData((previous) => {
+      const next = { ...previous };
+      responses.forEach((response, index) => {
+        const [name] = requests[index];
+        if (response.status === "fulfilled") next[name] = response.value;
+        else failed.push(name);
+      });
+      return next;
+    });
+    if (failed.length === requests.length) Alert.alert("Section could not be refreshed", "Your previously loaded information is still available. Pull down to retry.");
+    setSectionRefreshing("");
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -128,7 +151,7 @@ export function StudentWorkspaceScreen({ user }) {
       <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); if (item.key === "results") { setResultsRefreshing(true); apiRequest("/portal/results").then((response) => setData((previous) => ({ ...previous, results: response }))).catch(() => Alert.alert("Results could not be refreshed", "Your previously loaded report cards are still available. Pull down to retry.")).finally(() => setResultsRefreshing(false)); } if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } if (item.key === "notices") { setNoticesRefreshing(true); Promise.allSettled([apiRequest("/portal/announcements"), apiRequest("/portal/notifications")]).then(([noticeResult, notificationResult]) => { if (noticeResult.status === "fulfilled") setData((previous) => ({ ...previous, notices: noticeResult.value })); if (notificationResult.status === "fulfilled") setData((previous) => ({ ...previous, notifications: notificationResult.value })); if (noticeResult.status === "rejected" && notificationResult.status === "rejected") Alert.alert("Updates could not be refreshed", "Your previously loaded notices and notifications are still available."); }).finally(() => setNoticesRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
+      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (["learning", "attendance", "fees"].includes(item.key)) refreshSection(item.key); if (item.key === "timetable") load(true); if (item.key === "results") { setResultsRefreshing(true); apiRequest("/portal/results").then((response) => setData((previous) => ({ ...previous, results: response }))).catch(() => Alert.alert("Results could not be refreshed", "Your previously loaded report cards are still available. Pull down to retry.")).finally(() => setResultsRefreshing(false)); } if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } if (item.key === "notices") { setNoticesRefreshing(true); Promise.allSettled([apiRequest("/portal/announcements"), apiRequest("/portal/notifications")]).then(([noticeResult, notificationResult]) => { if (noticeResult.status === "fulfilled") setData((previous) => ({ ...previous, notices: noticeResult.value })); if (notificationResult.status === "fulfilled") setData((previous) => ({ ...previous, notifications: notificationResult.value })); if (noticeResult.status === "rejected" && notificationResult.status === "rejected") Alert.alert("Updates could not be refreshed", "Your previously loaded notices and notifications are still available."); }).finally(() => setNoticesRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
     </ScrollView>
 
     {loading && !student && !error ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.empty}>Loading your school information…</Text></View> : null}
@@ -168,7 +191,7 @@ export function StudentWorkspaceScreen({ user }) {
     </Panel> : null}
 
     {!loading && !error && section === "learning" ? <>
-      <Panel title="Homework & assignments" subtitle="Work assigned to your class">
+      <Panel title="Homework & assignments" subtitle={sectionRefreshing === "learning" ? "Refreshing assignments and submissions…" : "Work assigned to your class"}>
         {homework.length ? homework.map((item) => {
           const submission = submissionByHomework.get(String(item._id));
           return <DataRow key={String(item._id)} title={titleOf(item, "Homework")} subtitle={[item.subjectId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : ""].filter(Boolean).join(" · ")} trailing={submission?.status || "Submit"} onPress={() => { setSelectedHomework(item); setAnswer(submission?.answer || ""); }}/>;
@@ -177,12 +200,12 @@ export function StudentWorkspaceScreen({ user }) {
       <Panel title="My submissions">{renderRows(submissions, "No submissions yet.", (item) => ({ title: item.homeworkId?.title || "Assignment submission", subtitle: [item.status, item.submittedAt ? dateOf(item.submittedAt) : ""].filter(Boolean).join(" · "), trailing: item.marksObtained != null ? String(item.marksObtained) + "/" + item.maxMarks : "" }))}</Panel>
     </> : null}
 
-    {!loading && !error && section === "attendance" ? <Panel title="Attendance record" subtitle={`${attendanceSummary.percentage == null ? "No percentage available" : attendanceSummary.percentage + "% attendance"} · ${attendanceSummary.marked || 0} marked records`}>
+    {!loading && !error && section === "attendance" ? <Panel title="Attendance record" subtitle={sectionRefreshing === "attendance" ? "Refreshing attendance…" : `${attendanceSummary.percentage == null ? "No percentage available" : attendanceSummary.percentage + "% attendance"} · ${attendanceSummary.marked || 0} marked records`}>
       <View style={styles.metrics}>{["present", "absent", "late", "excused"].map((key) => <View style={styles.metric} key={key}><Text style={styles.metricValue}>{attendanceSummary[key] || 0}</Text><Text style={styles.metricLabel}>{key}</Text></View>)}</View>
       {renderRows(list(data.attendance).slice(0, 30), "No attendance records found.", (item) => ({ title: dateOf(item.date) || "Attendance", subtitle: item.remarks || "", trailing: item.status || "" }))}
     </Panel> : null}
 
-    {!loading && !error && section === "fees" ? <Panel title="Fees & payments" subtitle={`${feeSummary.invoiceCount || 0} invoices · Balance ${money(feeSummary.balance)}`}>
+    {!loading && !error && section === "fees" ? <Panel title="Fees & payments" subtitle={sectionRefreshing === "fees" ? "Refreshing fee statement…" : `${feeSummary.invoiceCount || 0} invoices · Balance ${money(feeSummary.balance)}`}>
       {fees.length ? fees.map((item) => {
         const expanded = expandedInvoiceId === String(item._id);
         return <View key={String(item._id)}>
