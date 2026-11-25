@@ -42,6 +42,7 @@ export function StudentWorkspaceScreen({ user }) {
   const [selectedHomework, setSelectedHomework] = useState(null);
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
   const [data, setData] = useState({ profile: [], homework: [], submissions: [], attendance: [], fees: [], results: [], timetable: [], documents: [], notices: [], notifications: [] });
 
   const load = useCallback(async (refresh = false) => {
@@ -124,7 +125,7 @@ export function StudentWorkspaceScreen({ user }) {
       <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
+      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
     </ScrollView>
 
     {loading && !student && !error ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.empty}>Loading your school information…</Text></View> : null}
@@ -201,7 +202,7 @@ export function StudentWorkspaceScreen({ user }) {
       </View>) : <Text style={styles.empty}>No timetable entries found.</Text>}
     </Panel> : null}
 
-    {!loading && !error && section === "documents" ? <Panel title="My documents" subtitle="Files shared by your school">
+    {!loading && !error && section === "documents" ? <Panel title="My documents" subtitle={documentsRefreshing ? "Refreshing school-shared files…" : "Files shared by your school"}>
       {renderRows(documents, "No documents have been shared with you.", (item) => ({ title: item.name || "Document", subtitle: [item.category?.replaceAll("_", " "), dateOf(item.createdAt)].filter(Boolean).join(" · "), trailing: item.format || "", onPress: item.fileUrl ? () => Linking.openURL(item.fileUrl) : undefined }))}
     </Panel> : null}
 
