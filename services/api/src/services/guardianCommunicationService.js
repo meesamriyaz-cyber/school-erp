@@ -103,10 +103,12 @@ export async function sendGuardianChannel({ channel, recipient, message, subject
       throw new Error("TWILIO_SMS_FROM must be a Twilio phone number in E.164 format (for example +15017122661)");
     }
 
-    // Twilio Console trial examples may only accept a predefined body token.
-    // Set this override only for trial testing; leave it blank for normal custom SMS.
-    const smsBody = channel === "sms"
-      ? (cleanEnv(process.env.TWILIO_SMS_BODY_OVERRIDE) || message)
+    // Twilio trial accounts accept only Twilio's predefined SMS template tokens.
+    // In non-production environments, use a supported event-notification template
+    // instead of the School ERP message body. Production always uses the real message.
+    const trialTemplate = cleanEnv(process.env.TWILIO_SMS_TRIAL_TEMPLATE) || "sms_event_notifications";
+    const smsBody = channel === "sms" && process.env.NODE_ENV !== "production"
+      ? trialTemplate
       : message;
 
     return twilioSend({
