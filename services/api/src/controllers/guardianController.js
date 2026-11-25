@@ -3,7 +3,7 @@ import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 import Student from "../models/Student.js";
 
-const CREATE_FIELDS = ["firstName", "lastName", "phone", "email"];
+const CREATE_FIELDS = ["firstName", "lastName", "email", "photoUrl"];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const appendRelationshipAudit = (record, actorUserId) => {
@@ -83,7 +83,7 @@ export const listGuardians = async (req, res, next) => {
 
     const [guardians, total] = await Promise.all([
       Guardian.find(filter)
-        .select("_id firstName lastName phone email status")
+        .select("_id firstName lastName phone email photoUrl phoneVerifiedAt verifiedPhone status")
         .sort({ firstName: 1, lastName: 1, _id: 1 })
         .skip(offset)
         .limit(limit)
@@ -103,7 +103,7 @@ export const createGuardian = async (req, res, next) => {
     const fields = validateBody(req.body, res, CREATE_FIELDS);
     if (!fields) return;
     if (typeof fields.firstName !== "string" || !fields.firstName.trim()) return invalid(res, "Guardian first name is required");
-    for (const field of ["lastName", "phone", "email"]) {
+    for (const field of ["lastName", "email", "photoUrl"]) {
       if (fields[field] !== undefined && fields[field] !== null && typeof fields[field] !== "string") return invalid(res, `${field} must be a string`);
     }
     const guardian = await Guardian.create({ ...fields, tenantId: req.tenantId });
@@ -139,7 +139,7 @@ export const updateGuardian = async (req, res, next) => {
     if (!updates) return;
     if (Object.keys(updates).length === 0) return invalid(res, "Provide at least one guardian field to update");
     if (Object.hasOwn(updates, "firstName") && (typeof updates.firstName !== "string" || !updates.firstName.trim())) return invalid(res, "Guardian first name cannot be empty");
-    for (const field of ["lastName", "phone", "email"]) {
+    for (const field of ["lastName", "email", "photoUrl"]) {
       if (updates[field] !== undefined && updates[field] !== null && typeof updates[field] !== "string") return invalid(res, `${field} must be a string`);
     }
 
@@ -172,7 +172,7 @@ export const updateGuardian = async (req, res, next) => {
           }
         }
 
-        const contactFieldsChanged = ["firstName", "lastName", "phone", "email"].some((field) => Object.hasOwn(updates, field));
+        const contactFieldsChanged = ["firstName", "lastName", "email"].some((field) => Object.hasOwn(updates, field));
         if (contactFieldsChanged) {
           const legacyLinks = await StudentGuardian.find({
             tenantId: req.tenantId,
