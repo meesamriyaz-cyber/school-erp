@@ -26,6 +26,7 @@ export default function StudentResultsPortal() {
   const [submissions, setSubmissions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState("");
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState("");
   const [homeworkNotice, setHomeworkNotice] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedStudent, setSelectedStudent] = useState("all");
@@ -176,7 +177,7 @@ export default function StudentResultsPortal() {
     <main className="student-portal">
       <header className="student-portal-header">
         <div>
-          <div className="portal-eyebrow">SCHOOLSUITE · FAMILY & STUDENT PORTAL</div>
+          <div className="portal-eyebrow">{isParent ? "SCHOOLSUITE · FAMILY COMMUNICATION" : "SCHOOLSUITE · STUDENT PORTAL"}</div>
           <h1>{isParent ? "Family learning overview" : "My student dashboard"}</h1>
           <p>View attendance, homework, examination results, fees and the class timetable.</p>
         </div>
@@ -268,7 +269,17 @@ export default function StudentResultsPortal() {
         )
       ) : activeTab === "fees" ? (
         loading ? <div className="portal-state">Loading fee statements…</div> : visibleFees.length === 0 ? <div className="portal-empty"><h2>No fee invoices</h2><p>Fee invoices and receipts issued by your school will appear here.</p></div> : (
-          <section className="portal-fee-list">{visibleFees.map((invoice) => <article className="portal-fee-card" key={invoice._id}><div className="portal-fee-heading"><div><span>{invoice.invoiceNumber} · {invoice.academicYearId?.name || "Academic year"}</span><h2>{isParent ? [invoice.student?.firstName, invoice.student?.lastName].filter(Boolean).join(" ") : "Fee statement"}</h2></div><strong className={"portal-fee-status fee-" + invoice.status}>{invoice.status}</strong></div><div className="portal-fee-totals"><div><span>Total</span><strong>₹{Number(invoice.totalAmount || 0).toLocaleString("en-IN")}</strong></div><div><span>Paid</span><strong>₹{Number(invoice.paidAmount || 0).toLocaleString("en-IN")}</strong></div><div><span>Balance</span><strong>₹{Number(invoice.balance || 0).toLocaleString("en-IN")}</strong></div><div><span>Due date</span><strong>{formatDate(invoice.dueDate)}</strong></div></div>{invoice.payments?.length > 0 && <div className="portal-receipts"><strong>Receipts</strong>{invoice.payments.map((payment) => <div key={payment._id}><span>{payment.receiptNumber} · {formatDate(payment.paymentDate)} · {payment.method?.replaceAll("_", " ")}</span><b>₹{Number(payment.amount || 0).toLocaleString("en-IN")} · {payment.status}</b></div>)}</div>}</article>)}</section>
+          <section className="portal-fee-list">{visibleFees.map((invoice) => {
+            const expanded = expandedInvoiceId === String(invoice._id);
+            return <article className="portal-fee-card" key={invoice._id}>
+              <div className="portal-fee-heading"><div><span>{invoice.invoiceNumber} · {invoice.academicYearId?.name || "Academic year"}</span><h2>{isParent ? [invoice.student?.firstName, invoice.student?.lastName].filter(Boolean).join(" ") : "Fee statement"}</h2></div><div className="portal-fee-heading-actions"><strong className={"portal-fee-status fee-" + invoice.status}>{invoice.status}</strong><button type="button" className="portal-fee-detail-toggle" aria-expanded={expanded} onClick={() => setExpandedInvoiceId(expanded ? "" : String(invoice._id))}>{expanded ? "Hide details" : "View details"}</button></div></div>
+              <div className="portal-fee-totals"><div><span>Total</span><strong>₹{Number(invoice.totalAmount || 0).toLocaleString("en-IN")}</strong></div><div><span>Paid</span><strong>₹{Number(invoice.paidAmount || 0).toLocaleString("en-IN")}</strong></div><div><span>Balance</span><strong>₹{Number(invoice.balance || 0).toLocaleString("en-IN")}</strong></div><div><span>Due date</span><strong>{formatDate(invoice.dueDate)}</strong></div></div>
+              {expanded && <div className="portal-fee-details">
+                <div className="portal-fee-line-items"><strong>Invoice breakdown</strong>{(invoice.items || []).length ? invoice.items.map((line, index) => <div key={index}><span>{line.name} · {(line.frequency || "one_time").replaceAll("_", " ")}</span><b>₹{Number(line.amount || 0).toLocaleString("en-IN")}</b></div>) : <p>No itemised fee details are available.</p>}</div>
+                <div className="portal-receipts"><strong>Payment history & receipts</strong>{invoice.payments?.length > 0 ? invoice.payments.map((payment) => <div key={payment._id}><span><b>{payment.receiptNumber || "Receipt"}</b> · {formatDate(payment.paymentDate)} · {payment.method?.replaceAll("_", " ") || "Payment"}{payment.reference ? ` · Ref: ${payment.reference}` : ""}{payment.reversalReason ? ` · Reversal: ${payment.reversalReason}` : ""}</span><b>₹{Number(payment.amount || 0).toLocaleString("en-IN")} · {payment.status}</b></div>) : <p>No payments have been recorded for this invoice.</p>}</div>
+              </div>}
+            </article>;
+          })}</section>
         )
       ) : activeTab === "timetable" ? (
         loading ? <div className="portal-state">Loading timetable…</div> : visibleTimetable.length === 0 || visibleTimetable.every((item) => !item.entries?.length) ? <div className="portal-empty"><h2>No timetable available</h2><p>Your current class timetable will appear here once it is published in the school workspace.</p></div> : (
