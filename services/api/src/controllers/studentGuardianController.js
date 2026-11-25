@@ -6,6 +6,7 @@ import Guardian from "../models/Guardian.js";
 import StudentGuardian, { RELATIONSHIPS } from "../models/StudentGuardian.js";
 
 const BOOLEAN_FIELDS = ["isPrimary", "isEmergencyContact", "canPickup", "receivesCommunication", "canAccessPortal"];
+const CHANNELS = ["sms", "whatsapp", "email"];
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const handleError = (error, res, next) => {
   if (error.code === 11000) return res.status(409).json({ success: false, message: "This student-guardian relationship already exists or conflicts with the primary guardian" });
@@ -87,11 +88,13 @@ export const createStudentGuardian = async (req, res, next) => {
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body)) return invalid(res, "Provide student-guardian relationship details");
     if (Object.hasOwn(body, "tenantId") || Object.hasOwn(body, "studentId")) return invalid(res, "School and student assignment are determined by the request context");
-    const allowed = ["guardianId", "relationship", ...BOOLEAN_FIELDS];
+    const allowed = ["guardianId", "relationship", ...BOOLEAN_FIELDS, "communicationChannels", "preferredLanguage"];
     if (Object.keys(body).some((field) => !allowed.includes(field))) return invalid(res, "One or more unsupported relationship fields were provided");
     if (!mongoose.isValidObjectId(body.guardianId)) return invalid(res, "A valid guardian ID is required");
     if (!RELATIONSHIPS.includes(body.relationship)) return invalid(res, "Invalid guardian relationship type");
     for (const field of BOOLEAN_FIELDS) if (body[field] !== undefined && typeof body[field] !== "boolean") return invalid(res, `${field} must be a boolean`);
+    if (body.communicationChannels !== undefined && (!Array.isArray(body.communicationChannels) || body.communicationChannels.some((channel) => !CHANNELS.includes(channel)) || new Set(body.communicationChannels).size !== body.communicationChannels.length)) return invalid(res, "communicationChannels must contain unique supported channels");
+    if (body.preferredLanguage !== undefined && (typeof body.preferredLanguage !== "string" || !/^[a-z]{2}(-[A-Z]{2})?$/.test(body.preferredLanguage))) return invalid(res, "preferredLanguage must be a language code such as en or en-IN");
 
     let link;
     await session.withTransaction(async () => {
@@ -119,6 +122,8 @@ export const createStudentGuardian = async (req, res, next) => {
         guardianId: guardian._id,
         relationship: body.relationship,
         ...Object.fromEntries(BOOLEAN_FIELDS.filter((field) => body[field] !== undefined && field !== "isPrimary").map((field) => [field, body[field]])),
+        ...(body.communicationChannels !== undefined ? { communicationChannels: body.communicationChannels } : {}),
+        ...(body.preferredLanguage !== undefined ? { preferredLanguage: body.preferredLanguage } : {}),
         isPrimary,
         canAccessPortal: typeof body.canAccessPortal === "boolean" ? body.canAccessPortal : isPrimary,
       };
@@ -150,11 +155,13 @@ export const updateStudentGuardian = async (req, res, next) => {
     if (!mongoose.isValidObjectId(req.params.studentGuardianId)) return invalid(res, "Invalid student-guardian relationship ID");
     const body = req.body;
     if (!body || typeof body !== "object" || Array.isArray(body)) return invalid(res, "Provide student-guardian fields to update");
-    const allowed = ["relationship", ...BOOLEAN_FIELDS, "status"];
+    const allowed = ["relationship", ...BOOLEAN_FIELDS, "communicationChannels", "preferredLanguage", "status"];
     if (Object.keys(body).some((field) => !allowed.includes(field))) return invalid(res, "One or more unsupported relationship fields were provided");
     if (!Object.keys(body).length) return invalid(res, "Provide at least one relationship field to update");
     if (Object.hasOwn(body, "relationship") && !RELATIONSHIPS.includes(body.relationship)) return invalid(res, "Invalid guardian relationship type");
     for (const field of BOOLEAN_FIELDS) if (Object.hasOwn(body, field) && typeof body[field] !== "boolean") return invalid(res, `${field} must be a boolean`);
+    if (body.communicationChannels !== undefined && (!Array.isArray(body.communicationChannels) || body.communicationChannels.some((channel) => !CHANNELS.includes(channel)) || new Set(body.communicationChannels).size !== body.communicationChannels.length)) return invalid(res, "communicationChannels must contain unique supported channels");
+    if (body.preferredLanguage !== undefined && (typeof body.preferredLanguage !== "string" || !/^[a-z]{2}(-[A-Z]{2})?$/.test(body.preferredLanguage))) return invalid(res, "preferredLanguage must be a language code such as en or en-IN");
     if (Object.hasOwn(body, "status") && !["active", "inactive"].includes(body.status)) return invalid(res, "Status must be active or inactive");
     if (body.status === "inactive" && body.isPrimary === true) return invalid(res, "A relationship cannot be made primary and inactive at the same time");
 
