@@ -257,3 +257,21 @@
   .portal-overview-metrics article{min-height:126px;padding:14px}
   .portal-overview-metrics article>strong{font-size:23px}
 }
+
+/* Attendance summary cards */
+.portal-attendance-summary{display:grid;grid-template-columns:minmax(190px,.9fr) minmax(0,2fr);gap:14px;margin-bottom:16px}
+.portal-attendance-rate,.attendance-count{padding:17px 19px;border:1px solid #e7ebf2;border-radius:13px;background:#fff;box-shadow:0 3px 12px rgba(29,49,84,.04)}
+.portal-attendance-rate{display:flex;flex-direction:column;gap:7px}
+.portal-attendance-rate>span,.attendance-count>span{font-size:11px;font-weight:700;color:#778196}
+.portal-attendance-rate>strong{font-size:29px;line-height:1.2;color:#4263eb;font-weight:800}
+.portal-attendance-rate>small{font-size:10px;color:#929caf}
+.portal-attendance-track{height:7px;border-radius:20px;background:#edf0f6;overflow:hidden;margin:2px 0}
+.portal-attendance-track>span{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#4263eb,#20aa80)}
+.portal-attendance-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.attendance-count{display:flex;flex-direction:column;justify-content:center;gap:9px;min-height:105px}
+.attendance-count>strong{font-size:25px;font-weight:800;color:#28364d}
+.attendance-count-present{border-top:3px solid #20a779}
+.attendance-count-absent{border-top:3px solid #e16b75}
+.attendance-count-late{border-top:3px solid #d69b39}
+.attendance-count-excused{border-top:3px solid #8b72d6}
+@media(max-width:760px){.portal-attendance-summary{grid-template-columns:1fr}.portal-attendance-counts{grid-template-columns:repeat(2,minmax(0,1fr))}.attendance-count{min-height:85px}}
