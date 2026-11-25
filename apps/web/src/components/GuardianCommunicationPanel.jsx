@@ -174,8 +174,10 @@ export default function GuardianCommunicationPanel({ studentId, accessToken }) {
               {(item.channels || []).map((outcome, index) => (
                 <span key={`${item._id}-${outcome.channel}-${index}`} className={`status-${outcome.status}`}>
                   <span>
-                    {outcome.channel.toUpperCase()}: {outcome.status}
-                    {outcome.error ? ` — ${outcome.error}` : ""}
+                    {outcome.channel.toUpperCase()}: {outcome.providerStatus || outcome.status}
+                    {outcome.providerStatus && outcome.status === "accepted" ? " (provider accepted)" : ""}
+                    {(outcome.providerErrorMessage || outcome.error) ? ` — ${outcome.providerErrorMessage || outcome.error}` : ""}
+                    {outcome.providerErrorCode ? ` [${outcome.providerErrorCode}]` : ""}
                   </span>
                 </span>
               ))}
