@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { apiRequest } from "../services/apiClient";
 import { colors, radius, spacing } from "../theme/tokens";
 
@@ -38,6 +38,9 @@ export function StudentWorkspaceScreen({ user }) {
   const [error, setError] = useState("");
   const [partialErrors, setPartialErrors] = useState([]);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
+  const [selectedHomework, setSelectedHomework] = useState(null);
+  const [answer, setAnswer] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState({ profile: [], homework: [], submissions: [], attendance: [], fees: [], results: [], timetable: [], documents: [], notices: [], notifications: [] });
 
   const load = useCallback(async (refresh = false) => {
@@ -123,10 +126,10 @@ export function StudentWorkspaceScreen({ user }) {
 
     {!loading && !error && section === "learning" ? <>
       <Panel title="Homework & assignments" subtitle="Work assigned to your class">
-        {renderRows(homework, "No homework has been assigned yet.", (item) => {
+        {homework.length ? homework.map((item) => {
           const submission = submissionByHomework.get(String(item._id));
-          return { title: titleOf(item, "Homework"), subtitle: [item.subjectId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : ""].filter(Boolean).join(" · "), trailing: submission?.status || "Pending" };
-        })}
+          return <DataRow key={String(item._id)} title={titleOf(item, "Homework")} subtitle={[item.subjectId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : ""].filter(Boolean).join(" · ")} trailing={submission?.status || "Submit"} onPress={() => { setSelectedHomework(item); setAnswer(submission?.answer || ""); }}/>;
+        }) : <Text style={styles.empty}>No homework has been assigned yet.</Text>}
       </Panel>
       <Panel title="My submissions">{renderRows(submissions, "No submissions yet.", (item) => ({ title: item.homeworkId?.title || "Assignment submission", subtitle: [item.status, item.submittedAt ? dateOf(item.submittedAt) : ""].filter(Boolean).join(" · "), trailing: item.marksObtained != null ? String(item.marksObtained) + "/" + item.maxMarks : "" }))}</Panel>
     </> : null}
@@ -167,6 +170,27 @@ export function StudentWorkspaceScreen({ user }) {
       <Panel title="School notices">{renderRows(notices, "No current notices.", (item) => ({ title: titleOf(item, "School notice"), subtitle: item.body || item.category || "" }))}</Panel>
       <Panel title="Notifications">{renderRows(notifications, "No notifications.", (item) => ({ title: item.title || "School update", subtitle: item.body || dateOf(item.createdAt) }))}</Panel>
     </> : null}
+    <Modal visible={Boolean(selectedHomework)} transparent animationType="slide" onRequestClose={() => !submitting && setSelectedHomework(null)}>
+      <View style={styles.modalBackdrop}><View style={styles.modalCard}>
+        <Text style={styles.panelTitle}>{selectedHomework ? titleOf(selectedHomework, "Homework") : "Submit homework"}</Text>
+        <Text style={styles.panelSubtitle}>{selectedHomework?.dueDate ? "Due " + dateOf(selectedHomework.dueDate) : "Written answer"}</Text>
+        <TextInput value={answer} onChangeText={setAnswer} multiline textAlignVertical="top" placeholder="Write your answer here…" editable={!submitting} style={styles.answerInput} maxLength={10000}/>
+        <Text style={styles.rowSubtitle}>{answer.length}/10,000 characters · Written answers only</Text>
+        <View style={styles.modalActions}>
+          <TouchableOpacity style={styles.secondaryAction} disabled={submitting} onPress={() => setSelectedHomework(null)}><Text style={styles.secondaryActionText}>Cancel</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.primaryAction} disabled={submitting || !answer.trim()} onPress={async () => {
+            setSubmitting(true);
+            try {
+              await apiRequest(`/homework/${selectedHomework._id}/submissions`, { method: "POST", body: { answer } });
+              Alert.alert("Homework submitted", "Your written answer has been saved.");
+              setSelectedHomework(null);
+              await load(true);
+            } catch (requestError) { Alert.alert("Submission failed", requestError?.message || "Please try again."); }
+            finally { setSubmitting(false); }
+          }}><Text style={styles.primaryActionText}>{submitting ? "Submitting…" : "Submit answer"}</Text></TouchableOpacity>
+        </View>
+      </View></View>
+    </Modal>
   </ScrollView>;
 }
 
@@ -196,6 +220,14 @@ const styles = StyleSheet.create({
   metricValue: { color: colors.primary, fontSize: 17, fontWeight: "900" },
   metricLabel: { color: colors.muted, fontSize: 10, textTransform: "capitalize" },
   state: { padding: 24, alignItems: "center", gap: 10 },
+  modalBackdrop: { flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.45)", padding: spacing.lg },
+  modalCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  answerInput: { minHeight: 170, maxHeight: 280, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, color: colors.ink, fontSize: 14 },
+  modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
+  secondaryAction: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.md, backgroundColor: colors.background },
+  secondaryActionText: { color: colors.ink, fontWeight: "800" },
+  primaryAction: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.md, backgroundColor: colors.primary },
+  primaryActionText: { color: "#FFFFFF", fontWeight: "800" },
   invoiceDetails: { paddingHorizontal: 12, paddingBottom: 12, gap: 7, backgroundColor: colors.background, borderRadius: radius.md },
   error: { backgroundColor: "#FDECEC", borderRadius: radius.md, padding: 15, gap: 10 },
   errorText: { color: colors.danger, fontSize: 13 },
