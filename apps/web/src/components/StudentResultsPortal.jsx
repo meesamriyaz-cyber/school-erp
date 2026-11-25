@@ -19,6 +19,7 @@ export default function StudentResultsPortal() {
   const [fees, setFees] = useState([]);
   const [timetable, setTimetable] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationBusy, setNotificationBusy] = useState(false);
@@ -46,8 +47,9 @@ export default function StudentResultsPortal() {
       apiRequest("/portal/fees", { accessToken, signal: controller.signal }),
       apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),
       apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/documents", { accessToken, signal: controller.signal }),
       apiRequest("/portal/notifications", { accessToken, signal: controller.signal }),
-    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse, notificationResponse]) => {
+    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse, documentResponse, notificationResponse]) => {
       if (controller.signal.aborted) return;
       const failures = [];
       const applyList = (response, setter, label) => {
@@ -68,6 +70,7 @@ export default function StudentResultsPortal() {
       applyList(feesResponse, setFees, "fees");
       applyList(timetableResponse, setTimetable, "timetable");
       applyList(announcementResponse, setAnnouncements, "announcements");
+      applyList(documentResponse, setDocuments, "student documents");
       applyList(notificationResponse, setNotifications, "notifications");
 
       if (notificationResponse.status === "fulfilled" && Array.isArray(notificationResponse.value?.data)) {
@@ -87,6 +90,11 @@ export default function StudentResultsPortal() {
     });
     return () => controller.abort();
   }, [accessToken, retryCount]);
+
+  const visibleDocuments = useMemo(() => selectedStudent === "all"
+    ? documents
+    : documents.filter((item) => String(item.student?._id) === selectedStudent),
+  [documents, selectedStudent]);
 
   const visibleNotifications = useMemo(() => selectedStudent === "all" || !isParent
     ? notifications
@@ -200,6 +208,7 @@ export default function StudentResultsPortal() {
         <button type="button" className={activeTab === "fees" ? "active" : ""} aria-pressed={activeTab === "fees"} onClick={() => setActiveTab("fees")}>Fees</button>
         <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
         <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
+        <button type="button" className={activeTab === "documents" ? "active" : ""} aria-pressed={activeTab === "documents"} onClick={() => setActiveTab("documents")}>Documents ({documents.length})</button>
         <button type="button" className={activeTab === "notifications" ? "active" : ""} aria-pressed={activeTab === "notifications"} onClick={() => setActiveTab("notifications")}>Notifications {unreadCount > 0 ? `(${unreadCount})` : ""}</button>
         {isParent && <button type="button" className={activeTab === "messaging" ? "active" : ""} aria-pressed={activeTab === "messaging"} onClick={() => setActiveTab("messaging")}>Messages</button>}
       </nav>
@@ -275,6 +284,10 @@ export default function StudentResultsPortal() {
               {item.expiresAt && <footer>Available until {formatDate(item.expiresAt)}</footer>}
             </article>)}
           </section>
+        )
+      ) : activeTab === "documents" ? (
+        visibleDocuments.length === 0 ? <div className="portal-empty"><h2>No shared documents</h2><p>Documents made available by your school will appear here.</p></div> : (
+          <section className="portal-data-panel"><div className="portal-data-heading"><h2>Student documents</h2><span>{visibleDocuments.length} files</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr/><tr><th>Document</th>{isParent && <th>Student</th>}<th>Category</th><th>Uploaded</th><th>File</th></tr></thead><tbody>{visibleDocuments.map((document) => <tr key={document._id}><td>{document.name}</td>{isParent && <td>{[document.student?.firstName, document.student?.lastName].filter(Boolean).join(" ")}</td>}<td>{(document.category || "other").replaceAll("_", " ")}</td><td>{formatDate(document.createdAt)}</td><td><a href={document.fileUrl} target="_blank" rel="noreferrer">Open</a></td></tr>)}</tbody></table></div></section>
         )
       ) : activeTab === "messaging" ? (
         <MessagingWorkspace mode="parent" />
