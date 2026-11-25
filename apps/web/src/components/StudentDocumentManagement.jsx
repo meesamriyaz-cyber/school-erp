@@ -46,7 +46,7 @@ export default function StudentDocumentManagement() {
     if (file.size > 10 * 1024 * 1024) { setError("File size must not exceed 10 MB."); return; }
     setLoading(true);
     try {
-      const signed = await apiRequest(`/students/${encodeURIComponent(studentId)}/documents/signature`, { method: "POST", accessToken, body: {} });
+      const signed = await apiRequest(`/students/${encodeURIComponent(studentId)}/documents/signature`, { method: "POST", accessToken, body: { category } });
       const sign = signed.data;
       const form = new FormData();
       form.append("file", file);
