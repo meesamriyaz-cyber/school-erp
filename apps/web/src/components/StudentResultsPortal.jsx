@@ -16,6 +16,7 @@ export default function StudentResultsPortal() {
   const [results, setResults] = useState([]);
   const [homework, setHomework] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [attendanceSummary, setAttendanceSummary] = useState({ present: 0, absent: 0, late: 0, excused: 0, marked: 0, percentage: null });
   const [fees, setFees] = useState([]);
   const [timetable, setTimetable] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
@@ -74,6 +75,7 @@ export default function StudentResultsPortal() {
       applyList(homeworkResponse, setHomework, "homework");
       applyList(submissionResponse, setSubmissions, "homework submissions");
       applyList(attendanceResponse, setAttendance, "attendance");
+      setAttendanceSummary(attendanceResponse.status === "fulfilled" && attendanceResponse.value?.summary ? attendanceResponse.value.summary : { present: 0, absent: 0, late: 0, excused: 0, marked: 0, percentage: null });
       applyList(feesResponse, setFees, "fees");
       applyList(timetableResponse, setTimetable, "timetable");
       applyList(announcementResponse, setAnnouncements, "announcements");
