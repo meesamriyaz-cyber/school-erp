@@ -137,7 +137,18 @@ export function StudentWorkspaceScreen({ user }) {
     </Panel> : null}
 
     {!loading && !error && section === "fees" ? <Panel title="Fees & payments" subtitle={`${feeSummary.invoiceCount || 0} invoices · Balance ${money(feeSummary.balance)}`}>
-      {renderRows(fees, "No fee invoices found.", (item) => ({ title: item.invoiceNumber || item.feeStructureId?.name || "Fee invoice", subtitle: [item.academicYearId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : ""].filter(Boolean).join(" · "), trailing: money(item.balance ?? Math.max(0, (item.totalAmount || 0) - (item.paidAmount || 0))) }))}
+      {fees.length ? fees.map((item) => {
+        const expanded = expandedInvoiceId === String(item._id);
+        return <View key={String(item._id)}>
+          <DataRow title={item.invoiceNumber || item.feeStructureId?.name || "Fee invoice"} subtitle={[item.academicYearId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : "", item.status].filter(Boolean).join(" · ")} trailing={money(item.balance ?? Math.max(0, (item.totalAmount || 0) - (item.paidAmount || 0)))} onPress={() => setExpandedInvoiceId(expanded ? null : String(item._id))}/>
+          {expanded ? <View style={styles.invoiceDetails}>
+            <Text style={styles.rowSubtitle}>Total {money(item.totalAmount)} · Paid {money(item.paidAmount)} · Balance {money(item.balance)}</Text>
+            {(item.items || []).map((line, index) => <Text key={index} style={styles.rowSubtitle}>{line.name}: {money(line.amount)}</Text>)}
+            <Text style={styles.panelSubtitle}>Payment history</Text>
+            {(item.payments || []).length ? item.payments.map((payment) => <DataRow key={String(payment._id)} title={payment.receiptNumber || "Payment receipt"} subtitle={[dateOf(payment.paymentDate), payment.method?.replaceAll("_", " "), payment.status, payment.reversalReason].filter(Boolean).join(" · ")} trailing={money(payment.amount)}/>) : <Text style={styles.empty}>No payments recorded for this invoice.</Text>}
+          </View> : null}
+        </View>;
+      }) : <Text style={styles.empty}>No fee invoices found.</Text>}
     </Panel> : null}
 
     {!loading && !error && section === "results" ? <Panel title="Examination results" subtitle="Published results only">
@@ -185,6 +196,7 @@ const styles = StyleSheet.create({
   metricValue: { color: colors.primary, fontSize: 17, fontWeight: "900" },
   metricLabel: { color: colors.muted, fontSize: 10, textTransform: "capitalize" },
   state: { padding: 24, alignItems: "center", gap: 10 },
+  invoiceDetails: { paddingHorizontal: 12, paddingBottom: 12, gap: 7, backgroundColor: colors.background, borderRadius: radius.md },
   error: { backgroundColor: "#FDECEC", borderRadius: radius.md, padding: 15, gap: 10 },
   errorText: { color: colors.danger, fontSize: 13 },
   retry: { alignSelf: "flex-start", backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
