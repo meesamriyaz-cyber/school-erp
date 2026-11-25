@@ -34,6 +34,8 @@ const studentGuardianSchema = new mongoose.Schema(
     isEmergencyContact: { type: Boolean, default: false },
     canPickup: { type: Boolean, default: false },
     receivesCommunication: { type: Boolean, default: true },
+    communicationChannels: { type: [{ type: String, enum: ["sms", "whatsapp", "email"] }], default: ["sms", "whatsapp", "email"] },
+    preferredLanguage: { type: String, default: "en", trim: true, maxlength: 12 },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     auditTrail: { type: [relationshipAuditSchema], default: [] },
   },
