@@ -134,3 +134,126 @@
 .portal-fee-line-items>p,.portal-fee-details .portal-receipts>p{margin:0;color:#64748b;font-size:12px}
 .portal-fee-details .portal-receipts{border-top:1px solid #e2e8f0;padding-top:12px}
 @media(max-width:650px){.portal-fee-heading-actions{width:100%;justify-content:space-between}.portal-fee-line-items>div,.portal-fee-details .portal-receipts>div{align-items:flex-start;flex-direction:column;gap:4px}}
+
+/* SchoolSuite workspace visual refresh — student and family portal */
+.student-portal{
+  width:min(100%,1600px);
+  max-width:1600px;
+  margin:0 auto;
+  padding:34px 36px 42px;
+  color:var(--text-primary,#202c42);
+}
+.student-portal-header{
+  position:relative;
+  overflow:hidden;
+  align-items:center;
+  min-height:178px;
+  margin:0 0 24px;
+  padding:30px 34px;
+  border:1px solid #dce5ff;
+  border-radius:16px;
+  background:linear-gradient(112deg,#344fcb 0%,#4969e8 58%,#7183f1 100%);
+  box-shadow:0 12px 28px #4664d51b;
+}
+.student-portal-header:after{
+  content:"";
+  position:absolute;
+  width:220px;height:220px;
+  right:70px;top:-78px;
+  border:1px solid #ffffff35;
+  border-radius:50%;
+  box-shadow:0 0 0 28px #ffffff0c,0 0 0 58px #ffffff08;
+  pointer-events:none;
+}
+.student-portal-header>div:first-child{position:relative;z-index:1;max-width:650px}
+.student-portal-header .portal-eyebrow{color:#dbe3ff;font-size:10px;letter-spacing:1.5px}
+.student-portal-header h1{margin:9px 0;color:#fff;font-size:clamp(26px,2.4vw,34px);font-weight:800;letter-spacing:-1px}
+.student-portal-header p{max-width:560px;color:#e0e6ff;font-size:13px;line-height:1.7}
+.student-portal-header .portal-account{position:relative;z-index:2;color:#fff;border:0;padding:0 0 0 16px}
+.student-portal-header .portal-signout{border-color:#ffffff75;background:#ffffff;color:#304bc0;font-weight:700;padding:10px 16px}
+.portal-tabs{
+  display:flex;gap:5px;align-items:center;
+  margin:0 0 26px;padding:5px;
+  border:1px solid #e7ebf2;border-radius:12px;
+  background:#fff;box-shadow:0 2px 7px #1d315408;
+  overflow-x:auto;scrollbar-width:thin;
+}
+.portal-tabs button{
+  flex:0 0 auto;
+  border:0;border-radius:8px;
+  border-bottom:0;
+  padding:10px 14px;
+  color:#778196;
+  font-size:12px;font-weight:700;
+  transition:background .15s ease,color .15s ease,box-shadow .15s ease;
+}
+.portal-tabs button:hover{background:#f5f7ff;color:#4263eb}
+.portal-tabs button.active{
+  color:#3e5dde;background:#edf1ff;
+  box-shadow:inset 0 0 0 1px #dce5ff;
+}
+.portal-overview{gap:18px}
+.portal-overview-heading{align-items:center}
+.portal-overview-heading>div>span{color:#8592a8;letter-spacing:1.5px}
+.portal-overview-heading h2{font-size:20px;letter-spacing:-.5px}
+.portal-overview-heading>p{font-size:12px}
+.portal-overview-metrics{gap:15px}
+.portal-overview-metrics article{
+  position:relative;overflow:hidden;
+  min-height:140px;
+  padding:19px 19px 17px 21px;
+  border:1px solid #e7ebf2;border-radius:13px;
+  box-shadow:0 3px 12px rgba(29,49,84,.045);
+  transition:transform .16s ease,box-shadow .16s ease;
+}
+.portal-overview-metrics article:hover{transform:translateY(-2px);box-shadow:0 9px 20px #1d315410}
+.portal-overview-metrics article:before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#4263eb;
+}
+.portal-overview-metrics article:nth-child(2):before{background:#1eaa7c}
+.portal-overview-metrics article:nth-child(3):before{background:#9869d5}
+.portal-overview-metrics article:nth-child(4):before{background:#d49a39}
+.portal-overview-metrics article>span{font-size:11px;color:#78859b}
+.portal-overview-metrics article>strong{font:800 27px "Plus Jakarta Sans",sans-serif;color:#25334a;letter-spacing:-.7px}
+.portal-overview-metrics article>small{font-size:10px;color:#929caf}
+.portal-overview-note{
+  padding:20px 22px;
+  border:1px solid #e7ebf2;border-radius:13px;
+  background:linear-gradient(110deg,#fff 0%,#f7f8ff 100%);
+  box-shadow:0 2px 7px #1d315406;
+}
+.portal-overview-note strong{font-size:14px;color:#28364d}
+.portal-overview-note p{font-size:12px;color:#778196}
+.portal-data-panel,.portal-fee-card,.portal-profile-card,.portal-homework-card,.portal-notification-card,.portal-announcement-card{
+  border-color:#e7ebf2;border-radius:13px;
+  box-shadow:0 3px 12px rgba(29,49,84,.04);
+}
+.portal-data-heading h2,.portal-fee-heading h2{font-family:"Plus Jakarta Sans",sans-serif;letter-spacing:-.3px}
+.portal-empty,.portal-state{
+  border-color:#e7ebf2;border-radius:14px;
+  box-shadow:0 3px 12px rgba(29,49,84,.035);
+}
+.portal-submit-form button,.portal-notification-action{
+  transition:background .15s ease,transform .15s ease;
+}
+.portal-submit-form button{background:#4263eb}
+.portal-submit-form button:hover{background:#304bc0}
+.portal-notification-card.unread{border-left-color:#4263eb;background:#f7f9ff}
+.portal-attendance-status,.portal-fee-status{padding:5px 9px}
+@media(max-width:900px){
+  .student-portal{padding:24px 20px 34px}
+  .student-portal-header{padding:25px 24px}
+  .portal-overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+  .student-portal{padding:16px 13px 28px}
+  .student-portal-header{display:block;min-height:0;padding:22px 19px;border-radius:14px}
+  .student-portal-header:after{right:-100px;top:-100px}
+  .student-portal-header h1{font-size:25px}
+  .student-portal-header .portal-account{margin-top:15px;padding:0;justify-content:space-between}
+  .portal-tabs{margin-bottom:19px;padding:4px}
+  .portal-tabs button{padding:9px 11px;font-size:11px}
+  .portal-overview-metrics{gap:9px}
+  .portal-overview-metrics article{min-height:126px;padding:14px}
+  .portal-overview-metrics article>strong{font-size:23px}
+}
