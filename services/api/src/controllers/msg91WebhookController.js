@@ -10,6 +10,9 @@ const statusMap = {
 export const receiveMsg91Status = async (req, res, next) => {
   try {
     const secret = (process.env.MSG91_WEBHOOK_SECRET || "").trim();
+    if (!secret && process.env.NODE_ENV === "production") {
+      return res.status(503).json({ success: false, message: "MSG91 webhook secret is not configured" });
+    }
     if (secret) {
       const supplied = String(req.query.token || req.get("x-msg91-webhook-secret") || "");
       const expectedBuffer = Buffer.from(secret);
