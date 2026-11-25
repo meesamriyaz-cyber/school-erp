@@ -43,6 +43,7 @@ export function StudentWorkspaceScreen({ user }) {
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
+  const [resultsRefreshing, setResultsRefreshing] = useState(false);
   const [noticesRefreshing, setNoticesRefreshing] = useState(false);
   const [data, setData] = useState({ profile: [], homework: [], submissions: [], attendance: [], fees: [], results: [], timetable: [], documents: [], notices: [], notifications: [] });
 
@@ -126,7 +127,7 @@ export function StudentWorkspaceScreen({ user }) {
       <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } if (item.key === "notices") { setNoticesRefreshing(true); Promise.allSettled([apiRequest("/portal/announcements"), apiRequest("/portal/notifications")]).then(([noticeResult, notificationResult]) => { if (noticeResult.status === "fulfilled") setData((previous) => ({ ...previous, notices: noticeResult.value })); if (notificationResult.status === "fulfilled") setData((previous) => ({ ...previous, notifications: notificationResult.value })); if (noticeResult.status === "rejected" && notificationResult.status === "rejected") Alert.alert("Updates could not be refreshed", "Your previously loaded notices and notifications are still available."); }).finally(() => setNoticesRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
+      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); if (item.key === "results") { setResultsRefreshing(true); apiRequest("/portal/results").then((response) => setData((previous) => ({ ...previous, results: response }))).catch(() => Alert.alert("Results could not be refreshed", "Your previously loaded report cards are still available. Pull down to retry.")).finally(() => setResultsRefreshing(false)); } if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } if (item.key === "notices") { setNoticesRefreshing(true); Promise.allSettled([apiRequest("/portal/announcements"), apiRequest("/portal/notifications")]).then(([noticeResult, notificationResult]) => { if (noticeResult.status === "fulfilled") setData((previous) => ({ ...previous, notices: noticeResult.value })); if (notificationResult.status === "fulfilled") setData((previous) => ({ ...previous, notifications: notificationResult.value })); if (noticeResult.status === "rejected" && notificationResult.status === "rejected") Alert.alert("Updates could not be refreshed", "Your previously loaded notices and notifications are still available."); }).finally(() => setNoticesRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
     </ScrollView>
 
     {loading && !student && !error ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.empty}>Loading your school information…</Text></View> : null}
@@ -188,7 +189,7 @@ export function StudentWorkspaceScreen({ user }) {
       }) : <Text style={styles.empty}>No fee invoices found.</Text>}
     </Panel> : null}
 
-    {!loading && !error && section === "results" ? <Panel title="Examination results" subtitle="Published report cards and subject-wise performance">
+    {!loading && !error && section === "results" ? <Panel title="Examination results" subtitle={resultsRefreshing ? "Refreshing published report cards…" : "Published report cards and subject-wise performance"}>
       {results.length ? results.map((item, index) => {
         const examination = item.examination || {};
         const result = item.result || item;
