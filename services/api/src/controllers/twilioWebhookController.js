@@ -32,7 +32,7 @@ export const receiveTwilioStatus = async (req, res, next) => {
       "channels.$.providerErrorMessage": req.body.ErrorMessage ? String(req.body.ErrorMessage).slice(0, 240) : null,
       "channels.$.statusUpdatedAt": new Date(),
     };
-    if (providerStatus === "delivered") update["channels.$.deliveredAt"] = new Date();
+    if (providerStatus === "delivered" || providerStatus === "read") update["channels.$.deliveredAt"] = new Date();
     if (terminalFailureStatuses.has(providerStatus)) {
       update["channels.$.status"] = "failed";
       update["channels.$.error"] = req.body.ErrorMessage
@@ -44,7 +44,8 @@ export const receiveTwilioStatus = async (req, res, next) => {
       { "channels.providerMessageId": messageSid },
       { $set: update },
     );
-    // Acknowledge unknown SIDs so unrelated Twilio messages are not retried.
-    return res.status(200).json({ success: true, matched: result.matchedCount > 0 });
+    // A callback can race the initial database write; ask Twilio to retry rather than lose it.
+    if (!result.matchedCount) return res.status(503).json({ success: false, message: "Message record not ready; retry callback" });
+    return res.status(200).json({ success: true, matched: true });
   } catch (error) { return next(error); }
 };
