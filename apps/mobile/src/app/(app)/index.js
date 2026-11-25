@@ -56,6 +56,30 @@ function ComingSoon({ title, description, onHome }) {
   </View>;
 }
 
+function ParentCommunicationScreen({ announcements, notifications, onRefresh }) {
+  const [busyId, setBusyId] = useState("");
+  return <View style={styles.scrollContent}>
+    <View style={styles.welcomeBlock}>
+      <Text style={styles.kicker}>SCHOOL COMMUNICATION</Text>
+      <Text style={styles.welcomeTitle}>School updates</Text>
+      <Text style={styles.welcomeText}>Notices and messages shared about your ward.</Text>
+    </View>
+    <View style={styles.panel}>
+      <SectionHeader title="School notices" subtitle={`${announcements.length} updates`}/>
+      {announcements.length ? announcements.map((item) => <View key={String(item._id)} style={styles.teacherPeriod}><View style={{flex:1,gap:4}}><Text style={styles.examName}>{item.title || "School notice"}</Text><Text style={styles.detailText}>{item.body || ""}</Text><Text style={styles.metricNote}>{item.publishedAt ? new Date(item.publishedAt).toLocaleDateString("en-IN") : ""}</Text></View></View>) : <Text style={styles.emptyText}>No current school notices.</Text>}
+    </View>
+    <View style={styles.panel}>
+      <SectionHeader title="Notifications" subtitle={`${notifications.filter((item) => !item.readAt).length} unread`} action="Refresh" onAction={onRefresh}/>
+      {notifications.length ? notifications.map((item) => <TouchableOpacity key={String(item._id)} disabled={Boolean(item.readAt) || Boolean(busyId)} onPress={async () => {
+        setBusyId(String(item._id));
+        try { await apiRequest(`/portal/notifications/${item._id}/read`, { method: "PATCH" }); await onRefresh(); }
+        catch { /* The next refresh will keep the notification unread. */ }
+        finally { setBusyId(""); }
+      }} style={styles.teacherPeriod}><View style={{flex:1,gap:4}}><Text style={styles.examName}>{item.title || "School update"}</Text><Text style={styles.detailText}>{item.body || ""}</Text><Text style={styles.metricNote}>{item.readAt ? "Read" : "Tap to mark as read"} · {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : ""}</Text></View></TouchableOpacity>) : <Text style={styles.emptyText}>No notifications yet.</Text>}
+    </View>
+  </View>;
+}
+
 export default function AppHomeScreen() {
   const { user, signOut } = useAuth();
   const [report, setReport] = useState(null);
@@ -154,7 +178,7 @@ export default function AppHomeScreen() {
         <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>{yearName}</Text></View>
       </View> : null}
 
-      {isLearnerAccount ? <StudentWorkspaceScreen user={user}/> : null}
+      {user?.role === "parent" ? <ParentCommunicationScreen announcements={portalAnnouncements} notifications={portalNotifications} onRefresh={() => loadPortalHome(true)} /> : isLearnerAccount ? <StudentWorkspaceScreen user={user}/> : null}
       {isTeacher ? <>
         {loading && teacherEntries.length === 0 ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your teaching schedule…</Text></View> : null}
         {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={() => loadTeacherHome()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
