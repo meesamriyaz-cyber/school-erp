@@ -77,7 +77,7 @@ export function StudentDocumentsScreen({ onHome }) {
       const cloudResponse = await fetch(`https://api.cloudinary.com/v1_1/${sign.cloudName}/auto/upload`, { method: "POST", body: form });
       const uploaded = await cloudResponse.json();
       if (!cloudResponse.ok) throw new Error(uploaded?.error?.message || "Cloudinary upload failed.");
-      await apiRequest(`/students/${encodeURIComponent(studentId)}/documents`, { method: "POST, body: {
+      await apiRequest(`/students/${encodeURIComponent(studentId)}/documents`, { method: "POST", body: {
         name: file.name || "Student document", category, fileUrl: uploaded.secure_url, publicId: uploaded.public_id,
         resourceType: uploaded.resource_type, format: uploaded.format, bytes: uploaded.bytes, notes,
       }});
