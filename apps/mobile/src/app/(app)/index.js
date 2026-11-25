@@ -84,7 +84,6 @@ export default function AppHomeScreen() {
   const { user, signOut } = useAuth();
   const [report, setReport] = useState(null);
   const [teacherEntries, setTeacherEntries] = useState([]);
-  const [portalChildren, setPortalChildren] = useState([]);
   const [portalAnnouncements, setPortalAnnouncements] = useState([]);
   const [portalNotifications, setPortalNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -119,11 +118,9 @@ export default function AppHomeScreen() {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     setError("");
     try {
-      const [childrenResponse, announcementsResponse, notificationsResponse] = await Promise.all([
-        apiRequest("/portal/children"), apiRequest("/portal/announcements"), apiRequest("/portal/notifications"),
+      const [announcementsResponse, notificationsResponse] = await Promise.all([
+        apiRequest("/portal/announcements"), apiRequest("/portal/notifications"),
       ]);
-      if (!childrenResponse?.success || !Array.isArray(childrenResponse.data)) throw new Error(childrenResponse?.message || "Unable to load your linked student account.");
-      setPortalChildren(childrenResponse.data);
       setPortalAnnouncements(Array.isArray(announcementsResponse?.data) ? announcementsResponse.data : []);
       setPortalNotifications(Array.isArray(notificationsResponse?.data) ? notificationsResponse.data : []);
     } catch (requestError) { setError(requestError?.message || "Unable to load your student portal."); }
