@@ -31,10 +31,12 @@ import TeacherTimetablePortal from "./components/TeacherTimetablePortal.jsx";
 import AnnouncementManagement from "./components/AnnouncementManagement.jsx";
 import MessagingWorkspace from "./components/MessagingWorkspace.jsx";
 import CertificatesReports from "./components/CertificatesReports.jsx";
+import StudentDocumentManagement from "./components/StudentDocumentManagement.jsx";
 import SchoolDashboard from "./components/SchoolDashboard.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
+  { label: "Student Documents", icon: "▤", section: "MAIN" },
   { label: "Guardians", icon: "♧", section: "MAIN" },
   { label: "Teachers & Staff", icon: "♙", section: "MAIN" },
   { label: "Announcements", icon: "▤", section: "MAIN" },
