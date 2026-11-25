@@ -36,6 +36,8 @@ export function StudentWorkspaceScreen({ user }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [partialErrors, setPartialErrors] = useState([]);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
   const [data, setData] = useState({ profile: [], homework: [], submissions: [], attendance: [], fees: [], results: [], timetable: [], documents: [], notices: [], notifications: [] });
 
   const load = useCallback(async (refresh = false) => {
