@@ -36,6 +36,12 @@ export default function StudentResultsPortal() {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    if (isParent && !["announcements", "notifications", "messaging"].includes(activeTab)) {
+      setActiveTab("announcements");
+    }
+  }, [isParent, activeTab]);
+
+  useEffect(() => {
     if (!accessToken) return undefined;
     const controller = new AbortController();
     Promise.allSettled([
@@ -178,8 +184,8 @@ export default function StudentResultsPortal() {
       <header className="student-portal-header">
         <div>
           <div className="portal-eyebrow">{isParent ? "SCHOOLSUITE · FAMILY COMMUNICATION" : "SCHOOLSUITE · STUDENT PORTAL"}</div>
-          <h1>{isParent ? "Family learning overview" : "My student dashboard"}</h1>
-          <p>View attendance, homework, examination results, fees and the class timetable.</p>
+          <h1>{isParent ? "School communications" : "My student dashboard"}</h1>
+          <p>{isParent ? "Receive school notices, important notifications and messages about your ward." : "View attendance, homework, examination results, fees and the class timetable."}</p>
         </div>
         <div className="portal-account">
           <span>{fullName || (isParent ? "Parent account" : "Student account")}</span>
@@ -200,36 +206,21 @@ export default function StudentResultsPortal() {
         </div>
       )}
 
-      <nav className="portal-tabs no-print" aria-label="Student portal sections">
-        <button type="button" className={activeTab === "overview" ? "active" : ""} aria-pressed={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</button>
-        <button type="button" className={activeTab === "profile" ? "active" : ""} aria-pressed={activeTab === "profile"} onClick={() => setActiveTab("profile")}>Profile</button>
-        <button type="button" className={activeTab === "results" ? "active" : ""} aria-pressed={activeTab === "results"} onClick={() => setActiveTab("results")}>Results</button>
-        <button type="button" className={activeTab === "attendance" ? "active" : ""} aria-pressed={activeTab === "attendance"} onClick={() => setActiveTab("attendance")}>Attendance</button>
-        <button type="button" className={activeTab === "homework" ? "active" : ""} aria-pressed={activeTab === "homework"} onClick={() => setActiveTab("homework")}>Homework ({visibleHomework.length})</button>
-        <button type="button" className={activeTab === "fees" ? "active" : ""} aria-pressed={activeTab === "fees"} onClick={() => setActiveTab("fees")}>Fees</button>
-        <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
+      <nav className="portal-tabs no-print" aria-label={isParent ? "School communications" : "Student portal sections"}>
+        {!isParent && <>
+          <button type="button" className={activeTab === "overview" ? "active" : ""} aria-pressed={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</button>
+          <button type="button" className={activeTab === "profile" ? "active" : ""} aria-pressed={activeTab === "profile"} onClick={() => setActiveTab("profile")}>Profile</button>
+          <button type="button" className={activeTab === "results" ? "active" : ""} aria-pressed={activeTab === "results"} onClick={() => setActiveTab("results")}>Results</button>
+          <button type="button" className={activeTab === "attendance" ? "active" : ""} aria-pressed={activeTab === "attendance"} onClick={() => setActiveTab("attendance")}>Attendance</button>
+          <button type="button" className={activeTab === "homework" ? "active" : ""} aria-pressed={activeTab === "homework"} onClick={() => setActiveTab("homework")}>Homework ({visibleHomework.length})</button>
+          <button type="button" className={activeTab === "fees" ? "active" : ""} aria-pressed={activeTab === "fees"} onClick={() => setActiveTab("fees")}>Fees</button>
+          <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
+          <button type="button" className={activeTab === "documents" ? "active" : ""} aria-pressed={activeTab === "documents"} onClick={() => setActiveTab("documents")}>Documents ({documents.length})</button>
+        </>}
         <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
-        <button type="button" className={activeTab === "documents" ? "active" : ""} aria-pressed={activeTab === "documents"} onClick={() => setActiveTab("documents")}>Documents ({documents.length})</button>
         <button type="button" className={activeTab === "notifications" ? "active" : ""} aria-pressed={activeTab === "notifications"} onClick={() => setActiveTab("notifications")}>Notifications {unreadCount > 0 ? `(${unreadCount})` : ""}</button>
         {isParent && <button type="button" className={activeTab === "messaging" ? "active" : ""} aria-pressed={activeTab === "messaging"} onClick={() => setActiveTab("messaging")}>Messages</button>}
       </nav>
-      {isParent && children.length > 0 && (
-        <section className="portal-child-overview" aria-label="Linked children">
-          <div className="portal-child-overview-heading">
-            <div><strong>Linked children</strong><span>{children.length} student{children.length === 1 ? "" : "s"} connected to this parent account</span></div>
-            {children.length > 1 && <label>Viewing <select aria-label="Select child" value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option value="all">All children</option>{children.map(({ student }) => <option key={student._id} value={String(student._id)}>{[student.firstName, student.lastName].filter(Boolean).join(" ")}</option>)}</select></label>}
-          </div>
-          <div className="portal-child-cards">
-            {children.filter(({ student }) => selectedStudent === "all" || String(student?._id) === selectedStudent).map(({ student, currentEnrollment }) => (
-              <button type="button" className={"portal-child-card" + (selectedStudent === String(student?._id) ? " selected" : "")} key={student._id} onClick={() => setSelectedStudent((current) => current === String(student._id) ? "all" : String(student._id))}>
-                <span className="portal-child-avatar">{(student.firstName || "S").slice(0, 1).toUpperCase()}</span>
-                <span className="portal-child-info"><strong>{[student.firstName, student.lastName].filter(Boolean).join(" ")}</strong><small>{student.admissionNumber || "Student"}</small><small>{currentEnrollment ? [currentEnrollment.classId?.name, currentEnrollment.sectionId?.name].filter(Boolean).join(" · ") : "No active enrollment"}</small></span>
-                <span className="portal-child-action">{selectedStudent === String(student._id) ? "Selected" : "View details"}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
       {activeTab === "overview" ? (
         loading ? <div className="portal-state">Loading your school overview…</div> : (
           <section className="portal-overview">
