@@ -293,6 +293,8 @@ function DashboardApp() {
             <SchoolDashboard accessToken={accessToken} academicYearId={activeAcademicYear?._id} onNavigate={selectPage} />
           ) : activePage === "Students" ? (
   <StudentDirectory />
+) : activePage === "Student Documents" ? (
+  <StudentDocumentManagement />
 ) : activePage === "Guardians" ? (
   <GuardianDirectory />
 ) : activePage === "Teachers & Staff" ? (
