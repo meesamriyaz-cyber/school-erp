@@ -110,6 +110,7 @@ export function StudentWorkspaceScreen({ user }) {
 
     {loading && !student && !error ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.empty}>Loading your school information…</Text></View> : null}
     {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retry} onPress={() => load()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
+    {partialErrors.length > 0 && !loading ? <View style={styles.partialNotice}><Text style={styles.partialNoticeText}>Some sections could not be loaded: {partialErrors.join(", ")}. Pull down to retry.</Text></View> : null}
 
     {!loading && !error && section === "overview" ? <>
       <Panel title="My profile" subtitle={student?.admissionNumber || "Student account"}>
@@ -168,7 +169,15 @@ export function StudentWorkspaceScreen({ user }) {
 
     {!loading && !error && section === "notices" ? <>
       <Panel title="School notices">{renderRows(notices, "No current notices.", (item) => ({ title: titleOf(item, "School notice"), subtitle: item.body || item.category || "" }))}</Panel>
-      <Panel title="Notifications">{renderRows(notifications, "No notifications.", (item) => ({ title: item.title || "School update", subtitle: item.body || dateOf(item.createdAt) }))}</Panel>
+      <Panel title="Notifications" subtitle={`${notifications.filter((item) => !item.readAt).length} unread`}>
+        {notifications.length ? notifications.map((item) => <DataRow key={String(item._id)} title={item.title || "School update"} subtitle={[item.body, dateOf(item.createdAt)].filter(Boolean).join(" · ")} trailing={item.readAt ? "Read" : "Mark read"} onPress={async () => {
+          if (item.readAt) return;
+          try {
+            await apiRequest(`/portal/notifications/${item._id}/read`, { method: "PATCH" });
+            setData((previous) => ({ ...previous, notifications: { ...previous.notifications, data: list(previous.notifications).map((entry) => String(entry._id) === String(item._id) ? { ...entry, readAt: new Date().toISOString() } : entry) } }));
+          } catch (requestError) { Alert.alert("Could not update notification", requestError?.message || "Please try again."); }
+        }}/>) : <Text style={styles.empty}>No notifications.</Text>}
+      </Panel>
     </> : null}
     <Modal visible={Boolean(selectedHomework)} transparent animationType="slide" onRequestClose={() => !submitting && setSelectedHomework(null)}>
       <View style={styles.modalBackdrop}><View style={styles.modalCard}>
@@ -220,6 +229,8 @@ const styles = StyleSheet.create({
   metricValue: { color: colors.primary, fontSize: 17, fontWeight: "900" },
   metricLabel: { color: colors.muted, fontSize: 10, textTransform: "capitalize" },
   state: { padding: 24, alignItems: "center", gap: 10 },
+  partialNotice: { backgroundColor: "#FFF5E5", borderRadius: radius.md, padding: 11 },
+  partialNoticeText: { color: colors.ink, fontSize: 11, lineHeight: 16 },
   modalBackdrop: { flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.45)", padding: spacing.lg },
   modalCard: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
   answerInput: { minHeight: 170, maxHeight: 280, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, color: colors.ink, fontSize: 14 },
