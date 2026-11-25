@@ -121,3 +121,16 @@
 .portal-notification-card p{white-space:pre-wrap;line-height:1.6;color:#475569;margin:10px 0}
 .portal-notification-action{border:1px solid #cbd5e1;border-radius:7px;padding:7px 11px;background:#fff;color:#244d82;font-size:12px;font-weight:700;cursor:pointer}
 .portal-notification-action:disabled{opacity:.55;cursor:not-allowed}
+
+/* Student fee statement details */
+.portal-fee-heading-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.portal-fee-detail-toggle{border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#244d82;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.portal-fee-detail-toggle:hover{background:#f8fafc}
+.portal-fee-details{display:grid;gap:14px;margin-top:12px;padding-top:14px;border-top:1px solid #e2e8f0}
+.portal-fee-line-items,.portal-receipts{display:grid;gap:9px}
+.portal-fee-line-items>strong,.portal-fee-details .portal-receipts>strong{font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.05em}
+.portal-fee-line-items>div,.portal-fee-details .portal-receipts>div{display:flex;justify-content:space-between;gap:14px;padding:8px 10px;border-radius:7px;background:#f8fafc;color:#475569;font-size:12px}
+.portal-fee-line-items>div b,.portal-fee-details .portal-receipts>div>b{color:#172b4d;white-space:nowrap}
+.portal-fee-line-items>p,.portal-fee-details .portal-receipts>p{margin:0;color:#64748b;font-size:12px}
+.portal-fee-details .portal-receipts{border-top:1px solid #e2e8f0;padding-top:12px}
+@media(max-width:650px){.portal-fee-heading-actions{width:100%;justify-content:space-between}.portal-fee-line-items>div,.portal-fee-details .portal-receipts>div{align-items:flex-start;flex-direction:column;gap:4px}}
