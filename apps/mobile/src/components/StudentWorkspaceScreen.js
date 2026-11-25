@@ -80,7 +80,11 @@ export function StudentWorkspaceScreen({ user }) {
   const enrollment = profile?.currentEnrollment || null;
   const attendanceSummary = data.attendance?.summary || {};
   const feeSummary = data.fees?.summary || {};
-  const homework = list(data.homework);
+  // The portal API returns each assignment as { homework, student, enrollmentId }.
+  // Normalize here so the rest of the mobile workspace uses the actual homework record.
+  const homework = list(data.homework).map((entry) => entry?.homework
+    ? { ...entry.homework, student: entry.student || null, enrollmentId: entry.enrollmentId || null }
+    : entry);
   const submissions = list(data.submissions);
   const fees = list(data.fees);
   const results = list(data.results);
