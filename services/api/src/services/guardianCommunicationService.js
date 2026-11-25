@@ -13,9 +13,8 @@ const normalizeWhatsAppAddress = (value, label) => `whatsapp:${normalizeE164(val
 async function msg91Send({ recipient, body }) {
   const authKey = cleanEnv(process.env.MSG91_AUTH_KEY);
   const flowId = cleanEnv(process.env.MSG91_SMS_FLOW_ID);
-  const sender = cleanEnv(process.env.MSG91_SMS_SENDER_ID);
-  const variableName = cleanEnv(process.env.MSG91_SMS_MESSAGE_VARIABLE) || "message";
-  if (!authKey || !flowId || !sender) throw new Error("MSG91 SMS is not configured: set MSG91_AUTH_KEY, MSG91_SMS_FLOW_ID and MSG91_SMS_SENDER_ID");
+  const variableName = cleanEnv(process.env.MSG91_SMS_MESSAGE_VARIABLE) || "VAR1";
+  if (!authKey || !flowId) throw new Error("MSG91 SMS is not configured: set MSG91_AUTH_KEY and MSG91_SMS_FLOW_ID");
   if (!/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(variableName)) throw new Error("MSG91_SMS_MESSAGE_VARIABLE must be a valid template variable name");
   const mobiles = normalizeE164(recipient, "Guardian SMS number").slice(1);
   const correlationId = randomUUID();
@@ -24,7 +23,7 @@ async function msg91Send({ recipient, body }) {
     response = await fetch("https://control.msg91.com/api/v5/flow", {
       method: "POST",
       headers: { authkey: authKey, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ template_id: flowId, sender, recipients: [{ mobiles, [variableName]: body, CRQID: correlationId }] }),
+      body: JSON.stringify({ template_id: flowId, recipients: [{ mobiles, [variableName]: body, CRQID: correlationId }] }),
       signal: AbortSignal.timeout(15000),
     });
   } catch (error) {
