@@ -43,6 +43,7 @@ export function StudentWorkspaceScreen({ user }) {
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
+  const [noticesRefreshing, setNoticesRefreshing] = useState(false);
   const [data, setData] = useState({ profile: [], homework: [], submissions: [], attendance: [], fees: [], results: [], timetable: [], documents: [], notices: [], notifications: [] });
 
   const load = useCallback(async (refresh = false) => {
@@ -125,7 +126,7 @@ export function StudentWorkspaceScreen({ user }) {
       <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
+      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } if (item.key === "notices") { setNoticesRefreshing(true); Promise.allSettled([apiRequest("/portal/announcements"), apiRequest("/portal/notifications")]).then(([noticeResult, notificationResult]) => { if (noticeResult.status === "fulfilled") setData((previous) => ({ ...previous, notices: noticeResult.value })); if (notificationResult.status === "fulfilled") setData((previous) => ({ ...previous, notifications: notificationResult.value })); if (noticeResult.status === "rejected" && notificationResult.status === "rejected") Alert.alert("Updates could not be refreshed", "Your previously loaded notices and notifications are still available."); }).finally(() => setNoticesRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
     </ScrollView>
 
     {loading && !student && !error ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.empty}>Loading your school information…</Text></View> : null}
@@ -207,8 +208,8 @@ export function StudentWorkspaceScreen({ user }) {
     </Panel> : null}
 
     {!loading && !error && section === "notices" ? <>
-      <Panel title="School notices">{renderRows(notices, "No current notices.", (item) => ({ title: titleOf(item, "School notice"), subtitle: item.body || item.category || "" }))}</Panel>
-      <Panel title="Notifications" subtitle={`${notifications.filter((item) => !item.readAt).length} unread`}>
+      <Panel title="School notices" subtitle={noticesRefreshing ? "Refreshing school updates…" : "Published announcements"}>{renderRows(notices, "No current notices.", (item) => ({ title: titleOf(item, "School notice"), subtitle: item.body || item.category || "" }))}</Panel>
+      <Panel title="Notifications" subtitle={`${notifications.filter((item) => !item.readAt).length} unread${noticesRefreshing ? " · Refreshing…" : ""}`}>
         {notifications.length ? notifications.map((item) => <DataRow key={String(item._id)} title={item.title || "School update"} subtitle={[item.body, dateOf(item.createdAt)].filter(Boolean).join(" · ")} trailing={item.readAt ? "Read" : "Mark read"} onPress={async () => {
           if (item.readAt) return;
           try {
