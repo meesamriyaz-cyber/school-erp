@@ -258,7 +258,18 @@ export default function StudentResultsPortal() {
         )
       ) : activeTab === "attendance" ? (
         loading ? <div className="portal-state">Loading attendance…</div> : visibleAttendance.length === 0 ? <div className="portal-empty"><h2>No attendance records</h2><p>Attendance records shared by your school will appear here.</p></div> : (
-          <section className="portal-data-panel"><div className="portal-data-heading"><h2>Attendance history</h2><span>{visibleAttendance.length} records · recent 12 months</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Date</th>{isParent && <th>Student</th>}<th>Status</th><th>Remarks</th></tr></thead><tbody>{visibleAttendance.map((record) => <tr key={record._id}><td>{formatDate(record.date)}</td>{isParent && <td>{[record.student?.firstName, record.student?.lastName].filter(Boolean).join(" ")}</td>}<td><span className={"portal-attendance-status attendance-" + record.status}>{record.status}</span></td><td>{record.remarks || "—"}</td></tr>)}</tbody></table></div></section>
+          <>
+            <section className="portal-attendance-summary" aria-label="Attendance summary">
+              <article className="portal-attendance-rate"><span>Attendance rate</span><strong>{attendanceSummary.percentage == null ? "—" : String(attendanceSummary.percentage) + "%"}</strong><div className="portal-attendance-track"><span style={{ width: String(Math.max(0, Math.min(100, Number(attendanceSummary.percentage || 0)))) + "%" }}/></div><small>{attendanceSummary.marked || visibleAttendance.length} marked records</small></article>
+              <div className="portal-attendance-counts">
+                <article className="attendance-count attendance-count-present"><span>Present</span><strong>{attendanceSummary.present || 0}</strong></article>
+                <article className="attendance-count attendance-count-absent"><span>Absent</span><strong>{attendanceSummary.absent || 0}</strong></article>
+                <article className="attendance-count attendance-count-late"><span>Late</span><strong>{attendanceSummary.late || 0}</strong></article>
+                <article className="attendance-count attendance-count-excused"><span>Excused</span><strong>{attendanceSummary.excused || 0}</strong></article>
+              </div>
+            </section>
+            <section className="portal-data-panel"><div className="portal-data-heading"><h2>Attendance history</h2><span>{visibleAttendance.length} records · recent 12 months</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Date</th>{isParent && <th>Student</th>}<th>Status</th><th>Remarks</th></tr></thead><tbody>{visibleAttendance.map((record) => <tr key={record._id}><td>{formatDate(record.date)}</td>{isParent && <td>{[record.student?.firstName, record.student?.lastName].filter(Boolean).join(" ")}</td>}<td><span className={"portal-attendance-status attendance-" + record.status}>{record.status}</span></td><td>{record.remarks || "—"}</td></tr>)}</tbody></table></div></section>
+          </>
         )
       ) : activeTab === "fees" ? (
         loading ? <div className="portal-state">Loading fee statements…</div> : visibleFees.length === 0 ? <div className="portal-empty"><h2>No fee invoices</h2><p>Fee invoices and receipts issued by your school will appear here.</p></div> : (
