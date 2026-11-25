@@ -8,6 +8,7 @@ import FeeInvoice from "../models/FeeInvoice.js";
 import FeePayment from "../models/FeePayment.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import TimetableEntry from "../models/TimetableEntry.js";
+import StudentDocument from "../models/StudentDocument.js";
 import { guardianPortalAccessFilter } from "../utils/guardianPortalAccess.js";
 
 const validId = (value) => mongoose.isValidObjectId(value);
@@ -138,6 +139,28 @@ export const getMyProfile = async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
+};
+
+export const getMyDocuments = async (req, res, next) => {
+  try {
+    const children = await selectAuthorizedChildren(req, res);
+    if (!children) return;
+    if (!children.length) return res.status(200).json({ success: true, data: [] });
+    const documents = await StudentDocument.find({
+      tenantId: req.tenantId,
+      studentId: { $in: children.map((student) => student._id) },
+    }).sort({ createdAt: -1 }).limit(500).lean();
+    const childById = new Map(children.map((student) => [String(student._id), student]));
+    return res.status(200).json({
+      success: true,
+      data: documents.map((document) => ({
+        _id: document._id, student: childById.get(String(document.studentId)) || null,
+        name: document.name, category: document.category, fileUrl: document.fileUrl,
+        format: document.format, bytes: document.bytes, notes: document.notes,
+        createdAt: document.createdAt,
+      })),
+    });
+  } catch (error) { return next(error); }
 };
 
 export const getMyAttendance = async (req, res, next) => {
