@@ -26,8 +26,10 @@ export const createStudentDocumentSignature = async (req, res, next) => {
     if (!student) return;
     const { cloudName, apiKey, apiSecret } = cloudinaryConfig();
     if (!cloudName || !apiKey || !apiSecret) return fail(res, 503, "Cloudinary is not configured on the API server");
+    const { category } = req.body || {};
+    if (!categories.includes(category)) return fail(res, 400, "Select a valid document category");
     const timestamp = Math.floor(Date.now() / 1000);
-    const folder = `school-erp/${req.tenantId}/students/${student._id}/documents`;
+    const folder = `school-erp/${req.tenantId}/students/${student._id}/documents/${category}`;
     const publicId = `${Date.now()}-${crypto.randomUUID()}`;
     const params = { allowed_formats: "pdf,jpg,jpeg,png", folder, public_id: publicId, timestamp };
     const signatureBase = Object.keys(params).sort().map((key) => `${key}=${params[key]}`).join("&");
