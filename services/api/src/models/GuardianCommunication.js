@@ -7,8 +7,6 @@ const channelSchema = new mongoose.Schema({
   status: { type: String, enum: ["accepted", "failed", "skipped"], required: true },
   providerStatus: { type: String, default: null, maxlength: 40 },
   providerMessageId: { type: String, default: null, maxlength: 160 },
-  providerRequestId: { type: String, default: null, maxlength: 160 },
-  providerName: { type: String, default: null, maxlength: 40 },
   providerErrorCode: { type: String, default: null, maxlength: 40 },
   providerErrorMessage: { type: String, default: null, maxlength: 240 },
   deliveredAt: { type: Date, default: null },
