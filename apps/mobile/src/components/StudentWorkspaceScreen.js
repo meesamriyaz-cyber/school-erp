@@ -108,6 +108,7 @@ export function StudentWorkspaceScreen({ user }) {
   const notifications = list(data.notifications);
 
   const submissionByHomework = useMemo(() => new Map(submissions.map((item) => [String(item.homeworkId?._id || item.homeworkId), item])), [submissions]);
+  const pendingHomework = homework.filter((item) => !submissionByHomework.has(String(item._id)));
 
   const renderRows = (items, empty, mapper) => items.length
     ? items.map((item, index) => {
@@ -140,9 +141,16 @@ export function StudentWorkspaceScreen({ user }) {
       </Panel>
       <View style={styles.metrics}>
         <View style={styles.metric}><Text style={styles.metricValue}>{attendanceSummary.percentage == null ? "—" : attendanceSummary.percentage + "%"}</Text><Text style={styles.metricLabel}>Attendance</Text></View>
-        <View style={styles.metric}><Text style={styles.metricValue}>{homework.length}</Text><Text style={styles.metricLabel}>Homework</Text></View>
+        <View style={styles.metric}><Text style={styles.metricValue}>{pendingHomework.length}</Text><Text style={styles.metricLabel}>Pending work</Text></View>
+        <View style={styles.metric}><Text style={styles.metricValue}>{results.length}</Text><Text style={styles.metricLabel}>Results</Text></View>
         <View style={styles.metric}><Text style={styles.metricValue}>{money(feeSummary.balance)}</Text><Text style={styles.metricLabel}>Fee balance</Text></View>
       </View>
+      <Panel title="Recent examination results" subtitle="Your published report cards">
+        {results.length ? results.slice(0, 3).map((item, index) => <DataRow key={String(item.examination?._id || item._id || index)} title={item.examination?.name || item.name || "Examination"} subtitle={[item.result?.grade || item.grade, item.result?.status || item.status].filter(Boolean).join(" · ")} trailing={item.result?.percentage != null ? item.result.percentage + "%" : item.percentage != null ? item.percentage + "%" : ""} onPress={() => setSection("results")}/>) : <Text style={styles.empty}>Published results will appear here when available.</Text>}
+      </Panel>
+      <Panel title="Homework to complete" subtitle={pendingHomework.length + " assignments awaiting submission"}>
+        {pendingHomework.length ? pendingHomework.slice(0, 3).map((item) => <DataRow key={String(item._id)} title={titleOf(item, "Homework")} subtitle={[item.subjectId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : ""].filter(Boolean).join(" · ")} trailing="Open" onPress={() => setSection("learning")}/>) : <Text style={styles.empty}>You are all caught up on assigned homework.</Text>}
+      </Panel>
       <Panel title="Latest notices" subtitle="Updates from your school">{renderRows(notices.slice(0, 4), "No current school notices.", (item) => ({ title: titleOf(item, "School notice"), subtitle: item.body || item.category || "" }))}</Panel>
       <Panel title="Recent notifications">{renderRows(notifications.slice(0, 4), "You have no new notifications.", (item) => ({ title: item.title || "School update", subtitle: item.body || dateOf(item.createdAt) }))}</Panel>
     </> : null}
