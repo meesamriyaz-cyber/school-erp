@@ -89,7 +89,17 @@ export function StudentWorkspaceScreen({ user }) {
   const submissions = list(data.submissions);
   const fees = list(data.fees);
   const results = list(data.results);
-  const timetable = data.timetable?.data?.flatMap((item) => item.entries || []) || [];
+  const timetableGroups = data.timetable?.data || [];
+  const timetable = timetableGroups.flatMap((item) => item.entries || []);
+  const weekdayNames = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const timetableByDay = timetable.reduce((groups, entry) => {
+    const day = Number(entry.dayOfWeek);
+    const key = day >= 1 && day <= 6 ? day : 0;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(entry);
+    return groups;
+  }, {});
+  Object.values(timetableByDay).forEach((entries) => entries.sort((a, b) => String(a.startTime || "").localeCompare(String(b.startTime || ""))));
   const documents = list(data.documents);
   const notices = list(data.notices);
   const notifications = list(data.notifications);
@@ -180,8 +190,15 @@ export function StudentWorkspaceScreen({ user }) {
       {renderRows(results, "No published results are available yet.", (item) => ({ title: item.examination?.name || item.name || "Examination", subtitle: item.grade || item.status || "", trailing: item.percentage != null ? item.percentage + "%" : item.marksObtained != null ? String(item.marksObtained) : "" }))}
     </Panel> : null}
 
-    {!loading && !error && section === "timetable" ? <Panel title="My timetable" subtitle="Scheduled class periods">
-      {renderRows(timetable, "No timetable entries found.", (item) => ({ title: item.assignmentId?.subjectId?.name || "Subject", subtitle: [item.dayOfWeek, item.startTime && item.endTime ? item.startTime + "–" + item.endTime : "", item.classId?.name].filter(Boolean).join(" · "), trailing: item.room || "" }))}
+    {!loading && !error && section === "timetable" ? <Panel title="My weekly timetable" subtitle="Your class periods, organised by weekday">
+      {timetable.length ? Object.keys(timetableByDay).sort((a, b) => Number(a) - Number(b)).map((dayKey) => <View key={dayKey} style={styles.timetableDay}>
+        <Text style={styles.timetableDayTitle}>{weekdayNames[Number(dayKey)] || "Other"}</Text>
+        {timetableByDay[dayKey].map((item) => <View key={String(item._id)} style={styles.timetablePeriod}>
+          <View style={styles.timetableTime}><Text style={styles.timetableTimeText}>{item.startTime || "—"}</Text><Text style={styles.timetableTimeEnd}>{item.endTime || ""}</Text></View>
+          <View style={styles.timetablePeriodMain}><Text style={styles.rowTitle}>{item.assignmentId?.subjectId?.name || "Subject"}</Text><Text style={styles.rowSubtitle}>{[item.assignmentId?.teacherId?.firstName, item.assignmentId?.teacherId?.lastName].filter(Boolean).join(" ") || "Teacher not listed"}{item.room ? " · " + item.room : ""}</Text></View>
+          <Text style={styles.timetablePeriodNumber}>{item.periodNumber ? "P" + item.periodNumber : ""}</Text>
+        </View>)}
+      </View>) : <Text style={styles.empty}>No timetable entries found.</Text>}
     </Panel> : null}
 
     {!loading && !error && section === "documents" ? <Panel title="My documents" subtitle="Files shared by your school">
@@ -267,6 +284,14 @@ const styles = StyleSheet.create({
   primaryAction: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.md, backgroundColor: colors.primary },
   primaryActionText: { color: "#FFFFFF", fontWeight: "800" },
   invoiceDetails: { paddingHorizontal: 12, paddingBottom: 12, gap: 7, backgroundColor: colors.background, borderRadius: radius.md },
+  timetableDay: { gap: 7, marginTop: 5 },
+  timetableDayTitle: { color: "#4263EB", fontSize: 12, fontWeight: "900", letterSpacing: 0.5, marginTop: 6 },
+  timetablePeriod: { flexDirection: "row", alignItems: "center", gap: 10, padding: 11, borderRadius: 11, backgroundColor: "#F7F8FC", borderWidth: 1, borderColor: "#E9EDF5" },
+  timetableTime: { width: 58, gap: 3 },
+  timetableTimeText: { color: "#28364D", fontSize: 11, fontWeight: "900" },
+  timetableTimeEnd: { color: "#8994A8", fontSize: 10 },
+  timetablePeriodMain: { flex: 1, gap: 4 },
+  timetablePeriodNumber: { color: "#4263EB", fontSize: 10, fontWeight: "900" },
   error: { backgroundColor: "#FDECEC", borderRadius: radius.md, padding: 15, gap: 10 },
   errorText: { color: colors.danger, fontSize: 13 },
   retry: { alignSelf: "flex-start", backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
