@@ -17,6 +17,7 @@ import { AttendanceScreen } from "../../components/AttendanceScreen";
 import { StaffScreen } from "../../components/StaffScreen";
 import { TimetableScreen } from "../../components/TimetableScreen";
 import { TeacherWorkspaceScreen } from "../../components/TeacherWorkspaceScreen";
+import { StudentWorkspaceScreen } from "../../components/StudentWorkspaceScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
 const tabs = [
@@ -153,23 +154,7 @@ export default function AppHomeScreen() {
         <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>{yearName}</Text></View>
       </View> : null}
 
-      {isLearnerAccount ? <>
-        {loading && portalChildren.length === 0 && !error ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your student portal…</Text></View> : null}
-        {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={() => loadPortalHome()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
-        {!loading && !error ? <>
-          <View style={styles.welcomeBlock}><Text style={styles.kicker}>{user?.role === "parent" ? "FAMILY COMMUNICATION" : "STUDENT WORKSPACE"}</Text><Text style={styles.welcomeTitle}>Good day, {user?.firstName || "Student"}.</Text><Text style={styles.welcomeText}>{user?.role === "parent" ? "School updates for your linked student accounts." : "Your school information and updates."}</Text></View>
-          <View style={styles.panel}><SectionHeader title={user?.role === "parent" ? "Linked students" : "My student account"} subtitle={portalChildren.length ? `${portalChildren.length} linked record(s)` : "No linked student record yet"}/>
-            {portalChildren.map(item => <View key={item.student?._id} style={styles.teacherPeriod}><View style={{flex:1,gap:3}}><Text style={styles.examName}>{[item.student?.firstName,item.student?.lastName].filter(Boolean).join(" ") || "Student"}</Text><Text style={styles.detailText}>{item.student?.admissionNumber || "Admission number unavailable"}</Text><Text style={styles.metricNote}>{[item.currentEnrollment?.classId?.name,item.currentEnrollment?.sectionId?.name].filter(Boolean).join(" · ") || "Class placement not available"}</Text></View></View>)}
-          </View>
-          <View style={styles.panel}><SectionHeader title="School notices" subtitle="Published updates for your class or school"/>
-            {portalAnnouncements.length ? portalAnnouncements.slice(0,8).map(item => <View key={item._id} style={styles.teacherPeriod}><View style={{flex:1,gap:3}}><Text style={styles.examName}>{item.title}</Text><Text style={styles.detailText}>{item.body}</Text><Text style={styles.metricNote}>{(item.category || "general").replaceAll("_"," ")}</Text></View></View>) : <Text style={styles.emptyText}>No current school notices.</Text>}
-          </View>
-          <View style={styles.panel}><SectionHeader title="Notifications" subtitle={`${portalNotifications.filter(item => !item.readAt).length} unread`}/>
-            {portalNotifications.slice(0,5).map(item => <View key={item._id} style={styles.teacherPeriod}><View style={{flex:1,gap:3}}><Text style={styles.examName}>{item.title}</Text><Text style={styles.detailText}>{item.body}</Text></View></View>)}
-            {!portalNotifications.length ? <Text style={styles.emptyText}>No new notifications.</Text> : null}
-          </View>
-        </> : null}
-      </> : null}
+      {isLearnerAccount ? <StudentWorkspaceScreen user={user}/> : null}
       {isTeacher ? <>
         {loading && teacherEntries.length === 0 ? <View style={styles.stateCard}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading your teaching schedule…</Text></View> : null}
         {error ? <View style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><TouchableOpacity style={styles.retryButton} onPress={() => loadTeacherHome()}><Text style={styles.retryText}>Try again</Text></TouchableOpacity></View> : null}
