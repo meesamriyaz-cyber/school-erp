@@ -62,7 +62,12 @@ async function twilioSend({ to, body, from, accountSid, authToken, contentSid })
     const code = result.code ? ` (Twilio code ${result.code})` : "";
     throw new Error(`${result.message || `Twilio request failed (${response.status})`}${code}`);
   }
-  return {\n    messageId: result.sid || null,\n    providerStatus: result.status || "accepted",\n    providerErrorCode: result.error_code == null ? null : String(result.error_code),\n    providerErrorMessage: result.error_message || null,\n  };
+  return {
+    messageId: result.sid || null,
+    providerStatus: result.status || "accepted",
+    providerErrorCode: result.error_code == null ? null : String(result.error_code),
+    providerErrorMessage: result.error_message || null,
+  };
 }
 
 export async function sendGuardianChannel({ channel, recipient, message, subject }) {
