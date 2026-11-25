@@ -22,6 +22,7 @@ export default function StudentResultsPortal() {
   const [announcements, setAnnouncements] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
+  const [resultsRefreshing, setResultsRefreshing] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationBusy, setNotificationBusy] = useState(false);
@@ -42,6 +43,25 @@ export default function StudentResultsPortal() {
       setActiveTab("announcements");
     }
   }, [isParent, activeTab]);
+
+  // Refresh published report cards when the student opens Results so newly
+  // released marks appear without requiring a full portal reload.
+  useEffect(() => {
+    if (!accessToken || isParent || activeTab !== "results") return undefined;
+    const controller = new AbortController();
+    setResultsRefreshing(true);
+    apiRequest("/portal/results", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted && Array.isArray(response?.data)) setResults(response.data);
+      })
+      .catch(() => {
+        // Keep the last successful report cards visible if refresh fails.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setResultsRefreshing(false);
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
 
   // Refresh the timetable when the student opens that section. The dashboard may
   // remain mounted while timetable changes are made elsewhere in the school workspace.
@@ -422,7 +442,7 @@ export default function StudentResultsPortal() {
       ) : (
         <div className="portal-results">
           <div className="portal-results-toolbar no-print">
-            <span>{visibleResults.length} published result{visibleResults.length === 1 ? "" : "s"}</span>
+            <span>{visibleResults.length} published result{visibleResults.length === 1 ? "" : "s"}{resultsRefreshing ? " · Refreshing…" : ""}</span>
             <button type="button" onClick={() => window.print()}>Print report card</button>
           </div>
           {visibleResults.map((item) => (
