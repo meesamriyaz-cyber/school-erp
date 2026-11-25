@@ -124,7 +124,7 @@ export function StudentWorkspaceScreen({ user }) {
       <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => setSection(item.key)} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
+      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (item.key === "timetable") load(true); }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
     </ScrollView>
 
     {loading && !student && !error ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.empty}>Loading your school information…</Text></View> : null}
