@@ -72,10 +72,17 @@ export const sendGuardianCommunication = async (req, res, next) => {
           continue;
         }
         try {
-          const providerMessageId = await sendGuardianChannel({
+          const providerResult = await sendGuardianChannel({
             channel, recipient, message: body.message.trim(), subject: body.subject?.trim(),
           });
-          outcomes.push({ channel, recipient, status: "accepted", providerMessageId, error: null, attemptedAt: new Date() });
+          outcomes.push({
+            channel, recipient, status: "accepted",
+            providerMessageId: providerResult?.messageId || null,
+            providerStatus: providerResult?.providerStatus || "accepted",
+            providerErrorCode: providerResult?.providerErrorCode || null,
+            providerErrorMessage: providerResult?.providerErrorMessage || null,
+            statusUpdatedAt: new Date(), error: null, attemptedAt: new Date(),
+          });
         } catch (error) {
           outcomes.push({ channel, recipient, status: "failed", error: String(error?.message || "Provider error").slice(0, 240), attemptedAt: new Date() });
         }
