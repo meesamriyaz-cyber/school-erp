@@ -63,6 +63,25 @@ export default function StudentResultsPortal() {
   }, [accessToken, activeTab, isParent]);
 
   useEffect(() => {
+    if (!accessToken || isParent || !["announcements", "notifications"].includes(activeTab)) return undefined;
+    const controller = new AbortController();
+    const endpoint = activeTab === "announcements" ? "/portal/announcements" : "/portal/notifications";
+    apiRequest(endpoint, { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (controller.signal.aborted || !Array.isArray(response?.data)) return;
+        if (activeTab === "announcements") setAnnouncements(response.data);
+        else {
+          setNotifications(response.data);
+          setUnreadCount(Number(response.unreadCount ?? response.data.filter((item) => !item.readAt).length));
+        }
+      })
+      .catch(() => {
+        // Keep the last successful updates visible if a refresh fails.
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
+
+  useEffect(() => {
     if (!accessToken || activeTab !== "timetable") return undefined;
     const controller = new AbortController();
     apiRequest("/portal/timetable", { accessToken, signal: controller.signal })
