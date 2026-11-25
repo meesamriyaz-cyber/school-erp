@@ -23,6 +23,7 @@ export default function StudentResultsPortal() {
   const [documents, setDocuments] = useState([]);
   const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
   const [resultsRefreshing, setResultsRefreshing] = useState(false);
+  const [sectionRefreshing, setSectionRefreshing] = useState("");
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationBusy, setNotificationBusy] = useState(false);
@@ -43,6 +44,42 @@ export default function StudentResultsPortal() {
       setActiveTab("announcements");
     }
   }, [isParent, activeTab]);
+
+  // Keep frequently changing student sections current when opened.
+  useEffect(() => {
+    if (!accessToken || isParent || !["attendance", "homework", "fees"].includes(activeTab)) return undefined;
+    const controller = new AbortController();
+    const refresh = async () => {
+      setSectionRefreshing(activeTab);
+      try {
+        if (activeTab === "attendance") {
+          const response = await apiRequest("/portal/attendance", { accessToken, signal: controller.signal });
+          if (!controller.signal.aborted && Array.isArray(response?.data)) {
+            setAttendance(response.data);
+            if (response.summary) setAttendanceSummary(response.summary);
+          }
+        } else if (activeTab === "homework") {
+          const [homeworkResponse, submissionResponse] = await Promise.all([
+            apiRequest("/portal/homework", { accessToken, signal: controller.signal }),
+            apiRequest("/portal/homework-submissions", { accessToken, signal: controller.signal }),
+          ]);
+          if (!controller.signal.aborted) {
+            if (Array.isArray(homeworkResponse?.data)) setHomework(homeworkResponse.data);
+            if (Array.isArray(submissionResponse?.data)) setSubmissions(submissionResponse.data);
+          }
+        } else {
+          const response = await apiRequest("/portal/fees", { accessToken, signal: controller.signal });
+          if (!controller.signal.aborted && Array.isArray(response?.data)) setFees(response.data);
+        }
+      } catch {
+        // Keep the last successful data visible if a section refresh fails.
+      } finally {
+        if (!controller.signal.aborted) setSectionRefreshing("");
+      }
+    };
+    void refresh();
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
 
   // Refresh published report cards when the student opens Results so newly
   // released marks appear without requiring a full portal reload.
@@ -331,7 +368,7 @@ export default function StudentResultsPortal() {
       ) : activeTab === "attendance" ? (
         loading ? <div className="portal-state">Loading attendance…</div> : visibleAttendance.length === 0 ? <div className="portal-empty"><h2>No attendance records</h2><p>Attendance records shared by your school will appear here.</p></div> : (
           <>
-            <section className="portal-attendance-summary" aria-label="Attendance summary">
+            <section className="portal-attendance-summary" aria-label="Attendance summary"><span className="portal-section-refresh" aria-live="polite">{sectionRefreshing === "attendance" ? "Refreshing attendance…" : ""}</span>
               <article className="portal-attendance-rate"><span>Attendance rate</span><strong>{attendanceSummary.percentage == null ? "—" : String(attendanceSummary.percentage) + "%"}</strong><div className="portal-attendance-track"><span style={{ width: String(Math.max(0, Math.min(100, Number(attendanceSummary.percentage || 0)))) + "%" }}/></div><small>{attendanceSummary.marked || visibleAttendance.length} marked records</small></article>
               <div className="portal-attendance-counts">
                 <article className="attendance-count attendance-count-present"><span>Present</span><strong>{attendanceSummary.present || 0}</strong></article>
@@ -345,7 +382,7 @@ export default function StudentResultsPortal() {
         )
       ) : activeTab === "fees" ? (
         loading ? <div className="portal-state">Loading fee statements…</div> : visibleFees.length === 0 ? <div className="portal-empty"><h2>No fee invoices</h2><p>Fee invoices and receipts issued by your school will appear here.</p></div> : (
-          <section className="portal-fee-list">{visibleFees.map((invoice) => {
+          <section className="portal-fee-list"><div className="portal-data-heading"><span>{sectionRefreshing === "fees" ? "Refreshing fee statements…" : `${visibleFees.length} fee invoices`}</span></div>{visibleFees.map((invoice) => {
             const expanded = expandedInvoiceId === String(invoice._id);
             return <article className="portal-fee-card" key={invoice._id}>
               <div className="portal-fee-heading"><div><span>{invoice.invoiceNumber} · {invoice.academicYearId?.name || "Academic year"}</span><h2>{isParent ? [invoice.student?.firstName, invoice.student?.lastName].filter(Boolean).join(" ") : "Fee statement"}</h2></div><div className="portal-fee-heading-actions"><strong className={"portal-fee-status fee-" + invoice.status}>{invoice.status}</strong><button type="button" className="portal-fee-detail-toggle" aria-expanded={expanded} onClick={() => setExpandedInvoiceId(expanded ? "" : String(invoice._id))}>{expanded ? "Hide details" : "View details"}</button></div></div>
@@ -397,7 +434,7 @@ export default function StudentResultsPortal() {
         loading ? <div className="portal-state">Loading homework…</div> : visibleHomework.length === 0 ? <div className="portal-empty"><h2>No published homework</h2><p>Assignments shared by your school will appear here.</p></div> : (
           <>
           {homeworkNotice && <div className="portal-homework-notice" role="status">{homeworkNotice}</div>}
-          <div className="portal-homework-list">{visibleHomework.map((item) => <article className="portal-homework-card" key={String(item.homework._id) + String(item.student?._id)}>
+          <div className="portal-homework-list"><div className="portal-data-heading"><span>{sectionRefreshing === "homework" ? "Refreshing assignments…" : `${visibleHomework.length} assignments`}</span></div>{visibleHomework.map((item) => <article className="portal-homework-card" key={String(item.homework._id) + String(item.student?._id)}>
             <div className="portal-homework-heading"><div><span>{item.homework.subjectId?.name || "Subject"} · {item.homework.classId?.name || "Class"}{item.homework.sectionId?.name ? ` · ${item.homework.sectionId.name}` : ""}</span><h2>{item.homework.title}</h2></div><strong>Due {formatDate(item.homework.dueDate)}</strong></div>
             {isParent && <p className="portal-homework-student">For: {[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</p>}
             <p className="portal-homework-instructions">{item.homework.instructions}</p>
