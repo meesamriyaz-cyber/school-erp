@@ -49,10 +49,17 @@ export function StudentWorkspaceScreen({ user }) {
         ["timetable", "/portal/timetable"], ["documents", "/portal/documents"],
         ["notices", "/portal/announcements"], ["notifications", "/portal/notifications"],
       ];
-      const responses = await Promise.all(endpoints.map(([, endpoint]) => apiRequest(endpoint)));
+      const responses = await Promise.allSettled(endpoints.map(([, endpoint]) => apiRequest(endpoint)));
       const next = {};
-      endpoints.forEach(([key], index) => { next[key] = responses[index]; });
-      setData(next);
+      const failures = [];
+      endpoints.forEach(([key], index) => {
+        const result = responses[index];
+        if (result.status === "fulfilled") next[key] = result.value;
+        else { next[key] = null; failures.push(key); }
+      });
+      setData((previous) => ({ ...previous, ...next }));
+      setPartialErrors(failures);
+      if (failures.includes("profile")) setError("Unable to load your student profile. Please try again.");
     } catch (requestError) {
       setError(requestError?.message || "Unable to load your student workspace.");
     } finally {
