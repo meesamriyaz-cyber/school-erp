@@ -53,6 +53,7 @@ export default function StudentDocumentManagement() {
       form.append("api_key", sign.apiKey);
       form.append("timestamp", String(sign.timestamp));
       form.append("folder", sign.folder);
+      form.append("allowed_formats", sign.allowedFormats);
       form.append("public_id", sign.publicId);
       form.append("signature", sign.signature);
       const cloudResponse = await fetch(`https://api.cloudinary.com/v1_1/${sign.cloudName}/auto/upload`, { method: "POST", body: form });
@@ -70,12 +71,12 @@ export default function StudentDocumentManagement() {
   };
 
   const remove = async (document) => {
-    if (!window.confirm(`Delete the record for "${document.name}"? The Cloudinary file itself is retained.`)) return;
+    if (!window.confirm(`Delete the record for "${document.name}"? The file will also be deleted from Cloudinary.`)) return;
     setError(""); setNotice("");
     try {
       await apiRequest(`/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(document._id)}`, { method: "DELETE", accessToken });
       setDocuments((current) => current.filter((item) => item._id !== document._id));
-      setNotice("Document record deleted. The file remains in Cloudinary.");
+      setNotice("Document and Cloudinary file deleted.");
     } catch (err) { setError(err.message || "Unable to delete document."); }
   };
 
