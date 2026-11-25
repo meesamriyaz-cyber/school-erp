@@ -84,7 +84,7 @@ export function GuardianCommunicationPanel({ studentId }) {
     {history.slice(0, 8).map((item) => <View key={item._id} style={styles.historyItem}>
       <Text style={styles.name}>{[item.guardianId?.firstName, item.guardianId?.lastName].filter(Boolean).join(" ") || "Guardian"} · {new Date(item.createdAt).toLocaleDateString()}</Text>
       <Text style={styles.meta} numberOfLines={2}>{item.message}</Text>
-      <Text style={styles.meta}>{item.channels.map((entry) => `${entry.channel}: ${entry.status}`).join(" · ")}</Text>
+      <Text style={styles.meta}>{item.channels.map((entry) => `${entry.channel}: ${entry.providerStatus || entry.status}${entry.providerErrorCode ? ` (${entry.providerErrorCode})` : ""}`).join(" · ")}</Text>
     </View>)}
     {!loading && !history.length ? <Text style={styles.meta}>No communication has been sent yet.</Text> : null}
   </View>;
