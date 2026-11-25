@@ -173,7 +173,10 @@ export default function GuardianCommunicationPanel({ studentId, accessToken }) {
             <div className="guardian-communication-outcomes">
               {(item.channels || []).map((outcome, index) => (
                 <span key={`${item._id}-${outcome.channel}-${index}`} className={`status-${outcome.status}`}>
-                  {outcome.channel.toUpperCase()}: {outcome.status}
+                  <span>
+                    {outcome.channel.toUpperCase()}: {outcome.status}
+                    {outcome.error ? ` — ${outcome.error}` : ""}
+                  </span>
                 </span>
               ))}
             </div>
