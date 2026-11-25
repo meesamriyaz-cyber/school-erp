@@ -5,6 +5,7 @@ import { colors, radius, spacing } from "../theme/tokens";
 
 const sections = [
   { key: "overview", label: "Overview" },
+  { key: "profile", label: "My profile" },
   { key: "learning", label: "Learning" },
   { key: "attendance", label: "Attendance" },
   { key: "fees", label: "Fees" },
@@ -133,6 +134,18 @@ export function StudentWorkspaceScreen({ user }) {
       <Panel title="Recent notifications">{renderRows(notifications.slice(0, 4), "You have no new notifications.", (item) => ({ title: item.title || "School update", subtitle: item.body || dateOf(item.createdAt) }))}</Panel>
     </> : null}
 
+    {!loading && !error && section === "profile" ? <Panel title="Student profile" subtitle="Your school identity and current academic placement">
+      <DataRow title="Full name" subtitle={[student?.firstName, student?.lastName].filter(Boolean).join(" ") || "Not available"}/>
+      <DataRow title="Admission number" subtitle={student?.admissionNumber || "Not available"}/>
+      <DataRow title="Date of birth" subtitle={dateOf(student?.dateOfBirth) || "Not available"}/>
+      <DataRow title="Gender" subtitle={(student?.gender || "Not specified").replaceAll("_", " ")}/>
+      <DataRow title="Admission date" subtitle={dateOf(student?.admissionDate) || "Not available"}/>
+      <DataRow title="Current class" subtitle={[enrollment?.classId?.name, enrollment?.sectionId?.name].filter(Boolean).join(" · ") || "No active class placement"}/>
+      <DataRow title="Academic year" subtitle={enrollment?.academicYearId?.name || "Not available"}/>
+      <DataRow title="Address" subtitle={[student?.address?.line1, student?.address?.line2, student?.address?.city, student?.address?.district, student?.address?.state, student?.address?.postalCode].filter(Boolean).join(", ") || "Not available"}/>
+      <Text style={styles.profileReadOnly}>Profile information is managed by your school. Contact the school office if any details need correction.</Text>
+    </Panel> : null}
+
     {!loading && !error && section === "learning" ? <>
       <Panel title="Homework & assignments" subtitle="Work assigned to your class">
         {homework.length ? homework.map((item) => {
@@ -237,6 +250,7 @@ const styles = StyleSheet.create({
   rowSubtitle: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   rowTrailing: { color: colors.primary, fontSize: 11, fontWeight: "800", textTransform: "capitalize" },
   empty: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  profileReadOnly: { color: "#778196", backgroundColor: "#F5F7FB", borderRadius: 10, padding: 12, fontSize: 11, lineHeight: 16 },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   metric: { flex: 1, minWidth: "22%", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7EBF2", borderRadius: 13, padding: 13, gap: 5, alignItems: "center" },
   metricValue: { color: "#4263EB", fontSize: 19, fontWeight: "900" },
