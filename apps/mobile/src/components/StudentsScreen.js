@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { getStudentById, getStudents } from "../services/studentService";
 import { apiRequest } from "../services/apiClient";
+import { GuardianCommunicationPanel } from "./GuardianCommunicationPanel";
 import { colors, radius, spacing } from "../theme/tokens";
 
 const statuses = [
@@ -119,6 +120,7 @@ export function StudentsScreen({ onHome, onAddStudent }) {
         <InfoRow label="Phone" value={selectedStudent.guardianPhone || "Not provided"} />
         <InfoRow label="Email" value={selectedStudent.guardianEmail || "Not provided"} />
       </View>
+      <GuardianCommunicationPanel studentId={selectedStudent._id}/>
       <View style={styles.infoCard}>
         <Text style={styles.infoHeading}>Address</Text>
         <Text style={styles.addressText}>{addressText || "No address recorded."}</Text>
