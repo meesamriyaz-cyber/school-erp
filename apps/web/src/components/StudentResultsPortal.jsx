@@ -21,6 +21,7 @@ export default function StudentResultsPortal() {
   const [timetable, setTimetable] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationBusy, setNotificationBusy] = useState(false);
@@ -44,6 +45,23 @@ export default function StudentResultsPortal() {
 
   // Refresh the timetable when the student opens that section. The dashboard may
   // remain mounted while timetable changes are made elsewhere in the school workspace.
+  useEffect(() => {
+    if (!accessToken || isParent || activeTab !== "documents") return undefined;
+    const controller = new AbortController();
+    setDocumentsRefreshing(true);
+    apiRequest("/portal/documents", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted && Array.isArray(response?.data)) setDocuments(response.data);
+      })
+      .catch(() => {
+        // Keep the last successful document list visible if a refresh fails.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDocumentsRefreshing(false);
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
+
   useEffect(() => {
     if (!accessToken || activeTab !== "timetable") return undefined;
     const controller = new AbortController();
@@ -317,7 +335,7 @@ export default function StudentResultsPortal() {
         )
       ) : activeTab === "documents" ? (
         visibleDocuments.length === 0 ? <div className="portal-empty"><h2>No shared documents</h2><p>Documents made available by your school will appear here.</p></div> : (
-          <section className="portal-data-panel"><div className="portal-data-heading"><h2>Student documents</h2><span>{visibleDocuments.length} files</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Document</th>{isParent && <th>Student</th>}<th>Category</th><th>Uploaded</th><th>File</th></tr></thead><tbody>{visibleDocuments.map((document) => <tr key={document._id}><td>{document.name}</td>{isParent && <td>{[document.student?.firstName, document.student?.lastName].filter(Boolean).join(" ")}</td>}<td>{(document.category || "other").replaceAll("_", " ")}</td><td>{formatDate(document.createdAt)}</td><td><a href={document.fileUrl} target="_blank" rel="noreferrer">Open</a></td></tr>)}</tbody></table></div></section>
+          <section className="portal-data-panel"><div className="portal-data-heading"><h2>Student documents</h2><span>{documentsRefreshing ? "Refreshing…" : `${visibleDocuments.length} files`}</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Document</th>{isParent && <th>Student</th>}<th>Category</th><th>Uploaded</th><th>File</th></tr></thead><tbody>{visibleDocuments.map((document) => <tr key={document._id}><td>{document.name}</td>{isParent && <td>{[document.student?.firstName, document.student?.lastName].filter(Boolean).join(" ")}</td>}<td>{(document.category || "other").replaceAll("_", " ")}</td><td>{formatDate(document.createdAt)}</td><td><a href={document.fileUrl} target="_blank" rel="noreferrer">Open</a></td></tr>)}</tbody></table></div></section>
         )
       ) : activeTab === "messaging" ? (
         <MessagingWorkspace mode="parent" />
