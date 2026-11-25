@@ -99,10 +99,14 @@ export function StudentWorkspaceScreen({ user }) {
     : <Text style={styles.empty}>{empty}</Text>;
 
   return <ScrollView style={styles.container} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary}/>}>
-    <View style={styles.heading}>
-      <Text style={styles.kicker}>STUDENT WORKSPACE</Text>
-      <Text style={styles.headingTitle}>Hello, {user?.firstName || student?.firstName || "Student"}</Text>
-      <Text style={styles.headingSubtitle}>Your learning, school records and updates in one place.</Text>
+    <View style={styles.welcomeBanner}>
+      <View style={styles.bannerCopy}>
+        <Text style={styles.bannerKicker}>YOUR SCHOOL AT A GLANCE</Text>
+        <Text style={styles.bannerTitle}>Hello, {user?.firstName || student?.firstName || "Student"}!</Text>
+        <Text style={styles.bannerSubtitle}>Your learning journey, school records and updates—all in one place.</Text>
+        {enrollment ? <View style={styles.classPill}><Text style={styles.classPillText}>{[enrollment.classId?.name, enrollment.sectionId?.name, enrollment.academicYearId?.name].filter(Boolean).join(" · ")}</Text></View> : null}
+      </View>
+      <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
       {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => setSection(item.key)} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
@@ -204,19 +208,24 @@ export function StudentWorkspaceScreen({ user }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: spacing.lg, paddingBottom: 28, gap: spacing.md },
-  heading: { gap: 6, paddingTop: 4, paddingBottom: 4 },
-  kicker: { color: colors.accent, fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
-  headingTitle: { color: colors.ink, fontSize: 26, fontWeight: "900" },
-  headingSubtitle: { color: colors.muted, fontSize: 13, lineHeight: 19 },
-  tabs: { gap: 8, paddingVertical: 4 },
-  tab: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: 13, paddingVertical: 9 },
-  tabActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  tabText: { color: colors.muted, fontSize: 12, fontWeight: "700" },
-  tabTextActive: { color: colors.primary },
-  panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
-  panelTitle: { color: colors.ink, fontSize: 17, fontWeight: "900" },
+  container: { flex: 1, backgroundColor: "#F5F7FB" },
+  content: { padding: spacing.lg, paddingTop: spacing.md, paddingBottom: 34, gap: spacing.lg },
+  welcomeBanner: { minHeight: 174, backgroundColor: "#4263EB", borderRadius: 20, padding: 20, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "space-between", shadowColor: "#304BC0", shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+  bannerCopy: { flex: 1, zIndex: 2, gap: 7, paddingRight: 6 },
+  bannerKicker: { color: "#DCE5FF", fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
+  bannerTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "900", letterSpacing: -0.6 },
+  bannerSubtitle: { color: "#E3E9FF", fontSize: 12, lineHeight: 18, maxWidth: 270 },
+  classPill: { alignSelf: "flex-start", marginTop: 5, backgroundColor: "#FFFFFF24", borderWidth: 1, borderColor: "#FFFFFF40", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
+  classPillText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
+  bannerOrb: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#FFFFFF18", borderWidth: 1, borderColor: "#FFFFFF35", alignItems: "center", justifyContent: "center", marginLeft: -8 },
+  bannerOrbText: { color: "#FFFFFF", fontSize: 38, fontWeight: "300" },
+  tabs: { gap: 8, paddingVertical: 4, paddingRight: 8 },
+  tab: { borderWidth: 1, borderColor: "#E7EBF2", backgroundColor: "#FFFFFF", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  tabActive: { borderColor: "#4263EB", backgroundColor: "#EDF1FF" },
+  tabText: { color: "#778196", fontSize: 12, fontWeight: "700" },
+  tabTextActive: { color: "#3E5DDE" },
+  panel: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7EBF2", borderRadius: 15, padding: spacing.lg, gap: spacing.md, shadowColor: "#1D3154", shadowOpacity: 0.035, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+  panelTitle: { color: "#28364D", fontSize: 16, fontWeight: "900", letterSpacing: -0.2 },
   panelSubtitle: { color: colors.muted, fontSize: 11, marginTop: 3 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, borderTopWidth: 1, borderTopColor: colors.border },
   rowMain: { flex: 1, gap: 4 },
@@ -225,8 +234,8 @@ const styles = StyleSheet.create({
   rowTrailing: { color: colors.primary, fontSize: 11, fontWeight: "800", textTransform: "capitalize" },
   empty: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  metric: { flex: 1, minWidth: "22%", backgroundColor: colors.background, borderRadius: radius.md, padding: 11, gap: 4, alignItems: "center" },
-  metricValue: { color: colors.primary, fontSize: 17, fontWeight: "900" },
+  metric: { flex: 1, minWidth: "22%", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7EBF2", borderRadius: 13, padding: 13, gap: 5, alignItems: "center" },
+  metricValue: { color: "#4263EB", fontSize: 19, fontWeight: "900" },
   metricLabel: { color: colors.muted, fontSize: 10, textTransform: "capitalize" },
   state: { padding: 24, alignItems: "center", gap: 10 },
   partialNotice: { backgroundColor: "#FFF5E5", borderRadius: radius.md, padding: 11 },
