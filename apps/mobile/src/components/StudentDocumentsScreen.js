@@ -67,8 +67,13 @@ export function StudentDocumentsScreen({ onHome }) {
     try {
       const signed = await apiRequest(`/students/${encodeURIComponent(studentId)}/documents/signature`, { method: "POST", body: {} });
       const sign = signed.data;
+      // React Native 0.86 does not reliably accept the legacy { uri, name, type }
+      // FormData part shape. Convert the picked local file to a Blob first.
+      const fileResponse = await fetch(file.uri);
+      if (!fileResponse.ok) throw new Error("Unable to read the selected file.");
+      const fileBlob = await fileResponse.blob();
       const form = new FormData();
-      form.append("file", { uri: file.uri, name: file.name || "student-document", type: file.mimeType || "application/octet-stream" });
+      form.append("file", fileBlob, file.name || "student-document");
       form.append("api_key", sign.apiKey);
       form.append("timestamp", String(sign.timestamp));
       form.append("folder", sign.folder);
