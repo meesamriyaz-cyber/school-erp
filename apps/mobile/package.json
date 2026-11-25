@@ -22,7 +22,8 @@
     "react-native-safe-area-context": "5.7.0",
     "react-native-screens": "4.26.2",
     "react-native-web": "0.21.4",
-    "expo-secure-store": "~57.0.4"
+    "expo-secure-store": "~57.0.4",
+    "expo-document-picker": "~57.0.0"
   },
   "type": "module"
 }
