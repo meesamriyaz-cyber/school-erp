@@ -188,8 +188,52 @@ export function StudentWorkspaceScreen({ user }) {
       }) : <Text style={styles.empty}>No fee invoices found.</Text>}
     </Panel> : null}
 
-    {!loading && !error && section === "results" ? <Panel title="Examination results" subtitle="Published results only">
-      {renderRows(results, "No published results are available yet.", (item) => ({ title: item.examination?.name || item.name || "Examination", subtitle: item.grade || item.status || "", trailing: item.percentage != null ? item.percentage + "%" : item.marksObtained != null ? String(item.marksObtained) : "" }))}
+    {!loading && !error && section === "results" ? <Panel title="Examination results" subtitle="Published report cards and subject-wise performance">
+      {results.length ? results.map((item, index) => {
+        const examination = item.examination || {};
+        const result = item.result || item;
+        const subjects = Array.isArray(result.subjects) ? result.subjects : [];
+        const studentName = [item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ");
+        const resultStatus = result.status || item.status || "";
+        return <View key={String(examination._id || item._id || index)} style={styles.reportCard}>
+          <View style={styles.reportHeading}>
+            <View style={styles.reportHeadingCopy}>
+              <Text style={styles.reportKicker}>OFFICIAL EXAMINATION RESULT</Text>
+              <Text style={styles.reportTitle}>{examination.name || item.name || "Examination"}</Text>
+              <Text style={styles.reportMeta}>{[dateOf(examination.startDate), dateOf(examination.endDate)].filter(Boolean).join(" – ") || "Examination dates not available"}</Text>
+              {examination.gradingScale ? <Text style={styles.reportMeta}>Grading scale: {examination.gradingScale}</Text> : null}
+            </View>
+            {resultStatus ? <View style={styles.resultBadge}><Text style={styles.resultBadgeText}>{String(resultStatus).replaceAll("_", " ").toUpperCase()}</Text></View> : null}
+          </View>
+          <View style={styles.reportStudent}>
+            <View style={styles.reportInfo}><Text style={styles.reportLabel}>Student</Text><Text style={styles.reportValue}>{studentName || "Your report card"}</Text></View>
+            <View style={styles.reportInfo}><Text style={styles.reportLabel}>Admission No.</Text><Text style={styles.reportValue}>{item.student?.admissionNumber || "—"}</Text></View>
+            <View style={styles.reportInfo}><Text style={styles.reportLabel}>Academic year</Text><Text style={styles.reportValue}>{examination.academicYear?.name || "—"}</Text></View>
+            {examination.academicTerm?.name ? <View style={styles.reportInfo}><Text style={styles.reportLabel}>Term</Text><Text style={styles.reportValue}>{examination.academicTerm.name}</Text></View> : null}
+            <View style={styles.reportInfo}><Text style={styles.reportLabel}>Class / Section</Text><Text style={styles.reportValue}>{[examination.class?.name, examination.section?.name].filter(Boolean).join(" · ") || "—"}</Text></View>
+          </View>
+          <Text style={styles.subjectsTitle}>Subject-wise marks</Text>
+          {subjects.length ? subjects.map((subject, subjectIndex) => <View key={String(subject.examSubjectId || subject._id || subjectIndex)} style={styles.subjectResult}>
+            <View style={styles.subjectTop}>
+              <Text style={styles.subjectName}>{subject.subject?.name || "Subject"}</Text>
+              <Text style={styles.subjectMarks}>{subject.absent ? "Absent" : subject.marksObtained ?? "—"} / {subject.maxMarks ?? "—"}</Text>
+            </View>
+            <View style={styles.subjectDetails}>
+              <Text style={styles.subjectDetail}>Pass: {subject.passMarks ?? "—"}</Text>
+              <Text style={styles.subjectDetail}>Grade: {subject.grade || "—"}</Text>
+              <Text style={styles.subjectDetail}>Status: {subject.status || "—"}</Text>
+            </View>
+            {subject.remarks ? <Text style={styles.subjectRemarks}>{subject.remarks}</Text> : null}
+          </View>) : <Text style={styles.empty}>Subject-wise marks are not available for this result.</Text>}
+          <View style={styles.reportSummary}>
+            <View style={styles.reportTotal}><Text style={styles.reportLabel}>Total marks</Text><Text style={styles.reportTotalValue}>{result.totalObtained ?? "—"} / {result.totalMaximum ?? "—"}</Text></View>
+            <View style={styles.reportTotal}><Text style={styles.reportLabel}>Percentage</Text><Text style={styles.reportTotalValue}>{result.percentage == null ? "—" : result.percentage + "%"}</Text></View>
+            <View style={styles.reportTotal}><Text style={styles.reportLabel}>Overall grade</Text><Text style={styles.reportTotalValue}>{result.grade || "—"}</Text></View>
+            <View style={styles.reportTotal}><Text style={styles.reportLabel}>Overall result</Text><Text style={styles.reportTotalValue}>{resultStatus ? String(resultStatus).replaceAll("_", " ").toUpperCase() : "—"}</Text></View>
+          </View>
+          <Text style={styles.reportFooter}>This report reflects the result published by your school.</Text>
+        </View>;
+      }) : <Text style={styles.empty}>No published results are available yet.</Text>}
     </Panel> : null}
 
     {!loading && !error && section === "timetable" ? <Panel title="My weekly timetable" subtitle="Your class periods, organised by weekday">
@@ -294,6 +338,30 @@ const styles = StyleSheet.create({
   timetableTimeEnd: { color: "#8994A8", fontSize: 10 },
   timetablePeriodMain: { flex: 1, gap: 4 },
   timetablePeriodNumber: { color: "#4263EB", fontSize: 10, fontWeight: "900" },
+  reportCard: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 14, gap: 12 },
+  reportHeading: { flexDirection: "row", alignItems: "flex-start", gap: 8, justifyContent: "space-between" },
+  reportHeadingCopy: { flex: 1, gap: 4 },
+  reportKicker: { color: "#4263EB", fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  reportTitle: { color: "#28364D", fontSize: 16, fontWeight: "900" },
+  reportMeta: { color: colors.muted, fontSize: 10, lineHeight: 15 },
+  resultBadge: { backgroundColor: "#EDF1FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 },
+  resultBadgeText: { color: "#3E5DDE", fontSize: 9, fontWeight: "900" },
+  reportStudent: { flexDirection: "row", flexWrap: "wrap", gap: 10, padding: 11, borderRadius: 10, backgroundColor: "#F7F8FC" },
+  reportInfo: { minWidth: "44%", flexGrow: 1, gap: 3 },
+  reportLabel: { color: colors.muted, fontSize: 9, fontWeight: "700" },
+  reportValue: { color: colors.ink, fontSize: 11, fontWeight: "800" },
+  subjectsTitle: { color: colors.ink, fontSize: 12, fontWeight: "900" },
+  subjectResult: { padding: 10, borderRadius: 10, backgroundColor: "#FAFBFE", borderWidth: 1, borderColor: "#E9EDF5", gap: 6 },
+  subjectTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  subjectName: { flex: 1, color: colors.ink, fontSize: 12, fontWeight: "800" },
+  subjectMarks: { color: "#4263EB", fontSize: 11, fontWeight: "900" },
+  subjectDetails: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  subjectDetail: { color: colors.muted, fontSize: 10 },
+  subjectRemarks: { color: colors.muted, fontSize: 10, lineHeight: 15 },
+  reportSummary: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  reportTotal: { flex: 1, minWidth: "42%", padding: 9, borderRadius: 9, backgroundColor: "#F7F8FC", gap: 4 },
+  reportTotalValue: { color: "#28364D", fontSize: 13, fontWeight: "900" },
+  reportFooter: { color: colors.muted, fontSize: 9, lineHeight: 14 },
   error: { backgroundColor: "#FDECEC", borderRadius: radius.md, padding: 15, gap: 10 },
   errorText: { color: colors.danger, fontSize: 13 },
   retry: { alignSelf: "flex-start", backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
