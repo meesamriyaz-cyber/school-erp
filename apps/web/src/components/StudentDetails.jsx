@@ -3,6 +3,7 @@ import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import EditStudentForm from "./EditStudentForm.jsx";
 import StudentGuardianManagement from "./StudentGuardianManagement.jsx";
+import GuardianCommunicationPanel from "./GuardianCommunicationPanel.jsx";
 
 function formatDate(value) {
   if (!value) return "Not provided";
@@ -185,6 +186,10 @@ export default function StudentDetails({ studentId, onBack }) {
         accessToken={accessToken}
         canManage={["school_admin", "principal"].includes(user?.role)}
       />
+
+      {canManageStudent && (
+        <GuardianCommunicationPanel studentId={studentId} accessToken={accessToken} />
+      )}
 
       <section className="student-details-card student-academic-profile" aria-labelledby="student-current-placement-title">
         <h3 id="student-current-placement-title">Current Academic Placement</h3>
