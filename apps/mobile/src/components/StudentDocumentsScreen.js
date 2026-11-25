@@ -65,7 +65,7 @@ export function StudentDocumentsScreen({ onHome }) {
     if (!studentId || !file) { setError("Select a student and a file."); return; }
     setSaving(true); setError(""); setNotice("");
     try {
-      const signed = await apiRequest(`/students/${encodeURIComponent(studentId)}/documents/signature`, { method: "POST", body: {} });
+      const signed = await apiRequest(`/students/${encodeURIComponent(studentId)}/documents/signature`, { method: "POST", body: { category } });
       const sign = signed.data;
       // React Native 0.86 does not reliably accept the legacy { uri, name, type }
       // FormData part shape. Convert the picked local file to a Blob first.
