@@ -154,8 +154,32 @@ export default function StudentResultsPortal() {
   useEffect(() => {
     if (!accessToken) return undefined;
     const controller = new AbortController();
+
+    // Parent accounts receive communication data only. Student academic,
+    // financial and identity endpoints are reserved for authenticated students.
+    if (isParent) {
+      Promise.allSettled([
+        apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
+        apiRequest("/portal/notifications", { accessToken, signal: controller.signal }),
+      ]).then(([announcementResponse, notificationResponse]) => {
+        if (controller.signal.aborted) return;
+        const failures = [];
+        if (announcementResponse.status === "fulfilled" && Array.isArray(announcementResponse.value?.data)) {
+          setAnnouncements(announcementResponse.value.data);
+        } else failures.push("announcements");
+        if (notificationResponse.status === "fulfilled" && Array.isArray(notificationResponse.value?.data)) {
+          setNotifications(notificationResponse.value.data);
+          setUnreadCount(Number(notificationResponse.value?.unreadCount ?? notificationResponse.value.data.filter((item) => !item.readAt).length));
+        } else failures.push("notifications");
+        setLoadError(failures.length ? "Some communication sections could not be loaded: " + failures.join(", ") + ". Retry to load them again." : "");
+        setError("");
+      }).finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+      return () => controller.abort();
+    }
+
     Promise.allSettled([
-      apiRequest("/portal/children", { accessToken, signal: controller.signal }),
       apiRequest("/portal/profile", { accessToken, signal: controller.signal }),
       apiRequest("/portal/results", { accessToken, signal: controller.signal }),
       apiRequest("/portal/homework", { accessToken, signal: controller.signal }),
@@ -166,7 +190,7 @@ export default function StudentResultsPortal() {
       apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
       apiRequest("/portal/documents", { accessToken, signal: controller.signal }),
       apiRequest("/portal/notifications", { accessToken, signal: controller.signal }),
-    ]).then(([childrenResponse, profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse, documentResponse, notificationResponse]) => {
+    ]).then(([profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse, documentResponse, notificationResponse]) => {
       if (controller.signal.aborted) return;
       const failures = [];
       const applyList = (response, setter, label) => {
@@ -178,8 +202,7 @@ export default function StudentResultsPortal() {
         }
       };
 
-      applyList(childrenResponse, setChildren, "linked students");
-      applyList(profileResponse, setProfiles, "student profiles");
+      applyList(profileResponse, setProfiles, "student profile");
       applyList(resultResponse, setResults, "published results");
       applyList(homeworkResponse, setHomework, "homework");
       applyList(submissionResponse, setSubmissions, "homework submissions");
@@ -191,12 +214,9 @@ export default function StudentResultsPortal() {
       applyList(documentResponse, setDocuments, "student documents");
       applyList(notificationResponse, setNotifications, "notifications");
 
-      if (notificationResponse.status === "fulfilled" && Array.isArray(notificationResponse.value?.data)) {
-        setUnreadCount(Number(notificationResponse.value?.unreadCount || 0));
-      } else {
-        setUnreadCount(0);
-      }
-
+      setUnreadCount(notificationResponse.status === "fulfilled" && Array.isArray(notificationResponse.value?.data)
+        ? Number(notificationResponse.value?.unreadCount ?? notificationResponse.value.data.filter((item) => !item.readAt).length)
+        : 0);
       setError(resultResponse.status === "rejected"
         ? resultResponse.reason?.message || "Unable to load published results."
         : "");
@@ -207,7 +227,7 @@ export default function StudentResultsPortal() {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [accessToken, retryCount]);
+  }, [accessToken, isParent, retryCount]);
 
   const visibleDocuments = useMemo(() => selectedStudent === "all"
     ? documents
