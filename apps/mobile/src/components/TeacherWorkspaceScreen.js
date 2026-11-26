@@ -41,7 +41,7 @@ export function TeacherWorkspaceScreen() {
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const selected=assignments.find(x=>x._id===assignmentId)||assignments[0];
-  const scopes=useMemo(()=>{const m=new Map();assignments.forEach(a=>m.set([id(a.academicYearId),id(a.classId),id(a.sectionId)||"all"].join(":"),a));return [...m.values()];},[assignments]);
+  const scopes=useMemo(()=>{const m=new Map();assignments.forEach(a=>m.set([id(a.academicYearId),id(a.classId),id(a.sectionId)||"all",id(a.subjectId)||"all"].join(":"),a));return [...m.values()];},[assignments]);
   const loadBase=useCallback(async()=>{
     setLoading(true);setError("");
     try {
