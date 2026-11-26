@@ -1,14 +1,14 @@
 import express from "express";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAuditLogs, getAuditOutboxStatus, retryFailedAuditEvent } = vi.hoisted(() => ({
+const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAuditLogs, getAuditOutboxStatus, retryFailedAuditEvent, getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents } = vi.hoisted(() => ({
   listSchools: vi.fn((_req, res) => res.status(200).json({ endpoint: "listSchools" })),
   getSchoolDetails: vi.fn((_req, res) => res.status(200).json({ endpoint: "getSchoolDetails" })),
   updateSchoolStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateSchoolStatus" })),
   createSchool: vi.fn((_req, res) => res.status(201).json({ endpoint: "createSchool" })),
   listAuditLogs: vi.fn((_req, res) => res.status(200).json({ endpoint: "listAuditLogs" })),
   getAuditOutboxStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "getAuditOutboxStatus" })),
-  retryFailedAuditEvent: vi.fn((_req, res) => res.status(200).json({ endpoint: "retryFailedAuditEvent" })),
+  retryFailedAuditEvent: vi.fn((_req, res) => res.status(200).json({ endpoint: "retryFailedAuditEvent" })),\n  getBusinessOverview: vi.fn((_req, res) => res.status(200).json({ endpoint: "getBusinessOverview" })),\n  listSubscriptionPlans: vi.fn((_req, res) => res.status(200).json({ endpoint: "listSubscriptionPlans" })),\n  createSubscriptionPlan: vi.fn((_req, res) => res.status(201).json({ endpoint: "createSubscriptionPlan" })),\n  recordPlatformPayment: vi.fn((_req, res) => res.status(201).json({ endpoint: "recordPlatformPayment" })),\n  reversePlatformPayment: vi.fn((_req, res) => res.status(200).json({ endpoint: "reversePlatformPayment" })),\n  createRenewalInvoice: vi.fn((_req, res) => res.status(201).json({ endpoint: "createRenewalInvoice" })),\n  listCommercialEvents: vi.fn((_req, res) => res.status(200).json({ endpoint: "listCommercialEvents" })),
 }));
 
 vi.mock("../middleware/requireTrustedOrigin.js", () => ({
@@ -29,7 +29,7 @@ vi.mock("../middleware/authenticate.js", () => ({
 vi.mock("../controllers/auditLogController.js", () => ({ listAuditLogs }));
 vi.mock("../controllers/auditOutboxController.js", () => ({ getAuditOutboxStatus, retryFailedAuditEvent }));
 
-vi.mock("../controllers/platformController.js", () => ({
+vi.mock("../controllers/platformBillingController.js", () => ({ getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents }));\n\nvi.mock("../controllers/platformController.js", () => ({
   listSchools,
   getSchoolDetails,
   updateSchoolStatus,
@@ -73,7 +73,7 @@ describe("platform school-management route authorization", () => {
     ["GET", "/schools", undefined, listSchools],
     ["GET", "/schools/507f1f77bcf86cd799439011", undefined, getSchoolDetails],
     ["PATCH", "/schools/507f1f77bcf86cd799439011/status", { status: "suspended" }, updateSchoolStatus],
-    ["POST", "/schools", { school: {}, admin: {} }, createSchool],
+    ["POST", "/schools", { school: {}, admin: {} }, createSchool],\n    ["GET", "/business-overview", undefined, getBusinessOverview],\n    ["GET", "/subscription-plans", undefined, listSubscriptionPlans],\n    ["POST", "/subscription-plans", { name: "Monthly", billingInterval: "monthly", amount: 100 }, createSubscriptionPlan],\n    ["POST", "/payments/507f1f77bcf86cd799439011/reverse", { reason: "Duplicate entry" }, reversePlatformPayment],\n    ["POST", "/subscriptions/507f1f77bcf86cd799439011/renewal-invoice", {}, createRenewalInvoice],\n    ["GET", "/commercial-events", undefined, listCommercialEvents],
   ];
 
   it.each(protectedRequests)(
