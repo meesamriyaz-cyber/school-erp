@@ -38,6 +38,7 @@ test('auth infrastructure and protected routes are present', async () => {
     '../src/config/environment.js',
     '../src/components/AppScreen.js',
     '../src/components/ParentMessagingScreen.js',
+    '../src/components/TeacherMessagingScreen.js',
   ];
   for (const path of paths) {
     const source = await readFile(new URL(path, import.meta.url), 'utf8');
@@ -81,4 +82,22 @@ test('parent family workspace exposes the same teacher messaging API as web', as
   assert.match(messaging, /studentId/);
   assert.match(app, /ParentMessagingScreen/);
   assert.match(app, /\["notices","Notices"\].*\["notifications","Notifications"\].*\["messages","Messages"\]/s);
+});
+
+
+test('teacher mobile workspace supports scoped parent conversation replies', async () => {
+  const messaging = await readFile(new URL('../src/components/TeacherMessagingScreen.js', import.meta.url), 'utf8');
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  for (const endpoint of [
+    '/messaging/conversations',
+    '/messaging/conversations/${conversation._id}/messages',
+    '/messaging/conversations/${conversation._id}/read',
+    '/messaging/conversations/${active._id}/close',
+  ]) {
+    assert.ok(messaging.includes(endpoint), 'teacher messaging should use ' + endpoint);
+  }
+  assert.match(messaging, /method: "POST"/);
+  assert.match(messaging, /teacherUnreadCount/);
+  assert.match(workspace, /TeacherMessagingScreen/);
+  assert.match(workspace, /\["messages","Parent messages"\]/);
 });
