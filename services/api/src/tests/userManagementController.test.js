@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { userModel, tenantModel, sessionModel, hashPassword, auditWrite, auditTransaction } = vi.hoisted(() => ({
+const { staffModel, userModel, tenantModel, sessionModel, hashPassword, auditWrite, auditTransaction } = vi.hoisted(() => ({
   staffModel: { updateMany: vi.fn() },
   userModel: {
     find: vi.fn(),
