@@ -46,6 +46,7 @@ export function StudentWorkspaceScreen({ user }) {
   const [resultsRefreshing, setResultsRefreshing] = useState(false);
   const [sectionRefreshing, setSectionRefreshing] = useState("");
   const [noticesRefreshing, setNoticesRefreshing] = useState(false);
+  const [failedPhotos, setFailedPhotos] = useState({});
   const [data, setData] = useState({ profile: [], homework: [], submissions: [], attendance: [], fees: [], results: [], timetable: [], documents: [], notices: [], notifications: [] });
 
   const load = useCallback(async (refresh = false) => {
@@ -163,7 +164,7 @@ export function StudentWorkspaceScreen({ user }) {
       <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); if (["learning", "attendance", "fees"].includes(item.key)) refreshSection(item.key); if (item.key === "timetable") load(true); if (item.key === "results") { setResultsRefreshing(true); apiRequest("/portal/results").then((response) => setData((previous) => ({ ...previous, results: response }))).catch(() => Alert.alert("Results could not be refreshed", "Your previously loaded report cards are still available. Pull down to retry.")).finally(() => setResultsRefreshing(false)); } if (item.key === "documents") { setDocumentsRefreshing(true); apiRequest("/portal/documents").then((response) => setData((previous) => ({ ...previous, documents: response }))).catch(() => Alert.alert("Documents could not be refreshed", "Your previously loaded documents are still available. Pull down to retry.")).finally(() => setDocumentsRefreshing(false)); } if (item.key === "notices") { setNoticesRefreshing(true); Promise.allSettled([apiRequest("/portal/announcements"), apiRequest("/portal/notifications")]).then(([noticeResult, notificationResult]) => { if (noticeResult.status === "fulfilled") setData((previous) => ({ ...previous, notices: noticeResult.value })); if (notificationResult.status === "fulfilled") setData((previous) => ({ ...previous, notifications: notificationResult.value })); if (noticeResult.status === "rejected" && notificationResult.status === "rejected") Alert.alert("Updates could not be refreshed", "Your previously loaded notices and notifications are still available."); }).finally(() => setNoticesRefreshing(false)); } }} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
+      {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); refreshSection(item.key); }} accessibilityRole="tab" accessibilityState={{ selected: section === item.key }} hitSlop={6} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
     </ScrollView>
 
     {loading && !student && !error ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.empty}>Loading your school information…</Text></View> : null}
@@ -196,7 +197,7 @@ export function StudentWorkspaceScreen({ user }) {
           const parent = (profile?.parents || []).find((item) => item.relationship === relationship);
           return { key: relationship, label: relationship === "father" ? "Father" : "Mother", name: parent?.name || "Details not added", photoUrl: parent?.photoUrl, phone: parent?.phone, email: parent?.email, emailVerified: parent?.emailVerified };
         })].map((person) => <View key={person.key} style={styles.familyPerson}>
-          <View style={styles.avatarCircle}>{person.photoUrl ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage}/> : <Text style={styles.avatarInitial}>{person.key === "student" ? "S" : person.key === "father" ? "F" : "M"}</Text>}</View>
+          <View style={styles.avatarCircle}>{person.photoUrl && !failedPhotos[person.key] ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage} onError={() => setFailedPhotos((previous) => ({ ...previous, [person.key]: true }))}/> : <Text style={styles.avatarInitial}>{person.key === "student" ? "S" : person.key === "father" ? "F" : "M"}</Text>}</View>
           <Text style={styles.familyLabel}>{person.label}</Text>
           <Text style={styles.familyName} numberOfLines={2}>{person.name || "Not available"}</Text>
         </View>)}
@@ -225,7 +226,17 @@ export function StudentWorkspaceScreen({ user }) {
       <Panel title="Homework & assignments" subtitle={sectionRefreshing === "learning" ? "Refreshing assignments and submissions…" : "Work assigned to your class"}>
         {homework.length ? homework.map((item) => {
           const submission = submissionByHomework.get(String(item._id));
-          return <DataRow key={String(item._id)} title={titleOf(item, "Homework")} subtitle={[item.subjectId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : ""].filter(Boolean).join(" · ")} trailing={submission?.status || "Submit"} onPress={() => { setSelectedHomework(item); setAnswer(submission?.answer || ""); }}/>;
+          const reviewed = submission?.status === "reviewed";
+          const submissionLabel = reviewed ? "Reviewed" : submission ? "Submitted" : "Submit";
+          const submissionSubtitle = [item.subjectId?.name, item.dueDate ? "Due " + dateOf(item.dueDate) : "", submission?.submittedAt ? "Submitted " + dateOf(submission.submittedAt) : ""].filter(Boolean).join(" · ");
+          return <DataRow key={String(item._id)} title={titleOf(item, "Homework")} subtitle={submissionSubtitle} trailing={submissionLabel} onPress={() => {
+            if (reviewed) {
+              const feedback = [submission.feedback, submission.marksObtained != null ? "Marks: " + submission.marksObtained + (submission.maxMarks != null ? " / " + submission.maxMarks : "") : ""].filter(Boolean).join("\n");
+              Alert.alert("Homework reviewed", feedback || "Your teacher has reviewed this submission.");
+              return;
+            }
+            setSelectedHomework(item); setAnswer(submission?.answer || "");
+          }}/>;
         }) : <Text style={styles.empty}>No homework has been assigned yet.</Text>}
       </Panel>
       <Panel title="My submissions">{renderRows(submissions, "No submissions yet.", (item) => ({ title: item.homeworkId?.title || "Assignment submission", subtitle: [item.status, item.submittedAt ? dateOf(item.submittedAt) : ""].filter(Boolean).join(" · "), trailing: item.marksObtained != null ? String(item.marksObtained) + "/" + item.maxMarks : "" }))}</Panel>
@@ -311,7 +322,20 @@ export function StudentWorkspaceScreen({ user }) {
     </Panel> : null}
 
     {!loading && !error && section === "documents" ? <Panel title="My documents" subtitle={documentsRefreshing ? "Refreshing school-shared files…" : "Files shared by your school"}>
-      {renderRows(documents, "No documents have been shared with you.", (item) => ({ title: item.name || "Document", subtitle: [item.category?.replaceAll("_", " "), dateOf(item.createdAt)].filter(Boolean).join(" · "), trailing: item.format || "", onPress: item.fileUrl ? () => Linking.openURL(item.fileUrl) : undefined }))}
+      {renderRows(documents, "No documents have been shared with you.", (item) => ({
+        title: item.name || "Document",
+        subtitle: [item.category?.replaceAll("_", " "), dateOf(item.createdAt), item.bytes ? (item.bytes / 1024).toFixed(0) + " KB" : ""].filter(Boolean).join(" · "),
+        trailing: item.fileUrl ? "Open" : "Unavailable",
+        onPress: item.fileUrl ? async () => {
+          try {
+            const supported = await Linking.canOpenURL(item.fileUrl);
+            if (!supported) throw new Error("This document link cannot be opened on this device.");
+            await Linking.openURL(item.fileUrl);
+          } catch (openError) {
+            Alert.alert("Unable to open document", openError?.message || "Please contact your school for a working document link.");
+          }
+        } : () => Alert.alert("Document unavailable", "This file does not currently have an accessible link. Please contact your school.")
+      }))}
     </Panel> : null}
 
     {!loading && !error && section === "notices" ? <>
@@ -329,7 +353,8 @@ export function StudentWorkspaceScreen({ user }) {
     <Modal visible={Boolean(selectedHomework)} transparent animationType="slide" onRequestClose={() => !submitting && setSelectedHomework(null)}>
       <View style={styles.modalBackdrop}><View style={styles.modalCard}>
         <Text style={styles.panelTitle}>{selectedHomework ? titleOf(selectedHomework, "Homework") : "Submit homework"}</Text>
-        <Text style={styles.panelSubtitle}>{selectedHomework?.dueDate ? "Due " + dateOf(selectedHomework.dueDate) : "Written answer"}</Text>
+        <Text style={styles.panelSubtitle}>{selectedHomework?.dueDate ? "Due " + dateOf(selectedHomework.dueDate) : "Written answer"} · Written submissions only</Text>
+        {selectedHomework?.instructions ? <Text style={styles.rowSubtitle}>{selectedHomework.instructions}</Text> : null}
         <TextInput value={answer} onChangeText={setAnswer} multiline textAlignVertical="top" placeholder="Write your answer here…" editable={!submitting} style={styles.answerInput} maxLength={10000}/>
         <Text style={styles.rowSubtitle}>{answer.length}/10,000 characters · Written answers only</Text>
         <View style={styles.modalActions}>
