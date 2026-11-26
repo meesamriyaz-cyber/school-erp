@@ -14,9 +14,6 @@ const guardianSchema = new mongoose.Schema(
     lastName: { type: String, default: "", trim: true, maxlength: 80 },
     phone: { type: String, default: null, trim: true, match: [/^[0-9]{10}$/, "Phone number must contain exactly 10 digits"] },
     photoUrl: { type: String, default: null, trim: true, maxlength: 2048, validate: { validator(value) { if (!value) return true; try { return new URL(value).protocol === "https:"; } catch { return false; } }, message: "Guardian photo URL must be HTTPS" } },
-    phoneVerifiedAt: { type: Date, default: null },
-    verifiedPhone: { type: String, default: null, trim: true, maxlength: 20 },
-    pendingPhone: { type: String, default: null, trim: true, maxlength: 20 },
     email: {
       type: String,
       default: null,
