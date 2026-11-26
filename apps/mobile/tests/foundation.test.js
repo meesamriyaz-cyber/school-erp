@@ -39,6 +39,7 @@ test('auth infrastructure and protected routes are present', async () => {
     '../src/components/AppScreen.js',
     '../src/components/ParentMessagingScreen.js',
     '../src/components/TeacherMessagingScreen.js',
+    '../src/components/TeacherAnnouncementsScreen.js',
   ];
   for (const path of paths) {
     const source = await readFile(new URL(path, import.meta.url), 'utf8');
@@ -100,4 +101,19 @@ test('teacher mobile workspace supports scoped parent conversation replies', asy
   assert.match(messaging, /teacherUnreadCount/);
   assert.match(workspace, /TeacherMessagingScreen/);
   assert.match(workspace, /\["messages","Parent messages"\]/);
+});
+
+
+test('teacher mobile announcements match the web announcement API and workspace', async () => {
+  const announcements = await readFile(new URL('../src/components/TeacherAnnouncementsScreen.js', import.meta.url), 'utf8');
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  for (const endpoint of ['/announcements', '/teacher-assignments?status=active', '/academic-years', '/announcements/${item._id}/${action}']) {
+    assert.ok(announcements.includes(endpoint), 'teacher announcements should use ' + endpoint);
+  }
+  assert.match(announcements, /audienceType/);
+  assert.match(announcements, /method: "POST"/);
+  assert.match(announcements, /"publish"/);
+  assert.match(announcements, /"archive"/);
+  assert.match(workspace, /TeacherAnnouncementsScreen/);
+  assert.match(workspace, /\["announcements","Announcements"\]/);
 });
