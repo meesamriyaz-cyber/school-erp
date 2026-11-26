@@ -140,3 +140,12 @@ test('school administrator mobile overview exposes the same core school operatio
   assert.match(app, /Attendance trend/);
   assert.match(app, /Academic performance/);
 });
+
+
+test('teacher mobile workspace preserves separate subject assignments within the same class', async () => {
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /id\(a\.subjectId\)\|\|"all"/);
+  assert.match(workspace, /\[\["attendance","Attendance"\],\["students","My students"\],\["homework","Homework"\],\["exams","Exams"\]/);
+  assert.match(workspace, /\["announcements","Announcements"\],\["messages","Parent messages"\]/);
+  assert.match(workspace, /\/teacher-assignments\?status=active/);
+});
