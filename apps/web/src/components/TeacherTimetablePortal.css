@@ -174,3 +174,29 @@
   .teacher-workspace-tabs { gap: 2px; }
   .teacher-workspace-tabs button { padding: 10px 12px; }
 }
+
+
+/* Dashboard refinement pass */
+.teacher-overview { display:grid; gap:18px; max-width:none; }
+.teacher-overview-cards { grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+.teacher-overview-cards article { position:relative; display:grid; align-content:start; gap:7px; min-width:0; min-height:132px; padding:17px 18px 15px 58px; border:1px solid #e8edf4; border-radius:13px; background:#fff; box-shadow:0 3px 12px #1d31540a; }
+.teacher-overview-cards article:before { position:absolute; top:17px; left:17px; display:grid; place-items:center; width:30px; height:30px; border-radius:9px; background:#edf1ff; color:#4263eb; font-size:16px; font-weight:800; content:"◷"; }
+.teacher-overview-cards article:nth-child(2):before { background:#f2edfb; color:#7654b5; content:"▦"; }
+.teacher-overview-cards article:nth-child(3):before { background:#e9f8f0; color:#16835b; content:"◎"; }
+.teacher-overview-cards article:nth-child(4):before { background:#fff5e4; color:#a66a12; content:"✓"; }
+.teacher-overview-cards strong { color:#26344d; font-size:25px; letter-spacing:-.6px; }
+.teacher-overview-cards span { color:#7d899d; font-size:11px; font-weight:650; }
+.teacher-overview-schedule { margin-top:0; padding:20px; border:1px solid #e8edf4; border-radius:13px; background:#fff; box-shadow:0 3px 12px #1d31540a; }
+.teacher-overview-schedule h2 { margin:0 0 5px; color:#34415a; font-size:14px; }
+.teacher-overview-schedule>p { margin:0 0 12px; color:#8490a4; font-size:11px; }
+.teacher-overview-schedule article { grid-template-columns:minmax(130px,.7fr) minmax(0,1.5fr) auto; gap:12px; padding:14px 0; border-top:1px solid #edf0f5; }
+.teacher-overview-schedule article strong { color:#34415a; font-size:12px; }
+.teacher-overview-schedule article span { color:#52617a; font-size:12px; font-weight:650; }
+.teacher-overview-schedule article small { color:#929caf; font-size:10px; }
+.teacher-overview-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:0; }
+.teacher-overview-actions button { display:flex; align-items:center; justify-content:center; min-height:44px; padding:10px 12px; border:1px solid #e5eaf2; border-radius:9px; background:#fff; color:#5266bd; font-size:11px; font-weight:750; box-shadow:0 2px 7px #1d315406; }
+.teacher-overview-actions button:hover { border-color:#cbd5ff; background:#f8f9ff; box-shadow:0 3px 10px #4263eb12; }
+.teacher-overview-actions button:focus-visible { outline:3px solid #4263eb35; outline-offset:2px; }
+@media(max-width:900px) { .teacher-overview-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } .teacher-overview-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:700px) { .teacher-overview-schedule article { grid-template-columns:1fr; gap:4px; } }
+@media(max-width:520px) { .teacher-overview-schedule { padding:15px; } .teacher-overview-actions { grid-template-columns:1fr 1fr; } .teacher-overview-actions button { justify-content:flex-start; } }
