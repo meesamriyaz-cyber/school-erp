@@ -136,7 +136,7 @@ export default function StudentForm({ onClose, onCreated }) {
             <div className="student-form-grid">
               <label>Admission number *<input name="admissionNumber" value={form.admissionNumber} onChange={updateField} maxLength={50} required disabled={!!createdStudent}/></label>
               <label>Admission date *<input name="admissionDate" type="date" value={form.admissionDate} onChange={updateField} required disabled={!!createdStudent}/></label>
-              <label>First name *<input name="firstName" value={form.firstName} onChange={updateField} maxLength={80} required disabled={!!createdStudent}/></label>
+              <label>Student first name *<input name="firstName" value={form.firstName} onChange={updateField} maxLength={80} required disabled={!!createdStudent}/></label>
               <label>Last name<input name="lastName" value={form.lastName} onChange={updateField} maxLength={80} disabled={!!createdStudent}/></label>
               <label>Date of birth<input name="dateOfBirth" type="date" value={form.dateOfBirth} onChange={updateField} disabled={!!createdStudent}/></label>
               <label>Gender<select name="gender" value={form.gender} onChange={updateField} disabled={!!createdStudent}><option value="not_specified">Prefer not to specify</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></label>
