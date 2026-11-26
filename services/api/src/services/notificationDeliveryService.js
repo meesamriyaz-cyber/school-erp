@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import Notification from "../models/Notification.js";
 import User from "../models/User.js";
+import Guardian from "../models/Guardian.js";
+import StudentGuardian from "../models/StudentGuardian.js";
+import { sendGuardianChannel } from "./guardianCommunicationService.js";
 import { markWorkerStarted, markWorkerHeartbeat, markWorkerCycleStarted, markWorkerCycleSucceeded, markWorkerCycleFailed, markWorkerStopped } from "./workerHealth.js";
 
 const MAX_ATTEMPTS = 8;
@@ -62,7 +65,7 @@ export async function processPendingNotifications({ batchSize = 50, notification
           tenantId: notification.tenantId,
           role: notification.recipientRole,
           status: "active",
-        }).select("_id").lean();
+        }).select("_id email firstName").lean();
 
         if (!recipient) {
           await Notification.updateOne(
@@ -75,6 +78,47 @@ export async function processPendingNotifications({ batchSize = 50, notification
           );
           processed += 1;
           continue;
+        }
+
+        // Parent email is an additional channel; the in-app notification remains
+        // independently deliverable if email is unavailable or fails.
+        if (notification.recipientRole === "parent" && notification.emailDeliveryStatus === "pending") {
+          const guardian = await Guardian.findOne({
+            tenantId: notification.tenantId, userId: recipient._id, status: "active",
+            emailVerifiedAt: { $ne: null },
+          }).select("_id email verifiedEmail").lean();
+          const links = guardian ? await StudentGuardian.find({
+            tenantId: notification.tenantId, guardianId: guardian._id,
+            studentId: { $in: notification.relatedStudentIds || [] },
+            status: "active", receivesCommunication: true, communicationChannels: "email",
+          }).select("_id").limit(1).lean() : [];
+          const email = String(guardian?.verifiedEmail || guardian?.email || "").trim().toLowerCase();
+          if (!guardian || !links.length || !email) {
+            await Notification.updateOne(
+              { _id: notification._id, deliveryStatus: "processing", processingToken, emailDeliveryStatus: "pending" },
+              { $set: { emailDeliveryStatus: "skipped", emailLastError: null } },
+            );
+          } else {
+            await Notification.updateOne(
+              { _id: notification._id, deliveryStatus: "processing", processingToken, emailDeliveryStatus: "pending" },
+              { $set: { emailDeliveryStatus: "sending" } },
+            );
+            try {
+              const emailResult = await sendGuardianChannel({
+                channel: "email", recipient: email, subject: notification.title,
+                message: notification.body, guardianId: guardian._id, purpose: "school_notification",
+              });
+              await Notification.updateOne(
+                { _id: notification._id, deliveryStatus: "processing", processingToken, emailDeliveryStatus: "sending" },
+                { $set: { emailDeliveryStatus: "sent", emailDeliveredAt: new Date(), emailMessageId: emailResult.messageId || null, emailLastError: null } },
+              );
+            } catch (emailError) {
+              await Notification.updateOne(
+                { _id: notification._id, deliveryStatus: "processing", processingToken, emailDeliveryStatus: "sending" },
+                { $set: { emailDeliveryStatus: "failed", emailLastError: safeError(emailError) } },
+              );
+            }
+          }
         }
 
         const result = await Notification.updateOne(
