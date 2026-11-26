@@ -166,7 +166,7 @@ export default function StudentForm({ onClose, onCreated }) {
               <label>Father first name<input name="firstName" value={form.father.firstName} onChange={(event) => updateParentField("father", event)} maxLength={80} disabled={!!createdStudent}/></label>
               <label>Father last name<input name="lastName" value={form.father.lastName} onChange={(event) => updateParentField("father", event)} maxLength={80} disabled={!!createdStudent}/></label>
               <label>Father phone (10 digits)<input name="phone" type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={form.father.phone} onChange={(event) => updateParentField("father", event)} disabled={!!createdStudent}/></label>
-              <label>Father email (OTP verified)<input name="email" type="email" value={form.father.email} onChange={(event) => updateParentField("father", event)} maxLength={254} disabled={!!createdStudent}/></label>
+              <label>Father email (verification code sent after save)<input name="email" type="email" value={form.father.email} onChange={(event) => updateParentField("father", event)} maxLength={254} disabled={!!createdStudent}/></label>
               <label className="student-form-full">Father photo URL (HTTPS)<input name="photoUrl" type="url" value={form.father.photoUrl} onChange={(event) => updateParentField("father", event)} maxLength={2048} disabled={!!createdStudent}/></label>
             </div>
             <h3>Mother details (optional)</h3>
@@ -174,7 +174,7 @@ export default function StudentForm({ onClose, onCreated }) {
               <label>Mother first name<input name="firstName" value={form.mother.firstName} onChange={(event) => updateParentField("mother", event)} maxLength={80} disabled={!!createdStudent}/></label>
               <label>Mother last name<input name="lastName" value={form.mother.lastName} onChange={(event) => updateParentField("mother", event)} maxLength={80} disabled={!!createdStudent}/></label>
               <label>Mother phone (10 digits)<input name="phone" type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={form.mother.phone} onChange={(event) => updateParentField("mother", event)} disabled={!!createdStudent}/></label>
-              <label>Mother email (OTP verified)<input name="email" type="email" value={form.mother.email} onChange={(event) => updateParentField("mother", event)} maxLength={254} disabled={!!createdStudent}/></label>
+              <label>Mother email (verification code sent after save)<input name="email" type="email" value={form.mother.email} onChange={(event) => updateParentField("mother", event)} maxLength={254} disabled={!!createdStudent}/></label>
               <label className="student-form-full">Mother photo URL (HTTPS)<input name="photoUrl" type="url" value={form.mother.photoUrl} onChange={(event) => updateParentField("mother", event)} maxLength={2048} disabled={!!createdStudent}/></label>
             </div>
             {parentVerification.map((item) => <p key={item.guardianId} role="status">{item.relationship}: {item.sent ? "verification email sent" : item.error || "verification email pending"}</p>)}
