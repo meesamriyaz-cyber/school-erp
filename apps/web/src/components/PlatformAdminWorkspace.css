@@ -192,3 +192,14 @@
   .platform-search-form { min-width:100%; }
   .platform-status-filter { width:100%;justify-content:space-between; }
 }
+
+
+.platform-plan-form { margin:18px 0 24px; }
+.platform-payment-inline { display:grid;grid-template-columns:90px 130px 120px auto;gap:6px;min-width:420px; }
+.platform-payment-inline input,.platform-payment-inline select,.platform-subscription-assign input,.platform-subscription-assign select { min-width:0;padding:8px;border:1px solid #dce3ed;border-radius:7px;background:#fff;color:#34415a;font:inherit;font-size:12px; }
+.platform-payment-inline .platform-primary-button { padding:8px 10px; }
+.platform-subscription-assign { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px; }
+.platform-subscription-assign label { display:grid;gap:6px;color:#526078;font-size:12px;font-weight:700; }
+.platform-subscription-assign button { align-self:end;justify-self:start; }
+.platform-school-details { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px; }
+@media(max-width:650px) { .platform-payment-inline { grid-template-columns:1fr 1fr;min-width:280px; } .platform-subscription-assign,.platform-school-details { grid-template-columns:1fr; } }
