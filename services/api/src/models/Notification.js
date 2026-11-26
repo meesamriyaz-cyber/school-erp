@@ -45,6 +45,10 @@ const notificationSchema = new mongoose.Schema({
   deliveredAt: { type: Date, default: null },
   lastError: { type: String, default: null, maxlength: 200 },
   deliveryHistory: { type: [deliveryHistorySchema], default: [] },
+  emailDeliveryStatus: { type: String, enum: ["not_applicable", "pending", "sending", "sent", "failed", "skipped"], default: "pending" },
+  emailDeliveredAt: { type: Date, default: null },
+  emailMessageId: { type: String, default: null, maxlength: 128 },
+  emailLastError: { type: String, default: null, maxlength: 200 },
   readAt: { type: Date, default: null },
 }, { timestamps: true, versionKey: false, strict: "throw" });
 
