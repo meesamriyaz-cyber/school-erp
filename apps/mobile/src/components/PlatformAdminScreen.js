@@ -11,6 +11,8 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [overview, setOverview] = useState(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState("");
+  const [commercialRecords, setCommercialRecords] = useState([]);
+  const [commercialError, setCommercialError] = useState("");
   const [schools, setSchools] = useState([]);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
@@ -54,6 +56,20 @@ export function PlatformAdminScreen({ user, onSignOut }) {
     return () => { mounted = false; };
   }, [section]);
 
+  useEffect(() => {
+    if (["overview", "schools", "users"].includes(section)) return undefined;
+    let mounted = true;
+    setLoading(true); setCommercialError("");
+    const endpoint = section === "plans" ? "/platform/subscription-plans"
+      : section === "billing" ? "/platform/invoices"
+      : "/platform/commercial-events?limit=50";
+    apiRequest(endpoint)
+      .then((response) => { if (mounted) setCommercialRecords(Array.isArray(response?.data) ? response.data : []); })
+      .catch((requestError) => { if (mounted) setCommercialError(requestError?.message || "Unable to load commercial records."); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [section]);
+
   const switchSection = (next) => {
     setSection(next);
     setPage(1);
@@ -87,16 +103,16 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         <Text style={styles.welcomeName}>{[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Platform administrator"}</Text>
         <Text style={styles.welcomeCopy}>Restricted cross-school administration</Text>
       </View>
-      <View style={styles.tabs}>
-        {[["overview", "Overview"], ["schools", "Schools"], ["users", "Users"]].map(([key, label]) =>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+        {[["overview", "Overview"], ["schools", "Schools"], ["users", "Users"], ["plans", "Plans"], ["billing", "Billing"], ["audit", "Audit"]].map(([key, label]) =>
           <TouchableOpacity key={key} onPress={() => switchSection(key)} style={[styles.tab, section === key && styles.tabActive]}>
             <Text style={[styles.tabText, section === key && styles.tabTextActive]}>{label}</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
       {section === "overview" ? <View style={styles.metricsWrap}>
         {overviewLoading ? <ActivityIndicator color={colors.primary}/> : null}
-        {overviewError ? <View style={styles.error}><Text style={styles.errorText}>{overviewError}</Text></View> : null}
+        {overviewError ? <View style={styles.error}><Text style={styles.errorText}>{overviewError}</Text></View> : null}\n        {!overviewLoading && !overviewError && !overview ? <Text style={styles.metricHint}>No business overview data is available yet.</Text> : null}
         {overview ? <>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CLIENT SCHOOLS</Text><Text style={styles.metricValue}>{overview.schools?.total ?? 0}</Text><Text style={styles.metricHint}>{overview.schools?.active ?? 0} active</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>ACTIVE SUBSCRIPTIONS</Text><Text style={styles.metricValue}>{Object.values(overview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</Text><Text style={styles.metricHint}>Across all billing terms</Text></View>
@@ -106,6 +122,27 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         </> : null}
         <Text style={styles.metricFootnote}>Platform revenue only. Student fee collections remain separate within each school.</Text>
       </View> : null}
+
+      {["plans", "billing", "audit"].includes(section) ? <>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>{section === "plans" ? "Subscription plans" : section === "billing" ? "Platform billing" : "Commercial audit"}</Text>
+            <Text style={styles.sectionSubtitle}>{section === "plans" ? "Monthly, annual and lifetime offers" : section === "billing" ? "Platform invoices and recorded payments" : "Plan, subscription and payment history"}</Text>
+          </View>
+          <TouchableOpacity onPress={() => switchSection(section)} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></TouchableOpacity>
+        </View>
+        {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading…</Text></View> : null}
+        {commercialError ? <View style={styles.error}><Text style={styles.errorText}>{commercialError}</Text><TouchableOpacity onPress={() => switchSection(section)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+        {!loading && !commercialError && commercialRecords.length === 0 ? <View style={styles.state}><Text style={styles.stateText}>{section === "plans" ? "No subscription plans created yet." : section === "billing" ? "No platform invoices yet." : "No commercial events recorded yet."}</Text></View> : null}
+        {commercialRecords.map((item, index) => <View key={String(item.id || item._id || index)} style={styles.record}>
+          <View style={{ flex: 1, gap: 5 }}>
+            <Text style={styles.recordName}>{section === "plans" ? item.name : section === "billing" ? item.invoiceNumber : String(item.action || "Event").replaceAll("_", " ")}</Text>
+            <Text style={styles.recordSubtitle}>{section === "plans" ? (item.billingInterval === "one_time" ? "Lifetime · single payment" : item.billingInterval + " · " + item.currency + " " + item.amount) : section === "billing" ? (item.tenantId?.name || "School") + " · " + item.status : (item.tenantId?.name || "Platform") + " · " + new Date(item.createdAt).toLocaleDateString()}</Text>
+          </View>
+          <View style={styles.statusPill}><Text style={styles.statusText}>{section === "plans" ? (item.isArchived ? "archived" : item.isActive ? "active" : "inactive") : section === "billing" ? item.status : "logged"}</Text></View>
+        </View>)}
+        <Text style={styles.metricFootnote}>Commercial controls and payment recording are available in the web platform workspace.</Text>
+      </> : null}
       {section !== "overview" ? <>
       <View style={styles.sectionHeader}>
         <View style={{ flex: 1 }}>
@@ -170,7 +207,7 @@ const styles = StyleSheet.create({
   metricHint: { color: colors.muted, fontSize: 10 },
   metricFootnote: { color: colors.muted, fontSize: 10, lineHeight: 15 },
   tabs: { flexDirection: "row", gap: 7, backgroundColor: colors.surface, padding: 5, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
-  tab: { flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: radius.sm },
+  tab: { minWidth: 76, alignItems: "center", paddingHorizontal: 12, paddingVertical: 11, borderRadius: radius.sm },
   tabActive: { backgroundColor: colors.primarySoft },
   tabText: { color: colors.muted, fontSize: 12, fontWeight: "800" },
   tabTextActive: { color: colors.primary },
