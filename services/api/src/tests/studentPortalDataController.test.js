@@ -38,7 +38,7 @@ const query = (value, methods = []) => {
 
 const configureParent = () => {
   mocks.guardianFindOne.mockReturnValue(query({ _id: "guardian-a" }, ["select"]));
-  mocks.relationshipFind.mockReturnValue(query([{ studentId: "student-a", canAccessPortal: true }], ["sort", "populate"]));
+  mocks.relationshipFind.mockReturnValue(query([{ studentId: "student-a", canAccessPortal: true }], ["select", "sort", "populate"]));
   mocks.studentFind.mockReturnValue(query([
     { _id: "student-a", firstName: "Amina", lastName: "Khan" },
   ], ["select", "sort"]));
