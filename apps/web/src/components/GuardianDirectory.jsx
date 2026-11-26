@@ -240,7 +240,9 @@ export default function GuardianDirectory() {
     if (!email) { setMutationError("Save a parent email address before requesting verification."); return; }
     setSaving(true); setMutationError(""); setMutationNotice("");
     try {
-      await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}/email-verification/send`, { method: "POST", accessToken, body: { email } });
+      const response = await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}/email-verification/send`, { method: "POST", accessToken, body: { email } });
+      if (!response?.success) throw new Error(response?.message || "Could not send verification email.");
+      setSelectedGuardian((current) => ({ ...current, pendingEmail: email, emailDeliveryStatus: "accepted", emailDeliveryUpdatedAt: new Date().toISOString() }));
       setMutationNotice(`A six-digit verification code was sent to ${email}.`);
     } catch (requestError) { setMutationError(requestError.message || "Could not send verification email."); }
     finally { setSaving(false); }
@@ -485,7 +487,7 @@ export default function GuardianDirectory() {
                     <span><strong>Phone:</strong> {selectedGuardian.phone || "—"}</span>
                     <span><strong>Email:</strong> {selectedGuardian.email || "—"}</span>
                     <span><strong>Pending email:</strong> {selectedGuardian.pendingEmail || "—"}</span>
-                    <span><strong>Email verification:</strong> {selectedGuardian.emailVerifiedAt && selectedGuardian.verifiedEmail === selectedGuardian.email ? "Verified" : "Not verified"}</span>
+                    <span><strong>Email verification:</strong> {selectedGuardian.emailVerifiedAt && selectedGuardian.verifiedEmail === selectedGuardian.email ? "Verified" : "Not verified"}</span>\n                    <span><strong>Email delivery:</strong> {selectedGuardian.emailDeliveryStatus || "No recent delivery event"}</span>\n                    {selectedGuardian.emailDeliveryUpdatedAt ? <span><strong>Delivery updated:</strong> {new Date(selectedGuardian.emailDeliveryUpdatedAt).toLocaleString()}</span> : null}
                     <span><strong>Phone verification:</strong> Not performed (contact number only)</span>
                     <span><strong>Status:</strong> <GuardianStatus status={selectedGuardian.status} /></span>
                     {selectedGuardian.photoUrl ? <img src={selectedGuardian.photoUrl} alt={`${fullName(selectedGuardian)} profile`} className="guardian-directory-photo" /> : null}
