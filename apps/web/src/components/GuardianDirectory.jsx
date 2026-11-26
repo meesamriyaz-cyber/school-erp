@@ -212,7 +212,7 @@ export default function GuardianDirectory() {
   };
 
   const verifyEmailCode = async () => {
-    if (!selectedGuardian || !/^\\d{6}$/.test(verificationCode.trim())) { setMutationError("Enter the six-digit code sent by email."); return; }
+    if (!selectedGuardian || !/^\d{6}$/.test(verificationCode.trim())) { setMutationError("Enter the six-digit code sent by email."); return; }
     setSaving(true); setMutationError(""); setMutationNotice("");
     try {
       const response = await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}/email-verification/verify`, { method: "POST", accessToken, body: { code: verificationCode.trim() } });
