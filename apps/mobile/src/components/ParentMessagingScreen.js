@@ -5,6 +5,7 @@ import { colors, radius, spacing } from "../theme/tokens";
 
 const personName = (person) => [person?.firstName, person?.lastName].filter(Boolean).join(" ") || "School user";
 const dateTime = (value) => value ? new Date(value).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "";
+const contactKey = (contact) => [contact.teacher?._id, contact.classId, contact.sectionId || "all"].map((value) => String(value || "")).join(":");
 
 export function ParentMessagingScreen() {
   const [contacts, setContacts] = useState([]);
@@ -59,8 +60,9 @@ export function ParentMessagingScreen() {
 
   const startConversation = async (contact) => {
     const teacherId = contact.teacher?._id;
-    const studentId = selectedStudents[teacherId] || contact.students?.[0]?._id;
-    const message = firstMessages[teacherId] || "";
+    const key = contactKey(contact);
+    const studentId = selectedStudents[key] || contact.students?.[0]?._id;
+    const message = firstMessages[key] || "";
     if (!studentId || !message.trim()) {
       setError("Choose a child and write a first message.");
       return;
@@ -74,7 +76,7 @@ export function ParentMessagingScreen() {
         body: { studentId, teacherId, message: message.trim() },
       });
       if (!response?.success) throw new Error("Unable to start this conversation.");
-      setFirstMessages((current) => ({ ...current, [teacherId]: "" }));
+      setFirstMessages((current) => ({ ...current, [key]: "" }));
       setNotice("Your message has been sent.");
       await loadWorkspace();
       await openConversation(response.data);
@@ -135,18 +137,19 @@ export function ParentMessagingScreen() {
       <Text style={styles.panelTitle}>Contact an assigned teacher</Text>
       {loading ? <ActivityIndicator color={colors.primary}/> : contacts.length ? contacts.map((contact, index) => {
         const teacherId = contact.teacher?._id || String(index);
-        const selected = selectedStudents[teacherId] || contact.students?.[0]?._id || "";
-        return <View key={teacherId + String(contact.classId || index)} style={styles.contact}>
+        const key = contactKey(contact);
+        const selected = selectedStudents[key] || contact.students?.[0]?._id || "";
+        return <View key={key || teacherId + String(index)} style={styles.contact}>
           <Text style={styles.person}>{personName(contact.teacher)}</Text>
           <Text style={styles.muted}>{contact.subject?.name || "Subject"} · Assigned class</Text>
           <Text style={styles.fieldLabel}>Child</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.studentChoices}>
-            {(contact.students || []).map((student) => <TouchableOpacity key={student._id} onPress={() => setSelectedStudents((current) => ({ ...current, [teacherId]: student._id }))} style={[styles.choice, selected === student._id && styles.choiceActive]}>
+            {(contact.students || []).map((student) => <TouchableOpacity key={student._id} onPress={() => setSelectedStudents((current) => ({ ...current, [key]: student._id }))} style={[styles.choice, selected === student._id && styles.choiceActive]}>
               <Text style={[styles.choiceText, selected === student._id && styles.choiceTextActive]}>{personName(student)}</Text>
             </TouchableOpacity>)}
           </ScrollView>
-          <TextInput value={firstMessages[teacherId] || ""} onChangeText={(value) => setFirstMessages((current) => ({ ...current, [teacherId]: value }))} placeholder="Write your first message…" multiline maxLength={5000} style={styles.input}/>
-          <TouchableOpacity disabled={busy || !(firstMessages[teacherId] || "").trim() || !selected} onPress={() => startConversation(contact)} style={[styles.primary, (busy || !(firstMessages[teacherId] || "").trim() || !selected) && styles.disabled]}>
+          <TextInput value={firstMessages[key] || ""} onChangeText={(value) => setFirstMessages((current) => ({ ...current, [key]: value }))} placeholder="Write your first message…" multiline maxLength={5000} style={styles.input}/>
+          <TouchableOpacity disabled={busy || !(firstMessages[key] || "").trim() || !selected} onPress={() => startConversation(contact)} style={[styles.primary, (busy || !(firstMessages[teacherId] || "").trim() || !selected) && styles.disabled]}>
             <Text style={styles.primaryText}>{busy ? "Sending…" : "Send message"}</Text>
           </TouchableOpacity>
         </View>;
