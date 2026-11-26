@@ -17,7 +17,7 @@ function verifyResendSignature(req) {
   const id = req.get("svix-id");
   const timestamp = req.get("svix-timestamp");
   const signatures = req.get("svix-signature");
-  if (!id || !timestamp || !signatures || !/^\\d+$/.test(timestamp)) return false;
+  if (!id || !timestamp || !signatures || !/^\d+$/.test(timestamp)) return false;
   const timestampSeconds = Number(timestamp);
   if (!Number.isSafeInteger(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_CLOCK_SKEW_SECONDS) return false;
 
