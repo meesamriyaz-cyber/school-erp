@@ -85,6 +85,9 @@ export const createStudent = async (req, res, next) => {
   if (typeof fields.admissionNumber !== "string" || !fields.admissionNumber.trim() || typeof fields.firstName !== "string" || !fields.firstName.trim()) {
     return invalidRequest(res, "Admission number and first name are required");
   }
+  if (Object.hasOwn(fields, "guardianPhone") && fields.guardianPhone !== null && fields.guardianPhone !== "" && (typeof fields.guardianPhone !== "string" || !/^[0-9]{10}$/.test(fields.guardianPhone))) {
+    return invalidRequest(res, "Guardian phone number must contain exactly 10 digits (0-9), without country code or symbols");
+  }
   if (typeof fields.guardianName !== "string" || !fields.guardianName.trim()) {
     return invalidRequest(res, "Primary guardian name is required");
   }
@@ -136,6 +139,7 @@ export const updateStudent = async (req, res, next) => {
     if (Object.hasOwn(body, "tenantId")) return invalidRequest(res, "School assignment cannot be changed");
     const updates = pickFields(body, UPDATE_FIELDS);
     if (Object.hasOwn(updates, "address") && (!updates.address || typeof updates.address !== "object" || Array.isArray(updates.address))) return invalidRequest(res, "Address must be an object");
+    if (Object.hasOwn(updates, "guardianPhone") && updates.guardianPhone !== null && updates.guardianPhone !== "" && (typeof updates.guardianPhone !== "string" || !/^[0-9]{10}$/.test(updates.guardianPhone))) return invalidRequest(res, "Guardian phone number must contain exactly 10 digits (0-9), without country code or symbols");
     if (Object.hasOwn(updates, "guardianName") && (typeof updates.guardianName !== "string" || !updates.guardianName.trim())) return invalidRequest(res, "Primary guardian name cannot be empty");
     if (Object.hasOwn(updates, "guardianRelationship") && !["mother", "father", "uncle", "aunt", "legal_guardian", "grandparent", "step_parent", "sibling", "other"].includes(updates.guardianRelationship)) return invalidRequest(res, "Invalid primary guardian relationship");
     if (Object.hasOwn(updates, "photoUrl") && updates.photoUrl !== null && updates.photoUrl !== "" && (typeof updates.photoUrl !== "string" || !isHttpsUrl(updates.photoUrl.trim()))) return invalidRequest(res, "Student photo URL must be a valid HTTPS URL");
