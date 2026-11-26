@@ -106,6 +106,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         </> : null}
         <Text style={styles.metricFootnote}>Platform revenue only. Student fee collections remain separate within each school.</Text>
       </View> : null}
+      {section !== "overview" ? <>
       <View style={styles.sectionHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionTitle}>{section === "schools" ? "School directory" : "User directory"}</Text>
@@ -139,6 +140,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         <Text style={styles.pageCount}>Page {page} of {pagination.pages}</Text>
         <TouchableOpacity disabled={page >= pagination.pages} onPress={() => setPage((value) => value + 1)} style={[styles.pageButton, page >= pagination.pages && styles.disabled]}><Text style={styles.pageText}>Next</Text></TouchableOpacity>
       </View> : null}
+      </> : null}
       <Text style={styles.footer}>SchoolSuite · Platform administration</Text>
     </ScrollView>
   </AppScreen>;
