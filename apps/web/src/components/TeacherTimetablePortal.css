@@ -200,3 +200,102 @@
 @media(max-width:900px) { .teacher-overview-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } .teacher-overview-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:700px) { .teacher-overview-schedule article { grid-template-columns:1fr; gap:4px; } }
 @media(max-width:520px) { .teacher-overview-schedule { padding:15px; } .teacher-overview-actions { grid-template-columns:1fr 1fr; } .teacher-overview-actions button { justify-content:flex-start; } }
+
+
+/* Consistent visual treatment for teacher operational modules */
+.teacher-workspace-content .teacher-attendance,
+.teacher-workspace-content .homework-page,
+.teacher-workspace-content .teacher-exams,
+.teacher-workspace-content .teacher-reports {
+  max-width:none; min-width:0; padding:20px; border:1px solid #e8edf4;
+  border-radius:13px; background:#fff; box-shadow:0 3px 12px #1d31540a;
+}
+.teacher-workspace-content :is(.teacher-attendance-heading,.homework-intro,.teacher-reports header) {
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+}
+.teacher-workspace-content :is(.teacher-attendance-heading h2,.homework-intro h2,.teacher-exams h2,.teacher-reports h2) {
+  margin:0 0 5px; color:#26344d; font-family:"Plus Jakarta Sans","Segoe UI",sans-serif;
+  font-size:17px; font-weight:800; letter-spacing:-.25px;
+}
+.teacher-workspace-content :is(.teacher-attendance-heading p,.homework-intro p,.teacher-exams>p,.teacher-reports header p) {
+  margin:0; color:#8490a4; font-size:11px; line-height:1.6;
+}
+.teacher-workspace-content :is(.teacher-attendance-filters,.homework-form,.teacher-report-filters) {
+  gap:12px; margin-top:16px;
+}
+.teacher-workspace-content :is(.teacher-attendance-filters label,.homework-form label,.teacher-report-filters label,.teacher-exams>label,.teacher-exams-change-reason) {
+  display:grid; gap:6px; color:#65728a; font-size:11px; font-weight:700;
+}
+.teacher-workspace-content :is(.homework-form input,.homework-form select,.homework-form textarea,.homework-review-form input,.homework-review-form textarea,.teacher-exams select,.teacher-exams input,.teacher-exams textarea,.teacher-report-filters input,.teacher-report-filters select,.teacher-attendance-filters select,.teacher-attendance-filters input,.teacher-attendance-table-wrap select,.teacher-attendance-table-wrap input) {
+  min-height:40px; width:100%; min-width:0; padding:9px 11px; border:1px solid #e0e6ef;
+  border-radius:8px; background:#fff; color:#34415a; font:inherit; font-size:12px;
+}
+.teacher-workspace-content :is(.teacher-attendance-filters select:focus,.teacher-attendance-filters input:focus,.teacher-attendance-table-wrap select:focus,.teacher-attendance-table-wrap input:focus,.homework-form input:focus,.homework-form select:focus,.homework-form textarea:focus,.homework-review-form input:focus,.homework-review-form textarea:focus,.teacher-exams select:focus,.teacher-exams input:focus,.teacher-exams textarea:focus,.teacher-report-filters input:focus,.teacher-report-filters select:focus) {
+  border-color:#9aacf8; outline:0; box-shadow:0 0 0 3px #4263eb18;
+}
+.teacher-workspace-content :is(.teacher-attendance-summary,.teacher-report-summary,.homework-register-summary) { gap:10px; }
+.teacher-workspace-content :is(.teacher-attendance-summary div,.teacher-report-summary article,.homework-register-summary span) {
+  padding:14px; border:1px solid #e8edf4; border-radius:10px; background:#fff;
+}
+.teacher-workspace-content :is(.teacher-attendance-summary strong,.teacher-report-summary strong,.homework-register-summary strong) {
+  color:#26344d; font-family:"Plus Jakarta Sans","Segoe UI",sans-serif; font-size:21px; font-weight:800;
+}
+.teacher-workspace-content :is(.teacher-attendance-summary span,.teacher-report-summary span,.homework-register-summary span) { color:#8490a4; font-size:10px; }
+.teacher-workspace-content :is(.teacher-attendance-heading>button,.teacher-report-filters button,.homework-primary,.homework-review-form button,.teacher-exams>button) {
+  min-height:40px; padding:9px 14px; border:1px solid #4263eb; border-radius:8px;
+  background:#4263eb; color:#fff; font-size:11px; font-weight:750; box-shadow:0 2px 5px #4263eb20;
+}
+.teacher-workspace-content :is(.teacher-attendance-heading>button:disabled,.teacher-report-filters button:disabled,.homework-primary:disabled,.teacher-exams>button:disabled) { opacity:.55; box-shadow:none; }
+.teacher-workspace-content .teacher-attendance-bulk button {
+  min-height:36px; padding:8px 11px; border:1px solid #e5eaf2; border-radius:8px;
+  background:#f7f8ff; color:#5266bd; font-size:10px; font-weight:700;
+}
+.teacher-workspace-content .teacher-attendance-bulk button:hover { border-color:#cbd5ff; background:#edf1ff; }
+.teacher-workspace-content :is(.teacher-attendance-table-wrap,.teacher-report-table,.teacher-exams-table) {
+  overflow:auto; border:1px solid #e8edf4; border-radius:10px; background:#fff;
+}
+.teacher-workspace-content :is(.teacher-attendance-table-wrap table,.teacher-report-table table,.teacher-exams-table table) { width:100%; border-collapse:separate; border-spacing:0; }
+.teacher-workspace-content :is(.teacher-attendance-table-wrap th,.teacher-report-table th,.teacher-exams-table th) {
+  padding:12px; border-bottom:1px solid #e8edf4; background:#f8f9fc; color:#78859b;
+  font-size:9px; font-weight:800; letter-spacing:.05em; text-align:left; text-transform:uppercase;
+}
+.teacher-workspace-content :is(.teacher-attendance-table-wrap td,.teacher-report-table td,.teacher-exams-table td) {
+  padding:11px 12px; border-bottom:1px solid #edf0f5; color:#43516a; font-size:11px;
+}
+.teacher-workspace-content :is(.teacher-attendance-table-wrap tr:last-child td,.teacher-report-table tr:last-child td,.teacher-exams-table tr:last-child td) { border-bottom:0; }
+.teacher-workspace-content :is(.homework-card,.homework-item,.homework-submission,.homework-roster) {
+  border:1px solid #e8edf4; border-radius:11px; box-shadow:none;
+}
+.teacher-workspace-content .homework-card { padding:18px; }
+.teacher-workspace-content .homework-card h3 { margin:0 0 14px; color:#34415a; font-size:14px; }
+.teacher-workspace-content .homework-item { padding:15px; }
+.teacher-workspace-content .homework-item-main strong { color:#34415a; font-size:12px; }
+.teacher-workspace-content :is(.homework-item-main span,.homework-item footer,.homework-item p) { color:#77849a; font-size:11px; }
+.teacher-workspace-content .homework-status { border:1px solid #e8edf4; font-size:9px; }
+.teacher-workspace-content .homework-status.status-published { border-color:#d9eee3; background:#f2fbf6; color:#26784d; }
+.teacher-workspace-content .homework-item footer button,.teacher-workspace-content .homework-register-heading button {
+  min-height:34px; padding:7px 10px; border:1px solid #e5eaf2; border-radius:8px;
+  background:#fff; color:#5266bd; font-size:10px; font-weight:700;
+}
+.teacher-workspace-content .teacher-exams { display:grid; gap:13px; }
+.teacher-workspace-content .teacher-exams>label { max-width:520px; margin:0; }
+.teacher-workspace-content .teacher-exams-mark { gap:8px; }
+.teacher-workspace-content .teacher-exams-mark input[type=number] { width:82px; }
+.teacher-workspace-content .teacher-exams-mark label { display:flex; align-items:center; gap:5px; color:#65728a; font-size:10px; }
+.teacher-workspace-content .teacher-exams-mark label input { width:15px; min-height:15px; }
+.teacher-workspace-content .teacher-exams-change-reason { max-width:620px; }
+.teacher-workspace-content .teacher-exams-change-reason textarea { min-height:74px; resize:vertical; }
+.teacher-workspace-content :is(.teacher-attendance-error,.homework-error,.teacher-timetable-error) { border:1px solid #f4d8d5; border-radius:9px; background:#fff7f6; color:#a52820; }
+.teacher-workspace-content :is(.teacher-attendance-notice,.homework-notice,.teacher-workspace-notice) { border:1px solid #d9eee3; border-radius:9px; background:#f2fbf6; color:#26784d; }
+@media(max-width:760px) {
+  .teacher-workspace-content :is(.teacher-attendance,.homework-page,.teacher-exams,.teacher-reports) { padding:15px; }
+  .teacher-workspace-content :is(.teacher-attendance-summary,.teacher-report-summary) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .teacher-workspace-content :is(.teacher-attendance-heading,.homework-intro,.teacher-reports header) { align-items:flex-start; flex-direction:column; }
+  .teacher-workspace-content .teacher-report-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:520px) {
+  .teacher-workspace-content :is(.teacher-attendance-summary,.teacher-report-summary,.homework-register-summary) { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .teacher-workspace-content .teacher-report-filters { grid-template-columns:1fr; }
+  .teacher-workspace-content .teacher-report-filters label:first-child,.teacher-workspace-content .teacher-report-filters button { grid-column:auto; }
+  .teacher-workspace-content .teacher-attendance-heading>button { width:100%; }
+}
