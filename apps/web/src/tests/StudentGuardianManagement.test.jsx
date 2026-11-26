@@ -75,7 +75,7 @@ describe("StudentGuardianManagement", () => {
     await user.type(screen.getByLabelText("First name *"), "Sara");
     await user.type(screen.getByLabelText("Last name"), "Khan");
     await user.type(screen.getByLabelText("Phone"), "8888888888");
-    await user.type(screen.getByLabelText("Email"), "sara@example.com");
+    await user.type(screen.getByLabelText("Email (OTP verified)"), "sara@example.com");
     await user.selectOptions(screen.getByLabelText("Relationship *"), "mother");
     await user.click(screen.getByLabelText("Primary guardian"));
     await user.click(screen.getByRole("button", { name: "Save guardian" }));
