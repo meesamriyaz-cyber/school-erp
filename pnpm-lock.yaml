@@ -25,6 +25,9 @@ importers:
       expo-secure-store:
         specifier: ~57.0.4
         version: 57.0.4(expo@57.0.27)
+      expo-document-picker:
+        specifier: ~57.0.0
+        version: 57.0.3(expo@57.0.27)
       expo-status-bar:
         specifier: ~57.0.1
         version: 57.0.1(expo@57.0.27)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.2.3))(react@19.2.3)
@@ -4029,6 +4032,12 @@ packages:
   zod@4.6.5:
     resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
+  expo-document-picker@57.0.3:
+    resolution:
+      tarball: https://registry.npmjs.org/expo-document-picker/-/expo-document-picker-57.0.3.tgz
+    peerDependencies:
+      expo: '*'
+
   expo-secure-store@57.0.4:
     resolution:
       tarball: https://registry.npmjs.org/expo-secure-store/-/expo-secure-store-57.0.4.tgz
@@ -4036,6 +4045,7 @@ packages:
       expo: '*'
 
 snapshots:
+  expo-document-picker@57.0.3(expo@57.0.27): {}
   expo-secure-store@57.0.4(expo@57.0.27): {}
 
 
