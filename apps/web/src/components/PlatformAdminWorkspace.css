@@ -1,0 +1,194 @@
+/* SchoolSuite blue theme for the cross-school platform workspace */
+.platform-shell {
+  --platform-primary:#4263eb;
+  --platform-primary-strong:#304bc0;
+  --platform-primary-soft:#edf1ff;
+  --platform-page:#f5f7fb;
+  --platform-ink:#202c42;
+  --platform-muted:#778196;
+  --platform-border:#e7ebf2;
+  min-height:100vh;
+  display:flex;
+  color:var(--platform-ink);
+  background:var(--platform-page);
+  font-family:"DM Sans","Segoe UI",sans-serif;
+}
+.platform-sidebar {
+  flex:0 0 258px;
+  width:258px;
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  border-right:1px solid var(--platform-border);
+}
+.platform-brand {
+  min-height:84px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:0 23px;
+  border-bottom:1px solid #f0f2f7;
+}
+.platform-brand-mark {
+  width:39px;height:39px;display:grid;place-items:center;
+  border-radius:12px;color:#fff;
+  background:linear-gradient(145deg,#5378ff,#3651ce);
+  box-shadow:0 6px 13px #4263eb30;
+  font:800 22px "Plus Jakarta Sans",sans-serif;
+}
+.platform-brand-name { color:#1e2b44;font:800 18px "Plus Jakarta Sans",sans-serif;letter-spacing:-.7px; }
+.platform-brand-name span { color:var(--platform-primary); }
+.platform-brand-caption,.platform-identity-label,.platform-nav-heading {
+  color:#9aa4b5;font-size:9px;font-weight:800;letter-spacing:1.05px;
+}
+.platform-brand-caption { margin-top:3px; }
+.platform-identity {
+  display:grid;gap:6px;margin:19px 15px 14px;padding:14px 12px;
+  border:1px solid var(--platform-border);border-radius:12px;background:#fff;
+}
+.platform-identity strong { color:#34415a;font-size:13px; }
+.platform-identity>span:last-child { color:#98a2b2;font-size:11px; }
+.platform-navigation { flex:1;padding:8px 13px 20px; }
+.platform-nav-heading { display:block;padding:8px 11px;color:#a2abba;font-size:10px; }
+.platform-nav-link {
+  display:flex;align-items:center;gap:12px;width:100%;min-height:42px;
+  margin:2px 0;padding:0 12px;text-align:left;border:0;border-radius:9px;
+  background:transparent;color:#738096;font-size:12px;font-weight:600;cursor:pointer;
+}
+.platform-nav-link:hover { background:#f5f7ff;color:var(--platform-primary); }
+.platform-nav-link-active { background:var(--platform-primary-soft);color:#3e5dde;font-weight:800; }
+.platform-sidebar-footer {
+  display:flex;align-items:center;gap:9px;margin:14px;padding:14px 12px;
+  border-radius:12px;background:#f7f8fc;color:var(--platform-muted);font-size:11px;
+}
+.platform-security-dot { width:8px;height:8px;border-radius:50%;background:#1eaa7c; }
+.platform-main { min-width:0;flex:1; }
+.platform-topbar {
+  min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:18px;
+  padding:12px 36px;background:#fff;border-bottom:1px solid var(--platform-border);
+}
+.platform-topbar>div:first-child { display:flex;align-items:center;gap:12px;color:#929caf;font-size:12px; }
+.platform-topbar>div:first-child strong { color:#34415a; }
+.platform-breadcrumb-divider { color:#c5ccd7; }
+.platform-user-actions { display:flex;align-items:center;gap:11px; }
+.platform-user-avatar {
+  width:38px;height:38px;display:grid;place-items:center;border-radius:12px;
+  background:#e5edff;color:var(--platform-primary);font-size:12px;font-weight:800;
+}
+.platform-user-copy { display:flex;flex-direction:column;gap:4px; }
+.platform-user-copy strong { color:#34415a;font-size:12px; }
+.platform-user-copy span { color:#98a2b2;font-size:10px; }
+.platform-logout,.platform-secondary-button,.platform-page-button {
+  border:1px solid #e7ebf2;border-radius:9px;background:#fff;color:#526078;
+  padding:9px 13px;font-size:12px;font-weight:700;cursor:pointer;
+}
+.platform-logout:hover,.platform-secondary-button:hover,.platform-page-button:hover:not(:disabled) {
+  border-color:#cbd6ff;background:#f5f7ff;color:var(--platform-primary);
+}
+.platform-content { max-width:1600px;margin:0 auto;padding:34px 36px 42px; }
+.platform-eyebrow { margin-bottom:9px;color:#8592a8;font-size:10px;font-weight:800;letter-spacing:1.5px; }
+.platform-content>h1 { margin:0 0 9px;color:var(--platform-ink);font:800 clamp(24px,2.2vw,30px) "Plus Jakarta Sans",sans-serif;letter-spacing:-1px; }
+.platform-page-description { margin:0 0 25px;color:#8b96a9;font-size:13px;line-height:1.7; }
+.platform-welcome-card {
+  min-height:178px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:24px;padding:30px 34px;border:1px solid #dce5ff;border-radius:16px;color:#fff;
+  background:linear-gradient(112deg,#344fcb 0%,#4969e8 58%,#7183f1 100%);
+  box-shadow:0 12px 28px #4664d51b;
+}
+.platform-welcome-card>div:first-child { position:relative;z-index:1;max-width:620px; }
+.platform-card-kicker { color:#dbe3ff;font-size:10px;font-weight:800;letter-spacing:1.5px; }
+.platform-welcome-card h2 { margin:10px 0;color:#fff;font:800 clamp(22px,2.2vw,30px) "Plus Jakarta Sans",sans-serif;letter-spacing:-.8px; }
+.platform-welcome-card p { color:#e0e6ff;font-size:13px;line-height:1.7; }
+.platform-welcome-card button,.platform-primary-button {
+  border:0;border-radius:8px;background:#fff;color:#3d59d5;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;
+}
+.platform-welcome-card button:hover { background:#eef2ff; }
+.platform-card-art {
+  position:absolute;right:60px;top:10px;width:180px;height:180px;border:1px solid #ffffff35;border-radius:50%;
+  display:grid;place-items:center;color:#ffffff28;font-size:100px;box-shadow:0 0 0 28px #ffffff0c,0 0 0 58px #ffffff08;
+}
+.platform-summary-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px; }
+.platform-summary-card {
+  position:relative;display:grid;gap:8px;align-content:start;min-height:145px;padding:19px 19px 17px 21px;
+  border:1px solid var(--platform-border);border-radius:13px;background:#fff;box-shadow:0 3px 12px #1d31540b;
+}
+.platform-summary-card:before { content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--platform-primary); }
+.platform-summary-card:nth-child(2):before { background:#1eaa7c; }
+.platform-summary-card:nth-child(3):before { background:#9869d5; }
+.platform-summary-icon { width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:var(--platform-primary-soft);color:var(--platform-primary);font-size:17px; }
+.platform-summary-label { color:#78859b;font-size:11px;font-weight:700; }
+.platform-summary-card strong { color:#25334a;font:800 22px "Plus Jakarta Sans",sans-serif; }
+.platform-summary-card p { margin:0;color:#929caf;font-size:11px;line-height:1.55; }
+.platform-form-card,.platform-directory {
+  padding:22px;border:1px solid var(--platform-border);border-radius:13px;background:#fff;box-shadow:0 3px 12px #1d31540a;
+}
+.platform-form-heading,.platform-directory-toolbar,.platform-directory-meta,.platform-pagination {
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+}
+.platform-form-heading { margin-bottom:18px; }
+.platform-form-heading h2 { margin:0 0 5px;color:#28364d;font:800 17px "Plus Jakarta Sans",sans-serif; }
+.platform-form-heading p,.platform-directory-meta span { margin:0;color:#929caf;font-size:11px; }
+.platform-primary-button { background:var(--platform-primary);color:#fff; }
+.platform-primary-button:hover { background:var(--platform-primary-strong); }
+.platform-school-form { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px; }
+.platform-school-form h3,.platform-form-actions { grid-column:1/-1; }
+.platform-school-form label { display:grid;gap:7px;color:#526078;font-size:12px;font-weight:700; }
+.platform-school-form input,.platform-school-form select,.platform-search-field input,.platform-status-filter select {
+  width:100%;min-width:0;padding:10px 11px;border:1px solid #dce3ed;border-radius:8px;background:#fff;color:#34415a;font:inherit;font-size:13px;
+}
+.platform-school-form input:focus,.platform-school-form select:focus,.platform-search-field input:focus,.platform-status-filter select:focus {
+  outline:3px solid #dce5ff;border-color:var(--platform-primary);
+}
+.platform-form-actions { display:flex;gap:10px;flex-wrap:wrap; }
+.platform-form-success,.platform-directory-error { padding:13px 15px;border-radius:9px;background:#effaf5;color:#18794e;font-size:12px; }
+.platform-directory-error { background:#fff1f0;color:#b42318; }
+.platform-directory-error button,.platform-form-success button { margin-left:10px;border:0;background:transparent;color:inherit;font-weight:800;cursor:pointer; }
+.platform-directory-toolbar { margin-bottom:16px; }
+.platform-search-form { display:flex;align-items:center;gap:8px;flex:1;min-width:240px; }
+.platform-search-field { display:flex;align-items:center;gap:7px;flex:1;min-width:0; }
+.platform-search-icon { color:#8994a7; }
+.platform-status-filter { display:flex;align-items:center;gap:8px;color:#778196;font-size:11px;font-weight:700; }
+.platform-status-filter select { width:auto;min-width:130px; }
+.platform-directory-meta { margin:15px 0;color:#929caf;font-size:11px; }
+.platform-directory-meta strong { color:#43516a;font-size:12px; }
+.platform-table-wrap { overflow:auto;border:1px solid #edf0f5;border-radius:10px; }
+.platform-school-table { width:100%;border-collapse:collapse;font-size:12px; }
+.platform-school-table th,.platform-school-table td { padding:12px 13px;text-align:left;border-bottom:1px solid #edf0f5;white-space:nowrap; }
+.platform-school-table th { background:#f7f8fc;color:#778196;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase; }
+.platform-school-table td { color:#526078; }
+.platform-school-name-button { border:0;background:transparent;color:var(--platform-primary);font:inherit;font-weight:800;cursor:pointer; }
+.platform-school-name-button:hover { color:var(--platform-primary-strong);text-decoration:underline; }
+.platform-status-pill { display:inline-block;padding:5px 8px;border-radius:20px;background:#f1f3f7;color:#778196;font-size:10px;font-weight:800; }
+.platform-status-active { background:#e8f8f1;color:#16845f; }
+.platform-status-pending { background:#fff5df;color:#a66b16; }
+.platform-status-suspended { background:#fff0ef;color:#b54747; }
+.platform-pagination { margin-top:16px;color:#929caf;font-size:11px; }
+.platform-pagination>div { display:flex;align-items:center;gap:10px; }
+.platform-page-button:disabled { opacity:.45;cursor:not-allowed; }
+.platform-page-count { color:#526078;font-weight:700; }
+@media(max-width:900px) {
+  .platform-sidebar { flex-basis:220px;width:220px; }
+  .platform-topbar { padding:12px 22px; }
+  .platform-content { padding:26px 22px 34px; }
+}
+@media(max-width:650px) {
+  .platform-shell { display:block; }
+  .platform-sidebar { width:100%;min-height:0;border-right:0;border-bottom:1px solid var(--platform-border); }
+  .platform-brand { min-height:66px;padding:0 16px; }
+  .platform-identity { margin:10px 14px;padding:10px 12px; }
+  .platform-navigation { display:flex;gap:5px;overflow-x:auto;padding:0 12px 12px; }
+  .platform-nav-heading { display:none; }
+  .platform-nav-link { width:auto;min-width:max-content;min-height:38px;padding:0 12px; }
+  .platform-sidebar-footer { display:none; }
+  .platform-topbar { min-height:62px;padding:10px 14px; }
+  .platform-user-copy { display:none; }
+  .platform-content { padding:22px 14px 28px; }
+  .platform-welcome-card { min-height:190px;padding:22px 19px; }
+  .platform-card-art { right:-75px;opacity:.55; }
+  .platform-summary-grid { grid-template-columns:1fr;gap:10px; }
+  .platform-summary-card { min-height:120px; }
+  .platform-form-card,.platform-directory { padding:15px; }
+  .platform-school-form { grid-template-columns:1fr; }
+  .platform-search-form { min-width:100%; }
+  .platform-status-filter { width:100%;justify-content:space-between; }
+}
