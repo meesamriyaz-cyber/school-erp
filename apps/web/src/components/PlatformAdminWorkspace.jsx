@@ -32,7 +32,7 @@ export default function PlatformAdminWorkspace() {
   const [activePage, setActivePage] = useState("Overview");
   const [businessOverview, setBusinessOverview] = useState(null);
   const [businessOverviewError, setBusinessOverviewError] = useState("");
-  const [loadingBusinessOverview, setLoadingBusinessOverview] = useState(false);
+  const [loadingBusinessOverview, setLoadingBusinessOverview] = useState(true);
   const [schools, setSchools] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -110,8 +110,6 @@ export default function PlatformAdminWorkspace() {
   useEffect(() => {
     if (activePage !== "Overview") return undefined;
     const controller = new AbortController();
-    setLoadingBusinessOverview(true);
-    setBusinessOverviewError("");
     apiRequest("/platform/business-overview", { accessToken, signal: controller.signal })
       .then((response) => {
         if (!controller.signal.aborted) setBusinessOverview(response?.data ?? null);
