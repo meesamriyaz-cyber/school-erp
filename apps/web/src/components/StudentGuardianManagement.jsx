@@ -109,6 +109,7 @@ export default function StudentGuardianManagement({
     setError("");
     setNotice("");
 
+    let emailVerificationNotice = "";
     try {
       let guardianId = selectedGuardianId;
       if (selectedGuardianId === "__new__") {
@@ -133,9 +134,9 @@ export default function StudentGuardianManagement({
         if (guardianForm.email.trim()) {
           try {
             await apiRequest(`/guardians/${encodeURIComponent(guardianId)}/email-verification/send`, { method: "POST", accessToken, body: { email: guardianForm.email.trim() } });
-            setNotice("Guardian linked. Email verification code sent.");
+            emailVerificationNotice = " Email verification code sent.";
           } catch (verificationError) {
-            setNotice(`Guardian linked, but email verification could not be sent: ${verificationError.message || "Please resend from Guardian Directory."}`);
+            emailVerificationNotice = ` Email verification could not be sent: ${verificationError.message || "Please resend from Guardian Directory."}`;
           }
         }
       }
@@ -162,7 +163,7 @@ export default function StudentGuardianManagement({
       setSelectedGuardianId("__new__");
       setRelationship("other");
       setFlags(EMPTY_FLAGS);
-      setNotice("Guardian linked successfully.");
+      setNotice(`Guardian linked successfully.${emailVerificationNotice}`);
       refresh();
     } catch (saveError) {
       setError(saveError.message || "Unable to save guardian information.");
@@ -303,8 +304,11 @@ export default function StudentGuardianManagement({
                 Phone
                 <input
                   type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]{10}"
+                  maxLength={10}
                   value={guardianForm.phone}
-                  onChange={(event) => setGuardianForm((current) => ({ ...current, phone: event.target.value }))}
+                  onChange={(event) => setGuardianForm((current) => ({ ...current, phone: event.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))}
                 />
               </label>
               <label>
