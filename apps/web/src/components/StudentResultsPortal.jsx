@@ -416,7 +416,6 @@ export default function StudentResultsPortal() {
             {announcements.map((item) => <article className="portal-announcement-card" key={item._id}>
               <div className="portal-announcement-meta"><span>{(item.category || "general").replaceAll("_", " ")}</span><time dateTime={item.publishedAt}>{formatDate(item.publishedAt)}</time></div>
               <h2>{item.title}</h2><p>{item.body}</p>
-              {isParent && <small>For: {children.filter(({ student }) => selectedStudent === "all" || String(student?._id) === selectedStudent).map(({ student }) => [student.firstName, student.lastName].filter(Boolean).join(" ")).join(", ")}</small>}
               {item.expiresAt && <footer>Available until {formatDate(item.expiresAt)}</footer>}
             </article>)}
           </section>
