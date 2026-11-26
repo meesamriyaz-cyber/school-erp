@@ -99,15 +99,16 @@ describe("Staff management API", () => {
   });
 
   it("keeps linked staff and login emails synchronized from either profile", async () => {
+    const linkedTeacher = await createUser(schoolA, "teacher");
     const created = await request("/staff", {
       method: "POST", token: adminA.token,
       body: JSON.stringify(staffPayload({
-        employeeType: "teaching", userId: String(teacherA.user._id), designation: "Class Teacher",
+        employeeType: "teaching", userId: String(linkedTeacher.user._id), designation: "Class Teacher",
         email: "stale-contact@example.test",
       })),
     });
     expect(created.status).toBe(201);
-    expect(created.body.data.email).toBe(teacherA.user.email);
+    expect(created.body.data.email).toBe(linkedTeacher.user.email);
 
     const staffEmail = `teacher-staff-${randomUUID()}@example.test`;
     const fromStaff = await request(`/staff/${created.body.data.id}`, {
@@ -115,10 +116,10 @@ describe("Staff management API", () => {
     });
     expect(fromStaff.status).toBe(200);
     expect(fromStaff.body.data.email).toBe(staffEmail);
-    expect((await User.findById(teacherA.user._id).lean()).email).toBe(staffEmail);
+    expect((await User.findById(linkedTeacher.user._id).lean()).email).toBe(staffEmail);
 
     const userEmail = `teacher-user-${randomUUID()}@example.test`;
-    const fromUser = await request(`/school/users/${teacherA.user._id}`, {
+    const fromUser = await request(`/school/users/${linkedTeacher.user._id}`, {
       method: "PATCH", token: adminA.token, body: JSON.stringify({ email: userEmail }),
     });
     expect(fromUser.status).toBe(200);
