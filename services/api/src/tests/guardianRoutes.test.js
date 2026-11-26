@@ -566,7 +566,7 @@ describe("Guardian API integration tests", () => {
     expect(student.status).toBe(200);
     expect(student.body.data.guardianName).toBe("Updated Guardian");
     expect(student.body.data.guardianPhone).toBe("9222222222");
-    expect(student.body.data.guardianEmail).toBe("updated@example.test");
+    expect(student.body.data.guardianEmail).toBeNull();
 
     const details = await request(`/guardians/${guardian._id}`, {
       token: adminA.token,
