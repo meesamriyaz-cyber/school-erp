@@ -7,6 +7,8 @@ const initialForm = {
   address: { line1: "", line2: "", city: "", district: "", state: "", postalCode: "", country: "" },
   gender: "not_specified", admissionDate: new Date().toISOString().slice(0, 10),
   guardianName: "", guardianRelationship: "other", guardianPhone: "", guardianEmail: "",
+  father: { firstName: "", lastName: "", phone: "", email: "", photoUrl: "" },
+  mother: { firstName: "", lastName: "", phone: "", email: "", photoUrl: "" },
 };
 
 export default function StudentForm({ onClose, onCreated }) {
@@ -23,6 +25,7 @@ export default function StudentForm({ onClose, onCreated }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [createdStudent, setCreatedStudent] = useState(null);
+  const [parentVerification, setParentVerification] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -62,6 +65,10 @@ export default function StudentForm({ onClose, onCreated }) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   }
+  function updateParentField(parent, event) {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [parent]: { ...current[parent], [name]: name === "phone" ? value.replace(/[^0-9]/g, "").slice(0, 10) : value } }));
+  }
   function updateAddressField(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, address: { ...current.address, [name]: value } }));
@@ -82,11 +89,23 @@ export default function StudentForm({ onClose, onCreated }) {
           guardianPhone: form.guardianPhone.trim(), guardianEmail: form.guardianEmail.trim(),
           dateOfBirth: form.dateOfBirth || null, photoUrl: form.photoUrl.trim() || null,
           address: Object.fromEntries(Object.entries(form.address).map(([key, value]) => [key, value.trim()])),
+          parents: Object.fromEntries(["father", "mother"].map((role) => [role, form[role].firstName.trim() ? { ...form[role], firstName: form[role].firstName.trim(), lastName: form[role].lastName.trim(), phone: form[role].phone.trim(), email: form[role].email.trim(), photoUrl: form[role].photoUrl.trim() } : undefined])),
         };
         const response = await apiRequest("/students", { method: "POST", accessToken, body: payload });
         if (!response?.success || !response.data?._id) throw new Error("Student profile was not created successfully.");
         student = response.data;
         setCreatedStudent(student);
+        const verificationTargets = response.parents || [];
+        const verification = await Promise.all(verificationTargets.filter((parent) => parent.emailVerificationRequired).map(async (parent) => {
+          const email = form[parent.relationship]?.email?.trim();
+          try {
+            await apiRequest(`/guardians/${parent.guardianId}/email-verification/send`, { method: "POST", accessToken, body: { email } });
+            return { ...parent, sent: true };
+          } catch (sendError) { return { ...parent, sent: false, error: sendError.message || "Email could not be sent" }; }
+        }));
+        setParentVerification(verification);
+        if (verification.some((item) => !item.sent)) setNotice("Student profile created, but one or more parent verification emails could not be sent. Resend from Guardian Directory.");
+        else if (verification.length) setNotice("Parent email verification codes have been sent.");
       }
       const enrollmentResponse = await apiRequest("/enrollments", {
         method: "POST", accessToken,
@@ -142,6 +161,23 @@ export default function StudentForm({ onClose, onCreated }) {
               <label>Guardian phone<input name="guardianPhone" type="tel" value={form.guardianPhone} onChange={updateField} maxLength={20} disabled={!!createdStudent}/></label>
               <label className="student-form-full">Guardian email<input name="guardianEmail" type="email" value={form.guardianEmail} onChange={updateField} maxLength={254} disabled={!!createdStudent}/></label>
             </div>
+            <h3>Father details (optional)</h3>
+            <div className="student-form-grid">
+              <label>Father first name<input name="firstName" value={form.father.firstName} onChange={(event) => updateParentField("father", event)} maxLength={80} disabled={!!createdStudent}/></label>
+              <label>Father last name<input name="lastName" value={form.father.lastName} onChange={(event) => updateParentField("father", event)} maxLength={80} disabled={!!createdStudent}/></label>
+              <label>Father phone (10 digits)<input name="phone" type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={form.father.phone} onChange={(event) => updateParentField("father", event)} disabled={!!createdStudent}/></label>
+              <label>Father email (OTP verified)<input name="email" type="email" value={form.father.email} onChange={(event) => updateParentField("father", event)} maxLength={254} disabled={!!createdStudent}/></label>
+              <label className="student-form-full">Father photo URL (HTTPS)<input name="photoUrl" type="url" value={form.father.photoUrl} onChange={(event) => updateParentField("father", event)} maxLength={2048} disabled={!!createdStudent}/></label>
+            </div>
+            <h3>Mother details (optional)</h3>
+            <div className="student-form-grid">
+              <label>Mother first name<input name="firstName" value={form.mother.firstName} onChange={(event) => updateParentField("mother", event)} maxLength={80} disabled={!!createdStudent}/></label>
+              <label>Mother last name<input name="lastName" value={form.mother.lastName} onChange={(event) => updateParentField("mother", event)} maxLength={80} disabled={!!createdStudent}/></label>
+              <label>Mother phone (10 digits)<input name="phone" type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={form.mother.phone} onChange={(event) => updateParentField("mother", event)} disabled={!!createdStudent}/></label>
+              <label>Mother email (OTP verified)<input name="email" type="email" value={form.mother.email} onChange={(event) => updateParentField("mother", event)} maxLength={254} disabled={!!createdStudent}/></label>
+              <label className="student-form-full">Mother photo URL (HTTPS)<input name="photoUrl" type="url" value={form.mother.photoUrl} onChange={(event) => updateParentField("mother", event)} maxLength={2048} disabled={!!createdStudent}/></label>
+            </div>
+            {parentVerification.map((item) => <p key={item.guardianId} role="status">{item.relationship}: {item.sent ? "verification email sent" : item.error || "verification email pending"}</p>)}
             <h3>Academic placement</h3>
             {optionsLoading ? <p role="status">Loading academic years…</p> : null}
             <div className="student-form-grid">
