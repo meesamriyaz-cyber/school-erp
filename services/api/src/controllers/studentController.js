@@ -4,6 +4,8 @@ import Student from "../models/Student.js";
 import Enrollment from "../models/Enrollment.js";
 import { getTeacherEnrollmentScope, teacherCanAccessEnrollment } from "../utils/teacherAssignmentScope.js";
 import { syncLegacyStudentGuardian } from "../services/syncLegacyStudentGuardian.js";
+import Guardian from "../models/Guardian.js";
+import StudentGuardian from "../models/StudentGuardian.js";
 
 const CREATE_FIELDS = [
   "admissionNumber", "firstName", "lastName", "dateOfBirth", "photoUrl", "address",
@@ -11,6 +13,46 @@ const CREATE_FIELDS = [
 ];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
 const LEGACY_GUARDIAN_FIELDS = ["guardianName", "guardianRelationship", "guardianPhone", "guardianEmail"];
+const PARENT_ROLES = ["father", "mother"];
+const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+const validateParent = (parent, relationship) => {
+  if (parent == null) return null;
+  if (typeof parent !== "object" || Array.isArray(parent)) return `${relationship} details must be an object`;
+  const allowed = ["firstName", "lastName", "phone", "email", "photoUrl"];
+  if (Object.keys(parent).some((key) => !allowed.includes(key))) return `${relationship} contains unsupported fields`;
+  const supplied = allowed.some((key) => parent[key] !== undefined && parent[key] !== null && parent[key] !== "");
+  if (!supplied) return null;
+  if (typeof parent.firstName !== "string" || !parent.firstName.trim()) return `${relationship} first name is required when parent details are provided`;
+  if (parent.phone != null && parent.phone !== "" && (typeof parent.phone !== "string" || !/^[0-9]{10}$/.test(parent.phone))) return `${relationship} phone number must contain exactly 10 digits`;
+  if (parent.email != null && parent.email !== "" && (typeof parent.email !== "string" || !emailPattern.test(parent.email.trim()) || parent.email.trim().length > 254)) return `${relationship} email address is invalid`;
+  if (parent.photoUrl != null && parent.photoUrl !== "" && (typeof parent.photoUrl !== "string" || !isHttpsUrl(parent.photoUrl.trim()))) return `${relationship} photo URL must be a valid HTTPS URL`;
+  for (const key of ["lastName"]) if (parent[key] != null && typeof parent[key] !== "string") return `${relationship} ${key} must be a string`;
+  return null;
+};
+const createParentRelationship = async ({ student, parent, relationship, session }) => {
+  if (!parent || !parent.firstName?.trim()) return null;
+  const guardian = await Guardian.create([{
+    tenantId: student.tenantId,
+    firstName: parent.firstName.trim(),
+    lastName: parent.lastName?.trim() || "",
+    phone: parent.phone || null,
+    photoUrl: parent.photoUrl || null,
+    ...(parent.email ? { pendingEmail: parent.email.trim().toLowerCase() } : {}),
+  }], { session });
+  const [link] = await StudentGuardian.create([{
+    tenantId: student.tenantId,
+    studentId: student._id,
+    guardianId: guardian[0]._id,
+    relationship,
+    source: "manual",
+    isPrimary: false,
+    canAccessPortal: false,
+    isEmergencyContact: false,
+    canPickup: false,
+    receivesCommunication: true,
+  }], { session });
+  return { guardianId: guardian[0]._id, relationship: link.relationship, emailVerificationRequired: Boolean(parent.email) };
+};
 
 const pickFields = (source, allowedFields) => Object.fromEntries(
   allowedFields.filter((field) => Object.hasOwn(source, field)).map((field) => [field, source[field]]),
@@ -80,6 +122,9 @@ export const createStudent = async (req, res, next) => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return invalidRequest(res, "Provide student details");
   if (Object.hasOwn(body, "tenantId")) return invalidRequest(res, "School assignment is determined by the authenticated account");
   const fields = pickFields(body, CREATE_FIELDS);
+  const parents = body.parents && typeof body.parents === "object" && !Array.isArray(body.parents) ? body.parents : {};
+  if (body.parents !== undefined && (!body.parents || typeof body.parents !== "object" || Array.isArray(body.parents) || Object.keys(body.parents).some((key) => !PARENT_ROLES.includes(key)))) return invalidRequest(res, "Parents must contain father and/or mother details");
+  for (const relationship of PARENT_ROLES) { const error = validateParent(parents[relationship], relationship); if (error) return invalidRequest(res, error); }
   if (Object.hasOwn(fields, "address") && (!fields.address || typeof fields.address !== "object" || Array.isArray(fields.address))) return invalidRequest(res, "Address must be an object");
   if (Object.hasOwn(fields, "photoUrl") && fields.photoUrl !== null && fields.photoUrl !== "" && (typeof fields.photoUrl !== "string" || !isHttpsUrl(fields.photoUrl.trim()))) return invalidRequest(res, "Student photo URL must be a valid HTTPS URL");
   if (typeof fields.admissionNumber !== "string" || !fields.admissionNumber.trim() || typeof fields.firstName !== "string" || !fields.firstName.trim()) {
@@ -102,8 +147,10 @@ export const createStudent = async (req, res, next) => {
     await session.withTransaction(async () => {
       [student] = await Student.create([{ ...fields, tenantId: req.tenantId }], { session });
       await syncLegacyStudentGuardian(student, { session, actorUserId: req.auth.userId });
+      for (const relationship of PARENT_ROLES) await createParentRelationship({ student, parent: parents[relationship], relationship, session });
     });
-    return res.status(201).json({ success: true, data: student });
+    const parentLinks = await StudentGuardian.find({ tenantId: req.tenantId, studentId: student._id, relationship: { $in: PARENT_ROLES } }).select("guardianId relationship").lean();
+    return res.status(201).json({ success: true, data: student, parents: parentLinks.map((link) => ({ guardianId: link.guardianId, relationship: link.relationship, emailVerificationRequired: true })) });
   } catch (error) { return handleStudentError(error, res, next); }
   finally { if (session) await session.endSession(); }
 };
