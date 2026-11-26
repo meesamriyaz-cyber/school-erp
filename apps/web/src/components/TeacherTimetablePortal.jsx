@@ -89,23 +89,33 @@ export default function TeacherTimetablePortal() {
         <button type="button" className={activeView === "messaging" ? "active" : ""} onClick={() => setActiveView("messaging")}>Parent messages</button>
       </nav>
       <div className="teacher-workspace-content">
-      {activeView === "overview" ? <section className="teacher-overview">
-        <div className="teacher-overview-cards">
-          <article><strong>{entries.length}</strong><span>Weekly periods</span></article>
-          <article><strong>{classCount}</strong><span>Classes on timetable</span></article>
-          <article><strong>{subjectCount}</strong><span>Subjects on timetable</span></article>
-          <article><strong>{assignments.length}</strong><span>Active assignments</span></article>
+      {activeView === "overview" ? <section className="teacher-overview school-dashboard" aria-label="Teacher overview">
+        <div className="school-dashboard-heading">
+          <div><span className="school-dashboard-eyebrow">TEACHING OVERVIEW</span><h2>Your teaching at a glance</h2><p>A live snapshot of your timetable and teaching responsibilities.</p></div>
+          <span className="school-dashboard-live"><i /> Workspace ready</span>
         </div>
-        <div className="teacher-overview-schedule"><h2>{todayValue ? `Today's schedule · ${DAYS.find((day) => day.value === todayValue)?.label}` : "Weekend schedule"}</h2><p>Your periods for today, based on the active timetable.</p>
-          {loading ? <p>Loading today's schedule…</p> : todayValue && sortedEntries.some((entry) => entry.dayOfWeek === todayValue) ?
-            sortedEntries.filter((entry) => entry.dayOfWeek === todayValue).map((entry) => <article key={entry._id}><strong>{entry.startTime} – {entry.endTime}</strong><span>{entry.assignmentId?.subjectId?.name || "Subject"} · {entry.classId?.name || "Class"}{entry.sectionId?.name ? ` · ${entry.sectionId.name}` : ""}</span><small>Period {entry.periodNumber}{entry.room ? ` · ${entry.room}` : ""}</small></article>) :
-            <p>No timetable periods are scheduled for today.</p>}
+        <div className="school-dashboard-stats">
+          <article className="school-dashboard-stat"><span className="school-dashboard-stat-icon blue" aria-hidden="true">◷</span><span className="school-dashboard-stat-label">Weekly periods</span><strong>{entries.length}</strong><small>Scheduled teaching periods</small></article>
+          <article className="school-dashboard-stat"><span className="school-dashboard-stat-icon violet" aria-hidden="true">▦</span><span className="school-dashboard-stat-label">Classes on timetable</span><strong>{classCount}</strong><small>Classes you teach</small></article>
+          <article className="school-dashboard-stat"><span className="school-dashboard-stat-icon green" aria-hidden="true">◎</span><span className="school-dashboard-stat-label">Subjects on timetable</span><strong>{subjectCount}</strong><small>Distinct subjects assigned</small></article>
+          <article className="school-dashboard-stat"><span className="school-dashboard-stat-icon amber" aria-hidden="true">✓</span><span className="school-dashboard-stat-label">Active assignments</span><strong>{assignments.length}</strong><small>Current teaching assignments</small></article>
         </div>
-        <div className="teacher-overview-actions">
-          <button type="button" onClick={() => setActiveView("students")}>View my students</button>
-          <button type="button" onClick={() => setActiveView("attendance")}>Mark attendance</button>
-          <button type="button" onClick={() => setActiveView("homework")}>Manage homework</button>
-          <button type="button" onClick={() => setActiveView("exams")}>Enter examination marks</button>
+        <div className="school-dashboard-panels">
+          <article className="school-dashboard-panel teacher-dashboard-schedule">
+            <header><div><h3>{todayValue ? `Today's schedule · ${DAYS.find((day) => day.value === todayValue)?.label}` : "Weekend schedule"}</h3><p>Your periods for today, based on the active timetable.</p></div><button type="button" onClick={() => setActiveView("timetable")}>View timetable →</button></header>
+            {loading ? <p className="school-dashboard-empty">Loading today's schedule…</p> : todayValue && sortedEntries.some((entry) => entry.dayOfWeek === todayValue) ?
+              sortedEntries.filter((entry) => entry.dayOfWeek === todayValue).map((entry) => <div className="teacher-dashboard-period" key={entry._id}><strong>{entry.startTime} – {entry.endTime}</strong><span>{entry.assignmentId?.subjectId?.name || "Subject"} · {entry.classId?.name || "Class"}{entry.sectionId?.name ? ` · ${entry.sectionId.name}` : ""}</span><small>Period {entry.periodNumber}{entry.room ? ` · ${entry.room}` : ""}</small></div>) :
+              <p className="school-dashboard-empty">No timetable periods are scheduled for today.</p>}
+          </article>
+          <article className="school-dashboard-panel teacher-dashboard-quick">
+            <header><div><h3>Quick access</h3><p>Common teaching tasks</p></div></header>
+            <div className="teacher-dashboard-actions">
+              <button type="button" onClick={() => setActiveView("attendance")}>Mark attendance <span>→</span></button>
+              <button type="button" onClick={() => setActiveView("students")}>View my students <span>→</span></button>
+              <button type="button" onClick={() => setActiveView("homework")}>Manage homework <span>→</span></button>
+              <button type="button" onClick={() => setActiveView("exams")}>Examination marks <span>→</span></button>
+            </div>
+          </article>
         </div>
       </section> : activeView === "students" ? <TeacherRosterPortal accessToken={accessToken} assignments={assignments} /> : activeView === "reports" ? <TeacherReportsPortal accessToken={accessToken} assignments={assignments} /> : activeView === "timetable" ? <>
         {error && <p className="teacher-timetable-error" role="alert">{error}</p>}
