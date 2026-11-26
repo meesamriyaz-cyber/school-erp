@@ -58,3 +58,25 @@ export async function logout() {
     await secureStorage.clearRefreshToken();
   }
 }
+
+export async function requestPasswordReset({ email, tenantSlug, accountType = "school" }) {
+  return apiRequest("/auth/password-reset/request", {
+    method: "POST", auth: false, retryAuth: false,
+    body: {
+      email: email.trim().toLowerCase(),
+      ...(accountType === "school" ? { tenantSlug: tenantSlug.trim().toLowerCase() } : {}),
+    },
+  });
+}
+
+export async function completePasswordReset({ email, tenantSlug, accountType = "school", code, newPassword }) {
+  return apiRequest("/auth/password-reset/complete", {
+    method: "POST", auth: false, retryAuth: false,
+    body: {
+      email: email.trim().toLowerCase(),
+      ...(accountType === "school" ? { tenantSlug: tenantSlug.trim().toLowerCase() } : {}),
+      code: code.trim(),
+      newPassword,
+    },
+  });
+}
