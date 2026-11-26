@@ -123,7 +123,21 @@ export async function listPlatformInvoices(req, res, next) {
       filter.tenantId = req.query.schoolId;
     }
     const invoices = await PlatformInvoice.find(filter).populate("tenantId", "name slug").sort({ issuedAt: -1 }).limit(100).lean();
-    return res.json({ success: true, data: invoices });
+    const invoiceIds = invoices.map((invoice) => invoice._id);
+    const payments = invoiceIds.length
+      ? await PlatformPayment.find({ invoiceId: { $in: invoiceIds } }).sort({ paymentDate: -1 }).lean()
+      : [];
+    const paymentsByInvoice = new Map();
+    for (const payment of payments) {
+      const key = String(payment.invoiceId);
+      paymentsByInvoice.set(key, [...(paymentsByInvoice.get(key) || []), payment]);
+    }
+    const data = invoices.map((invoice) => {
+      const invoicePayments = paymentsByInvoice.get(String(invoice._id)) || [];
+      const paidAmount = money(invoicePayments.filter((payment) => payment.status === "recorded").reduce((sum, payment) => sum + payment.amount, 0));
+      return { ...invoice, payments: invoicePayments, paidAmount, outstandingAmount: money(invoice.totalAmount - paidAmount) };
+    });
+    return res.json({ success: true, data });
   } catch (error) { return next(error); }
 }
 
