@@ -134,13 +134,14 @@ export const getMyProfile = async (req, res, next) => {
       data: await Promise.all(children.map(async (student) => {
         const relationships = await StudentGuardian.find({ tenantId: req.tenantId, studentId: student._id, status: "active" })
           .sort({ relationship: 1, createdAt: 1 })
-          .populate({ path: "guardianId", select: "firstName lastName phone email photoUrl phoneVerifiedAt verifiedPhone status", match: { tenantId: req.tenantId, status: "active" } }).lean();
+          .populate({ path: "guardianId", select: "firstName lastName phone email photoUrl emailVerifiedAt verifiedEmail status", match: { tenantId: req.tenantId, status: "active" } }).lean();
         const parents = relationships.filter((link) => link.guardianId && ["father", "mother"].includes(link.relationship)).map((link) => ({
           relationship: link.relationship,
           name: [link.guardianId.firstName, link.guardianId.lastName].filter(Boolean).join(" "),
           photoUrl: link.guardianId.photoUrl || null,
           phone: link.guardianId.phone || null,
-          phoneVerified: Boolean(link.guardianId.phone && link.guardianId.verifiedPhone === link.guardianId.phone && link.guardianId.phoneVerifiedAt),
+          email: link.guardianId.email || null,
+          emailVerified: Boolean(link.guardianId.email && link.guardianId.verifiedEmail === link.guardianId.email && link.guardianId.emailVerifiedAt),
         }));
         return { student, parents, currentEnrollment: enrollmentByStudentId.get(String(student._id)) || null };
       })),
