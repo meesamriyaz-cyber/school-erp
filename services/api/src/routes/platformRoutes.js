@@ -11,7 +11,7 @@ import { getAuditOutboxStatus, retryFailedAuditEvent } from "../controllers/audi
 import {
   getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan,
   archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices,
-  recordPlatformPayment, reversePlatformPayment, createRenewalInvoice,
+  recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents,
 } from "../controllers/platformBillingController.js";
 
 const router = Router();
@@ -28,6 +28,7 @@ router.get("/invoices", ...platformOnly, listPlatformInvoices);
 router.post("/invoices/:invoiceId/payments", ...platformOnly, recordPlatformPayment);
 router.post("/payments/:paymentId/reverse", ...platformOnly, reversePlatformPayment);
 router.post("/subscriptions/:subscriptionId/renewal-invoice", ...platformOnly, createRenewalInvoice);
+router.get("/commercial-events", ...platformOnly, listCommercialEvents);
 
 router.get("/audit-logs", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), listAuditLogs);
 router.get("/audit-outbox", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), getAuditOutboxStatus);
