@@ -29,17 +29,29 @@ export const sendGuardianEmailCode = async (req, res, next) => {
       message: `Your Payam Education verification code is ${code}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`,
     });
 
-    guardian.pendingEmail = email;
-    guardian.emailDeliveryEmailId = delivery.messageId;
-    guardian.emailDeliveryStatus = delivery.providerStatus || "accepted";
-    guardian.emailDeliveryUpdatedAt = new Date();
-    guardian.emailDeliveryEvents = [];
-    guardian.emailOtpSalt = salt;
-    guardian.emailOtpHash = otpDigest(salt, code);
-    guardian.emailOtpExpiresAt = new Date(Date.now() + 10 * 60_000);
-    guardian.emailOtpSentAt = new Date();
-    guardian.emailOtpAttempts = 0;
-    await guardian.save();
+    // Update only verification fields. Legacy guardian records may contain
+    // phone values in older formats; document.save() would revalidate those
+    // unrelated fields and could fail after Resend has already sent the email.
+    const update = await Guardian.updateOne(
+      { _id: guardian._id, tenantId: req.tenantId, status: "active" },
+      {
+        $set: {
+          pendingEmail: email,
+          emailDeliveryEmailId: delivery.messageId,
+          emailDeliveryStatus: delivery.providerStatus || "accepted",
+          emailDeliveryUpdatedAt: new Date(),
+          emailDeliveryEvents: [],
+          emailOtpSalt: salt,
+          emailOtpHash: otpDigest(salt, code),
+          emailOtpExpiresAt: new Date(Date.now() + 10 * 60_000),
+          emailOtpSentAt: new Date(),
+          emailOtpAttempts: 0,
+        },
+      },
+    );
+    if (!update.matchedCount) {
+      return res.status(404).json({ success: false, message: "Guardian not found" });
+    }
     return res.status(200).json({ success: true, message: "Email verification code sent" });
   } catch (error) { return next(error); }
 };
@@ -65,21 +77,42 @@ export const verifyGuardianEmailCode = async (req, res, next) => {
     const expected = Buffer.from(guardian.emailOtpHash, "hex");
     const actual = Buffer.from(otpDigest(guardian.emailOtpSalt, code), "hex");
     if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) {
-      guardian.emailOtpAttempts = (guardian.emailOtpAttempts || 0) + 1;
-      await guardian.save();
+      await Guardian.updateOne(
+        { _id: guardian._id, tenantId: req.tenantId, status: "active" },
+        { $inc: { emailOtpAttempts: 1 } },
+      );
       return res.status(400).json({ success: false, message: "The code is incorrect" });
     }
 
-    guardian.email = guardian.pendingEmail;
-    guardian.verifiedEmail = guardian.pendingEmail;
-    guardian.emailVerifiedAt = new Date();
-    guardian.pendingEmail = null;
-    guardian.emailOtpHash = null;
-    guardian.emailOtpSalt = null;
-    guardian.emailOtpExpiresAt = null;
-    guardian.emailOtpSentAt = null;
-    guardian.emailOtpAttempts = 0;
-    await guardian.save();
-    return res.status(200).json({ success: true, data: { email: guardian.email, emailVerified: true, emailVerifiedAt: guardian.emailVerifiedAt } });
+    const verifiedEmail = guardian.pendingEmail;
+    const emailVerifiedAt = new Date();
+    const update = await Guardian.updateOne(
+      {
+        _id: guardian._id,
+        tenantId: req.tenantId,
+        status: "active",
+        pendingEmail: verifiedEmail,
+        emailOtpHash: guardian.emailOtpHash,
+      },
+      {
+        $set: {
+          email: verifiedEmail,
+          verifiedEmail,
+          emailVerifiedAt,
+          emailOtpAttempts: 0,
+        },
+        $unset: {
+          pendingEmail: 1,
+          emailOtpHash: 1,
+          emailOtpSalt: 1,
+          emailOtpExpiresAt: 1,
+          emailOtpSentAt: 1,
+        },
+      },
+    );
+    if (!update.modifiedCount) {
+      return res.status(409).json({ success: false, message: "Verification code is no longer active. Request a new code." });
+    }
+    return res.status(200).json({ success: true, data: { email: verifiedEmail, emailVerified: true, emailVerifiedAt } });
   } catch (error) { return next(error); }
 };
