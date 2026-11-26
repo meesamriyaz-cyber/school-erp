@@ -121,7 +121,7 @@ export default function StudentGuardianManagement({
           body: {
             firstName: guardianForm.firstName.trim(),
             lastName: guardianForm.lastName.trim(),
-            phone: guardianForm.phone.trim(),
+            phone: guardianForm.phone.trim() || null,
             email: guardianForm.email.trim(),
             photoUrl: guardianForm.photoUrl.trim(),
           },
