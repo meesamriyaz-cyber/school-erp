@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 import Tenant from "../models/Tenant.js";
 import User, { USER_ROLES } from "../models/User.js";
+import Staff from "../models/Staff.js";
 import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
 import { writeUserAudit, withAuditTransaction } from "../services/auditLogService.js";
@@ -248,6 +249,13 @@ export const updateUser = async (req, res, next) => {
         { new: true, runValidators: true, session },
       ).select("_id tenantId firstName lastName email phone role status authVersion lastLoginAt createdAt updatedAt").lean();
       if (!updatedUser) return null;
+      if (Object.hasOwn(update, "email")) {
+        await Staff.updateMany(
+          { tenantId: updatedUser.tenantId, userId: updatedUser._id },
+          { $set: { email: updatedUser.email } },
+          { session },
+        );
+      }
       await writeUserAudit({
         actorUserId: req.auth.userId, actorRole: req.auth.role, tenantId: req.auth.tenantId,
         targetUserId: updatedUser._id, targetTenantId: updatedUser.tenantId,
