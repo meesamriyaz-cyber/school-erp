@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import "./TeacherTimetablePortal.css";
+import "./SchoolDashboard.css";
 import TeacherAttendancePortal from "./TeacherAttendancePortal.jsx";
 import HomeworkManagement from "./HomeworkManagement.jsx";
 import TeacherExaminations from "./TeacherExaminations.jsx";
