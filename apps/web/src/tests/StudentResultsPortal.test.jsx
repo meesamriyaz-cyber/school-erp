@@ -60,6 +60,7 @@ describe("Parent school communications", () => {
       return Promise.resolve({ success: true, data: [] });
     });
     render(<StudentResultsPortal />);
+    fireEvent.click(screen.getByRole("button", { name: /Notifications/ }));
     expect(await screen.findByText("Parent meeting")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Mark as read" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Mark as read" })).toBeNull());
