@@ -72,12 +72,18 @@ export default function TeacherTimetablePortal() {
 
   return (
     <main className="teacher-timetable-page">
-      <header className="teacher-timetable-header">
-        <div><span>TEACHER WORKSPACE</span><h1>Teacher workspace</h1><p>Your daily teaching responsibilities in one place.</p></div>
-        <button type="button" onClick={() => void logout()}>Sign out</button>
+      <header className="student-portal-header teacher-portal-header">
+        <div>
+          <div className="portal-eyebrow">SCHOOLSUITE · TEACHER PORTAL</div>
+          <h1>My teacher dashboard</h1>
+          <p>Manage your timetable, classes, attendance, homework and communication.</p>
+        </div>
+        <div className="portal-account">
+          <span>{name}</span>
+          <button type="button" className="portal-signout" onClick={() => void logout()}>Sign out</button>
+        </div>
       </header>
-      <p className="teacher-timetable-welcome">Welcome, {name}</p>
-      <nav className="teacher-workspace-tabs" aria-label="Teacher workspace">
+      <nav className="portal-tabs teacher-workspace-tabs" aria-label="Teacher workspace">
         <button type="button" className={activeView === "overview" ? "active" : ""} onClick={() => setActiveView("overview")}>Overview</button>
         <button type="button" className={activeView === "timetable" ? "active" : ""} onClick={() => setActiveView("timetable")}>My timetable</button>
         <button type="button" className={activeView === "attendance" ? "active" : ""} onClick={() => setActiveView("attendance")}>Mark attendance</button>
