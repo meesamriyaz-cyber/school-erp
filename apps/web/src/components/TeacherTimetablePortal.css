@@ -1,4 +1,11 @@
-.teacher-timetable-page { min-height: 100vh; padding: 32px clamp(18px, 5vw, 64px); background: #f6f8fc; color: #17243a; }
+.teacher-timetable-page { width: 100%; max-width: 1600px; min-height: 100vh; margin: 0 auto; padding: 32px clamp(18px, 3vw, 48px) 48px; background: var(--page-bg, #f5f7fb); color: var(--text-primary, #202c42); }
+.teacher-workspace-content { width: 100%; max-width: 1440px; margin: 0 auto; min-width: 0; }
+.teacher-timetable-header { max-width: 1440px; }
+.teacher-timetable-welcome, .teacher-workspace-tabs { max-width: 1440px; }
+.teacher-workspace-tabs { flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 0 0 2px; }
+.teacher-workspace-tabs button { flex: 0 0 auto; white-space: nowrap; border-radius: 8px 8px 0 0; padding: 12px 14px; font-size: 13px; }
+.teacher-workspace-tabs button:hover { color: #3154d8; background: #eef2ff; }
+.teacher-workspace-tabs button.active { background: transparent; }
 .teacher-timetable-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; max-width: 1100px; margin: 0 auto 24px; }
 .teacher-timetable-header span { color: #64748b; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
 .teacher-timetable-header h1 { margin: 7px 0; font-size: clamp(25px, 4vw, 34px); }
@@ -17,7 +24,7 @@
 .teacher-timetable-room { text-align: right; }
 .teacher-timetable-empty, .teacher-timetable-error { padding: 18px; border-radius: 10px; background: white; }
 .teacher-timetable-error { color: #b42318; }
-@media (max-width: 640px) { .teacher-timetable-page { padding: 22px 14px; } .teacher-timetable-period { grid-template-columns: 1fr; gap: 8px; } .teacher-timetable-room { text-align: left; } }
+@media (max-width: 640px) { .teacher-timetable-page { padding: 22px 14px; } .teacher-workspace-tabs { overflow-x: auto; flex-wrap: nowrap; margin-right: -14px; padding-right: 14px; } .teacher-timetable-period { grid-template-columns: 1fr; gap: 8px; } .teacher-timetable-room { text-align: left; } }
 .teacher-workspace-tabs{display:flex;gap:8px;max-width:1100px;margin:0 auto 20px;border-bottom:1px solid #e2e8f0}.teacher-workspace-tabs button{border:0;border-bottom:2px solid transparent;padding:11px 15px;background:transparent;color:#64748b;font-weight:700;cursor:pointer}.teacher-workspace-tabs button.active{border-bottom-color:#4263eb;color:#3154d8}
 
 
