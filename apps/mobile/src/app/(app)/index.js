@@ -258,7 +258,7 @@ export default function AppHomeScreen() {
           <MetricCard icon="♙" label="Active students" value={formatNumber(report.students?.active)} note={`${formatNumber(report.students?.total)} records`} tint="#E8F1FC"/>
           <MetricCard icon="✓" label="Present today" value={formatNumber(report.attendance?.today?.present)} note={report.attendance?.today?.percentage == null ? "Attendance not marked" : `${report.attendance.today.percentage}% attendance`} tint="#E6F5ED"/>
           <MetricCard icon="♧" label="Teaching staff" value={formatNumber(report.staff?.teaching)} note={`${formatNumber(report.staff?.totalActive)} active staff`} tint="#F0EAFE"/>
-          <MetricCard icon="₹" label="Fee collection" value={formatMoney(report.fees?.net)} note={`${formatMoney(report.fees?.outstanding)} outstanding`} tint="#FFF3DF"/>
+          <MetricCard icon="₹" label="Net fee collection" value={formatMoney(report.fees?.net)} note={`${formatMoney(report.fees?.outstanding)} outstanding`} tint="#FFF3DF"/>
         </View>
 
         <View style={styles.panel}>
@@ -297,7 +297,7 @@ export default function AppHomeScreen() {
 
         <SectionHeader title="Quick access" subtitle="Your school management tools" />
         <View style={styles.quickGrid}>
-          {tabs.slice(1, 4).map((tab) => <TouchableOpacity key={tab.key} style={styles.quickCard} onPress={() => setActiveTab(tab.key)}><Text style={styles.quickIcon}>{tab.icon}</Text><Text style={styles.quickLabel}>{tab.label}</Text><Text style={styles.quickArrow}>→</Text></TouchableOpacity>)}
+          {tabs.filter((tab) => ["students", "attendance", "timetable", "staff"].includes(tab.key)).map((tab) => <TouchableOpacity key={tab.key} style={styles.quickCard} onPress={() => setActiveTab(tab.key)}><Text style={styles.quickIcon}>{tab.icon}</Text><Text style={styles.quickLabel}>{tab.label}</Text><Text style={styles.quickArrow}>→</Text></TouchableOpacity>)}
         </View>
         <View style={styles.dashboardFooter}><Text>Updated {report.generatedAt ? new Date(report.generatedAt).toLocaleTimeString() : "recently"}</Text><Text>{formatNumber(report.examinations?.published)} published exams</Text></View>
       </> : null}
