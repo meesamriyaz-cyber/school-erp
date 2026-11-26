@@ -101,7 +101,7 @@ export default function StaffManagement() {
         <label>Employee code<input value={form.employeeCode || ""} maxLength={30} onChange={(e) => setForm((v) => ({ ...v, employeeCode: e.target.value }))} /></label>
         <label>First name *<input required maxLength={80} value={form.firstName} onChange={(e) => setForm((v) => ({ ...v, firstName: e.target.value }))} /></label>
         <label>Last name<input maxLength={80} value={form.lastName || ""} onChange={(e) => setForm((v) => ({ ...v, lastName: e.target.value }))} /></label>
-        <label>Email<input type="email" maxLength={254} value={form.email || ""} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} /></label>
+        <label>Email (staff & login)<input type="email" maxLength={254} value={form.email || ""} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} /></label>
         <label>Phone<input type="tel" maxLength={20} value={form.phone || ""} onChange={(e) => setForm((v) => ({ ...v, phone: e.target.value }))} /></label>
         <label>Designation *<input required maxLength={100} value={form.designation} onChange={(e) => setForm((v) => ({ ...v, designation: e.target.value }))} placeholder="e.g. Mathematics Teacher, Clerk, Driver" /></label>
         <label>Department<input maxLength={100} value={form.department || ""} onChange={(e) => setForm((v) => ({ ...v, department: e.target.value }))} placeholder="e.g. Academics, Administration" /></label>
@@ -110,7 +110,7 @@ export default function StaffManagement() {
         <label>Qualification<input maxLength={500} value={form.qualification || ""} onChange={(e) => setForm((v) => ({ ...v, qualification: e.target.value }))} /></label>
         <label>Experience (years)<input type="number" min="0" max="60" step="0.5" value={form.experienceYears} onChange={(e) => setForm((v) => ({ ...v, experienceYears: e.target.value }))} /></label>
       </div>
-      {form.employeeType === "teaching" && <p className="staff-help">Teaching employees must be linked to an active teacher login. Their academic assignments and timetable continue to use the existing teacher account.</p>}
+      {form.employeeType === "teaching" && <p className="staff-help">Teaching employees must be linked to an active teacher login. Their academic assignments and timetable continue to use the existing teacher account.</p>}<p className="staff-help">For linked accounts, name, email and phone changes are synchronized with the login profile.</p>
       <div className="staff-form-actions"><button type="submit" className="staff-primary" disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Create staff record"}</button></div>
     </form>}
     <div className="staff-filters"><input aria-label="Search staff" placeholder="Search name, employee code or designation" value={search} onChange={(e) => setSearch(e.target.value)} /><select aria-label="Filter staff category" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}><option value="">All staff</option><option value="teaching">Teaching</option><option value="non_teaching">Non-teaching</option></select><select aria-label="Filter employment status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All statuses</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
