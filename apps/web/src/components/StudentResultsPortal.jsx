@@ -11,7 +11,7 @@ const formatDate = (value) => value
 export default function StudentResultsPortal() {
   const { user, accessToken, logout } = useAuth();
   const isParent = user?.role === "parent";
-  const [children, setChildren] = useState([]);
+
   const [profiles, setProfiles] = useState([]);
   const [results, setResults] = useState([]);
   const [homework, setHomework] = useState([]);
@@ -32,18 +32,12 @@ export default function StudentResultsPortal() {
   const [submitting, setSubmitting] = useState("");
   const [expandedInvoiceId, setExpandedInvoiceId] = useState("");
   const [homeworkNotice, setHomeworkNotice] = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
-  const [selectedStudent, setSelectedStudent] = useState("all");
+  const [activeTab, setActiveTab] = useState(isParent ? "announcements" : "overview");
+  const [selectedStudent] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
-
-  useEffect(() => {
-    if (isParent && !["announcements", "notifications", "messaging"].includes(activeTab)) {
-      setActiveTab("announcements");
-    }
-  }, [isParent, activeTab]);
 
   // Keep frequently changing student sections current when opened.
   useEffect(() => {
@@ -86,7 +80,6 @@ export default function StudentResultsPortal() {
   useEffect(() => {
     if (!accessToken || isParent || activeTab !== "results") return undefined;
     const controller = new AbortController();
-    setResultsRefreshing(true);
     apiRequest("/portal/results", { accessToken, signal: controller.signal })
       .then((response) => {
         if (!controller.signal.aborted && Array.isArray(response?.data)) setResults(response.data);
@@ -105,7 +98,6 @@ export default function StudentResultsPortal() {
   useEffect(() => {
     if (!accessToken || isParent || activeTab !== "documents") return undefined;
     const controller = new AbortController();
-    setDocumentsRefreshing(true);
     apiRequest("/portal/documents", { accessToken, signal: controller.signal })
       .then((response) => {
         if (!controller.signal.aborted && Array.isArray(response?.data)) setDocuments(response.data);
