@@ -135,7 +135,7 @@ export default function PlatformAdminWorkspace() {
         .catch((error) => { if (!controller.signal.aborted) setPlansError(error.message || "Unable to load subscription plans."); });
     } else {
       apiRequest("/platform/subscription-plans", { accessToken, signal: controller.signal })
-        .then((response) => { if (!controller.signal.aborted) setPlans(response?.data ?? []); })
+        .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
         .catch(() => {});
     }
     return () => controller.abort();
