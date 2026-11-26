@@ -1,0 +1,166 @@
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { AppScreen } from "./AppScreen";
+import { apiRequest } from "../services/apiClient";
+import { colors, radius, spacing } from "../theme/tokens";
+
+const PAGE_SIZE = 20;
+
+export function PlatformAdminScreen({ user, onSignOut }) {
+  const [section, setSection] = useState("schools");
+  const [schools, setSchools] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadDirectory = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true); else setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (search.trim()) params.set("search", search.trim());
+      const endpoint = section === "schools" ? "/platform/schools" : "/platform/users";
+      const response = await apiRequest(endpoint + "?" + params.toString());
+      const records = Array.isArray(response?.data) ? response.data : [];
+      if (section === "schools") setSchools(records); else setUsers(records);
+      setPagination(response?.pagination || { total: records.length, pages: 1 });
+    } catch (requestError) {
+      setError(requestError?.message || "Unable to load the platform directory.");
+      if (section === "schools") setSchools([]); else setUsers([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [page, search, section]);
+
+  useEffect(() => { void loadDirectory(); }, [loadDirectory]);
+
+  const switchSection = (next) => {
+    setSection(next);
+    setPage(1);
+    setSearch("");
+    setError("");
+  };
+
+  const nameOf = (item) => section === "schools"
+    ? item.name || item.schoolName || "Unnamed school"
+    : [item.firstName, item.lastName].filter(Boolean).join(" ") || item.name || "Unnamed user";
+  const subtitleOf = (item) => section === "schools"
+    ? item.slug || item.code || item.email || "School account"
+    : item.email || item.role?.replaceAll("_", " ") || "User account";
+  const statusOf = (item) => String(item.status || (item.isActive === false ? "suspended" : "active")).replaceAll("_", " ");
+
+  return <AppScreen style={styles.screen} edges={["top", "bottom"]}>
+    <View style={styles.header}>
+      <View style={styles.brandMark}><Text style={styles.brandMarkText}>SE</Text></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.brandName}>SCHOOLSUITE</Text>
+        <Text style={styles.brandCaption}>PLATFORM CONTROL</Text>
+      </View>
+      <TouchableOpacity onPress={onSignOut} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></TouchableOpacity>
+    </View>
+    <ScrollView contentContainerStyle={styles.content}>
+      <Text style={styles.kicker}>CENTRAL ADMINISTRATION</Text>
+      <Text style={styles.title}>Platform workspace</Text>
+      <Text style={styles.description}>Manage school organisations and user accounts across the platform.</Text>
+      <View style={styles.welcome}>
+        <Text style={styles.welcomeLabel}>SIGNED IN AS</Text>
+        <Text style={styles.welcomeName}>{[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Platform administrator"}</Text>
+        <Text style={styles.welcomeCopy}>Restricted cross-school administration</Text>
+      </View>
+      <View style={styles.tabs}>
+        {[["schools", "Schools"], ["users", "Users"]].map(([key, label]) =>
+          <TouchableOpacity key={key} onPress={() => switchSection(key)} style={[styles.tab, section === key && styles.tabActive]}>
+            <Text style={[styles.tabText, section === key && styles.tabTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <View style={styles.sectionHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sectionTitle}>{section === "schools" ? "School directory" : "User directory"}</Text>
+          <Text style={styles.sectionSubtitle}>{pagination.total || 0} records across the platform</Text>
+        </View>
+        <TouchableOpacity onPress={() => loadDirectory(true)} style={styles.refresh}><Text style={styles.refreshText}>{refreshing ? "Refreshing…" : "Refresh"}</Text></TouchableOpacity>
+      </View>
+      <TextInput
+        value={search}
+        onChangeText={(value) => { setSearch(value); setPage(1); }}
+        placeholder={section === "schools" ? "Search schools…" : "Search users…"}
+        placeholderTextColor={colors.muted}
+        style={styles.search}
+        returnKeyType="search"
+        accessibilityLabel={section === "schools" ? "Search schools" : "Search users"}
+      />
+      {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading directory…</Text></View> : null}
+      {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => loadDirectory()}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+      {!loading && !error ? (section === "schools" ? schools : users).length ? (section === "schools" ? schools : users).map((item, index) =>
+        <View key={String(item.id || item._id || index)} style={styles.record}>
+          <View style={styles.recordIcon}><Text style={styles.recordIconText}>{section === "schools" ? "⌂" : "♙"}</Text></View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.recordName}>{nameOf(item)}</Text>
+            <Text style={styles.recordSubtitle}>{subtitleOf(item)}</Text>
+          </View>
+          <View style={styles.statusPill}><Text style={styles.statusText}>{statusOf(item)}</Text></View>
+        </View>
+      ) : <View style={styles.state}><Text style={styles.stateText}>No {section} found.</Text></View> : null}
+      {!loading && pagination.pages > 1 ? <View style={styles.pagination}>
+        <TouchableOpacity disabled={page <= 1} onPress={() => setPage((value) => value - 1)} style={[styles.pageButton, page <= 1 && styles.disabled]}><Text style={styles.pageText}>Previous</Text></TouchableOpacity>
+        <Text style={styles.pageCount}>Page {page} of {pagination.pages}</Text>
+        <TouchableOpacity disabled={page >= pagination.pages} onPress={() => setPage((value) => value + 1)} style={[styles.pageButton, page >= pagination.pages && styles.disabled]}><Text style={styles.pageText}>Next</Text></TouchableOpacity>
+      </View> : null}
+      <Text style={styles.footer}>SchoolSuite · Platform administration</Text>
+    </ScrollView>
+  </AppScreen>;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: spacing.lg, paddingVertical: 13, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  brandMark: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  brandMarkText: { color: colors.white, fontSize: 15, fontWeight: "900" },
+  brandName: { color: colors.ink, fontSize: 13, fontWeight: "900", letterSpacing: 1.1 },
+  brandCaption: { color: colors.muted, fontSize: 9, fontWeight: "800", letterSpacing: 1, marginTop: 3 },
+  signOut: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 11, paddingVertical: 8 },
+  signOutText: { color: colors.muted, fontSize: 11, fontWeight: "800" },
+  content: { padding: spacing.lg, paddingBottom: 36, gap: spacing.md },
+  kicker: { color: colors.primary, fontSize: 10, fontWeight: "900", letterSpacing: 1.4, marginTop: 5 },
+  title: { color: colors.ink, fontSize: 26, fontWeight: "900", letterSpacing: -0.6 },
+  description: { color: colors.muted, fontSize: 13, lineHeight: 20 },
+  welcome: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 20, gap: 6, marginVertical: 5 },
+  welcomeLabel: { color: "#DCE5FF", fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
+  welcomeName: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  welcomeCopy: { color: "#E3E9FF", fontSize: 11 },
+  tabs: { flexDirection: "row", gap: 7, backgroundColor: colors.surface, padding: 5, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  tab: { flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: radius.sm },
+  tabActive: { backgroundColor: colors.primarySoft },
+  tabText: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  tabTextActive: { color: colors.primary },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 7 },
+  sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: "900" },
+  sectionSubtitle: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  refresh: { padding: 9 },
+  refreshText: { color: colors.primary, fontSize: 11, fontWeight: "800" },
+  search: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 13, paddingVertical: 11, color: colors.ink, fontSize: 13 },
+  record: { flexDirection: "row", alignItems: "center", gap: 11, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 13 },
+  recordIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  recordIconText: { color: colors.primary, fontSize: 17, fontWeight: "900" },
+  recordName: { color: colors.ink, fontSize: 13, fontWeight: "800" },
+  recordSubtitle: { color: colors.muted, fontSize: 10 },
+  statusPill: { backgroundColor: colors.primarySoft, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill },
+  statusText: { color: colors.primary, fontSize: 9, fontWeight: "800", textTransform: "capitalize" },
+  state: { alignItems: "center", padding: 25, gap: 10, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  stateText: { color: colors.muted, fontSize: 12 },
+  error: { padding: 14, borderRadius: radius.md, backgroundColor: "#FFF0EF", gap: 8 },
+  errorText: { color: colors.danger, fontSize: 12 },
+  retry: { color: colors.primary, fontWeight: "900", fontSize: 12 },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
+  pageButton: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  pageText: { color: colors.primary, fontSize: 11, fontWeight: "800" },
+  pageCount: { color: colors.muted, fontSize: 11, fontWeight: "700" },
+  disabled: { opacity: 0.35 },
+  footer: { textAlign: "center", color: colors.muted, fontSize: 10, marginTop: 14 },
+});
