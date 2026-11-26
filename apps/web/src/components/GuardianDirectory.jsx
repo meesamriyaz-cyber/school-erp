@@ -487,7 +487,9 @@ export default function GuardianDirectory() {
                     <span><strong>Phone:</strong> {selectedGuardian.phone || "—"}</span>
                     <span><strong>Email:</strong> {selectedGuardian.email || "—"}</span>
                     <span><strong>Pending email:</strong> {selectedGuardian.pendingEmail || "—"}</span>
-                    <span><strong>Email verification:</strong> {selectedGuardian.emailVerifiedAt && selectedGuardian.verifiedEmail === selectedGuardian.email ? "Verified" : "Not verified"}</span>\n                    <span><strong>Email delivery:</strong> {selectedGuardian.emailDeliveryStatus || "No recent delivery event"}</span>\n                    {selectedGuardian.emailDeliveryUpdatedAt ? <span><strong>Delivery updated:</strong> {new Date(selectedGuardian.emailDeliveryUpdatedAt).toLocaleString()}</span> : null}
+                    <span><strong>Email verification:</strong> {selectedGuardian.emailVerifiedAt && selectedGuardian.verifiedEmail === selectedGuardian.email ? "Verified" : "Not verified"}</span>
+                    <span><strong>Email delivery:</strong> {selectedGuardian.emailDeliveryStatus || "No recent delivery event"}</span>
+                    {selectedGuardian.emailDeliveryUpdatedAt ? <span><strong>Delivery updated:</strong> {new Date(selectedGuardian.emailDeliveryUpdatedAt).toLocaleString()}</span> : null}
                     <span><strong>Phone verification:</strong> Not performed (contact number only)</span>
                     <span><strong>Status:</strong> <GuardianStatus status={selectedGuardian.status} /></span>
                     {selectedGuardian.photoUrl ? <img src={selectedGuardian.photoUrl} alt={`${fullName(selectedGuardian)} profile`} className="guardian-directory-photo" /> : null}
