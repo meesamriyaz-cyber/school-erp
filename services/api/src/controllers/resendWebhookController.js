@@ -47,7 +47,8 @@ export const receiveResendWebhook = async (req, res) => {
   try { event = JSON.parse(req.body.toString("utf8")); } catch {
     return res.status(400).json({ success: false, message: "Invalid webhook JSON" });
   }
-  if (!event?.id || !DELIVERY_EVENTS.has(event.type)) {
+  const eventId = event?.id || req.get("svix-id");
+  if (!eventId || !DELIVERY_EVENTS.has(event.type)) {
     return res.status(200).json({ success: true, ignored: true });
   }
 
@@ -59,7 +60,7 @@ export const receiveResendWebhook = async (req, res) => {
 
   const occurredAt = event.created_at ? new Date(event.created_at) : new Date();
   const filter = guardianTag
-    ? { _id: guardianTag, pendingEmail: { $exists: true, $ne: null } }
+    ? { _id: guardianTag }
     : { emailDeliveryEmailId: emailId };
 
   const guardian = await Guardian.findOne(filter);
@@ -70,7 +71,7 @@ export const receiveResendWebhook = async (req, res) => {
   if (guardian.emailDeliveryEmailId && guardian.emailDeliveryEmailId !== emailId) {
     return res.status(200).json({ success: true, ignored: true });
   }
-  if (guardian.emailDeliveryEvents?.some((item) => item.eventId === event.id)) {
+  if (guardian.emailDeliveryEvents?.some((item) => item.eventId === eventId)) {
     return res.status(200).json({ success: true, duplicate: true });
   }
 
@@ -79,7 +80,7 @@ export const receiveResendWebhook = async (req, res) => {
   guardian.emailDeliveryUpdatedAt = occurredAt;
   guardian.emailDeliveryEvents = [
     ...(guardian.emailDeliveryEvents || []).slice(-19),
-    { eventId: event.id, type: event.type, occurredAt },
+    { eventId, type: event.type, occurredAt },
   ];
   await guardian.save();
 
