@@ -142,6 +142,19 @@ test('school administrator mobile overview exposes the same core school operatio
 });
 
 
+test('teacher mobile retry actions reload the currently selected teaching workflow', async () => {
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  const announcements = await readFile(new URL('../src/components/TeacherAnnouncementsScreen.js', import.meta.url), 'utf8');
+  const timetable = await readFile(new URL('../src/components/TimetableScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /if\(tab==="homework"\)return activeHomework\?loadSubmissions\(activeHomework\):loadBase\(\)/);
+  assert.match(workspace, /if\(tab==="exams"\)return selectedExam\?loadExamRoster\(selectedExam\):loadBase\(\)/);
+  assert.match(workspace, /if\(tab==="reports"\)return runReport\(\)/);
+  assert.match(workspace, /onPress=\{retryCurrentTab\}/);
+  assert.match(announcements, /onPress=\{load\}/);
+  assert.match(timetable, /const params = isTeacher \? \{\}/);
+  assert.match(timetable, /getTimetable\(params\)/);
+});
+
 test('teacher mobile workspace preserves separate subject assignments within the same class', async () => {
   const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
   assert.match(workspace, /id\(a\.subjectId\)\|\|"all"/);
