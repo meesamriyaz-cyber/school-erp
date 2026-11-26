@@ -7,9 +7,8 @@ import {
   refresh,
   logout,
   changePassword,
-  requestPasswordReset,
-  completePasswordReset,
 } from "../controllers/authController.js";
+import { requestPasswordReset, completePasswordReset } from "../controllers/passwordResetController.js";
 import authenticate from "../middleware/authenticate.js";
 const router = Router();
 
