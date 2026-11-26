@@ -88,7 +88,7 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
   let existingLegacyQuery = StudentGuardian.findOne({ tenantId, studentId, source: { $in: ["legacy_student", "manual_and_legacy"] } });
   if (session) existingLegacyQuery = existingLegacyQuery.session(session);
   const existingLegacyLink = await existingLegacyQuery;
-  if (!guardian && !details.phone && !details.pendingEmail && existingLegacyLink) {
+  if (!guardian && !details.phone && existingLegacyLink) {
     let linkedGuardianQuery = Guardian.findOne({ _id: existingLegacyLink.guardianId, tenantId });
     if (session) linkedGuardianQuery = linkedGuardianQuery.session(session);
     guardian = await linkedGuardianQuery;
