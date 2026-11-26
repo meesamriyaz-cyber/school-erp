@@ -14,7 +14,7 @@ const CREATE_FIELDS = [
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
 const LEGACY_GUARDIAN_FIELDS = ["guardianName", "guardianRelationship", "guardianPhone", "guardianEmail"];
 const PARENT_ROLES = ["father", "mother"];
-const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const validateParent = (parent, relationship) => {
   if (parent == null) return null;
   if (typeof parent !== "object" || Array.isArray(parent)) return `${relationship} details must be an object`;
