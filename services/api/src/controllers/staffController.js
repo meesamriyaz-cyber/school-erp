@@ -13,8 +13,8 @@ const validId = (value) => mongoose.isObjectIdOrHexString(value);
 const serialize = (record) => ({
   id: String(record._id), userId: record.userId ? String(record.userId._id || record.userId) : null,
   linkedUser: record.userId && typeof record.userId === "object" ? { id: String(record.userId._id), firstName: record.userId.firstName, lastName: record.userId.lastName, email: record.userId.email, role: record.userId.role, status: record.userId.status } : null,
-  employeeCode: record.employeeCode || null, firstName: record.firstName, lastName: record.lastName,
-  email: record.userId?.email || record.email || null, phone: record.phone || null, employeeType: record.employeeType,
+  employeeCode: record.employeeCode || null, firstName: record.userId?.firstName || record.firstName, lastName: record.userId?.lastName ?? record.lastName,
+  email: record.userId?.email || record.email || null, phone: record.userId?.phone ?? record.phone ?? null, employeeType: record.employeeType,
   designation: record.designation, department: record.department || null, employmentType: record.employmentType,
   joiningDate: record.joiningDate, qualification: record.qualification || null,
   experienceYears: record.experienceYears, employmentStatus: record.employmentStatus,
