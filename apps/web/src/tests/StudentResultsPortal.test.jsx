@@ -36,6 +36,17 @@ describe("Parent school communications", () => {
     expect(mocks.apiRequest).toHaveBeenCalledWith("/portal/notifications", expect.objectContaining({ accessToken: "access-token" }));
   });
 
+  it("opens the parent–teacher messaging workspace from the family portal", async () => {
+    render(<StudentResultsPortal />);
+    expect(await screen.findByRole("heading", { name: "School communications" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Messages" }));
+    expect(await screen.findByRole("heading", { name: "Parent–teacher messages" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mocks.apiRequest).toHaveBeenCalledWith("/messaging/conversations", expect.objectContaining({ accessToken: "access-token" }));
+      expect(mocks.apiRequest).toHaveBeenCalledWith("/messaging/contacts", expect.objectContaining({ accessToken: "access-token" }));
+    });
+  });
+
   it("renders school notices returned by the parent communication endpoint", async () => {
     mocks.apiRequest.mockImplementation((path) => Promise.resolve({
       success: true,
