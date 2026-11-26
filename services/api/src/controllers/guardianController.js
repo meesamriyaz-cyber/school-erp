@@ -106,8 +106,18 @@ export const createGuardian = async (req, res, next) => {
     for (const field of ["lastName", "email", "photoUrl"]) {
       if (fields[field] !== undefined && fields[field] !== null && typeof fields[field] !== "string") return invalid(res, `${field} must be a string`);
     }
-    const guardian = await Guardian.create({ ...fields, tenantId: req.tenantId });
-    return res.status(201).json({ success: true, data: guardian });
+    const initialEmail = fields.email;
+    delete fields.email;
+    const guardian = await Guardian.create({
+      ...fields,
+      ...(initialEmail ? { pendingEmail: initialEmail.trim().toLowerCase() } : {}),
+      tenantId: req.tenantId,
+    });
+    return res.status(201).json({
+      success: true,
+      data: guardian,
+      ...(initialEmail ? { message: "Guardian created. Send an email verification code to confirm the pending email address." } : {}),
+    });
   } catch (error) { return handleError(error, res, next); }
 };
 
@@ -137,6 +147,16 @@ export const updateGuardian = async (req, res, next) => {
     if (!mongoose.isValidObjectId(guardianId)) return invalid(res, "Invalid guardian ID");
     const updates = validateBody(req.body, res, UPDATE_FIELDS);
     if (!updates) return;
+    if (Object.hasOwn(updates, "email")) {
+      const nextEmail = updates.email;
+      delete updates.email;
+      if (nextEmail !== null && nextEmail !== "") {
+        if (typeof nextEmail !== "string" || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(nextEmail.trim())) return invalid(res, "Enter a valid guardian email address");
+        updates.pendingEmail = nextEmail.trim().toLowerCase();
+      } else {
+        updates.pendingEmail = null;
+      }
+    }
     if (Object.keys(updates).length === 0) return invalid(res, "Provide at least one guardian field to update");
     if (Object.hasOwn(updates, "firstName") && (typeof updates.firstName !== "string" || !updates.firstName.trim())) return invalid(res, "Guardian first name cannot be empty");
     for (const field of ["lastName", "email", "photoUrl"]) {
@@ -172,7 +192,7 @@ export const updateGuardian = async (req, res, next) => {
           }
         }
 
-        const contactFieldsChanged = ["firstName", "lastName", "email"].some((field) => Object.hasOwn(updates, field));
+        const contactFieldsChanged = ["firstName", "lastName"].some((field) => Object.hasOwn(updates, field));
         if (contactFieldsChanged) {
           const legacyLinks = await StudentGuardian.find({
             tenantId: req.tenantId,
