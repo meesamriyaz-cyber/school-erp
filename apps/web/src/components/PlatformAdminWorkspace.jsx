@@ -99,6 +99,8 @@ export default function PlatformAdminWorkspace() {
   const [createUserError, setCreateUserError] = useState("");
   const [createUserSuccess, setCreateUserSuccess] = useState("");
   const [plans, setPlans] = useState([]);
+  const [schoolSubscription, setSchoolSubscription] = useState(null);
+  const [schoolSubscriptionError, setSchoolSubscriptionError] = useState("");
   const [plansError, setPlansError] = useState("");
   const [planForm, setPlanForm] = useState({ name: "", description: "", billingInterval: "monthly", amount: "", currency: "INR", annualDiscountPercent: "0" });
   const [savingPlan, setSavingPlan] = useState(false);
@@ -134,12 +136,16 @@ export default function PlatformAdminWorkspace() {
         .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
         .catch((error) => { if (!controller.signal.aborted) setPlansError(error.message || "Unable to load subscription plans."); });
     } else {
+      setSchoolSubscriptionError("");
       apiRequest("/platform/subscription-plans", { accessToken, signal: controller.signal })
         .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
         .catch(() => {});
+      apiRequest(`/platform/schools/${encodeURIComponent(selectedSchoolId)}/subscription`, { accessToken, signal: controller.signal })
+        .then((response) => { if (!controller.signal.aborted) setSchoolSubscription(response?.data?.subscription ?? null); })
+        .catch((error) => { if (!controller.signal.aborted) setSchoolSubscriptionError(error.message || "Unable to load subscription."); });
     }
     return () => controller.abort();
-  }, [activePage, accessToken]);
+  }, [activePage, accessToken, selectedSchoolId]);
 
   useEffect(() => {
     if (activePage !== "Billing") return undefined;
@@ -963,6 +969,8 @@ export default function PlatformAdminWorkspace() {
                   </section>
                   <section className="platform-lifecycle-controls" aria-label="School subscription management">
                     <div><h3>Subscription</h3><p>Assign monthly, discounted annual, or negotiated lifetime access. Access activates only after the invoice is fully paid.</p></div>
+                    {schoolSubscription && <div className="platform-current-subscription"><strong>Current subscription</strong><span>{schoolSubscription.planName || "Assigned plan"} · {schoolSubscription.billingInterval === "one_time" ? "Lifetime access" : statusLabel(schoolSubscription.billingInterval)}</span><span>{statusLabel(schoolSubscription.status)} · {schoolSubscription.currency} {Number(schoolSubscription.amount || 0).toLocaleString("en-IN")}</span><small>{schoolSubscription.nextBillingAt ? `Next billing: ${formatDate(schoolSubscription.nextBillingAt)}` : schoolSubscription.lifetimeAccess ? "No renewal or expiry" : schoolSubscription.currentPeriodEndsAt ? `Period ends: ${formatDate(schoolSubscription.currentPeriodEndsAt)}` : "Billing date pending"}</small></div>}
+                    {schoolSubscriptionError && <p role="alert">{schoolSubscriptionError}</p>}
                     <div className="platform-subscription-assign">
                       <label>Plan<select value={assignPlanId} onChange={(event) => setAssignPlanId(event.target.value)}><option value="">Select a plan</option>{plans.filter((plan) => plan.isActive && !plan.isArchived).map((plan) => <option key={plan.id || plan._id} value={plan.id || plan._id}>{plan.name} · {plan.billingInterval} · {plan.currency} {plan.amount}{plan.billingInterval === "annual" ? ` · ${plan.annualDiscountPercent || 0}% discount` : ""}</option>)}</select></label>
                       <label>Invoice due date (optional)<input type="date" value={assignDueAt} onChange={(event) => setAssignDueAt(event.target.value)} /></label>
