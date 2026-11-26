@@ -76,6 +76,15 @@ describe("TeacherTimetablePortal", () => {
     expect(document.querySelector(".teacher-workspace-content .teacher-reports")).toBeInTheDocument();
   });
 
+  it("uses the school dashboard design primitives for the teacher overview", async () => {
+    render(<TeacherTimetablePortal />);
+    expect(await screen.findByText("TEACHING OVERVIEW")).toBeInTheDocument();
+    expect(document.querySelector(".teacher-overview.school-dashboard .school-dashboard-stats")).toBeInTheDocument();
+    expect(document.querySelectorAll(".teacher-overview .school-dashboard-stat")).toHaveLength(4);
+    expect(document.querySelector(".teacher-overview .school-dashboard-panels")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /View timetable/ })).toBeInTheDocument();
+  });
+
   it("opens the parent messaging workspace from teacher navigation", async () => {
     render(<TeacherTimetablePortal />);
     fireEvent.click(await screen.findByRole("button", { name: "Parent messages" }));
