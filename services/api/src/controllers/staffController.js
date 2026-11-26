@@ -14,7 +14,7 @@ const serialize = (record) => ({
   id: String(record._id), userId: record.userId ? String(record.userId._id || record.userId) : null,
   linkedUser: record.userId && typeof record.userId === "object" ? { id: String(record.userId._id), firstName: record.userId.firstName, lastName: record.userId.lastName, email: record.userId.email, role: record.userId.role, status: record.userId.status } : null,
   employeeCode: record.employeeCode || null, firstName: record.firstName, lastName: record.lastName,
-  email: record.email || null, phone: record.phone || null, employeeType: record.employeeType,
+  email: record.userId?.email || record.email || null, phone: record.phone || null, employeeType: record.employeeType,
   designation: record.designation, department: record.department || null, employmentType: record.employmentType,
   joiningDate: record.joiningDate, qualification: record.qualification || null,
   experienceYears: record.experienceYears, employmentStatus: record.employmentStatus,
@@ -59,7 +59,7 @@ async function validateUserLink(userId, tenantId, employeeType, session = null, 
     return null;
   }
   if (!validId(userId)) { const error = new Error("Invalid linked user ID"); error.code = "STAFF_USER_INVALID"; throw error; }
-  let query = User.findOne({ _id: userId, tenantId, ...(requireActive ? { status: "active" } : {}) }).select("_id role");
+  let query = User.findOne({ _id: userId, tenantId, ...(requireActive ? { status: "active" } : {}) }).select("_id role email");
   if (session) query = query.session(session);
   const user = await query.lean();
   if (!user) { const error = new Error("Select an active user from this school"); error.code = "STAFF_USER_INVALID"; throw error; }
@@ -123,7 +123,8 @@ export const createStaff = async (req, res, next) => {
   const fields = parseFields(req.body, CREATE_FIELDS, res);
   if (!fields) return;
   try {
-    await validateUserLink(fields.userId, req.tenantId, fields.employeeType);
+    const linkedUser = await validateUserLink(fields.userId, req.tenantId, fields.employeeType);
+    if (linkedUser?.email) fields.email = linkedUser.email;
     const record = await Staff.create({ ...fields, tenantId: req.tenantId, auditTrail: [{ action: "created", actorUserId: req.auth.userId, changedFields: Object.keys(fields) }] });
     const populated = await Staff.findOne({ _id: record._id, tenantId: req.tenantId }).populate("userId", "firstName lastName email role status").lean();
     return res.status(201).json({ success: true, data: serialize(populated) });
@@ -143,19 +144,49 @@ export const updateStaff = async (req, res, next) => {
   const fields = parseFields(req.body, UPDATE_FIELDS, res, true);
   if (!fields) return;
   if (!Object.keys(fields).length) return invalid(res, "Provide at least one staff field to update");
+  const session = await mongoose.startSession();
   try {
-    const current = await Staff.findOne({ _id: req.params.staffId, tenantId: req.tenantId }).select("employeeType userId employmentStatus").lean();
-    if (!current || current.employmentStatus === "separated") return res.status(404).json({ success: false, message: "Staff record not found or already separated" });
-    const employeeType = fields.employeeType || current.employeeType;
-    await validateUserLink(current.userId, req.tenantId, employeeType, null, false);
-    const record = await Staff.findOneAndUpdate(
-      { _id: req.params.staffId, tenantId: req.tenantId, employmentStatus: { $ne: "separated" } },
-      { $set: fields, $push: { auditTrail: { $each: [{ action: "profile_updated", actorUserId: req.auth.userId, changedFields: Object.keys(fields) }], $slice: -50 } } },
-      { new: true, runValidators: true },
-    ).populate("userId", "firstName lastName email role status").lean();
-    if (!record) return res.status(404).json({ success: false, message: "Staff record not found or already separated" });
+    let updatedId = null;
+    await session.withTransaction(async () => {
+      const current = await Staff.findOne({ _id: req.params.staffId, tenantId: req.tenantId })
+        .select("employeeType userId employmentStatus").session(session).lean();
+      if (!current || current.employmentStatus === "separated") {
+        const error = new Error("Staff record not found or already separated"); error.code = "STAFF_NOT_FOUND"; throw error;
+      }
+      const employeeType = fields.employeeType || current.employeeType;
+      const linkedUser = await validateUserLink(current.userId, req.tenantId, employeeType, session, false);
+      if (linkedUser && Object.hasOwn(fields, "email")) {
+        if (!fields.email) {
+          const error = new Error("A linked staff member must have a valid login email address"); error.code = "STAFF_EMAIL_REQUIRED"; throw error;
+        }
+        const updatedUser = await User.findOneAndUpdate(
+          { _id: linkedUser._id, tenantId: req.tenantId },
+          { $set: { email: fields.email } },
+          { new: true, runValidators: true, session },
+        ).select("_id email").lean();
+        if (!updatedUser) {
+          const error = new Error("The linked login account could not be found"); error.code = "STAFF_USER_INVALID"; throw error;
+        }
+        fields.email = updatedUser.email;
+      }
+      const record = await Staff.findOneAndUpdate(
+        { _id: req.params.staffId, tenantId: req.tenantId, employmentStatus: { $ne: "separated" } },
+        { $set: fields, $push: { auditTrail: { $each: [{ action: "profile_updated", actorUserId: req.auth.userId, changedFields: Object.keys(fields) }], $slice: -50 } } },
+        { new: true, runValidators: true, session },
+      ).select("_id");
+      if (!record) {
+        const error = new Error("Staff record not found or already separated"); error.code = "STAFF_NOT_FOUND"; throw error;
+      }
+      updatedId = record._id;
+    });
+    const record = await Staff.findOne({ _id: updatedId, tenantId: req.tenantId })
+      .populate("userId", "firstName lastName email role status").lean();
     return res.status(200).json({ success: true, data: serialize(record) });
-  } catch (error) { return handleError(error, res, next); }
+  } catch (error) {
+    if (error.code === "STAFF_EMAIL_REQUIRED") return invalid(res, error.message);
+    if (error.code === "STAFF_NOT_FOUND") return res.status(404).json({ success: false, message: error.message });
+    return handleError(error, res, next);
+  } finally { await session.endSession(); }
 };
 
 export const updateStaffStatus = async (req, res, next) => {
