@@ -812,7 +812,13 @@ export default function PlatformAdminWorkspace() {
                     ? "Search and manage accounts across all registered schools."
                     : activePage === "UserDetails"
                       ? "Review and update an account profile."
-                      : "Search registered schools, review their status, and move through the directory."}
+                      : activePage === "Plans"
+                        ? "Create and maintain monthly, annual and lifetime subscription offers."
+                        : activePage === "Billing"
+                          ? "Review platform invoices, record payments and manage reversals."
+                          : activePage === "Commercial audit"
+                            ? "Trace subscription, plan and payment changes across your school portfolio."
+                            : "Search registered schools, review their status, and move through the directory."}
           </p>
 
           {activePage === "Overview" ? (
@@ -832,19 +838,19 @@ export default function PlatformAdminWorkspace() {
               {businessOverviewError && <div className="platform-directory-error" role="alert"><p>{businessOverviewError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
               {loadingBusinessOverview && <p role="status">Loading business metrics…</p>}
               {businessOverview && (
-                <>
+                <div className="platform-overview-metrics">
                   <section className="platform-summary-grid" aria-label="Business overview">
                     <article className="platform-summary-card"><span className="platform-summary-icon">⌂</span><span className="platform-summary-label">Client schools</span><strong>{businessOverview.schools?.total ?? 0}</strong><p>{businessOverview.schools?.active ?? 0} active schools</p></article>
                     <article className="platform-summary-card"><span className="platform-summary-icon">↻</span><span className="platform-summary-label">Active subscriptions</span><strong>{Object.values(businessOverview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</strong><p>Monthly, annual and lifetime plans</p></article>
-                    <article className="platform-summary-card"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Invoiced revenue</span><strong>{(businessOverview.invoiced || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.invoiced || 0)).join(" · ") || "—"}</strong><p>Issued platform invoices, excluding void and draft</p></article>
-                    <article className="platform-summary-card"><span className="platform-summary-icon">✓</span><span className="platform-summary-label">Cash collected</span><strong>{(businessOverview.collected || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.collected || 0)).join(" · ") || "—"}</strong><p>Recorded platform payments</p></article>
+                    <article className="platform-summary-card"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Invoiced revenue</span><strong>{(businessOverview.invoiced || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.invoiced || 0)).join(" · ") || "No invoices yet"}</strong><p>Issued platform invoices, excluding void and draft</p></article>
+                    <article className="platform-summary-card"><span className="platform-summary-icon">✓</span><span className="platform-summary-label">Cash collected</span><strong>{(businessOverview.collected || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.collected || 0)).join(" · ") || "No payments yet"}</strong><p>Recorded platform payments</p></article>
                   </section>
                   <section className="platform-summary-grid" aria-label="Recurring revenue">
                     {Object.entries(businessOverview.subscriptions || {}).map(([currency, metrics]) => (
                       <article className="platform-summary-card" key={currency}><span className="platform-summary-label">{currency} recurring run rate</span><strong>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.mrr || 0)} / month</strong><p>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.arr || 0)} annualised · {new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.lifetimeSales || 0)} lifetime sales</p></article>
                     ))}
                   </section>
-                </>
+                </div>
               )}
               <section className="platform-summary-grid" aria-label="Platform operations">
                 <article className="platform-summary-card"><span className="platform-summary-icon">⌂</span><span className="platform-summary-label">Client portfolio</span><strong>Manage schools</strong><p>Search school accounts and review their lifecycle.</p><button type="button" className="platform-secondary-button" onClick={() => setActivePage("Schools")}>Open schools</button></article>
