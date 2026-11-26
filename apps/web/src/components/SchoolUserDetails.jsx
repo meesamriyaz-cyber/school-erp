@@ -252,6 +252,7 @@ export default function SchoolUserDetails({ userId, onBack }) {
           {editing ? (
             <form className="school-user-edit-form" onSubmit={handleSubmit} noValidate>
               <h3>Edit personal information</h3>
+              <p>If this account is linked to a staff record, name, email and phone changes are synchronized with that staff profile.</p>
               <div className="school-user-edit-grid">
                 <label>
                   <span>First name</span>
