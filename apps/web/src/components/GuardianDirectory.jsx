@@ -494,7 +494,6 @@ export default function GuardianDirectory() {
                       <label>6-digit email code <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))} /></label>
                       <button type="button" onClick={verifyEmailCode} disabled={saving || verificationCode.length !== 6}>Verify email</button>
                     </div>}
-                  </div>
                   </div>}
                   {canLinkPortal && !editing && (
                     <div className="guardian-directory-portal-link">
