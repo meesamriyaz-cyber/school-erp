@@ -1187,7 +1187,7 @@ describe("Guardian API integration tests", () => {
         admissionDate: "2026-04-01",
         guardianName: "Shahnawaz Chachoo",
         guardianRelationship: "uncle",
-        guardianPhone: "919149410572",
+        guardianPhone: "9149410572",
         guardianEmail: "shahnawaz@example.test",
       }),
     });
@@ -1195,9 +1195,9 @@ describe("Guardian API integration tests", () => {
     expect(studentResponse.status).toBe(201);
     const student = studentResponse.body.data;
 
-    const directory = await request("/guardians?search=919149410572", { token: adminA.token });
+    const directory = await request("/guardians?search=9149410572", { token: adminA.token });
     const guardian = directory.body.data.find(
-      (item) => item.phone === "919149410572",
+      (item) => item.phone === "9149410572",
     );
     expect(guardian).toBeTruthy();
     expect(guardian.firstName).toBe("Shahnawaz");
