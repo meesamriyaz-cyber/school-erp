@@ -182,7 +182,11 @@ export default function AppHomeScreen() {
         </View>
       </View>
       <View style={styles.scrollContent}>
-        <ComingSoon title={unavailableTitle} description={unavailableDescription} onHome={signOut}/>
+        <View style={styles.comingSoon}>
+          <View style={styles.comingIcon}><Text style={styles.comingIconText}>SE</Text></View>
+          <Text style={styles.comingTitle}>{unavailableTitle}</Text>
+          <Text style={styles.comingDescription}>{unavailableDescription}</Text>
+        </View>
         <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
           <Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text>
         </TouchableOpacity>
@@ -294,7 +298,23 @@ export default function AppHomeScreen() {
        activeTab === "attendance" ? <AttendanceScreen onHome={onHome}/> :
        activeTab === "staff" ? <StaffScreen onHome={onHome}/> :
        <View style={styles.profileCard}><View style={styles.profileLarge}><Text style={styles.profileLargeText}>{fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</Text></View><Text style={styles.profileName}>{fullName}</Text><Text style={styles.profileRole}>{role}</Text><Text style={styles.profileSchool}>School ERP mobile account</Text>
-        {!isTeacher && !isLearnerAccount ? <><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("enrollments")}><Text style={styles.secondaryButtonText}>Manage enrollments & class placements</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("fees")}><Text style={styles.secondaryButtonText}>Fees & Payments</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("examinations")}><Text style={styles.secondaryButtonText}>Examinations & Results</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("reports")}><Text style={styles.secondaryButtonText}>Reports & Analytics</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("certificates")}><Text style={styles.secondaryButtonText}>Certificates & Documents</Text></TouchableOpacity><TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("documents")}><Text style={styles.secondaryButtonText}>Student Document Management</Text></TouchableOpacity></> : null}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
+        {isSchoolAdministrator ? <>
+          <View style={styles.moreGroup}>
+            <SectionHeader title="School operations" subtitle="Manage day-to-day school activity"/>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("enrollments")}><Text style={styles.secondaryButtonText}>Enrollments & class placements</Text></TouchableOpacity>
+          </View>
+          <View style={styles.moreGroup}>
+            <SectionHeader title="Finance" subtitle="Core school fee collection"/>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("fees")}><Text style={styles.secondaryButtonText}>Fees & Payments</Text></TouchableOpacity>
+          </View>
+          <View style={styles.moreGroup}>
+            <SectionHeader title="Academic records" subtitle="Assessment, reporting and documents"/>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("examinations")}><Text style={styles.secondaryButtonText}>Examinations & Results</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("reports")}><Text style={styles.secondaryButtonText}>Reports & Analytics</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("certificates")}><Text style={styles.secondaryButtonText}>Certificates & Reports</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("documents")}><Text style={styles.secondaryButtonText}>Student Documents</Text></TouchableOpacity>
+          </View>
+         </>}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
     </ScrollView>}
 
     <View style={styles.bottomNav}>
@@ -381,6 +401,7 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, fontSize: 13 },
   retryButton: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surface, borderRadius: 8 },
   retryText: { color: colors.primary, fontWeight: "800" },
+  moreGroup: { gap: spacing.sm },
   comingSoon: { alignItems: "center", backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: 28, gap: 14, marginTop: 30 },
   comingIcon: { width: 64, height: 64, backgroundColor: colors.primary, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   comingIconText: { color: colors.white, fontWeight: "900", fontSize: 20 },
