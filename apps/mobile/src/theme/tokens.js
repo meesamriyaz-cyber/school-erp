@@ -1,15 +1,16 @@
 export const colors = Object.freeze({
-  primary: '#173B63',
-  primaryStrong: '#102C4B',
-  primarySoft: '#EAF1F8',
-  accent: '#D69A32',
-  background: '#F7F9FC',
+  primary: '#4263EB',
+  primaryStrong: '#304BC0',
+  primarySoft: '#EDF1FF',
+  accent: '#D49A39',
+  violet: '#9869D5',
+  background: '#F5F7FB',
   surface: '#FFFFFF',
-  ink: '#17283B',
-  muted: '#65758A',
-  border: '#DCE4ED',
+  ink: '#202C42',
+  muted: '#778196',
+  border: '#E7EBF2',
   white: '#FFFFFF',
-  success: '#23845B',
+  success: '#1EAA7C',
   danger: '#B54747',
 });
 
@@ -24,8 +25,8 @@ export const spacing = Object.freeze({
 
 export const radius = Object.freeze({
   sm: 8,
-  md: 14,
-  lg: 20,
+  md: 13,
+  lg: 16,
   pill: 999,
 });
 
