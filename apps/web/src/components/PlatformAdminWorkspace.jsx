@@ -30,6 +30,9 @@ function statusLabel(status) {
 export default function PlatformAdminWorkspace() {
   const { user, logout, accessToken } = useAuth();
   const [activePage, setActivePage] = useState("Overview");
+  const [businessOverview, setBusinessOverview] = useState(null);
+  const [businessOverviewError, setBusinessOverviewError] = useState("");
+  const [loadingBusinessOverview, setLoadingBusinessOverview] = useState(false);
   const [schools, setSchools] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -681,25 +684,27 @@ export default function PlatformAdminWorkspace() {
                 <div className="platform-card-art" aria-hidden="true">⌂</div>
               </section>
 
-              <section className="platform-summary-grid" aria-label="Platform modules">
-                <article className="platform-summary-card">
-                  <span className="platform-summary-icon">⌂</span>
-                  <span className="platform-summary-label">School directory</span>
-                  <strong>Available</strong>
-                  <p>Search and inspect registered schools.</p>
-                </article>
-                <article className="platform-summary-card">
-                  <span className="platform-summary-icon">＋</span>
-                  <span className="platform-summary-label">School onboarding</span>
-                  <strong>Available</strong>
-                  <p>Create a school and its initial administrator.</p>
-                </article>
-                <article className="platform-summary-card">
-                  <span className="platform-summary-icon">✓</span>
-                  <span className="platform-summary-label">Lifecycle controls</span>
-                  <strong>Available</strong>
-                  <p>Activate, suspend and reactivate schools.</p>
-                </article>
+              {businessOverviewError && <div className="platform-directory-error" role="alert"><p>{businessOverviewError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
+              {loadingBusinessOverview && <p role="status">Loading business metrics…</p>}
+              {businessOverview && (
+                <>
+                  <section className="platform-summary-grid" aria-label="Business overview">
+                    <article className="platform-summary-card"><span className="platform-summary-icon">⌂</span><span className="platform-summary-label">Client schools</span><strong>{businessOverview.schools?.total ?? 0}</strong><p>{businessOverview.schools?.active ?? 0} active schools</p></article>
+                    <article className="platform-summary-card"><span className="platform-summary-icon">↻</span><span className="platform-summary-label">Active subscriptions</span><strong>{Object.values(businessOverview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</strong><p>Monthly, annual and lifetime plans</p></article>
+                    <article className="platform-summary-card"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Invoiced revenue</span><strong>{(businessOverview.invoiced || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.invoiced || 0)).join(" · ") || "—"}</strong><p>Issued platform invoices, excluding void and draft</p></article>
+                    <article className="platform-summary-card"><span className="platform-summary-icon">✓</span><span className="platform-summary-label">Cash collected</span><strong>{(businessOverview.collected || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.collected || 0)).join(" · ") || "—"}</strong><p>Recorded platform payments</p></article>
+                  </section>
+                  <section className="platform-summary-grid" aria-label="Recurring revenue">
+                    {Object.entries(businessOverview.subscriptions || {}).map(([currency, metrics]) => (
+                      <article className="platform-summary-card" key={currency}><span className="platform-summary-label">{currency} recurring run rate</span><strong>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.mrr || 0)} / month</strong><p>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.arr || 0)} annualised · {new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.lifetimeSales || 0)} lifetime sales</p></article>
+                    ))}
+                  </section>
+                </>
+              )}
+              <section className="platform-summary-grid" aria-label="Platform operations">
+                <article className="platform-summary-card"><span className="platform-summary-icon">⌂</span><span className="platform-summary-label">Client portfolio</span><strong>Manage schools</strong><p>Search school accounts and review their lifecycle.</p><button type="button" className="platform-secondary-button" onClick={() => setActivePage("Schools")}>Open schools</button></article>
+                <article className="platform-summary-card"><span className="platform-summary-icon">＋</span><span className="platform-summary-label">Onboarding</span><strong>New client</strong><p>Register a school and its initial administrator.</p><button type="button" className="platform-secondary-button" onClick={() => setActivePage("CreateSchool")}>Add school</button></article>
+                <article className="platform-summary-card"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Billing data</span><strong>Separate from school fees</strong><p>These metrics represent SchoolSuite platform invoices and payments.</p></article>
               </section>
             </>
           ) : activePage === "CreateSchool" ? (
