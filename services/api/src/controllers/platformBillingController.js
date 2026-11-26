@@ -4,6 +4,7 @@ import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import SchoolSubscription from "../models/SchoolSubscription.js";
 import PlatformInvoice from "../models/PlatformInvoice.js";
 import PlatformPayment from "../models/PlatformPayment.js";
+import PlatformCommercialEvent from "../models/PlatformCommercialEvent.js";
 
 const fail = (res, status, message) => res.status(status).json({ success: false, message });
 const validId = (value) => mongoose.isObjectIdOrHexString(value);
@@ -35,6 +36,7 @@ export async function createSubscriptionPlan(req, res, next) {
     if (!Number.isFinite(Number(annualDiscountPercent)) || Number(annualDiscountPercent) < 0 || Number(annualDiscountPercent) > 100 || (billingInterval !== "annual" && Number(annualDiscountPercent) !== 0)) return fail(res, 400, "Discount is only valid for annual plans and must be between 0 and 100");
     if (!Array.isArray(features) || features.some(x => typeof x !== "string" || x.length > 120)) return fail(res, 400, "Features must be a list of short text values");
     const plan = await SubscriptionPlan.create({ name: name.trim(), description, billingInterval, amount: money(amount), currency: currency.toUpperCase(), annualDiscountPercent: Number(annualDiscountPercent), features, createdBy: actorId(req) });
+    await PlatformCommercialEvent.create({ actorUserId: actorId(req), action: "PLAN_CREATED", details: { planId: String(plan._id), billingInterval, amount: plan.amount, currency: plan.currency } });
     return res.status(201).json({ success: true, data: { plan: { ...plan.toObject(), id: String(plan._id) } } });
   } catch (error) { if (error.name === "ValidationError") return fail(res, 400, "Invalid plan details"); return next(error); }
 }
@@ -52,6 +54,7 @@ export async function updateSubscriptionPlan(req, res, next) {
     if ("currency" in updates) updates.currency = updates.currency.toUpperCase();
     const plan = await SubscriptionPlan.findOneAndUpdate({ _id: req.params.planId, isArchived: false }, { $set: updates }, { new: true, runValidators: true }).lean();
     if (!plan) return fail(res, 404, "Subscription plan not found");
+    await PlatformCommercialEvent.create({ actorUserId: actorId(req), action: "PLAN_UPDATED", details: { planId: String(plan._id), changedFields: Object.keys(updates) } });
     return res.json({ success: true, data: { plan: { ...plan, id: String(plan._id) } } });
   } catch (error) { if (error.name === "ValidationError") return fail(res, 400, "Invalid plan details"); return next(error); }
 }
@@ -61,6 +64,7 @@ export async function archiveSubscriptionPlan(req, res, next) {
     if (!validId(req.params.planId)) return fail(res, 400, "Invalid plan ID");
     const plan = await SubscriptionPlan.findOneAndUpdate({ _id: req.params.planId, isArchived: false }, { $set: { isArchived: true, isActive: false } }, { new: true }).lean();
     if (!plan) return fail(res, 404, "Subscription plan not found");
+    await PlatformCommercialEvent.create({ actorUserId: actorId(req), action: "PLAN_ARCHIVED", details: { planId: String(plan._id) } });
     return res.json({ success: true, message: "Plan archived", data: { id: String(plan._id) } });
   } catch (error) { return next(error); }
 }
@@ -104,6 +108,7 @@ export async function assignSchoolSubscription(req, res, next) {
         issuedAt: now, dueAt: dueAt ? new Date(dueAt) : new Date(now.getTime() + 7 * 86400000),
         status: "issued", notes, createdBy: actorId(req),
       }], { session });
+      await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: school._id, subscriptionId: subscription._id, invoiceId: invoice._id, action: "SUBSCRIPTION_ASSIGNED", details: { planId: String(plan._id), billingInterval: plan.billingInterval, amount: charge, currency: plan.currency, annualDiscountPercent: Number(plan.annualDiscountPercent || 0) } }], { session });
     });
     return res.status(201).json({ success: true, message: "Subscription assigned; access remains pending until invoice payment is confirmed", data: { subscription, invoice } });
   } catch (error) { if (error.name === "ValidationError") return fail(res, 400, "Invalid subscription details"); return next(error); }
@@ -144,12 +149,14 @@ export async function recordPlatformPayment(req, res, next) {
       const collected = money(outstanding - Number(amount));
       invoice.status = collected <= 0 ? "paid" : "partially_paid";
       await invoice.save({ session });
+      await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: invoice.subscriptionId, invoiceId: invoice._id, paymentId: payment._id, action: "PAYMENT_RECORDED", details: { amount: payment.amount, currency: payment.currency, method: payment.method, invoiceStatus: invoice.status } }], { session });
       if (invoice.subscriptionId && invoice.status === "paid") {
         const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: "pending" }).session(session);
         if (subscription) {
           await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
           subscription.status = "active";
           await subscription.save({ session });
+          await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: "SUBSCRIPTION_ACTIVATED", details: { billingInterval: subscription.billingInterval, lifetimeAccess: subscription.lifetimeAccess } }], { session });
           await Tenant.updateOne({ _id: invoice.tenantId, status: "pending" }, { $set: { status: "active" } }, { session });
         }
       }
