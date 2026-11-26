@@ -37,6 +37,7 @@ test('auth infrastructure and protected routes are present', async () => {
     '../src/services/authService.js',
     '../src/config/environment.js',
     '../src/components/AppScreen.js',
+    '../src/components/ParentMessagingScreen.js',
   ];
   for (const path of paths) {
     const source = await readFile(new URL(path, import.meta.url), 'utf8');
@@ -61,4 +62,23 @@ test('design tokens expose valid palette and scales', () => {
   assert.ok(spacing.xxl > spacing.xl && spacing.xl > spacing.lg);
   assert.ok(radius.pill > radius.lg);
   assert.ok(typography.display > typography.xxl);
+});
+
+
+test('parent family workspace exposes the same teacher messaging API as web', async () => {
+  const messaging = await readFile(new URL('../src/components/ParentMessagingScreen.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../src/app/(app)/index.js', import.meta.url), 'utf8');
+  for (const endpoint of [
+    '/messaging/contacts',
+    '/messaging/conversations',
+    '/messaging/conversations/${conversation._id}/messages',
+    '/messaging/conversations/${conversation._id}/read',
+  ]) {
+    assert.ok(messaging.includes(endpoint), 'parent messaging should use ' + endpoint);
+  }
+  assert.match(messaging, /method: "POST"/);
+  assert.match(messaging, /teacherId/);
+  assert.match(messaging, /studentId/);
+  assert.match(app, /ParentMessagingScreen/);
+  assert.match(app, /\["notices","Notices"\].*\["notifications","Notifications"\].*\["messages","Messages"\]/s);
 });
