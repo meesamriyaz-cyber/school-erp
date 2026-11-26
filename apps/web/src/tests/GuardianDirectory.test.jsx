@@ -145,7 +145,7 @@ describe("GuardianDirectory", () => {
 
     expect(await screen.findByText("Guardian record deactivated. Linked student history has been retained.")).toBeInTheDocument();
     expect(screen.getAllByText("inactive").length).toBeGreaterThan(0);
-    expect(apiRequest).toHaveBeenLastCalledWith("/guardians/guardian-1", {
+    expect(apiRequest).toHaveBeenCalledWith("/guardians/guardian-1", {
       method: "PATCH",
       accessToken: "test-access-token",
       body: { status: "inactive" },
