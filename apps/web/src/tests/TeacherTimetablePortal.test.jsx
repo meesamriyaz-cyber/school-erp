@@ -60,7 +60,7 @@ describe("TeacherTimetablePortal", () => {
   });
   it("uses the shared operational layout for attendance and examination marks", async () => {
     render(<TeacherTimetablePortal />);
-    fireEvent.click(await screen.findByRole("button", { name: "Mark attendance" }));
+    fireEvent.click(screen.getByRole("navigation", { name: "Teacher workspace" }).querySelector('button:nth-child(3)'));
     expect(document.querySelector(".teacher-workspace-content .teacher-attendance")).toBeInTheDocument();
     expect(document.querySelector(".teacher-workspace-content .teacher-attendance-summary")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Examination marks" }));
