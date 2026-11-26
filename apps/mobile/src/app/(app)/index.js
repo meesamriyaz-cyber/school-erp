@@ -18,6 +18,7 @@ import { StaffScreen } from "../../components/StaffScreen";
 import { TimetableScreen } from "../../components/TimetableScreen";
 import { TeacherWorkspaceScreen } from "../../components/TeacherWorkspaceScreen";
 import { StudentWorkspaceScreen } from "../../components/StudentWorkspaceScreen";
+import { ParentMessagingScreen } from "../../components/ParentMessagingScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
 const tabs = [
@@ -58,17 +59,21 @@ function ComingSoon({ title, description, onHome }) {
 
 function ParentCommunicationScreen({ announcements, notifications, onRefresh }) {
   const [busyId, setBusyId] = useState("");
+  const [section, setSection] = useState("notices");
   return <View style={styles.scrollContent}>
     <View style={styles.welcomeBlock}>
       <Text style={styles.kicker}>SCHOOL COMMUNICATION</Text>
-      <Text style={styles.welcomeTitle}>School updates</Text>
-      <Text style={styles.welcomeText}>Notices and messages shared about your ward.</Text>
+      <Text style={styles.welcomeTitle}>Family workspace</Text>
+      <Text style={styles.welcomeText}>School notices, notifications and direct communication with your ward's teachers.</Text>
     </View>
-    <View style={styles.panel}>
-      <SectionHeader title="School notices" subtitle={`${announcements.length} updates`}/>
+    <View style={styles.parentTabs}>
+      {[["notices","Notices"],["notifications","Notifications"],["messages","Messages"]].map(([key,label]) => <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{selected:section===key}} onPress={() => setSection(key)} style={[styles.parentTab,section===key&&styles.parentTabActive]}><Text style={[styles.parentTabText,section===key&&styles.parentTabTextActive]}>{label}{key==="notifications"&&notifications.some(item=>!item.readAt)? " · "+notifications.filter(item=>!item.readAt).length:""}</Text></TouchableOpacity>)}
+    </View>
+    {section === "notices" ? <View style={styles.panel}>
+      <SectionHeader title="School notices" subtitle={`${announcements.length} updates`} action="Refresh" onAction={onRefresh}/>
       {announcements.length ? announcements.map((item) => <View key={String(item._id)} style={styles.teacherPeriod}><View style={{flex:1,gap:4}}><Text style={styles.examName}>{item.title || "School notice"}</Text><Text style={styles.detailText}>{item.body || ""}</Text><Text style={styles.metricNote}>{item.publishedAt ? new Date(item.publishedAt).toLocaleDateString("en-IN") : ""}</Text></View></View>) : <Text style={styles.emptyText}>No current school notices.</Text>}
-    </View>
-    <View style={styles.panel}>
+    </View> : null}
+    {section === "notifications" ? <View style={styles.panel}>
       <SectionHeader title="Notifications" subtitle={`${notifications.filter((item) => !item.readAt).length} unread`} action="Refresh" onAction={onRefresh}/>
       {notifications.length ? notifications.map((item) => <TouchableOpacity key={String(item._id)} disabled={Boolean(item.readAt) || Boolean(busyId)} onPress={async () => {
         setBusyId(String(item._id));
@@ -76,7 +81,8 @@ function ParentCommunicationScreen({ announcements, notifications, onRefresh }) 
         catch { /* The next refresh will keep the notification unread. */ }
         finally { setBusyId(""); }
       }} style={styles.teacherPeriod}><View style={{flex:1,gap:4}}><Text style={styles.examName}>{item.title || "School update"}</Text><Text style={styles.detailText}>{item.body || ""}</Text><Text style={styles.metricNote}>{item.readAt ? "Read" : "Tap to mark as read"} · {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-IN") : ""}</Text></View></TouchableOpacity>) : <Text style={styles.emptyText}>No notifications yet.</Text>}
-    </View>
+    </View> : null}
+    {section === "messages" ? <ParentMessagingScreen/> : null}
   </View>;
 }
 
@@ -402,6 +408,11 @@ const styles = StyleSheet.create({
   retryButton: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.surface, borderRadius: 8 },
   retryText: { color: colors.primary, fontWeight: "800" },
   moreGroup: { gap: spacing.sm },
+  parentTabs: { flexDirection: "row", gap: 6, backgroundColor: colors.surface, borderRadius: radius.md, padding: 5 },
+  parentTab: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: radius.sm },
+  parentTabActive: { backgroundColor: colors.primary },
+  parentTabText: { color: colors.muted, fontSize: 11, fontWeight: "800" },
+  parentTabTextActive: { color: colors.white },
   comingSoon: { alignItems: "center", backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: 28, gap: 14, marginTop: 30 },
   comingIcon: { width: 64, height: 64, backgroundColor: colors.primary, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   comingIconText: { color: colors.white, fontWeight: "900", fontSize: 20 },
