@@ -107,7 +107,7 @@ test('teacher mobile workspace supports scoped parent conversation replies', asy
 test('teacher mobile announcements match the web announcement API and workspace', async () => {
   const announcements = await readFile(new URL('../src/components/TeacherAnnouncementsScreen.js', import.meta.url), 'utf8');
   const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
-  for (const endpoint of ['/announcements', '/teacher-assignments?status=active', '/academic-years', '/announcements/${item._id}/${action}']) {
+  for (const endpoint of ['/announcements', '/teacher-assignments?status=active', '/academic-years', '"/announcements/"+item._id+"/"+action']) {
     assert.ok(announcements.includes(endpoint), 'teacher announcements should use ' + endpoint);
   }
   assert.match(announcements, /audienceType/);
