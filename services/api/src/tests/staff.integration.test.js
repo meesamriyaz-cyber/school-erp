@@ -112,20 +112,26 @@ describe("Staff management API", () => {
 
     const staffEmail = `teacher-staff-${randomUUID()}@example.test`;
     const fromStaff = await request(`/staff/${created.body.data.id}`, {
-      method: "PATCH", token: adminA.token, body: JSON.stringify({ email: staffEmail }),
+      method: "PATCH", token: adminA.token, body: JSON.stringify({ email: staffEmail, firstName: "Updated", lastName: "Staff", phone: "+919876543210" }),
     });
     expect(fromStaff.status).toBe(200);
     expect(fromStaff.body.data.email).toBe(staffEmail);
-    expect((await User.findById(linkedTeacher.user._id).lean()).email).toBe(staffEmail);
+    const staffUpdatedUser = await User.findById(linkedTeacher.user._id).lean();
+    expect(staffUpdatedUser.email).toBe(staffEmail);
+    expect(staffUpdatedUser.firstName).toBe("Updated");
+    expect(staffUpdatedUser.phone).toBe("+919876543210");
 
     const userEmail = `teacher-user-${randomUUID()}@example.test`;
     const fromUser = await request(`/school/users/${linkedTeacher.user._id}`, {
-      method: "PATCH", token: adminA.token, body: JSON.stringify({ email: userEmail }),
+      method: "PATCH", token: adminA.token, body: JSON.stringify({ email: userEmail, firstName: "Updated From User", lastName: "Directory", phone: "+911234567890" }),
     });
     expect(fromUser.status).toBe(200);
     expect(fromUser.body.data.user.email).toBe(userEmail);
     const refreshedStaff = await request(`/staff/${created.body.data.id}`, { token: adminA.token });
     expect(refreshedStaff.body.data.email).toBe(userEmail);
+    expect(refreshedStaff.body.data.firstName).toBe("Updated From User");
+    expect(refreshedStaff.body.data.lastName).toBe("Directory");
+    expect(refreshedStaff.body.data.phone).toBe("+911234567890");
     expect(refreshedStaff.body.data.linkedUser.email).toBe(userEmail);
   });
 
