@@ -98,6 +98,36 @@ describe("Staff management API", () => {
     expect(linked.body.data.userId).toBe(String(teacherA.user._id));
   });
 
+  it("keeps linked staff and login emails synchronized from either profile", async () => {
+    const created = await request("/staff", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify(staffPayload({
+        employeeType: "teaching", userId: String(teacherA.user._id), designation: "Class Teacher",
+        email: "stale-contact@example.test",
+      })),
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.data.email).toBe(teacherA.user.email);
+
+    const staffEmail = `teacher-staff-${randomUUID()}@example.test`;
+    const fromStaff = await request(`/staff/${created.body.data.id}`, {
+      method: "PATCH", token: adminA.token, body: JSON.stringify({ email: staffEmail }),
+    });
+    expect(fromStaff.status).toBe(200);
+    expect(fromStaff.body.data.email).toBe(staffEmail);
+    expect((await User.findById(teacherA.user._id).lean()).email).toBe(staffEmail);
+
+    const userEmail = `teacher-user-${randomUUID()}@example.test`;
+    const fromUser = await request(`/school/users/${teacherA.user._id}`, {
+      method: "PATCH", token: adminA.token, body: JSON.stringify({ email: userEmail }),
+    });
+    expect(fromUser.status).toBe(200);
+    expect(fromUser.body.data.user.email).toBe(userEmail);
+    const refreshedStaff = await request(`/staff/${created.body.data.id}`, { token: adminA.token });
+    expect(refreshedStaff.body.data.email).toBe(userEmail);
+    expect(refreshedStaff.body.data.linkedUser.email).toBe(userEmail);
+  });
+
   it("prevents cross-school account links and cross-school record access", async () => {
     const invalidLink = await request("/staff", { method: "POST", token: adminA.token, body: JSON.stringify(staffPayload({ employeeType: "teaching", userId: String((await createUser(schoolB, "teacher")).user._id) })) });
     expect(invalidLink.status).toBe(400);
