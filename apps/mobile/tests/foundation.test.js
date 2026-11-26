@@ -166,6 +166,15 @@ test('teacher mobile attendance reports support an explicit date range', async (
   assert.match(workspace, /To date \(YYYY-MM-DD\)/);
 });
 
+test('student section refresh reports partial failures deterministically', async () => {
+  const workspace = await readFile(new URL('../src/components/StudentWorkspaceScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /const updates = \{\}/);
+  assert.match(workspace, /else failed\.push\(name\)/);
+  assert.match(workspace, /if \(Object\.keys\(updates\)\.length\) setData/);
+  assert.match(workspace, /setPartialErrors\(\(previous\) => .*failed/);
+  assert.match(workspace, /Previously loaded information has been kept/);
+});
+
 test('teacher mobile workspace preserves separate subject assignments within the same class', async () => {
   const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
   assert.match(workspace, /id\(a\.subjectId\)\|\|"all"/);
