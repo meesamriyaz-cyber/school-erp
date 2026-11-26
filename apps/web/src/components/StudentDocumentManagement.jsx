@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 
@@ -29,16 +29,16 @@ export default function StudentDocumentManagement() {
       .catch((err) => setError(err.message || "Unable to load students."));
   }, [accessToken]);
 
-  const loadDocuments = async (selectedId = studentId) => {
-    if (!selectedId) { setDocuments([]); return; }
+  const loadDocuments = useCallback(async (selectedId = studentId) => {
+    if (!selectedId) return;
     const response = await apiRequest(`/students/${encodeURIComponent(selectedId)}/documents`, { accessToken });
     setDocuments(response.data || []);
-  };
+  }, [accessToken, studentId]);
 
   useEffect(() => {
-    if (!studentId) { setDocuments([]); return; }
+    if (!studentId) return;
     loadDocuments(studentId).catch((err) => setError(err.message || "Unable to load documents."));
-  }, [studentId, accessToken]);
+  }, [studentId, loadDocuments]);
 
   const upload = async (event) => {
     event.preventDefault(); setError(""); setNotice("");
@@ -85,7 +85,7 @@ export default function StudentDocumentManagement() {
     {error && <p role="alert" style={{ color: "#b42318" }}>{error}</p>}
     {notice && <p role="status" style={{ color: "#067647" }}>{notice}</p>}
     <label style={{ display: "grid", gap: 6, maxWidth: 520, marginBottom: 18 }}>Student
-      <select value={studentId} onChange={(event) => setStudentId(event.target.value)}><option value="">Select a student</option>{students.map((student) => <option key={student._id} value={student._id}>{student.admissionNumber} — {studentName(student)}</option>)}</select>
+      <select value={studentId} onChange={(event) => { setDocuments([]); setStudentId(event.target.value); }}><option value="">Select a student</option>{students.map((student) => <option key={student._id} value={student._id}>{student.admissionNumber} — {studentName(student)}</option>)}</select>
     </label>
     <form onSubmit={upload} style={{ display: "grid", gap: 12, maxWidth: 620, padding: 18, border: "1px solid #e4e7ec", borderRadius: 12, marginBottom: 24 }}>
       <h3>Upload a document</h3>
