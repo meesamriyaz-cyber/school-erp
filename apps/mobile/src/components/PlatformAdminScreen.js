@@ -112,7 +112,8 @@ export function PlatformAdminScreen({ user, onSignOut }) {
       </ScrollView>
       {section === "overview" ? <View style={styles.metricsWrap}>
         {overviewLoading ? <ActivityIndicator color={colors.primary}/> : null}
-        {overviewError ? <View style={styles.error}><Text style={styles.errorText}>{overviewError}</Text></View> : null}\n        {!overviewLoading && !overviewError && !overview ? <Text style={styles.metricHint}>No business overview data is available yet.</Text> : null}
+        {overviewError ? <View style={styles.error}><Text style={styles.errorText}>{overviewError}</Text></View> : null}
+        {!overviewLoading && !overviewError && !overview ? <Text style={styles.metricHint}>No business overview data is available yet.</Text> : null}
         {overview ? <>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CLIENT SCHOOLS</Text><Text style={styles.metricValue}>{overview.schools?.total ?? 0}</Text><Text style={styles.metricHint}>{overview.schools?.active ?? 0} active</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>ACTIVE SUBSCRIPTIONS</Text><Text style={styles.metricValue}>{Object.values(overview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</Text><Text style={styles.metricHint}>Across all billing terms</Text></View>
