@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { userModel, tenantModel, sessionModel, hashPassword, auditWrite, auditTransaction } = vi.hoisted(() => ({
+  staffModel: { updateMany: vi.fn() },
   userModel: {
     find: vi.fn(),
     countDocuments: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("../models/User.js", () => ({
   USER_ROLES: ["platform_admin", "school_admin", "principal", "teacher", "accountant", "librarian", "transport_manager", "student", "parent"],
 }));
 vi.mock("../models/Tenant.js", () => ({ default: tenantModel }));
+vi.mock("../models/Staff.js", () => ({ default: staffModel }));
 vi.mock("../models/Session.js", () => ({ default: sessionModel }));
 vi.mock("../utils/password.js", () => ({ hashPassword }));
 vi.mock("../services/auditLogService.js", () => ({ writeUserAudit: auditWrite, withAuditTransaction: auditTransaction }));
@@ -50,6 +52,7 @@ describe("user management controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auditWrite.mockResolvedValue(true);
+    staffModel.updateMany.mockResolvedValue({ acknowledged: true, modifiedCount: 1 });
     req = {
       auth: { userId: new mongoose.Types.ObjectId().toString(), tenantId: tenantId.toString(), role: "school_admin" },
       params: { userId: userId.toString() },
@@ -163,6 +166,24 @@ describe("user management controller", () => {
     }), { session: {} });
     expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("email");
     expect(auditWrite.mock.calls[0][0]).not.toHaveProperty("passwordHash");
+  });
+
+  it("synchronizes a linked staff email when a user profile email changes", async () => {
+    const existing = { _id: userId, tenantId, firstName: "Sam", lastName: "Teacher", email: "sam@example.com", role: "teacher", status: "active" };
+    const updated = { ...existing, email: "new.sam@example.com" };
+    userModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }) });
+    userModel.findOneAndUpdate.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updated) }) });
+    req.body = { email: "NEW.SAM@example.com" };
+
+    await updateUser(req, res, next);
+
+    expect(staffModel.updateMany).toHaveBeenCalledWith(
+      { tenantId, userId },
+      { $set: { email: "new.sam@example.com" } },
+      { session: {} },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("increments authVersion and revokes sessions when a user is suspended", async () => {
