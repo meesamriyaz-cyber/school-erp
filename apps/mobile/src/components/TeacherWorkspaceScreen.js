@@ -161,7 +161,7 @@ export function TeacherWorkspaceScreen() {
     <Chips items={tabs.map(([value,label])=>({value,label}))} value={tab} onChange={v=>{setTab(v);setError("");setNotice("");}}/>
     {error?<View style={s.alert}><Text style={s.error}>{error}</Text><TouchableOpacity onPress={()=>tab==="students"?loadStudents():tab==="attendance"?loadAttendance():loadBase()}><Text style={s.action}>Try again</Text></TouchableOpacity></View>:null}
     {notice?<View style={s.notice}><Text style={s.success}>{notice}</Text></View>:null}
-    {tab!=="exams"&&scopes.length>0?<View style={s.panel}><Text style={s.label}>Assigned class and subject</Text><Chips items={scopes.map(a=>({value:a._id,label:assignmentLabel(a)}))} value={selected?._id||""} onChange={setAssignmentId}/></View>:null}
+    {tab!=="exams"&&tab!=="messages"&&scopes.length>0?<View style={s.panel}><Text style={s.label}>Assigned class and subject</Text><Chips items={scopes.map(a=>({value:a._id,label:assignmentLabel(a)}))} value={selected?._id||""} onChange={setAssignmentId}/></View>:null}
     {loading?<View style={s.loading}><ActivityIndicator color={colors.primary}/><Text style={s.muted}>Loading…</Text></View>:null}
     {tab==="attendance"&&!loading?<View style={s.panel}>
       <Text style={s.panelTitle}>Daily attendance</Text>
