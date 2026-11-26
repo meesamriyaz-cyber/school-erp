@@ -179,7 +179,10 @@ describe("user management controller", () => {
 
     expect(staffModel.updateMany).toHaveBeenCalledWith(
       { tenantId, userId },
-      { $set: { email: "new.sam@example.com" } },
+      {
+        $set: { email: "new.sam@example.com" },
+        $push: { auditTrail: { $each: [{ action: "profile_updated", actorUserId: req.auth.userId, changedFields: ["email"] }], $slice: -50 } },
+      },
       { session: {} },
     );
     expect(res.status).toHaveBeenCalledWith(200);
