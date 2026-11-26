@@ -33,7 +33,6 @@ export default function GuardianCommunicationPanel({ studentId, accessToken }) {
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async (signal) => {
-    setLoading(true);
     setError("");
     try {
       const response = await apiRequest(
