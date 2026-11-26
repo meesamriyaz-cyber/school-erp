@@ -184,7 +184,7 @@ describe("App", () => {
     const user = userEvent.setup();
     useAuth.mockReturnValue(schoolAdmin());
     render(<App />);
-    await user.click(screen.getByRole("button", { name: /Classes & Sections/ }));
+    await user.click(screen.getByRole("button", { name: /^Classes$/ }));
     expect(screen.getByRole("heading", { name: "Classes management displayed" })).toBeInTheDocument();
   });
 
