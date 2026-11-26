@@ -21,14 +21,19 @@ export const sendGuardianEmailCode = async (req, res, next) => {
 
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
     const salt = crypto.randomBytes(16).toString("hex");
-    await sendGuardianChannel({
+    const delivery = await sendGuardianChannel({
       channel: "email",
+      guardianId: guardian._id,
       recipient: email,
       subject: "Verify your email address",
       message: `Your Payam Education verification code is ${code}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`,
     });
 
     guardian.pendingEmail = email;
+    guardian.emailDeliveryEmailId = delivery.messageId;
+    guardian.emailDeliveryStatus = delivery.providerStatus || "accepted";
+    guardian.emailDeliveryUpdatedAt = new Date();
+    guardian.emailDeliveryEvents = [];
     guardian.emailOtpSalt = salt;
     guardian.emailOtpHash = otpDigest(salt, code);
     guardian.emailOtpExpiresAt = new Date(Date.now() + 10 * 60_000);
