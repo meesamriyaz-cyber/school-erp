@@ -83,7 +83,7 @@ export const listGuardians = async (req, res, next) => {
 
     const [guardians, total] = await Promise.all([
       Guardian.find(filter)
-        .select("_id firstName lastName phone email photoUrl phoneVerifiedAt verifiedPhone status")
+        .select("_id firstName lastName phone email photoUrl emailVerifiedAt verifiedEmail pendingEmail status")
         .sort({ firstName: 1, lastName: 1, _id: 1 })
         .skip(offset)
         .limit(limit)
