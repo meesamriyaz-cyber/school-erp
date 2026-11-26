@@ -256,7 +256,8 @@ export async function reversePlatformPayment(req, res, next) {
       if (invoice.subscriptionId && invoice.status !== "paid") {
         const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: { $in: ["active", "past_due"] } }).session(session);
         if (subscription && subscription.billingInterval !== "one_time") {
-          subscription.status = "past_due";
+          subscription.status = subscription.billingInterval === "one_time" ? "cancelled" : "past_due";
+          if (subscription.billingInterval === "one_time") subscription.cancelledAt = new Date();
           await subscription.save({ session });
         }
       }
@@ -266,4 +267,23 @@ export async function reversePlatformPayment(req, res, next) {
     return res.json({ success: true, message: "Payment reversed and invoice balance recalculated", data: result });
   } catch (error) { if (error.statusCode) return fail(res, error.statusCode, error.message); return next(error); }
   finally { await session.endSession(); }
+}
+
+
+export async function listCommercialEvents(req, res, next) {
+  try {
+    const page = Math.max(1, Number.parseInt(req.query.page ?? "1", 10));
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit ?? "25", 10)));
+    const filter = {};
+    if (req.query.schoolId !== undefined) {
+      if (!validId(req.query.schoolId)) return fail(res, 400, "Invalid school ID");
+      filter.tenantId = req.query.schoolId;
+    }
+    if (req.query.action !== undefined) filter.action = req.query.action;
+    const [events, total] = await Promise.all([
+      PlatformCommercialEvent.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).populate("tenantId", "name slug").lean(),
+      PlatformCommercialEvent.countDocuments(filter),
+    ]);
+    return res.json({ success: true, data: events, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  } catch (error) { return next(error); }
 }
