@@ -7,6 +7,9 @@ const navigation = [
   { label: "Overview", icon: "▦" },
   { label: "Schools", icon: "⌂" },
   { label: "Users", icon: "♙" },
+  { label: "Plans", icon: "◇" },
+  { label: "Billing", icon: "₹" },
+  { label: "Commercial audit", icon: "≡" },
 ];
 
 const PAGE_SIZE = 20;
@@ -95,6 +98,22 @@ export default function PlatformAdminWorkspace() {
   const [creatingUser, setCreatingUser] = useState(false);
   const [createUserError, setCreateUserError] = useState("");
   const [createUserSuccess, setCreateUserSuccess] = useState("");
+  const [plans, setPlans] = useState([]);
+  const [plansError, setPlansError] = useState("");
+  const [planForm, setPlanForm] = useState({ name: "", description: "", billingInterval: "monthly", amount: "", currency: "INR", annualDiscountPercent: "0" });
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [planMessage, setPlanMessage] = useState("");
+  const [invoices, setInvoices] = useState([]);
+  const [billingError, setBillingError] = useState("");
+  const [paymentForms, setPaymentForms] = useState({});
+  const [paymentBusyId, setPaymentBusyId] = useState("");
+  const [commercialEvents, setCommercialEvents] = useState([]);
+  const [eventsError, setEventsError] = useState("");
+  const [assignPlanId, setAssignPlanId] = useState("");
+  const [assignDueAt, setAssignDueAt] = useState("");
+  const [assignNotes, setAssignNotes] = useState("");
+  const [assigningSubscription, setAssigningSubscription] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] = useState("");
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -106,6 +125,39 @@ export default function PlatformAdminWorkspace() {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  useEffect(() => {
+    if (activePage !== "Plans" && activePage !== "SchoolDetails") return undefined;
+    const controller = new AbortController();
+    if (activePage === "Plans") {
+      apiRequest("/platform/subscription-plans?includeArchived=true", { accessToken, signal: controller.signal })
+        .then((response) => { if (!controller.signal.aborted) setPlans(response?.data ?? []); })
+        .catch((error) => { if (!controller.signal.aborted) setPlansError(error.message || "Unable to load subscription plans."); });
+    } else {
+      apiRequest("/platform/subscription-plans", { accessToken, signal: controller.signal })
+        .then((response) => { if (!controller.signal.aborted) setPlans(response?.data ?? []); })
+        .catch(() => {});
+    }
+    return () => controller.abort();
+  }, [activePage, accessToken]);
+
+  useEffect(() => {
+    if (activePage !== "Billing") return undefined;
+    const controller = new AbortController();
+    apiRequest("/platform/invoices", { accessToken, signal: controller.signal })
+      .then((response) => { if (!controller.signal.aborted) setInvoices(response?.data ?? []); })
+      .catch((error) => { if (!controller.signal.aborted) setBillingError(error.message || "Unable to load invoices."); });
+    return () => controller.abort();
+  }, [activePage, accessToken, reloadCount]);
+
+  useEffect(() => {
+    if (activePage !== "Commercial audit") return undefined;
+    const controller = new AbortController();
+    apiRequest("/platform/commercial-events?limit=50", { accessToken, signal: controller.signal })
+      .then((response) => { if (!controller.signal.aborted) setCommercialEvents(response?.data ?? []); })
+      .catch((error) => { if (!controller.signal.aborted) setEventsError(error.message || "Unable to load commercial events."); });
+    return () => controller.abort();
+  }, [activePage, accessToken, reloadCount]);
 
   useEffect(() => {
     if (activePage !== "Overview") return undefined;
@@ -272,6 +324,81 @@ export default function PlatformAdminWorkspace() {
     void loadUserDetails();
     return () => controller.abort();
   }, [activePage, accessToken, selectedUserId, reloadCount]);
+
+  const savePlan = async (event) => {
+    event.preventDefault();
+    if (savingPlan) return;
+    setSavingPlan(true);
+    setPlanMessage("");
+    setPlansError("");
+    try {
+      const payload = { ...planForm, amount: Number(planForm.amount), annualDiscountPercent: planForm.billingInterval === "annual" ? Number(planForm.annualDiscountPercent) : 0 };
+      const response = await apiRequest("/platform/subscription-plans", { method: "POST", accessToken, body: payload });
+      setPlans((current) => [...current, response?.data?.plan ?? response?.data].filter(Boolean));
+      setPlanForm({ name: "", description: "", billingInterval: "monthly", amount: "", currency: "INR", annualDiscountPercent: "0" });
+      setPlanMessage("Subscription plan created.");
+    } catch (error) { setPlansError(error.message || "Unable to create subscription plan."); }
+    finally { setSavingPlan(false); }
+  };
+
+  const updatePlan = async (plan, updates) => {
+    try {
+      const response = await apiRequest(`/platform/subscription-plans/${encodeURIComponent(plan.id || plan._id)}`, { method: "PATCH", accessToken, body: updates });
+      const updated = response?.data?.plan ?? response?.data;
+      setPlans((current) => current.map((item) => (item.id || item._id) === (plan.id || plan._id) ? updated : item));
+    } catch (error) { setPlansError(error.message || "Unable to update plan."); }
+  };
+
+  const archivePlan = async (plan) => {
+    if (!window.confirm(`Archive ${plan.name}? Existing subscriptions will not change.`)) return;
+    try {
+      await apiRequest(`/platform/subscription-plans/${encodeURIComponent(plan.id || plan._id)}/archive`, { method: "POST", accessToken });
+      setPlans((current) => current.map((item) => (item.id || item._id) === (plan.id || plan._id) ? { ...item, isArchived: true, isActive: false } : item));
+    } catch (error) { setPlansError(error.message || "Unable to archive plan."); }
+  };
+
+  const assignSubscription = async () => {
+    if (!selectedSchoolId || !assignPlanId || assigningSubscription) return;
+    setAssigningSubscription(true);
+    setSubscriptionMessage("");
+    try {
+      const body = { planId: assignPlanId, notes: assignNotes };
+      if (assignDueAt) body.dueAt = new Date(assignDueAt).toISOString();
+      const response = await apiRequest(`/platform/schools/${encodeURIComponent(selectedSchoolId)}/subscription`, { method: "POST", accessToken, body });
+      setSubscriptionMessage(response?.message || "Subscription assigned. Access awaits confirmed payment.");
+      setAssignPlanId(""); setAssignDueAt(""); setAssignNotes("");
+      setReloadCount((count) => count + 1);
+    } catch (error) { setSubscriptionMessage(error.message || "Unable to assign subscription."); }
+    finally { setAssigningSubscription(false); }
+  };
+
+  const recordPayment = async (invoice) => {
+    const key = invoice.id || invoice._id;
+    const form = paymentForms[key] || {};
+    if (!form.amount || !form.method || paymentBusyId) return;
+    setPaymentBusyId(key);
+    try {
+      await apiRequest(`/platform/invoices/${encodeURIComponent(key)}/payments`, {
+        method: "POST", accessToken,
+        body: { amount: Number(form.amount), method: form.method, reference: form.reference || "", notes: form.notes || "" },
+      });
+      setPaymentForms((current) => ({ ...current, [key]: { amount: "", method: "bank_transfer", reference: "", notes: "" } }));
+      setReloadCount((count) => count + 1);
+      const response = await apiRequest("/platform/invoices", { accessToken });
+      setInvoices(response?.data ?? []);
+    } catch (error) { setBillingError(error.message || "Unable to record payment."); }
+    finally { setPaymentBusyId(""); }
+  };
+
+  const reversePayment = async (payment) => {
+    const reason = window.prompt("Enter the reason for reversing this payment:");
+    if (!reason?.trim()) return;
+    try {
+      await apiRequest(`/platform/payments/${encodeURIComponent(payment.id || payment._id)}/reverse`, { method: "POST", accessToken, body: { reason: reason.trim() } });
+      const response = await apiRequest("/platform/invoices", { accessToken });
+      setInvoices(response?.data ?? []);
+    } catch (error) { setBillingError(error.message || "Unable to reverse payment."); }
+  };
 
   const openCreateUser = () => {
     setUserForm({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
@@ -673,7 +800,7 @@ export default function PlatformAdminWorkspace() {
 
         <div className="platform-content">
           <div className="platform-eyebrow">CENTRAL ADMINISTRATION</div>
-          <h1>{activePage === "Overview" ? "Platform overview" : activePage === "CreateSchool" ? "Create school" : activePage === "SchoolDetails" ? "School details" : activePage === "Users" ? "User directory" : activePage === "UserDetails" ? "User details" : activePage === "CreateUser" ? "Create user" : "School directory"}</h1>
+          <h1>{({ Overview: "Platform overview", CreateSchool: "Create school", SchoolDetails: "School details", Users: "User directory", UserDetails: "User details", CreateUser: "Create user", Plans: "Subscription plans", Billing: "Platform billing", "Commercial audit": "Commercial audit trail" })[activePage] || "School directory"}</h1>
           <p className="platform-page-description">
             {activePage === "Overview"
               ? "Manage schools and their access from one secure workspace."
@@ -725,6 +852,43 @@ export default function PlatformAdminWorkspace() {
                 <article className="platform-summary-card"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Billing data</span><strong>Separate from school fees</strong><p>These metrics represent SchoolSuite platform invoices and payments.</p></article>
               </section>
             </>
+          ) : activePage === "Plans" ? (
+            <section className="platform-directory" aria-label="Subscription plans">
+              <div className="platform-form-heading"><div><h2>Commercial plans</h2><p>Annual discount applies to the listed annual price. Existing subscriptions retain their agreed price snapshot.</p></div></div>
+              {plansError && <div className="platform-directory-error" role="alert">{plansError}</div>}
+              {planMessage && <p role="status" className="platform-form-success">{planMessage}</p>}
+              <form className="platform-school-form platform-plan-form" onSubmit={savePlan}>
+                <label>Plan name *<input required maxLength={100} value={planForm.name} onChange={(event) => setPlanForm((v) => ({ ...v, name: event.target.value }))} /></label>
+                <label>Billing model<select value={planForm.billingInterval} onChange={(event) => setPlanForm((v) => ({ ...v, billingInterval: event.target.value }))}><option value="monthly">Monthly recurring</option><option value="annual">Annual recurring</option><option value="one_time">One-time lifetime</option></select></label>
+                <label>Price *<input type="number" min="0.01" step="0.01" required value={planForm.amount} onChange={(event) => setPlanForm((v) => ({ ...v, amount: event.target.value }))} /></label>
+                <label>Currency<input required minLength={3} maxLength={3} value={planForm.currency} onChange={(event) => setPlanForm((v) => ({ ...v, currency: event.target.value.toUpperCase() }))} /></label>
+                {planForm.billingInterval === "annual" && <label>Annual discount (%)<input type="number" min="0" max="100" step="0.01" value={planForm.annualDiscountPercent} onChange={(event) => setPlanForm((v) => ({ ...v, annualDiscountPercent: event.target.value }))} /></label>}
+                <label>Description<input maxLength={500} value={planForm.description} onChange={(event) => setPlanForm((v) => ({ ...v, description: event.target.value }))} /></label>
+                <div className="platform-form-actions"><button className="platform-primary-button" type="submit" disabled={savingPlan}>{savingPlan ? "Saving…" : "Create plan"}</button></div>
+              </form>
+              <div className="platform-table-wrap"><table className="platform-school-table" aria-label="Subscription plans"><thead><tr><th>Plan</th><th>Billing</th><th>Price</th><th>Discount</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+                {plans.map((plan) => <tr key={plan.id || plan._id}><td><strong>{plan.name}</strong><br /><small>{plan.description}</small></td><td>{plan.billingInterval === "one_time" ? "Lifetime · one payment" : statusLabel(plan.billingInterval)}</td><td>{plan.currency} {Number(plan.amount).toLocaleString("en-IN")}</td><td>{plan.billingInterval === "annual" ? `${plan.annualDiscountPercent || 0}%` : "—"}</td><td>{plan.isArchived ? "Archived" : plan.isActive ? "Active" : "Inactive"}</td><td>{!plan.isArchived && <><button type="button" className="platform-secondary-button" onClick={() => void updatePlan(plan, { isActive: !plan.isActive })}>{plan.isActive ? "Deactivate" : "Activate"}</button> <button type="button" className="platform-secondary-button" onClick={() => void archivePlan(plan)}>Archive</button></>}</td></tr>)}
+                {!plans.length && <tr><td colSpan="6" className="platform-table-message">No subscription plans yet.</td></tr>}
+              </tbody></table></div>
+            </section>
+          ) : activePage === "Billing" ? (
+            <section className="platform-directory" aria-label="Platform invoices and payments">
+              <div className="platform-form-heading"><div><h2>Invoices & payments</h2><p>Platform billing only. Student fee collections remain within each school's finance records.</p></div><button type="button" className="platform-secondary-button" onClick={() => setReloadCount((count) => count + 1)}>Refresh</button></div>
+              {billingError && <div className="platform-directory-error" role="alert">{billingError}<button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
+              <div className="platform-table-wrap"><table className="platform-school-table" aria-label="Platform invoices"><thead><tr><th>Invoice</th><th>School</th><th>Issued / due</th><th>Total</th><th>Status</th><th>Record payment</th></tr></thead><tbody>
+                {invoices.map((invoice) => { const key = invoice.id || invoice._id; const form = paymentForms[key] || { amount: "", method: "bank_transfer", reference: "" }; return <tr key={key}><td><strong>{invoice.invoiceNumber}</strong></td><td>{invoice.tenantId?.name || "School"}</td><td>{formatDate(invoice.issuedAt)} / {formatDate(invoice.dueAt)}</td><td>{invoice.currency} {Number(invoice.totalAmount).toLocaleString("en-IN")}</td><td>{statusLabel(invoice.status)}</td><td>{["paid", "void"].includes(invoice.status) ? "—" : <div className="platform-payment-inline"><input aria-label={`Payment amount for ${invoice.invoiceNumber}`} type="number" min="0.01" step="0.01" value={form.amount} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, amount: event.target.value } }))} /><select aria-label={`Payment method for ${invoice.invoiceNumber}`} value={form.method} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, method: event.target.value } }))}><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="card">Card</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="other">Other</option></select><input aria-label={`Payment reference for ${invoice.invoiceNumber}`} placeholder="Reference" value={form.reference || ""} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, reference: event.target.value } }))} /><button className="platform-primary-button" type="button" disabled={paymentBusyId === key || !form.amount} onClick={() => void recordPayment(invoice)}>{paymentBusyId === key ? "Saving…" : "Record"}</button></div>}</td></tr>; })}
+                {!invoices.length && <tr><td colSpan="6" className="platform-table-message">No platform invoices found.</td></tr>}
+              </tbody></table></div>
+            </section>
+          ) : activePage === "Commercial audit" ? (
+            <section className="platform-directory" aria-label="Commercial audit events">
+              <div className="platform-form-heading"><div><h2>Commercial event history</h2><p>Plan changes, subscription assignments, activations, renewals and payment actions.</p></div><button type="button" className="platform-secondary-button" onClick={() => setReloadCount((count) => count + 1)}>Refresh</button></div>
+              {eventsError && <div className="platform-directory-error" role="alert">{eventsError}</div>}
+              <div className="platform-table-wrap"><table className="platform-school-table" aria-label="Commercial audit events"><thead><tr><th>When</th><th>School</th><th>Action</th><th>Details</th></tr></thead><tbody>
+                {commercialEvents.map((item) => <tr key={item.id || item._id}><td>{formatDate(item.createdAt)}</td><td>{item.tenantId?.name || "—"}</td><td>{statusLabel(item.action?.replaceAll("_", " ").toLowerCase())}</td><td><code>{JSON.stringify(item.details || {})}</code></td></tr>)}
+                {!commercialEvents.length && <tr><td colSpan="4" className="platform-table-message">No commercial events recorded yet.</td></tr>}
+              </tbody></table></div>
+            </section>
           ) : activePage === "CreateSchool" ? (
             <section className="platform-form-card" aria-label="Create school form">
               <div className="platform-form-heading">
@@ -789,6 +953,16 @@ export default function PlatformAdminWorkspace() {
                     </div>
                     {schoolStatusSuccess && <p role="status">{schoolStatusSuccess}</p>}
                     {schoolStatusError && <div className="platform-directory-error" role="alert"><p>{schoolStatusError}</p><button type="button" onClick={() => void updateSchoolStatus(school.status === "pending" || school.status === "suspended" ? "active" : "suspended")} disabled={updatingSchoolStatus}>Retry</button></div>}
+                  </section>
+                  <section className="platform-lifecycle-controls" aria-label="School subscription management">
+                    <div><h3>Subscription</h3><p>Assign monthly, discounted annual, or negotiated lifetime access. Access activates only after the invoice is fully paid.</p></div>
+                    <div className="platform-subscription-assign">
+                      <label>Plan<select value={assignPlanId} onChange={(event) => setAssignPlanId(event.target.value)}><option value="">Select a plan</option>{plans.filter((plan) => plan.isActive && !plan.isArchived).map((plan) => <option key={plan.id || plan._id} value={plan.id || plan._id}>{plan.name} · {plan.billingInterval} · {plan.currency} {plan.amount}{plan.billingInterval === "annual" ? ` · ${plan.annualDiscountPercent || 0}% discount` : ""}</option>)}</select></label>
+                      <label>Invoice due date (optional)<input type="date" value={assignDueAt} onChange={(event) => setAssignDueAt(event.target.value)} /></label>
+                      <label>Commercial notes<input maxLength={500} value={assignNotes} onChange={(event) => setAssignNotes(event.target.value)} /></label>
+                      <button type="button" className="platform-primary-button" disabled={!assignPlanId || assigningSubscription} onClick={() => void assignSubscription()}>{assigningSubscription ? "Assigning…" : "Assign plan & issue invoice"}</button>
+                    </div>
+                    {subscriptionMessage && <p role="status">{subscriptionMessage}</p>}
                   </section>
                   <h3>School administrators</h3>
                   {administrators.length ? <div className="platform-admin-list">{administrators.map((admin) => <article key={admin.id || admin._id || admin.email}><strong>{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || "Administrator"}</strong><span>{admin.email || "—"}</span><span>{statusLabel(admin.status)}</span></article>)}</div> : <p>No school administrators were returned for this school.</p>}
