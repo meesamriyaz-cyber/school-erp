@@ -123,7 +123,7 @@ describe("Staff management API", () => {
 
     const userEmail = `teacher-user-${randomUUID()}@example.test`;
     const fromUser = await request(`/school/users/${linkedTeacher.user._id}`, {
-      method: "PATCH", token: adminA.token, body: JSON.stringify({ email: userEmail, firstName: "Updated From User", lastName: "Directory", phone: "+911234567890" }),
+      method: "PATCH", token: adminA.token, headers: { origin: "http://localhost:5173" }, body: JSON.stringify({ email: userEmail, firstName: "Updated From User", lastName: "Directory", phone: "+911234567890" }),
     });
     expect(fromUser.status).toBe(200);
     expect(fromUser.body.data.user.email).toBe(userEmail);
