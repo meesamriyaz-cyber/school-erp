@@ -432,3 +432,5 @@
 .guardian-directory-verify-actions label { display: grid; gap: 5px; color: var(--text-secondary, #64748b); font-size: .85rem; }
 .guardian-directory-verify-actions input { min-height: 38px; max-width: 190px; padding: 7px 10px; border: 1px solid var(--border, #d9dfeb); border-radius: 8px; }
 .guardian-directory-verify-actions button { min-height: 38px; padding: 7px 12px; border: 1px solid var(--border, #d9dfeb); border-radius: 8px; background: #fff; font: inherit; font-weight: 600; }
+
+.guardian-directory-contact > span { overflow-wrap: anywhere; }
