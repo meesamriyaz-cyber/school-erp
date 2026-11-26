@@ -37,8 +37,10 @@ export default function StudentDocumentManagement() {
 
   useEffect(() => {
     if (!studentId) return;
-    loadDocuments(studentId).catch((err) => setError(err.message || "Unable to load documents."));
-  }, [studentId, loadDocuments]);
+    apiRequest(`/students/${encodeURIComponent(studentId)}/documents`, { accessToken })
+      .then((response) => setDocuments(response.data || []))
+      .catch((err) => setError(err.message || "Unable to load documents."));
+  }, [studentId, accessToken]);
 
   const upload = async (event) => {
     event.preventDefault(); setError(""); setNotice("");
