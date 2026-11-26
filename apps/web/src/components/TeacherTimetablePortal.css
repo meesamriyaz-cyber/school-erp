@@ -327,3 +327,183 @@
 .teacher-dashboard-actions button span { color:#8795d8; font-size:15px; }
 @media(max-width:900px) { .teacher-workspace-content { padding:0; } .teacher-overview .school-dashboard-panels { grid-template-columns:1fr; } }
 @media(max-width:640px) { .teacher-timetable-header { margin-bottom:18px; } .teacher-dashboard-period { grid-template-columns:1fr; gap:4px; } }
+
+
+/* Teacher portal adopts the student portal's blue SchoolSuite theme */
+.teacher-timetable-page {
+  max-width:1600px;
+  padding:32px 30px 42px;
+  background:#f5f7fb;
+  color:#202c42;
+}
+.teacher-timetable-header.teacher-portal-header {
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:24px;
+  width:100%;
+  max-width:none;
+  min-height:178px;
+  margin:0 0 24px;
+  padding:30px 42px;
+  overflow:hidden;
+  border:1px solid #dce5ff;
+  border-radius:16px;
+  color:#fff;
+  background:linear-gradient(112deg,#344fcb 0%,#4969e8 58%,#7183f1 100%);
+  box-shadow:0 12px 28px #4664d51b;
+}
+.teacher-portal-header:after {
+  content:"";
+  position:absolute;
+  width:220px;height:220px;
+  right:70px;top:-78px;
+  border:1px solid #ffffff35;
+  border-radius:50%;
+  box-shadow:0 0 0 28px #ffffff0c,0 0 0 58px #ffffff08;
+  pointer-events:none;
+}
+.teacher-portal-header>div:first-child { position:relative;z-index:1;max-width:650px; }
+.teacher-portal-header .portal-eyebrow {
+  color:#dbe3ff;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:1.5px;
+}
+.teacher-portal-header h1 {
+  margin:9px 0;
+  color:#fff;
+  font-size:clamp(26px,2.4vw,34px);
+  font-weight:800;
+  letter-spacing:-1px;
+}
+.teacher-portal-header p {
+  margin:0;
+  color:#e0e6ff;
+  font-size:13px;
+  line-height:1.7;
+}
+.teacher-portal-header .portal-account {
+  position:relative;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding:0;
+  border:0;
+  color:#fff;
+}
+.teacher-portal-header .portal-signout {
+  padding:10px 16px;
+  border:1px solid #ffffff75;
+  border-radius:8px;
+  background:#fff;
+  color:#304bc0;
+  font-weight:700;
+}
+.teacher-workspace-tabs.portal-tabs {
+  display:flex;
+  align-items:center;
+  flex-wrap:nowrap;
+  gap:5px;
+  max-width:none;
+  margin:0 0 26px;
+  padding:5px;
+  overflow-x:auto;
+  border:1px solid #e7ebf2;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 2px 7px #1d315408;
+  scrollbar-width:thin;
+}
+.teacher-workspace-tabs.portal-tabs button {
+  flex:0 0 auto;
+  min-height:42px;
+  padding:10px 14px;
+  border:0;
+  border-radius:8px;
+  border-bottom:0;
+  background:transparent;
+  color:#778196;
+  font-size:12px;
+  font-weight:700;
+}
+.teacher-workspace-tabs.portal-tabs button:hover {
+  background:#f5f7ff;
+  color:#4263eb;
+}
+.teacher-workspace-tabs.portal-tabs button.active {
+  background:#edf1ff;
+  color:#3e5dde;
+  box-shadow:inset 0 0 0 1px #dce5ff;
+}
+.teacher-overview .school-dashboard-heading h2 { color:#28364d; }
+.teacher-overview .school-dashboard-heading p { color:#778196; }
+.teacher-overview .school-dashboard-stat {
+  position:relative;
+  min-height:140px;
+  padding:19px 19px 17px 21px;
+  border-color:#e7ebf2;
+  border-radius:13px;
+  box-shadow:0 3px 12px rgba(29,49,84,.045);
+}
+.teacher-overview .school-dashboard-stat:before {
+  content:"";
+  position:absolute;
+  left:0;top:0;bottom:0;
+  width:3px;
+  background:#4263eb;
+}
+.teacher-overview .school-dashboard-stat:nth-child(2):before { background:#1eaa7c; }
+.teacher-overview .school-dashboard-stat:nth-child(3):before { background:#9869d5; }
+.teacher-overview .school-dashboard-stat:nth-child(4):before { background:#d49a39; }
+.teacher-overview .school-dashboard-stat-icon { display:none; }
+.teacher-overview .school-dashboard-stat-label { color:#78859b;font-size:11px;font-weight:600; }
+.teacher-overview .school-dashboard-stat>strong {
+  color:#25334a;
+  font:800 27px "Plus Jakarta Sans",sans-serif;
+  letter-spacing:-.7px;
+}
+.teacher-overview .school-dashboard-stat small { color:#929caf;font-size:10px; }
+.teacher-overview .school-dashboard-panel {
+  border-color:#e7ebf2;
+  border-radius:13px;
+  box-shadow:0 3px 12px rgba(29,49,84,.04);
+}
+.teacher-overview .school-dashboard-panel h3 { color:#28364d; }
+.teacher-dashboard-actions button {
+  border-color:#e7ebf2;
+  color:#5266bd;
+}
+@media(max-width:900px) {
+  .teacher-timetable-page { padding:24px 20px 34px; }
+  .teacher-timetable-header.teacher-portal-header { padding:25px 24px; }
+}
+@media(max-width:600px) {
+  .teacher-timetable-page { padding:16px 13px 28px; }
+  .teacher-timetable-header.teacher-portal-header {
+    display:block;
+    min-height:0;
+    padding:22px 19px;
+    border-radius:14px;
+  }
+  .teacher-portal-header:after { right:-100px;top:-100px; }
+  .teacher-portal-header h1 { font-size:25px; }
+  .teacher-portal-header .portal-account {
+    margin-top:15px;
+    justify-content:space-between;
+  }
+  .teacher-workspace-tabs.portal-tabs {
+    margin-bottom:19px;
+    padding:4px;
+  }
+  .teacher-workspace-tabs.portal-tabs button {
+    min-height:38px;
+    padding:9px 11px;
+    font-size:11px;
+  }
+  .teacher-overview .school-dashboard-stats { gap:9px; }
+  .teacher-overview .school-dashboard-stat { min-height:126px;padding:14px; }
+  .teacher-overview .school-dashboard-stat>strong { font-size:23px; }
+}
