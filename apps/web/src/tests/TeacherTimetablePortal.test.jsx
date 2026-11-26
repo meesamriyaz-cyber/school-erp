@@ -14,9 +14,10 @@ describe("TeacherTimetablePortal", () => {
   it("keeps teacher navigation and workspace content inside the shared page layout", async () => {
     render(<TeacherTimetablePortal />);
     expect(await screen.findByRole("navigation", { name: "Teacher workspace" })).toBeInTheDocument();
-    expect(document.querySelector(".teacher-overview-cards")).toBeInTheDocument();
-    expect(document.querySelector(".teacher-overview-schedule")).toBeInTheDocument();
-    expect(document.querySelector(".teacher-overview-actions")).toBeInTheDocument();
+    expect(await screen.findByText("TEACHING OVERVIEW")).toBeInTheDocument();
+    expect(document.querySelector(".teacher-overview.school-dashboard .school-dashboard-stats")).toBeInTheDocument();
+    expect(document.querySelector(".teacher-overview .school-dashboard-panels")).toBeInTheDocument();
+    expect(document.querySelector(".teacher-dashboard-actions")).toBeInTheDocument();
     expect(document.querySelector(".teacher-workspace-content")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Examination marks" })).toBeInTheDocument();
     expect(screen.queryByText("\\n")).not.toBeInTheDocument();
