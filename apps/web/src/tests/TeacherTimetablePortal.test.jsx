@@ -13,7 +13,7 @@ describe("TeacherTimetablePortal", () => {
 
   it("keeps teacher navigation and workspace content inside the shared page layout", async () => {
     render(<TeacherTimetablePortal />);
-    expect(await screen.findByRole("navigation", { name: "Teacher workspace" })).toBeInTheDocument();
+    expect(await screen.findByRole("navigation", { name: "My teacher dashboard" })).toBeInTheDocument();
     expect(await screen.findByText("TEACHING OVERVIEW")).toBeInTheDocument();
     expect(document.querySelector(".teacher-overview.school-dashboard .school-dashboard-stats")).toBeInTheDocument();
     expect(document.querySelector(".teacher-overview .school-dashboard-panels")).toBeInTheDocument();
@@ -31,7 +31,7 @@ describe("TeacherTimetablePortal", () => {
     }] });
 
     render(<TeacherTimetablePortal />);
-    expect(await screen.findByRole("heading", { name: "Teacher workspace" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "My teacher dashboard" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "My timetable" }));
     expect(screen.getByRole("heading", { name: /^Monday/ })).toBeInTheDocument();
     expect(screen.getAllByText("No periods assigned")).toHaveLength(5);
@@ -50,7 +50,7 @@ describe("TeacherTimetablePortal", () => {
     }] });
 
     render(<TeacherTimetablePortal />);
-    expect(await screen.findByRole("heading", { name: "Teacher workspace" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "My teacher dashboard" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "My timetable" }));
     expect(await screen.findByText("Science")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Print timetable" })).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe("TeacherTimetablePortal", () => {
   });
   it("uses the shared operational layout for attendance and examination marks", async () => {
     render(<TeacherTimetablePortal />);
-    fireEvent.click(screen.getByRole("navigation", { name: "Teacher workspace" }).querySelector('button:nth-child(3)'));
+    fireEvent.click(screen.getByRole("navigation", { name: "My teacher dashboard" }).querySelector('button:nth-child(3)'));
     expect(document.querySelector(".teacher-workspace-content .teacher-attendance")).toBeInTheDocument();
     expect(document.querySelector(".teacher-workspace-content .teacher-attendance-summary")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Examination marks" }));
