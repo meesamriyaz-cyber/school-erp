@@ -117,3 +117,15 @@ test('teacher mobile announcements match the web announcement API and workspace'
   assert.match(workspace, /TeacherAnnouncementsScreen/);
   assert.match(workspace, /\["announcements","Announcements"\]/);
 });
+
+test('platform admin has a dedicated mobile workspace for cross-school directories', async () => {
+  const screen = await readFile(new URL('../src/components/PlatformAdminScreen.js', import.meta.url), 'utf8');
+  const app = await readFile(new URL('../src/app/(app)/index.js', import.meta.url), 'utf8');
+  assert.match(app, /import \{ PlatformAdminScreen \}/);
+  assert.match(app, /if \(isPlatformAdministrator\) return <PlatformAdminScreen/);
+  assert.ok(screen.includes('"/platform/schools"') || screen.includes('"/platform/users"'));
+  assert.match(screen, /School directory/);
+  assert.match(screen, /User directory/);
+  assert.match(screen, /URLSearchParams/);
+  assert.match(screen, /pagination/);
+});
