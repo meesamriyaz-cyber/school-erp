@@ -95,16 +95,14 @@ export function StudentWorkspaceScreen({ user }) {
     if (key === "documents") setDocumentsRefreshing(true);
     if (key === "notices") setNoticesRefreshing(true);
     const responses = await Promise.allSettled(requests.map(([, endpoint]) => apiRequest(endpoint)));
+    const updates = {};
     const failed = [];
-    setData((previous) => {
-      const next = { ...previous };
-      responses.forEach((response, index) => {
-        const [name] = requests[index];
-        if (response.status === "fulfilled") next[name] = response.value;
-        else failed.push(name);
-      });
-      return next;
+    responses.forEach((response, index) => {
+      const [name] = requests[index];
+      if (response.status === "fulfilled") updates[name] = response.value;
+      else failed.push(name);
     });
+    if (Object.keys(updates).length) setData((previous) => ({ ...previous, ...updates }));
     setPartialErrors((previous) => [...previous.filter((name) => !requests.some(([requestName]) => requestName === name)), ...failed]);
     if (failed.length) Alert.alert(failed.length === requests.length ? "Section could not be refreshed" : "Some information could not be refreshed", "Unavailable: " + failed.join(", ") + ". Previously loaded information has been kept.");
     setSectionRefreshing("");
