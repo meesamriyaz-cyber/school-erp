@@ -38,7 +38,7 @@ const query = (value, methods = []) => {
 
 const configureParent = () => {
   mocks.guardianFindOne.mockReturnValue(query({ _id: "guardian-a" }, ["select"]));
-  mocks.relationshipFind.mockReturnValue(query([{ studentId: "student-a" }], ["select"]));
+  mocks.relationshipFind.mockReturnValue(query([], ["sort", "populate"]));
   mocks.studentFind.mockReturnValue(query([
     { _id: "student-a", firstName: "Amina", lastName: "Khan" },
   ], ["select", "sort"]));
@@ -256,7 +256,7 @@ describe("student portal read-only academic data", () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
-      data: [{ student: profile, currentEnrollment: enrollment }],
+      data: [{ student: profile, parents: [], currentEnrollment: enrollment }],
     });
     expect(next).not.toHaveBeenCalled();
   });
@@ -297,6 +297,7 @@ describe("student portal read-only academic data", () => {
       dateOfBirth: new Date("2015-04-12T00:00:00.000Z"),
     };
     mocks.studentFindOne.mockReturnValue(query(profile, ["select"]));
+    mocks.relationshipFind.mockReturnValue(query([], ["sort", "populate"]));
     mocks.enrollmentFind.mockReturnValue(query([], ["populate", "populate", "populate"]));
 
     await getMyProfile(req, res, next);
@@ -313,11 +314,11 @@ describe("student portal read-only academic data", () => {
       expect.stringContaining("guardianPhone"),
     );
     expect(mocks.guardianFindOne).not.toHaveBeenCalled();
-    expect(mocks.relationshipFind).not.toHaveBeenCalled();
+    expect(mocks.relationshipFind).toHaveBeenCalledWith({ tenantId: "tenant-a", studentId: "student-a", status: "active" });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
-      data: [{ student: profile, currentEnrollment: null }],
+      data: [{ student: profile, parents: [], currentEnrollment: null }],
     });
     expect(next).not.toHaveBeenCalled();
   });
