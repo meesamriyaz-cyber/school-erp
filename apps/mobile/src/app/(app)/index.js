@@ -18,6 +18,7 @@ import { StaffScreen } from "../../components/StaffScreen";
 import { TimetableScreen } from "../../components/TimetableScreen";
 import { TeacherWorkspaceScreen } from "../../components/TeacherWorkspaceScreen";
 import { StudentWorkspaceScreen } from "../../components/StudentWorkspaceScreen";
+import { PlatformAdminScreen } from "../../components/PlatformAdminScreen";
 import { ParentMessagingScreen } from "../../components/ParentMessagingScreen";
 import { colors, radius, spacing } from "../../theme/tokens";
 
@@ -164,6 +165,8 @@ export default function AppHomeScreen() {
     ? (teacherYearNames.length === 1 ? teacherYearNames[0] : teacherYearNames.length > 1 ? "Multiple academic years" : "Academic year not available")
     : report?.academicYear?.name || "Academic year not set";
   const onHome = () => setActiveTab("home");
+
+  if (isPlatformAdministrator) return <PlatformAdminScreen user={user} onSignOut={signOut}/>;
 
   if (!hasMobileWorkspace) {
     const unavailableTitle = isPlatformAdministrator
