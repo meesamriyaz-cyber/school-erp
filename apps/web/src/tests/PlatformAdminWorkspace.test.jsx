@@ -213,6 +213,8 @@ describe("PlatformAdminWorkspace school directory", () => {
     render(<PlatformAdminWorkspace />);
     await user.click(screen.getByRole("button", { name: /Schools/ }));
     await screen.findByText("Green Valley School");
+    apiRequest.mockResolvedValueOnce({ success: true, data: [] });
+    apiRequest.mockResolvedValueOnce({ success: true, data: { subscription: null } });
     apiRequest.mockResolvedValueOnce({
       success: true,
       data: {
@@ -237,6 +239,8 @@ describe("PlatformAdminWorkspace school directory", () => {
     const user = userEvent.setup();
     apiRequest
       .mockResolvedValueOnce(pageOne)
+      .mockResolvedValueOnce({ success: true, data: [] })
+      .mockResolvedValueOnce({ success: true, data: { subscription: null } })
       .mockResolvedValueOnce({
         success: true,
         data: {
@@ -286,6 +290,8 @@ describe("PlatformAdminWorkspace school directory", () => {
     const user = userEvent.setup();
     apiRequest
       .mockResolvedValueOnce(pageOne)
+      .mockResolvedValueOnce({ success: true, data: [] })
+      .mockResolvedValueOnce({ success: true, data: { subscription: null } })
       .mockResolvedValueOnce({
         success: true,
         data: {
