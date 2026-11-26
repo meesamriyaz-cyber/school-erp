@@ -82,9 +82,17 @@ export function StudentWorkspaceScreen({ user }) {
     const requests = key === "learning"
       ? [["homework", "/portal/homework"], ["submissions", "/portal/homework-submissions"]]
       : key === "attendance" ? [["attendance", "/portal/attendance"]]
-      : key === "fees" ? [["fees", "/portal/fees"]] : [];
+      : key === "fees" ? [["fees", "/portal/fees"]]
+      : key === "results" ? [["results", "/portal/results"]]
+      : key === "timetable" ? [["timetable", "/portal/timetable"]]
+      : key === "documents" ? [["documents", "/portal/documents"]]
+      : key === "notices" ? [["notices", "/portal/announcements"], ["notifications", "/portal/notifications"]]
+      : key === "profile" ? [["profile", "/portal/profile"]] : [];
     if (!requests.length) return;
     setSectionRefreshing(key);
+    if (key === "results") setResultsRefreshing(true);
+    if (key === "documents") setDocumentsRefreshing(true);
+    if (key === "notices") setNoticesRefreshing(true);
     const responses = await Promise.allSettled(requests.map(([, endpoint]) => apiRequest(endpoint)));
     const failed = [];
     setData((previous) => {
@@ -96,8 +104,12 @@ export function StudentWorkspaceScreen({ user }) {
       });
       return next;
     });
-    if (failed.length === requests.length) Alert.alert("Section could not be refreshed", "Your previously loaded information is still available. Pull down to retry.");
+    setPartialErrors((previous) => [...previous.filter((name) => !requests.some(([requestName]) => requestName === name)), ...failed]);
+    if (failed.length) Alert.alert(failed.length === requests.length ? "Section could not be refreshed" : "Some information could not be refreshed", "Unavailable: " + failed.join(", ") + ". Previously loaded information has been kept.");
     setSectionRefreshing("");
+    setResultsRefreshing(false);
+    setDocumentsRefreshing(false);
+    setNoticesRefreshing(false);
   };
 
   useEffect(() => { load(); }, [load]);
