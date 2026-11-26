@@ -38,7 +38,7 @@ const query = (value, methods = []) => {
 
 const configureParent = () => {
   mocks.guardianFindOne.mockReturnValue(query({ _id: "guardian-a" }, ["select"]));
-  mocks.relationshipFind.mockReturnValue(query([], ["sort", "populate"]));
+  mocks.relationshipFind.mockReturnValue(query([{ studentId: "student-a", canAccessPortal: true }], ["sort", "populate"]));
   mocks.studentFind.mockReturnValue(query([
     { _id: "student-a", firstName: "Amina", lastName: "Khan" },
   ], ["select", "sort"]));
@@ -297,7 +297,6 @@ describe("student portal read-only academic data", () => {
       dateOfBirth: new Date("2015-04-12T00:00:00.000Z"),
     };
     mocks.studentFindOne.mockReturnValue(query(profile, ["select"]));
-    mocks.relationshipFind.mockReturnValue(query([], ["sort", "populate"]));
     mocks.enrollmentFind.mockReturnValue(query([], ["populate", "populate", "populate"]));
 
     await getMyProfile(req, res, next);
