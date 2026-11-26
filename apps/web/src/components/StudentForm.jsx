@@ -43,7 +43,6 @@ export default function StudentForm({ onClose, onCreated }) {
 
   useEffect(() => {
     let alive = true;
-    setClasses([]); setClassId(""); setSections([]); setSectionId("");
     if (!yearId) return undefined;
     apiRequest(`/classes?academicYearId=${encodeURIComponent(yearId)}&status=active`, { accessToken })
       .then((response) => { if (alive) setClasses(Array.isArray(response?.data) ? response.data.filter((item) => item.status === "active") : []); })
@@ -53,7 +52,6 @@ export default function StudentForm({ onClose, onCreated }) {
 
   useEffect(() => {
     let alive = true;
-    setSections([]); setSectionId("");
     if (!classId) return undefined;
     apiRequest(`/sections?classId=${encodeURIComponent(classId)}&status=active`, { accessToken })
       .then((response) => { if (alive) setSections(Array.isArray(response?.data) ? response.data.filter((item) => item.status === "active") : []); })
@@ -181,8 +179,8 @@ export default function StudentForm({ onClose, onCreated }) {
             <h3>Academic placement</h3>
             {optionsLoading ? <p role="status">Loading academic years…</p> : null}
             <div className="student-form-grid">
-              <label>Academic year *<select value={yearId} onChange={(event) => setYearId(event.target.value)} required disabled={optionsLoading || !!createdStudent}><option value="">Select academic year</option>{years.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
-              <label>Class *<select value={classId} onChange={(event) => setClassId(event.target.value)} required disabled={!yearId || !classes.length || !!createdStudent}><option value="">Select class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+              <label>Academic year *<select value={yearId} onChange={(event) => { setYearId(event.target.value); setClassId(""); setClasses([]); setSectionId(""); setSections([]); }} required disabled={optionsLoading || !!createdStudent}><option value="">Select academic year</option>{years.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+              <label>Class *<select value={classId} onChange={(event) => { setClassId(event.target.value); setSectionId(""); setSections([]); }} required disabled={!yearId || !classes.length || !!createdStudent}><option value="">Select class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
               <label>Section (optional)<select value={sectionId} onChange={(event) => setSectionId(event.target.value)} disabled={!classId || !sections.length || !!createdStudent}><option value="">No section</option>{sections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
             </div>
             {years.length === 0 && !optionsLoading ? <p className="student-error" role="alert">No active academic year is available. Create or activate an academic year before admitting students.</p> : null}
