@@ -155,12 +155,21 @@ export function TeacherWorkspaceScreen() {
     }catch(err){setError(err.message||"Unable to load class report.");}
     finally{setBusy(false);}
   };
+  const retryCurrentTab=async()=>{
+    if(tab==="attendance")return loadAttendance();
+    if(tab==="students")return loadStudents();
+    if(tab==="homework")return activeHomework?loadSubmissions(activeHomework):loadBase();
+    if(tab==="exams")return selectedExam?loadExamRoster(selectedExam):loadBase();
+    if(tab==="reports")return runReport();
+    if(tab==="announcements"||tab==="messages")return loadBase();
+    return loadBase();
+  };
   const tabs=[["attendance","Attendance"],["students","My students"],["homework","Homework"],["exams","Exams"],["reports","Reports"],["announcements","Announcements"],["messages","Parent messages"]];
   const assignmentLabel=a=>(a.classId?.name||"Class")+(a.sectionId?.name?" · "+a.sectionId.name:" · All sections")+" — "+(a.subjectId?.name||"Subject");
   return <ScrollView contentContainerStyle={s.page}>
     <View style={s.heading}><Text style={s.kicker}>TEACHING & LEARNING</Text><Text style={s.title}>Teacher workspace</Text><Text style={s.muted}>Your assigned classes, student records and teaching tasks.</Text></View>
     <Chips items={tabs.map(([value,label])=>({value,label}))} value={tab} onChange={v=>{setTab(v);setError("");setNotice("");}}/>
-    {error?<View style={s.alert}><Text style={s.error}>{error}</Text><TouchableOpacity onPress={()=>tab==="students"?loadStudents():tab==="attendance"?loadAttendance():loadBase()}><Text style={s.action}>Try again</Text></TouchableOpacity></View>:null}
+    {error?<View style={s.alert}><Text style={s.error}>{error}</Text><TouchableOpacity onPress={retryCurrentTab}><Text style={s.action}>Try again</Text></TouchableOpacity></View>:null}
     {notice?<View style={s.notice}><Text style={s.success}>{notice}</Text></View>:null}
     {tab!=="exams"&&tab!=="messages"&&scopes.length>0?<View style={s.panel}><Text style={s.label}>Assigned class and subject</Text><Chips items={scopes.map(a=>({value:a._id,label:assignmentLabel(a)}))} value={selected?._id||""} onChange={setAssignmentId}/></View>:null}
     {loading?<View style={s.loading}><ActivityIndicator color={colors.primary}/><Text style={s.muted}>Loading…</Text></View>:null}
