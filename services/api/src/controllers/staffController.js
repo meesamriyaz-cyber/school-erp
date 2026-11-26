@@ -59,7 +59,7 @@ async function validateUserLink(userId, tenantId, employeeType, session = null, 
     return null;
   }
   if (!validId(userId)) { const error = new Error("Invalid linked user ID"); error.code = "STAFF_USER_INVALID"; throw error; }
-  let query = User.findOne({ _id: userId, tenantId, ...(requireActive ? { status: "active" } : {}) }).select("_id role email");
+  let query = User.findOne({ _id: userId, tenantId, ...(requireActive ? { status: "active" } : {}) }).select("_id role firstName lastName email phone");
   if (session) query = query.session(session);
   const user = await query.lean();
   if (!user) { const error = new Error("Select an active user from this school"); error.code = "STAFF_USER_INVALID"; throw error; }
