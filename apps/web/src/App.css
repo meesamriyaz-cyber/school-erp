@@ -3541,3 +3541,25 @@ body {
     white-space: nowrap;
   }
 }
+
+
+/* Quiet secondary action on authentication forms */
+.auth-link {
+  align-self: flex-end;
+  margin: 1px 0 2px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: #4263eb;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: right;
+  transition: color 150ms ease;
+}
+
+.auth-link:hover {
+  color: #304bc0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
