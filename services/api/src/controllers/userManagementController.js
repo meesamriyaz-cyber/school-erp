@@ -249,10 +249,27 @@ export const updateUser = async (req, res, next) => {
         { new: true, runValidators: true, session },
       ).select("_id tenantId firstName lastName email phone role status authVersion lastLoginAt createdAt updatedAt").lean();
       if (!updatedUser) return null;
-      if (Object.hasOwn(update, "email")) {
+      const staffIdentity = Object.fromEntries(
+        ["firstName", "lastName", "email", "phone"]
+          .filter((field) => Object.hasOwn(update, field))
+          .map((field) => [field, updatedUser[field] ?? (field === "lastName" ? "" : null)]),
+      );
+      if (Object.keys(staffIdentity).length) {
         await Staff.updateMany(
           { tenantId: updatedUser.tenantId, userId: updatedUser._id },
-          { $set: { email: updatedUser.email } },
+          {
+            $set: staffIdentity,
+            $push: {
+              auditTrail: {
+                $each: [{
+                  action: "profile_updated",
+                  actorUserId: req.auth.userId,
+                  changedFields: Object.keys(staffIdentity),
+                }],
+                $slice: -50,
+              },
+            },
+          },
           { session },
         );
       }
