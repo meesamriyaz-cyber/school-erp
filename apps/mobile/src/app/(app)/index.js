@@ -314,7 +314,7 @@ export default function AppHomeScreen() {
             <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("certificates")}><Text style={styles.secondaryButtonText}>Certificates & Reports</Text></TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={() => setActiveTab("documents")}><Text style={styles.secondaryButtonText}>Student Documents</Text></TouchableOpacity>
           </View>
-         </>}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
+         </> : null}<TouchableOpacity style={styles.signOutButton} onPress={signOut}><Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text></TouchableOpacity></View>}
     </ScrollView>}
 
     <View style={styles.bottomNav}>
