@@ -111,7 +111,7 @@ test('teacher mobile announcements match the web announcement API and workspace'
     assert.ok(announcements.includes(endpoint), 'teacher announcements should use ' + endpoint);
   }
   assert.match(announcements, /audienceType/);
-  assert.match(announcements, /method: "POST"/);
+  assert.match(announcements, /method:\s*"POST"/);
   assert.match(announcements, /"publish"/);
   assert.match(announcements, /"archive"/);
   assert.match(workspace, /TeacherAnnouncementsScreen/);
