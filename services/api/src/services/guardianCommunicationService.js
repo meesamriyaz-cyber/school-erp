@@ -70,7 +70,7 @@ async function twilioSend({ to, body, from, accountSid, authToken, contentSid })
   };
 }
 
-export async function sendGuardianChannel({ channel, recipient, message, subject, guardianId }) {
+export async function sendGuardianChannel({ channel, recipient, message, subject, guardianId, purpose = "guardian_email_verification" }) {
   if (channel === "sms" || channel === "whatsapp") {
     const accountSid = cleanEnv(process.env.TWILIO_ACCOUNT_SID);
     const authToken = cleanEnv(process.env.TWILIO_AUTH_TOKEN);
@@ -128,7 +128,7 @@ export async function sendGuardianChannel({ channel, recipient, message, subject
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [recipient], subject: subject || "School update", text: message, ...(guardianId ? { tags: [{ name: "guardian_id", value: String(guardianId) }, { name: "purpose", value: "guardian_email_verification" }] } : {}) }),
+      body: JSON.stringify({ from, to: [recipient], subject: subject || "School update", text: message, ...(guardianId ? { tags: [{ name: "guardian_id", value: String(guardianId) }, { name: "purpose", value: purpose }] } : {}) }),
       signal: AbortSignal.timeout(15000),
     });
     const result = await response.json().catch(() => ({}));
