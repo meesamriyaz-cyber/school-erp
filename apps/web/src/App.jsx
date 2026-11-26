@@ -279,7 +279,7 @@ function DashboardApp() {
           <div className="welcome-row">
             <div>
               <div className="eyebrow">SCHOOL WORKSPACE</div>
-              <h1>{activePage === "Overview" ? "Good day, {user?.role === "principal" ? "Principal" : "Administrator"}" : activePage}</h1>
+              <h1>{activePage === "Overview" ? (user?.role === "principal" ? "Good day, Principal" : "Good day, Administrator") : activePage}</h1>
               <p className="page-subtitle">
                 {activePage === "Overview"
                   ? "Here’s an overview of your school management workspace."
