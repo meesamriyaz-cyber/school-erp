@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/authContext.js";
+import { apiRequest } from "../lib/api.js";
 export default function LoginPage() {
   const { login } = useAuth();
 
@@ -9,8 +10,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resetStep, setResetStep] = useState("login");
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
 
-  async function handleSubmit(event) {
+  async function requestReset(event) {\n    event.preventDefault(); setError(""); setResetMessage(""); setSubmitting(true);\n    try {\n      const response = await apiRequest("/auth/password-reset/request", { method: "POST", body: { email: email.trim().toLowerCase(), ...(workspace === "school" ? { tenantSlug: tenantSlug.trim().toLowerCase() } : {}) } });\n      setResetMessage(response.message || "If the account is eligible, a reset code has been sent."); setResetStep("complete");\n    } catch (err) { setError(err.message || "Unable to request a reset code."); } finally { setSubmitting(false); }\n  }\n\n  async function completeReset(event) {\n    event.preventDefault(); setError(""); setResetMessage(""); setSubmitting(true);\n    try {\n      const response = await apiRequest("/auth/password-reset/complete", { method: "POST", body: { email: email.trim().toLowerCase(), ...(workspace === "school" ? { tenantSlug: tenantSlug.trim().toLowerCase() } : {}), code: resetCode.trim(), newPassword } });\n      setResetMessage(response.message || "Password reset successfully."); setResetStep("login"); setPassword(""); setResetCode(""); setNewPassword("");\n    } catch (err) { setError(err.message || "Unable to reset password."); } finally { setSubmitting(false); }\n  }\n\n  async function handleSubmit(event) {
     event.preventDefault();
     setError("");
     setSubmitting(true);
@@ -65,7 +70,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        {resetStep === "login" ? <form className="auth-form" onSubmit={handleSubmit}>
           {workspace === "school" && (
             <>
               <label htmlFor="tenantSlug">School ID</label>
