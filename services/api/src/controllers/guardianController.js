@@ -155,6 +155,10 @@ export const updateGuardian = async (req, res, next) => {
       if (nextEmail !== null && nextEmail !== "") {
         if (typeof nextEmail !== "string" || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(nextEmail.trim())) return invalid(res, "Enter a valid guardian email address");
         updates.pendingEmail = nextEmail.trim().toLowerCase();
+        updates.emailDeliveryEmailId = null;
+        updates.emailDeliveryStatus = null;
+        updates.emailDeliveryUpdatedAt = null;
+        updates.emailDeliveryEvents = [];
       } else {
         updates.email = null;
         updates.verifiedEmail = null;
