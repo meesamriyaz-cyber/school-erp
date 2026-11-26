@@ -269,9 +269,13 @@ export async function reversePlatformPayment(req, res, next) {
       await invoice.save({ session });
       if (invoice.subscriptionId && invoice.status !== "paid") {
         const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: { $in: ["active", "past_due"] } }).session(session);
-        if (subscription && subscription.billingInterval !== "one_time") {
-          subscription.status = subscription.billingInterval === "one_time" ? "cancelled" : "past_due";
-          if (subscription.billingInterval === "one_time") subscription.cancelledAt = new Date();
+        if (subscription) {
+          if (subscription.billingInterval === "one_time" || subscription.lifetimeAccess) {
+            subscription.status = "cancelled";
+            subscription.cancelledAt = new Date();
+          } else {
+            subscription.status = "past_due";
+          }
           await subscription.save({ session });
         }
       }
