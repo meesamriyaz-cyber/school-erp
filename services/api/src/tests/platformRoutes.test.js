@@ -8,7 +8,19 @@ const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAud
   createSchool: vi.fn((_req, res) => res.status(201).json({ endpoint: "createSchool" })),
   listAuditLogs: vi.fn((_req, res) => res.status(200).json({ endpoint: "listAuditLogs" })),
   getAuditOutboxStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "getAuditOutboxStatus" })),
-  retryFailedAuditEvent: vi.fn((_req, res) => res.status(200).json({ endpoint: "retryFailedAuditEvent" })),\n  getBusinessOverview: vi.fn((_req, res) => res.status(200).json({ endpoint: "getBusinessOverview" })),\n  listSubscriptionPlans: vi.fn((_req, res) => res.status(200).json({ endpoint: "listSubscriptionPlans" })),\n  createSubscriptionPlan: vi.fn((_req, res) => res.status(201).json({ endpoint: "createSubscriptionPlan" })),\n  updateSubscriptionPlan: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateSubscriptionPlan" })),\n  archiveSubscriptionPlan: vi.fn((_req, res) => res.status(200).json({ endpoint: "archiveSubscriptionPlan" })),\n  getSchoolSubscription: vi.fn((_req, res) => res.status(200).json({ endpoint: "getSchoolSubscription" })),\n  assignSchoolSubscription: vi.fn((_req, res) => res.status(201).json({ endpoint: "assignSchoolSubscription" })),\n  listPlatformInvoices: vi.fn((_req, res) => res.status(200).json({ endpoint: "listPlatformInvoices" })),\n  recordPlatformPayment: vi.fn((_req, res) => res.status(201).json({ endpoint: "recordPlatformPayment" })),\n  reversePlatformPayment: vi.fn((_req, res) => res.status(200).json({ endpoint: "reversePlatformPayment" })),\n  createRenewalInvoice: vi.fn((_req, res) => res.status(201).json({ endpoint: "createRenewalInvoice" })),\n  listCommercialEvents: vi.fn((_req, res) => res.status(200).json({ endpoint: "listCommercialEvents" })),
+  retryFailedAuditEvent: vi.fn((_req, res) => res.status(200).json({ endpoint: "retryFailedAuditEvent" })),
+  getBusinessOverview: vi.fn((_req, res) => res.status(200).json({ endpoint: "getBusinessOverview" })),
+  listSubscriptionPlans: vi.fn((_req, res) => res.status(200).json({ endpoint: "listSubscriptionPlans" })),
+  createSubscriptionPlan: vi.fn((_req, res) => res.status(201).json({ endpoint: "createSubscriptionPlan" })),
+  updateSubscriptionPlan: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateSubscriptionPlan" })),
+  archiveSubscriptionPlan: vi.fn((_req, res) => res.status(200).json({ endpoint: "archiveSubscriptionPlan" })),
+  getSchoolSubscription: vi.fn((_req, res) => res.status(200).json({ endpoint: "getSchoolSubscription" })),
+  assignSchoolSubscription: vi.fn((_req, res) => res.status(201).json({ endpoint: "assignSchoolSubscription" })),
+  listPlatformInvoices: vi.fn((_req, res) => res.status(200).json({ endpoint: "listPlatformInvoices" })),
+  recordPlatformPayment: vi.fn((_req, res) => res.status(201).json({ endpoint: "recordPlatformPayment" })),
+  reversePlatformPayment: vi.fn((_req, res) => res.status(200).json({ endpoint: "reversePlatformPayment" })),
+  createRenewalInvoice: vi.fn((_req, res) => res.status(201).json({ endpoint: "createRenewalInvoice" })),
+  listCommercialEvents: vi.fn((_req, res) => res.status(200).json({ endpoint: "listCommercialEvents" })),
 }));
 
 vi.mock("../middleware/requireTrustedOrigin.js", () => ({
@@ -29,7 +41,9 @@ vi.mock("../middleware/authenticate.js", () => ({
 vi.mock("../controllers/auditLogController.js", () => ({ listAuditLogs }));
 vi.mock("../controllers/auditOutboxController.js", () => ({ getAuditOutboxStatus, retryFailedAuditEvent }));
 
-vi.mock("../controllers/platformBillingController.js", () => ({ getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents }));\n\nvi.mock("../controllers/platformController.js", () => ({
+vi.mock("../controllers/platformBillingController.js", () => ({ getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents }));
+
+vi.mock("../controllers/platformController.js", () => ({
   listSchools,
   getSchoolDetails,
   updateSchoolStatus,
@@ -73,7 +87,19 @@ describe("platform school-management route authorization", () => {
     ["GET", "/schools", undefined, listSchools],
     ["GET", "/schools/507f1f77bcf86cd799439011", undefined, getSchoolDetails],
     ["PATCH", "/schools/507f1f77bcf86cd799439011/status", { status: "suspended" }, updateSchoolStatus],
-    ["POST", "/schools", { school: {}, admin: {} }, createSchool],\n    ["GET", "/business-overview", undefined, getBusinessOverview],\n    ["GET", "/subscription-plans", undefined, listSubscriptionPlans],\n    ["POST", "/subscription-plans", { name: "Monthly", billingInterval: "monthly", amount: 100 }, createSubscriptionPlan],\n    ["PATCH", "/subscription-plans/507f1f77bcf86cd799439011", { amount: 120 }, updateSubscriptionPlan],\n    ["POST", "/subscription-plans/507f1f77bcf86cd799439011/archive", {}, archiveSubscriptionPlan],\n    ["GET", "/schools/507f1f77bcf86cd799439011/subscription", undefined, getSchoolSubscription],\n    ["POST", "/schools/507f1f77bcf86cd799439011/subscription", { planId: "507f1f77bcf86cd799439011" }, assignSchoolSubscription],\n    ["GET", "/invoices", undefined, listPlatformInvoices],\n    ["POST", "/invoices/507f1f77bcf86cd799439011/payments", { amount: 100, method: "upi" }, recordPlatformPayment],\n    ["POST", "/payments/507f1f77bcf86cd799439011/reverse", { reason: "Duplicate entry" }, reversePlatformPayment],\n    ["POST", "/subscriptions/507f1f77bcf86cd799439011/renewal-invoice", {}, createRenewalInvoice],\n    ["GET", "/commercial-events", undefined, listCommercialEvents],
+    ["POST", "/schools", { school: {}, admin: {} }, createSchool],
+    ["GET", "/business-overview", undefined, getBusinessOverview],
+    ["GET", "/subscription-plans", undefined, listSubscriptionPlans],
+    ["POST", "/subscription-plans", { name: "Monthly", billingInterval: "monthly", amount: 100 }, createSubscriptionPlan],
+    ["PATCH", "/subscription-plans/507f1f77bcf86cd799439011", { amount: 120 }, updateSubscriptionPlan],
+    ["POST", "/subscription-plans/507f1f77bcf86cd799439011/archive", {}, archiveSubscriptionPlan],
+    ["GET", "/schools/507f1f77bcf86cd799439011/subscription", undefined, getSchoolSubscription],
+    ["POST", "/schools/507f1f77bcf86cd799439011/subscription", { planId: "507f1f77bcf86cd799439011" }, assignSchoolSubscription],
+    ["GET", "/invoices", undefined, listPlatformInvoices],
+    ["POST", "/invoices/507f1f77bcf86cd799439011/payments", { amount: 100, method: "upi" }, recordPlatformPayment],
+    ["POST", "/payments/507f1f77bcf86cd799439011/reverse", { reason: "Duplicate entry" }, reversePlatformPayment],
+    ["POST", "/subscriptions/507f1f77bcf86cd799439011/renewal-invoice", {}, createRenewalInvoice],
+    ["GET", "/commercial-events", undefined, listCommercialEvents],
   ];
 
   it.each(protectedRequests)(
