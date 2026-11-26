@@ -7,7 +7,10 @@ import { colors, radius, spacing } from "../theme/tokens";
 const PAGE_SIZE = 20;
 
 export function PlatformAdminScreen({ user, onSignOut }) {
-  const [section, setSection] = useState("schools");
+  const [section, setSection] = useState("overview");
+  const [overview, setOverview] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState("");
   const [schools, setSchools] = useState([]);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
@@ -18,6 +21,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [error, setError] = useState("");
 
   const loadDirectory = useCallback(async (refresh = false) => {
+    if (section === "overview") return;
     if (refresh) setRefreshing(true); else setLoading(true);
     setError("");
     try {
@@ -37,7 +41,18 @@ export function PlatformAdminScreen({ user, onSignOut }) {
     }
   }, [page, search, section]);
 
-  useEffect(() => { void loadDirectory(); }, [loadDirectory]);
+  useEffect(() => { if (section !== "overview") void loadDirectory(); }, [loadDirectory, section]);
+
+  useEffect(() => {
+    if (section !== "overview") return undefined;
+    let mounted = true;
+    setOverviewLoading(true); setOverviewError("");
+    apiRequest("/platform/business-overview")
+      .then((response) => { if (mounted) setOverview(response?.data ?? null); })
+      .catch((error) => { if (mounted) setOverviewError(error?.message || "Unable to load business overview."); })
+      .finally(() => { if (mounted) setOverviewLoading(false); });
+    return () => { mounted = false; };
+  }, [section]);
 
   const switchSection = (next) => {
     setSection(next);
@@ -73,12 +88,24 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         <Text style={styles.welcomeCopy}>Restricted cross-school administration</Text>
       </View>
       <View style={styles.tabs}>
-        {[["schools", "Schools"], ["users", "Users"]].map(([key, label]) =>
+        {[["overview", "Overview"], ["schools", "Schools"], ["users", "Users"]].map(([key, label]) =>
           <TouchableOpacity key={key} onPress={() => switchSection(key)} style={[styles.tab, section === key && styles.tabActive]}>
             <Text style={[styles.tabText, section === key && styles.tabTextActive]}>{label}</Text>
           </TouchableOpacity>
         )}
       </View>
+      {section === "overview" ? <View style={styles.metricsWrap}>
+        {overviewLoading ? <ActivityIndicator color={colors.primary}/> : null}
+        {overviewError ? <View style={styles.error}><Text style={styles.errorText}>{overviewError}</Text></View> : null}
+        {overview ? <>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>CLIENT SCHOOLS</Text><Text style={styles.metricValue}>{overview.schools?.total ?? 0}</Text><Text style={styles.metricHint}>{overview.schools?.active ?? 0} active</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>ACTIVE SUBSCRIPTIONS</Text><Text style={styles.metricValue}>{Object.values(overview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</Text><Text style={styles.metricHint}>Across all billing terms</Text></View>
+          {(overview.invoiced || []).map((item) => <View key={"inv-" + item._id} style={styles.metricCard}><Text style={styles.metricLabel}>INVOICED · {item._id}</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.invoiced || 0)}</Text><Text style={styles.metricHint}>Overdue: {new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.overdue || 0)}</Text></View>)}
+          {(overview.collected || []).map((item) => <View key={"cash-" + item._id} style={styles.metricCard}><Text style={styles.metricLabel}>CASH COLLECTED · {item._id}</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.collected || 0)}</Text><Text style={styles.metricHint}>Recorded platform payments</Text></View>)}
+          {Object.entries(overview.subscriptions || {}).map(([currency, item]) => <View key={"runrate-" + currency} style={styles.metricCard}><Text style={styles.metricLabel}>{currency} RECURRING RUN RATE</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(item.mrr || 0)} / mo</Text><Text style={styles.metricHint}>Lifetime sales: {new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(item.lifetimeSales || 0)}</Text></View>)}
+        </> : null}
+        <Text style={styles.metricFootnote}>Platform revenue only. Student fee collections remain separate within each school.</Text>
+      </View> : null}
       <View style={styles.sectionHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionTitle}>{section === "schools" ? "School directory" : "User directory"}</Text>
@@ -134,6 +161,12 @@ const styles = StyleSheet.create({
   welcomeLabel: { color: "#DCE5FF", fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
   welcomeName: { color: colors.white, fontSize: 20, fontWeight: "900" },
   welcomeCopy: { color: "#E3E9FF", fontSize: 11 },
+  metricsWrap: { gap: 9 },
+  metricCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 15, gap: 5 },
+  metricLabel: { color: colors.muted, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  metricValue: { color: colors.ink, fontSize: 21, fontWeight: "900" },
+  metricHint: { color: colors.muted, fontSize: 10 },
+  metricFootnote: { color: colors.muted, fontSize: 10, lineHeight: 15 },
   tabs: { flexDirection: "row", gap: 7, backgroundColor: colors.surface, padding: 5, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   tab: { flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: radius.sm },
   tabActive: { backgroundColor: colors.primarySoft },
