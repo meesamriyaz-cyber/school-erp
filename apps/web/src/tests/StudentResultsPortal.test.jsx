@@ -10,287 +10,61 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../lib/api.js", () => ({ apiRequest: mocks.apiRequest }));
 vi.mock("../context/authContext.js", () => ({
-  useAuth: () => ({
-    user: mocks.user,
-    accessToken: mocks.accessToken,
-    logout: mocks.logout,
-  }),
+  useAuth: () => ({ user: mocks.user, accessToken: mocks.accessToken, logout: mocks.logout }),
 }));
 
 import StudentResultsPortal from "../components/StudentResultsPortal.jsx";
 
-describe("StudentResultsPortal family overview", () => {
+describe("Parent school communications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.user = { role: "parent", firstName: "Parent", lastName: "Account" };
-    mocks.apiRequest.mockImplementation((path) => {
-      const responses = {
-        "/portal/profile": {
-          data: [
-            {
-              student: {
-                _id: "student-a", firstName: "Amina", lastName: "Khan",
-                admissionNumber: "A-01", dateOfBirth: "2015-04-12",
-                admissionDate: "2022-03-01", gender: "female", status: "active",
-                address: { city: "Srinagar", district: "Srinagar", state: "Jammu and Kashmir" },
-                guardianName: "Parent One", guardianRelationship: "mother",
-                guardianPhone: "9999999999", guardianEmail: "parent@example.test",
-              },
-              currentEnrollment: { classId: { name: "Class 5" }, sectionId: { name: "A" }, academicYearId: { name: "2026–27" } },
-            },
-            {
-              student: {
-                _id: "student-b", firstName: "Bilal", lastName: "Khan",
-                admissionNumber: "B-01", dateOfBirth: "2018-06-15",
-                admissionDate: "2024-03-01", gender: "male", status: "active",
-                guardianName: "Parent One", guardianRelationship: "father",
-              },
-              currentEnrollment: { classId: { name: "Class 2" }, sectionId: { name: "B" }, academicYearId: { name: "2026–27" } },
-            },
-          ],
-        },
-        "/portal/children": {
-          data: [
-            {
-              student: { _id: "student-a", firstName: "Amina", lastName: "Khan", admissionNumber: "A-01" },
-              currentEnrollment: { classId: { name: "Class 5" }, sectionId: { name: "A" } },
-            },
-            {
-              student: { _id: "student-b", firstName: "Bilal", lastName: "Khan", admissionNumber: "B-01" },
-              currentEnrollment: { classId: { name: "Class 2" }, sectionId: { name: "B" } },
-            },
-          ],
-        },
-        "/portal/results": { data: [] },
-        "/portal/homework": { data: [] },
-        "/portal/homework-submissions": { data: [] },
-        "/portal/attendance": {
-          data: [
-            { _id: "attendance-a", student: { _id: "student-a", firstName: "Amina" }, date: "2026-11-01", status: "present" },
-            { _id: "attendance-b", student: { _id: "student-b", firstName: "Bilal" }, date: "2026-11-02", status: "absent" },
-          ],
-        },
-        "/portal/fees": { data: [] },
-        "/portal/timetable": { data: [] },
-        "/portal/announcements": { data: [] },
-        "/portal/notifications": { data: [], unreadCount: 0 },
-      };
-      return Promise.resolve(responses[path] || { data: [] });
-    });
+    mocks.apiRequest.mockImplementation((path) => Promise.resolve(
+      path === "/portal/notifications" ? { success: true, data: [], unreadCount: 0 } : { success: true, data: [] },
+    ));
   });
 
-  it("opens with an overview dashboard and recalculates metrics for a selected child", async () => {
+  it("shows only notices, notifications and messages for parent accounts", async () => {
     render(<StudentResultsPortal />);
-
-    expect(await screen.findByText("Portal overview")).toBeTruthy();
-    expect(screen.getByText("50%")).toBeTruthy();
-    expect(screen.getByText("Combined view of your linked children")).toBeTruthy();
-
-    fireEvent.change(screen.getByRole("combobox", { name: "Select child" }), {
-      target: { value: "student-a" },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText("100%")).toBeTruthy();
-      expect(screen.getByText("Selected child's academic snapshot")).toBeTruthy();
-    });
+    expect(await screen.findByRole("heading", { name: "School communications" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Notices/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Notifications/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Messages" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Profile" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Results" })).not.toBeInTheDocument();
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/portal/announcements", expect.objectContaining({ accessToken: "access-token" }));
+    expect(mocks.apiRequest).toHaveBeenCalledWith("/portal/notifications", expect.objectContaining({ accessToken: "access-token" }));
   });
 
-  it("shows all linked children and filters the detail view to the selected child", async () => {
-    render(<StudentResultsPortal />);
-
-    expect(await screen.findByText("Family learning overview")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Amina Khan/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Bilal Khan/ })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Attendance" }));
-    expect(await screen.findByText("Attendance history")).toBeTruthy();
-    expect(screen.getByText("Amina")).toBeTruthy();
-    expect(screen.getByText("Bilal")).toBeTruthy();
-
-    fireEvent.change(screen.getByRole("combobox", { name: "Select child" }), {
-      target: { value: "student-a" },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText("Amina")).toBeTruthy();
-      expect(screen.queryByText("Bilal")).toBeNull();
-    });
-  });
-
-  it("shows the authorized student profile and filters it by the selected child", async () => {
-    render(<StudentResultsPortal />);
-
-    expect(await screen.findByText("Family learning overview")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Profile" }));
-
-    expect((await screen.findAllByText("STUDENT PROFILE")).length).toBe(2);
-    expect(screen.getByText("Srinagar, Srinagar, Jammu and Kashmir")).toBeTruthy();
-    expect(screen.getByText("9999999999 · parent@example.test")).toBeTruthy();
-    expect(screen.getByText("Class 5 · A · 2026–27")).toBeTruthy();
-
-    fireEvent.change(screen.getByRole("combobox", { name: "Select child" }), {
-      target: { value: "student-b" },
-    });
-
-    await waitFor(() => {
-      expect(screen.getAllByText("Bilal Khan").length).toBeGreaterThan(0);
-      expect(screen.queryByText("Srinagar, Srinagar, Jammu and Kashmir")).toBeNull();
-    });
-  });
-
-  it("renders published notices returned by the authorized portal endpoint", async () => {
+  it("renders school notices returned by the parent communication endpoint", async () => {
     mocks.apiRequest.mockImplementation((path) => Promise.resolve({
+      success: true,
       data: path === "/portal/announcements" ? [{
         _id: "notice-1", title: "Parent meeting", body: "Please attend the meeting on Friday.",
         category: "event", publishedAt: "2026-11-08T09:00:00.000Z",
-        expiresAt: "2026-11-15T09:00:00.000Z",
       }] : [],
     }));
     render(<StudentResultsPortal />);
-    expect(await screen.findByText("Family learning overview")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Notices/ }));
-    expect(await screen.findByText("Parent meeting")).toBeTruthy();
-    expect(screen.getByText("Please attend the meeting on Friday.")).toBeTruthy();
-    expect(mocks.apiRequest).toHaveBeenCalledWith("/portal/announcements", {
-      accessToken: "access-token", signal: expect.any(AbortSignal),
-    });
+    expect(await screen.findByText("Parent meeting")).toBeInTheDocument();
+    expect(screen.getByText("Please attend the meeting on Friday.")).toBeInTheDocument();
   });
 
-  it("renders academic context and subject remarks on a published report card", async () => {
-    mocks.apiRequest.mockImplementation((path) => Promise.resolve({
-      data: path === "/portal/results" ? [{
-        school: { name: "Green Valley School", contactEmail: "office@example.test" },
-        examination: {
-          _id: "exam-a",
-          name: "Mid Term",
-          startDate: "2026-09-01",
-          endDate: "2026-09-10",
-          academicYear: { name: "2026-27" },
-          class: { name: "Class 5" },
-          section: { name: "A" },
-          gradingScale: "School bands 2026",
-        },
-        student: { _id: "student-a", firstName: "Amina", lastName: "Khan", admissionNumber: "A-01" },
-        result: {
-          enrollmentId: "enroll-a",
-          subjects: [{
-            examSubjectId: "subject-a",
-            subject: { name: "Mathematics" },
-            maxMarks: 100,
-            passMarks: 35,
-            marksObtained: 82,
-            percentage: 82,
-            grade: "B",
-            absent: false,
-            status: "passed",
-            remarks: "Good progress",
-          }],
-          totalObtained: 82,
-          totalMaximum: 100,
-          percentage: 82,
-          grade: "B",
-          status: "passed",
-        },
-      }] : [],
-    }));
-
-    render(<StudentResultsPortal />);
-
-    expect(await screen.findByText("Portal overview")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Results" }));
-    expect(await screen.findByText("Mid Term")).toBeTruthy();
-    expect(screen.getByText("Green Valley School")).toBeTruthy();
-    expect(screen.getByText("office@example.test")).toBeTruthy();
-    expect(screen.getByText("2026-27")).toBeTruthy();
-    expect(screen.getByText("Class 5")).toBeTruthy();
-    expect(screen.getByText("A", { selector: "strong" })).toBeTruthy();
-    expect(screen.getByText("Mathematics")).toBeTruthy();
-    expect(screen.getByText("Good progress")).toBeTruthy();
-    expect(screen.getByText("Grading scale: School bands 2026")).toBeTruthy();
-    expect(screen.getAllByText("B")).toHaveLength(2);
-  });
-  it("shows delivered notifications and marks an individual notification read", async () => {
+  it("marks a parent notification as read", async () => {
     mocks.apiRequest.mockImplementation((path) => {
       if (path === "/portal/notifications") return Promise.resolve({
-        data: [{
-          _id: "notification-a", title: "Parent meeting",
-          body: "Please attend the meeting on Friday.",
-          createdAt: "2026-11-09T09:00:00.000Z", readAt: null,
-          relatedStudentIds: ["student-a"],
-        }],
+        success: true,
+        data: [{ _id: "notification-a", title: "Parent meeting", body: "Please attend.", createdAt: "2026-11-09T09:00:00.000Z", readAt: null }],
         unreadCount: 1,
       });
-      if (path === "/portal/notifications/notification-a/read") {
-        return Promise.resolve({ success: true, data: { readAt: "2026-11-09T10:00:00.000Z" } });
-      }
-      if (path === "/portal/notifications/read-all") return Promise.resolve({ success: true, data: { modifiedCount: 0 } });
+      if (path === "/portal/notifications/notification-a/read") return Promise.resolve({ success: true, data: { readAt: "2026-11-09T10:00:00.000Z" } });
       return Promise.resolve({ success: true, data: [] });
     });
-
     render(<StudentResultsPortal />);
-    expect(await screen.findByText("Family learning overview")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Notifications/ }));
-    expect(await screen.findByText("Parent meeting")).toBeTruthy();
-    expect(screen.getByText("1 unread")).toBeTruthy();
+    expect(await screen.findByText("Parent meeting")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Mark as read" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: "Mark as read" })).toBeNull());
     expect(mocks.apiRequest).toHaveBeenCalledWith("/portal/notifications/notification-a/read", {
       method: "PATCH", accessToken: "access-token",
     });
   });
-
-  it("shows teacher marks and feedback on a parent's homework portal", async () => {
-    mocks.apiRequest.mockImplementation((path) => {
-      if (path === "/portal/homework") return Promise.resolve({ data: [{
-        homework: {
-          _id: "homework-reviewed", title: "Fractions worksheet", instructions: "Solve all questions.",
-          dueDate: "2026-11-12", assignedDate: "2026-11-01",
-          subjectId: { name: "Mathematics" }, classId: { name: "Class 5" },
-          teacherId: { firstName: "Ayaan", lastName: "Khan" },
-        },
-        student: { _id: "student-a", firstName: "Amina", lastName: "Khan" },
-      }] });
-      if (path === "/portal/homework-submissions") return Promise.resolve({ data: [{
-        _id: "submission-reviewed", homeworkId: { _id: "homework-reviewed" },
-        studentId: { _id: "student-a" }, answer: "Completed worksheet",
-        status: "reviewed", marksObtained: 9, maxMarks: 10,
-        feedback: "Excellent understanding.", submittedAt: "2026-11-08T10:00:00.000Z",
-      }] });
-      return Promise.resolve({ success: true, data: [] });
-    });
-
-    render(<StudentResultsPortal />);
-    expect(await screen.findByText("Family learning overview")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Homework/ }));
-    expect(await screen.findByText("Fractions worksheet")).toBeTruthy();
-    expect(screen.getByText("Completed worksheet")).toBeTruthy();
-    expect(screen.getByText(/Marks: 9\/10/)).toBeTruthy();
-    expect(screen.getByText(/Excellent understanding/)).toBeTruthy();
-  });
-
- 
-  it("surfaces partial portal failures and retries the failed sections", async () => {
-    let feeCalls = 0;
-    mocks.apiRequest.mockImplementation((path) => {
-      if (path === "/portal/fees") {
-        feeCalls += 1;
-        return feeCalls === 1
-          ? Promise.reject(new Error("Fees service unavailable"))
-          : Promise.resolve({ data: [] });
-      }
-      return Promise.resolve({ data: [] });
-    });
-
-    render(<StudentResultsPortal />);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(/fees/i);
-    fireEvent.click(screen.getByRole("button", { name: "Retry failed sections" }));
-
-    await waitFor(() => {
-      expect(feeCalls).toBe(2);
-      expect(screen.queryByRole("alert")).toBeNull();
-    });
-  });
-
 });
