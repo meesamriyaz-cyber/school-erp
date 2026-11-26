@@ -10,7 +10,7 @@ export async function getStudents({ page = 1, limit = 20, search = "", status = 
 
 export async function getStudentById(studentId) {
   const response = await apiRequest(`/students/${encodeURIComponent(studentId)}`);
-  return response?.data ?? null;
+  return response?.data ? { ...response.data, parentVerification: response.parents ?? [] } : null;
 }
 
 export async function createStudent(body) {
