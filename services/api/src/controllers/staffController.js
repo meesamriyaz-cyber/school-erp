@@ -46,7 +46,7 @@ function parseFields(body, allowed, res, partial = false) {
     fields.joiningDate = date;
   }
   for (const key of ["firstName", "lastName", "employeeCode", "email", "phone", "designation", "department", "qualification"]) {
-    if (typeof fields[key] === "string") fields[key] = fields[key].trim() || (["lastName", "employeeCode", "email", "phone", "department", "qualification"].includes(key) ? null : fields[key]);
+    if (typeof fields[key] === "string") fields[key] = fields[key].trim() || (["employeeCode", "email", "phone", "department", "qualification"].includes(key) ? null : fields[key]);
   }
   if (fields.email) fields.email = fields.email.toLowerCase();
   if (fields.employeeCode) fields.employeeCode = fields.employeeCode.toUpperCase();
@@ -124,7 +124,9 @@ export const createStaff = async (req, res, next) => {
   if (!fields) return;
   try {
     const linkedUser = await validateUserLink(fields.userId, req.tenantId, fields.employeeType);
-    if (linkedUser?.email) fields.email = linkedUser.email;
+    if (linkedUser) {
+      for (const key of ["firstName", "lastName", "email", "phone"]) fields[key] = linkedUser[key] ?? (key === "lastName" ? "" : null);
+    }
     const record = await Staff.create({ ...fields, tenantId: req.tenantId, auditTrail: [{ action: "created", actorUserId: req.auth.userId, changedFields: Object.keys(fields) }] });
     const populated = await Staff.findOne({ _id: record._id, tenantId: req.tenantId }).populate("userId", "firstName lastName email role status").lean();
     return res.status(201).json({ success: true, data: serialize(populated) });
@@ -155,19 +157,26 @@ export const updateStaff = async (req, res, next) => {
       }
       const employeeType = fields.employeeType || current.employeeType;
       const linkedUser = await validateUserLink(current.userId, req.tenantId, employeeType, session, false);
-      if (linkedUser && Object.hasOwn(fields, "email")) {
-        if (!fields.email) {
+      const identityFields = ["firstName", "lastName", "email", "phone"];
+      const accountUpdate = Object.fromEntries(identityFields
+        .filter((key) => Object.hasOwn(fields, key))
+        .map((key) => [key, fields[key]]));
+      if (linkedUser && Object.keys(accountUpdate).length) {
+        if (Object.hasOwn(accountUpdate, "email") && !accountUpdate.email) {
           const error = new Error("A linked staff member must have a valid login email address"); error.code = "STAFF_EMAIL_REQUIRED"; throw error;
         }
+        if (Object.hasOwn(accountUpdate, "lastName") && accountUpdate.lastName == null) accountUpdate.lastName = "";
         const updatedUser = await User.findOneAndUpdate(
           { _id: linkedUser._id, tenantId: req.tenantId },
-          { $set: { email: fields.email } },
+          { $set: accountUpdate },
           { new: true, runValidators: true, session },
-        ).select("_id email").lean();
+        ).select("_id firstName lastName email phone").lean();
         if (!updatedUser) {
           const error = new Error("The linked login account could not be found"); error.code = "STAFF_USER_INVALID"; throw error;
         }
-        fields.email = updatedUser.email;
+        for (const key of identityFields) {
+          if (Object.hasOwn(fields, key)) fields[key] = updatedUser[key] ?? (key === "lastName" ? "" : null);
+        }
       }
       const record = await Staff.findOneAndUpdate(
         { _id: req.params.staffId, tenantId: req.tenantId, employmentStatus: { $ne: "separated" } },
