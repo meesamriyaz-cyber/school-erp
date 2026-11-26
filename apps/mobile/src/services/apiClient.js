@@ -76,6 +76,7 @@ export async function apiRequest(path, options = {}) {
         method,
         headers: {
           Accept: "application/json",
+          "X-Client-Type": "mobile",
           ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
           ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
           ...headers,
