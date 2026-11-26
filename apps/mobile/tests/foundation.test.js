@@ -159,8 +159,8 @@ test('teacher mobile attendance reports support an explicit date range', async (
   const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
   assert.match(workspace, /const \[reportFrom,setReportFrom\]=useState\(""\)/);
   assert.match(workspace, /const \[reportTo,setReportTo\]=useState\(""\)/);
-  assert.match(workspace, /from:reportFrom\|\|/);
-  assert.match(workspace, /to:reportTo\|\|/);
+  assert.match(workspace, /const from=reportFrom\|\|/);
+  assert.match(workspace, /const to=reportTo\|\|/);
   assert.match(workspace, /from>to/);
   assert.match(workspace, /From date \(YYYY-MM-DD\)/);
   assert.match(workspace, /To date \(YYYY-MM-DD\)/);
