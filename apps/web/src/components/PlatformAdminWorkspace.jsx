@@ -108,6 +108,26 @@ export default function PlatformAdminWorkspace() {
     .toUpperCase();
 
   useEffect(() => {
+    if (activePage !== "Overview") return undefined;
+    const controller = new AbortController();
+    setLoadingBusinessOverview(true);
+    setBusinessOverviewError("");
+    apiRequest("/platform/business-overview", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted) setBusinessOverview(response?.data ?? null);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted && error.name !== "AbortError") {
+          setBusinessOverviewError(error.message || "Unable to load business overview.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingBusinessOverview(false);
+      });
+    return () => controller.abort();
+  }, [activePage, accessToken, reloadCount]);
+
+  useEffect(() => {
     if (activePage !== "Schools") return undefined;
 
     const controller = new AbortController();
