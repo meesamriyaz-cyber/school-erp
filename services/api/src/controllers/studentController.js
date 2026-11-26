@@ -149,8 +149,8 @@ export const createStudent = async (req, res, next) => {
       await syncLegacyStudentGuardian(student, { session, actorUserId: req.auth.userId });
       for (const relationship of PARENT_ROLES) await createParentRelationship({ student, parent: parents[relationship], relationship, session });
     });
-    const parentLinks = await StudentGuardian.find({ tenantId: req.tenantId, studentId: student._id, relationship: { $in: PARENT_ROLES } }).select("guardianId relationship").lean();
-    return res.status(201).json({ success: true, data: student, parents: parentLinks.map((link) => ({ guardianId: link.guardianId, relationship: link.relationship, emailVerificationRequired: true })) });
+    const parentLinks = await StudentGuardian.find({ tenantId: req.tenantId, studentId: student._id, relationship: { $in: PARENT_ROLES } }).populate({ path: "guardianId", select: "pendingEmail emailVerifiedAt" }).lean();
+    return res.status(201).json({ success: true, data: student, parents: parentLinks.filter((link) => link.guardianId).map((link) => ({ guardianId: link.guardianId._id, relationship: link.relationship, emailVerificationRequired: Boolean(link.guardianId.pendingEmail) })) });
   } catch (error) { return handleStudentError(error, res, next); }
   finally { if (session) await session.endSession(); }
 };
