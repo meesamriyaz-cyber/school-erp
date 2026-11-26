@@ -58,6 +58,24 @@ describe("TeacherTimetablePortal", () => {
     expect(screen.getByText("Tuesday")).toBeInTheDocument();
     expect(screen.getByText("Lab 2")).toBeInTheDocument();
   });
+  it("uses the shared operational layout for attendance and examination marks", async () => {
+    render(<TeacherTimetablePortal />);
+    fireEvent.click(await screen.findByRole("button", { name: "Mark attendance" }));
+    expect(document.querySelector(".teacher-workspace-content .teacher-attendance")).toBeInTheDocument();
+    expect(document.querySelector(".teacher-workspace-content .teacher-attendance-summary")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Examination marks" }));
+    expect(document.querySelector(".teacher-workspace-content .teacher-exams")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Examination marks" })).toBeInTheDocument();
+  });
+
+  it("uses the shared operational layout for homework and reports", async () => {
+    render(<TeacherTimetablePortal />);
+    fireEvent.click(await screen.findByRole("button", { name: "Homework & classwork" }));
+    expect(document.querySelector(".teacher-workspace-content .homework-page")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reports" }));
+    expect(document.querySelector(".teacher-workspace-content .teacher-reports")).toBeInTheDocument();
+  });
+
   it("opens the parent messaging workspace from teacher navigation", async () => {
     render(<TeacherTimetablePortal />);
     fireEvent.click(await screen.findByRole("button", { name: "Parent messages" }));
