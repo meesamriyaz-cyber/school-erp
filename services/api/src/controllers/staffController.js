@@ -71,7 +71,7 @@ async function validateUserLink(userId, tenantId, employeeType, session = null, 
 }
 
 function handleError(error, res, next) {
-  if (error.code === 11000) return res.status(409).json({ success: false, message: "Employee code or linked user is already used by another staff record in this school" });
+  if (error.code === 11000) return res.status(409).json({ success: false, message: "Email, employee code, or linked account is already in use in this school" });
   if (["STAFF_TEACHER_LINK_REQUIRED", "STAFF_USER_INVALID", "STAFF_USER_ROLE_INVALID"].includes(error.code)) return res.status(400).json({ success: false, message: error.message });
   if (error.name === "ValidationError" || error.name === "CastError") return invalid(res, "One or more staff fields are invalid");
   return next(error);
