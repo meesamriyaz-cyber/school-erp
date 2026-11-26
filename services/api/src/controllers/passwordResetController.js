@@ -124,12 +124,15 @@ export const completePasswordReset = async (req, res, next) => {
     }
     const passwordHash = await hashPassword(newPassword);
     if (challenge.recoveryGuardianId) {
-      const stillLinked = await StudentGuardian.exists({
+      const linkedStudent = await Student.findOne({
+        tenantId: user.tenantId, userId: user._id, status: "active",
+      }).select("_id").lean();
+      const stillLinked = linkedStudent ? await StudentGuardian.exists({
         tenantId: user.tenantId,
         guardianId: challenge.recoveryGuardianId,
-        studentId: await Student.findOne({ tenantId: user.tenantId, userId: user._id, status: "active" }).select("_id").then((item) => item?._id),
+        studentId: linkedStudent._id,
         status: "active", receivesCommunication: true, communicationChannels: "email",
-      });
+      }) : false;
       const guardian = await Guardian.findOne({
         _id: challenge.recoveryGuardianId, tenantId: user.tenantId,
         status: "active", emailVerifiedAt: { $ne: null },
