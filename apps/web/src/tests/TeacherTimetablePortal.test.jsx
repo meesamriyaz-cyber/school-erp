@@ -47,6 +47,15 @@ describe("TeacherTimetablePortal", () => {
     expect(screen.getByText("Tuesday")).toBeInTheDocument();
     expect(screen.getByText("Lab 2")).toBeInTheDocument();
   });
+  it("opens the parent messaging workspace from teacher navigation", async () => {
+    render(<TeacherTimetablePortal />);
+    fireEvent.click(await screen.findByRole("button", { name: "Parent messages" }));
+    expect(await screen.findByRole("heading", { name: "Parent–teacher messages" })).toBeInTheDocument();
+    expect(await screen.findByText("No open conversations yet.")).toBeInTheDocument();
+    expect(apiRequest).toHaveBeenCalledWith("/messaging/conversations", { accessToken: "teacher-token" });
+    expect(apiRequest).toHaveBeenCalledWith("/messaging/contacts", { accessToken: "teacher-token" });
+  });
+
   it("opens the announcements workspace from the teacher navigation", async () => {
     render(<TeacherTimetablePortal />);
     fireEvent.click(await screen.findByRole("button", { name: "Announcements" }));
