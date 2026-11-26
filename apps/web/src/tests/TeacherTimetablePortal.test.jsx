@@ -11,6 +11,14 @@ vi.mock("../context/authContext.js", () => ({
 describe("TeacherTimetablePortal", () => {
   beforeEach(() => { vi.resetAllMocks(); apiRequest.mockResolvedValue({ success: true, data: [] }); });
 
+  it("keeps teacher navigation and workspace content inside the shared page layout", async () => {
+    render(<TeacherTimetablePortal />);
+    expect(await screen.findByRole("navigation", { name: "Teacher workspace" })).toBeInTheDocument();
+    expect(document.querySelector(".teacher-workspace-content")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Examination marks" })).toBeInTheDocument();
+    expect(screen.queryByText("\\n")).not.toBeInTheDocument();
+  });
+
   it("shows the teacher weekly schedule returned by the scoped timetable API", async () => {
     apiRequest.mockResolvedValueOnce({ success: true, data: [{
       _id: "period-1", dayOfWeek: 1, periodNumber: 1, startTime: "09:00", endTime: "09:45", room: "Room 4",
