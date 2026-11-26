@@ -93,11 +93,14 @@ export default function AppHomeScreen() {
 
   const isTeacher = user?.role === "teacher";
   const isLearnerAccount = user?.role === "student" || user?.role === "parent";
+  const isSchoolAdministrator = ["school_admin", "principal"].includes(user?.role);
+  const isPlatformAdministrator = user?.role === "platform_admin";
+  const hasMobileWorkspace = isTeacher || isLearnerAccount || isSchoolAdministrator;
   const visibleTabs = isLearnerAccount ? tabs.filter(tab => ["home", "more"].includes(tab.key)) : isTeacher ? [
     ...tabs.filter(tab => ["home", "timetable"].includes(tab.key)),
     { key: "teacher", label: "Teaching", icon: "✎" },
     ...tabs.filter(tab => tab.key === "more"),
-  ] : tabs;
+  ] : isSchoolAdministrator ? tabs : tabs.filter(tab => tab.key === "more");
 
   const loadTeacherHome = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
@@ -145,8 +148,8 @@ export default function AppHomeScreen() {
     if (activeTab !== "home") return;
     if (isTeacher) loadTeacherHome(true);
     else if (isLearnerAccount) loadPortalHome(true);
-    else loadDashboard(true);
-  }, [activeTab, isTeacher, isLearnerAccount, loadDashboard, loadTeacherHome, loadPortalHome]);
+    else if (isSchoolAdministrator) loadDashboard(true);
+  }, [activeTab, isTeacher, isLearnerAccount, isSchoolAdministrator, loadDashboard, loadTeacherHome, loadPortalHome]);
 
   const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || (isLearnerAccount ? "Student" : "Administrator");
   const role = (user?.role || "school user").replaceAll("_", " ");
@@ -155,6 +158,37 @@ export default function AppHomeScreen() {
     ? (teacherYearNames.length === 1 ? teacherYearNames[0] : teacherYearNames.length > 1 ? "Multiple academic years" : "Academic year not available")
     : report?.academicYear?.name || "Academic year not set";
   const onHome = () => setActiveTab("home");
+
+  if (!hasMobileWorkspace) {
+    const unavailableTitle = isPlatformAdministrator
+      ? "Platform admin workspace"
+      : user?.role === "accountant"
+        ? "Accounts module not enabled"
+        : user?.role === "transport_manager"
+          ? "Transport module not enabled"
+          : "Workspace not available";
+    const unavailableDescription = isPlatformAdministrator
+      ? "Platform administration is kept separate from school administration and is currently available on the web workspace."
+      : user?.role === "accountant"
+        ? "Advanced Accounts is an optional module. This mobile account does not currently have an enabled Accounts workspace. Core school fee collection remains available to school administrators."
+        : user?.role === "transport_manager"
+          ? "Transport is an optional module and no Transport workspace is currently enabled for this school account."
+          : "A dedicated workspace for this role is not currently available in the mobile app. Your account has not been given the school administrator workspace.";
+    return <AppScreen style={styles.screen} edges={["top", "bottom"]}>
+      <View style={styles.topHeader}>
+        <View style={styles.brand}>
+          <View style={styles.brandMark}><Text style={styles.brandMarkText}>SE</Text></View>
+          <View><Text style={styles.brandName}>SCHOOL ERP</Text><Text style={styles.brandCaption}>ACCOUNT WORKSPACE</Text></View>
+        </View>
+      </View>
+      <View style={styles.scrollContent}>
+        <ComingSoon title={unavailableTitle} description={unavailableDescription} onHome={signOut}/>
+        <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+          <Text style={styles.signOutText}>Sign out</Text><Text style={styles.signOutArrow}>→</Text>
+        </TouchableOpacity>
+      </View>
+    </AppScreen>;
+  }
 
   return <AppScreen style={styles.screen} edges={["top", "bottom"]}>
     <View style={styles.topHeader}>

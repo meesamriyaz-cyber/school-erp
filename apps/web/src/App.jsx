@@ -57,7 +57,6 @@ const navigation = [
   { label: "Grading Scales", icon: "▧", section: "ACADEMICS" },
   { label: "Homework & Classwork", icon: "✎", section: "ACADEMICS" },
   { label: "Fees & Payments", icon: "₹", section: "FINANCE" },
-  { label: "Reports", icon: "▥", section: "FINANCE" },
   { label: "User Management", icon: "♙", section: "SYSTEM" },
 ];
 
@@ -123,8 +122,13 @@ function DashboardApp() {
       <div className="auth-brand-mark">S</div>
       <h1>Workspace unavailable</h1>
       <p>
-        Your account does not currently have access to the
-        school administration workspace.
+        {user?.role === "accountant"
+          ? "The advanced Accounts workspace is a separately enabled module and is not currently available for this school account. Core fee collection remains part of the school workspace."
+          : user?.role === "transport_manager"
+            ? "The Transport workspace is a separately enabled module and is not currently available for this school account."
+            : user?.role === "librarian"
+              ? "A dedicated librarian workspace is not currently available for this account."
+              : "Your account does not currently have access to the school administration workspace."}
       </p>
       <button
         className="logout-button"
