@@ -4,6 +4,7 @@ import User from "../models/User.js";
 import Session from "../models/Session.js";
 import TeacherAssignment from "../models/TeacherAssignment.js";
 import TimetableEntry from "../models/TimetableEntry.js";
+import { writeUserAudit } from "../services/auditLogService.js";
 
 const CREATE_FIELDS = ["userId", "employeeCode", "firstName", "lastName", "email", "phone", "employeeType", "designation", "department", "employmentType", "joiningDate", "qualification", "experienceYears"];
 const UPDATE_FIELDS = CREATE_FIELDS.filter((field) => field !== "userId");
@@ -174,6 +175,15 @@ export const updateStaff = async (req, res, next) => {
         if (!updatedUser) {
           const error = new Error("The linked login account could not be found"); error.code = "STAFF_USER_INVALID"; throw error;
         }
+        await writeUserAudit({
+          actorUserId: req.auth.userId,
+          actorRole: req.auth.role,
+          tenantId: req.tenantId,
+          targetUserId: updatedUser._id,
+          targetTenantId: req.tenantId,
+          action: "USER_PROFILE_UPDATED",
+          changedFields: Object.keys(accountUpdate),
+        }, { session });
         for (const key of identityFields) {
           if (Object.hasOwn(fields, key)) fields[key] = updatedUser[key] ?? (key === "lastName" ? "" : null);
         }
