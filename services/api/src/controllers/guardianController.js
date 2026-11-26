@@ -153,7 +153,7 @@ export const updateGuardian = async (req, res, next) => {
       const nextEmail = updates.email;
       delete updates.email;
       if (nextEmail !== null && nextEmail !== "") {
-        if (typeof nextEmail !== "string" || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(nextEmail.trim())) return invalid(res, "Enter a valid guardian email address");
+        if (typeof nextEmail !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail.trim())) return invalid(res, "Enter a valid guardian email address");
         updates.pendingEmail = nextEmail.trim().toLowerCase();
         updates.emailDeliveryEmailId = null;
         updates.emailDeliveryStatus = null;
