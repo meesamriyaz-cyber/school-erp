@@ -54,9 +54,26 @@ export default function GuardianCommunicationPanel({ studentId, accessToken }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(controller.signal);
+    apiRequest(
+      `/guardian-communications/students/${encodeURIComponent(studentId)}`,
+      { accessToken, signal: controller.signal },
+    ).then((response) => {
+      if (controller.signal.aborted) return;
+      if (!response?.success) throw new Error(response?.message || "Unable to load guardian communication.");
+      setContacts(Array.isArray(response.data) ? response.data : []);
+      setHistory(Array.isArray(response.history) ? response.history : []);
+      setSelected((current) => current.filter((id) => (response.data || []).some(
+        (item) => String(item.guardian?._id) === id && item.receivesCommunication,
+      )));
+    }).catch((requestError) => {
+      if (requestError.name !== "AbortError" && !controller.signal.aborted) {
+        setError(requestError.message || "Unable to load guardian communication.");
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
     return () => controller.abort();
-  }, [load]);
+  }, [studentId, accessToken]);
 
   const toggleGuardian = (id) => {
     setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
