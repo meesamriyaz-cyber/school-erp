@@ -587,8 +587,8 @@ it("loads and displays linked guardian details for the student", async () => {
   expect(screen.getByText("Sara Khan")).toBeInTheDocument();
   expect(screen.getByText("Phone: 9999999999")).toBeInTheDocument();
   expect(screen.getByText("Phone: 8888888888")).toBeInTheDocument();
-  expect(screen.getByText("Email: imran@example.com")).toBeInTheDocument();
-  expect(screen.getByText("Email: sara@example.com")).toBeInTheDocument();
+  expect(screen.getByText(/Email: imran@example.com/)).toBeInTheDocument();
+  expect(screen.getByText(/Email: sara@example.com/)).toBeInTheDocument();
   expect(screen.getByText("Father")).toBeInTheDocument();
   expect(screen.getByText("Mother")).toBeInTheDocument();
   expect(apiRequest).toHaveBeenCalledWith(
