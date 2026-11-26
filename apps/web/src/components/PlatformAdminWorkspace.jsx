@@ -136,7 +136,6 @@ export default function PlatformAdminWorkspace() {
         .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
         .catch((error) => { if (!controller.signal.aborted) setPlansError(error.message || "Unable to load subscription plans."); });
     } else {
-      setSchoolSubscriptionError("");
       apiRequest("/platform/subscription-plans", { accessToken, signal: controller.signal })
         .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
         .catch(() => {});
@@ -714,6 +713,8 @@ export default function PlatformAdminWorkspace() {
   const openSchoolDetails = (school) => {
     setSelectedSchoolId(school.id || school._id);
     setSchoolDetails(null);
+    setSchoolSubscription(null);
+    setSchoolSubscriptionError("");
     setActivePage("SchoolDetails");
   };
 
