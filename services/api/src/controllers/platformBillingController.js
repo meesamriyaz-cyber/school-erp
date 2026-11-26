@@ -90,7 +90,6 @@ export async function assignSchoolSubscription(req, res, next) {
     const invoiceNumber = `PS-${now.getTime()}-${String(school._id).slice(-6)}`;
     let subscription, invoice;
     await session.withTransaction(async () => {
-      await SchoolSubscription.updateMany({ tenantId: school._id, status: { $in: ["pending", "active", "past_due"] } }, { $set: { status: "cancelled", cancelledAt: now } }, { session });
       [subscription] = await SchoolSubscription.create([{
         tenantId: school._id, planId: plan._id, planName: plan.name, billingInterval: plan.billingInterval,
         amount: charge, currency: plan.currency, annualDiscountPercent: Number(plan.annualDiscountPercent || 0),
@@ -148,6 +147,7 @@ export async function recordPlatformPayment(req, res, next) {
       if (invoice.subscriptionId && invoice.status === "paid") {
         const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: "pending" }).session(session);
         if (subscription) {
+          await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
           subscription.status = "active";
           await subscription.save({ session });
           await Tenant.updateOne({ _id: invoice.tenantId, status: "pending" }, { $set: { status: "active" } }, { session });
