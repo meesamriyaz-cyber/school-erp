@@ -88,3 +88,89 @@
 .teacher-workspace-notice{color:#166534}
 
 .teacher-overview{max-width:1100px;margin:0 auto}.teacher-overview-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.teacher-overview-cards article{display:flex;flex-direction:column;gap:5px;padding:18px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}.teacher-overview-cards strong{font-size:26px;color:#243b75}.teacher-overview-cards span{font-size:12px;color:#64748b;font-weight:650}.teacher-overview-schedule{margin-top:18px;padding:20px;border:1px solid #e2e8f0;border-radius:12px;background:#fff}.teacher-overview-schedule h2{margin:0 0 5px;font-size:19px}.teacher-overview-schedule>p{color:#64748b}.teacher-overview-schedule article{display:grid;grid-template-columns:150px 1fr auto;gap:14px;align-items:center;padding:13px 0;border-top:1px solid #e2e8f0}.teacher-overview-schedule article span,.teacher-overview-schedule article small{color:#64748b}.teacher-overview-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}.teacher-overview-actions button{border:1px solid #d8dfeb;border-radius:8px;padding:10px 14px;background:#fff;color:#3154d8;font-weight:700;cursor:pointer}@media(max-width:700px){.teacher-overview-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.teacher-overview-schedule article{grid-template-columns:1fr;gap:4px}}
+
+
+/* Shared teacher-workspace visual system */
+.teacher-timetable-page {
+  --teacher-ink: #202c42;
+  --teacher-muted: #778196;
+  --teacher-border: #e7ebf2;
+  --teacher-primary: #4263eb;
+  --teacher-primary-soft: #edf1ff;
+  --teacher-surface: #fff;
+  --teacher-radius: 13px;
+  color: var(--teacher-ink);
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+}
+.teacher-timetable-header { align-items: center; margin-bottom: 22px; }
+.teacher-timetable-header > div > span { color: #8592a8; font-size: 10px; letter-spacing: 1.5px; }
+.teacher-timetable-header h1 { color: #202c42; font: 800 clamp(24px, 2.2vw, 30px) "Plus Jakarta Sans", sans-serif; letter-spacing: -.8px; }
+.teacher-timetable-header p { margin: 0; color: #8b96a9; font-size: 13px; }
+.teacher-timetable-header > button { min-height: 40px; border-color: var(--teacher-border); border-radius: 9px; color: #46546d; font-size: 12px; }
+.teacher-timetable-welcome { margin-top: 0; margin-bottom: 18px; color: #526078; font-size: 13px; }
+.teacher-workspace-tabs { border-color: var(--teacher-border); margin-bottom: 24px; }
+.teacher-workspace-tabs button { min-height: 44px; color: #738096; font-size: 12px; transition: color .15s ease, background .15s ease; }
+.teacher-workspace-tabs button.active { color: var(--teacher-primary); border-bottom-color: var(--teacher-primary); font-weight: 750; }
+.teacher-workspace-content { display: grid; gap: 18px; }
+.teacher-workspace-content h2 { color: #28364d; font-family: "Plus Jakarta Sans", sans-serif; font-size: 17px; font-weight: 800; letter-spacing: -.25px; }
+.teacher-workspace-content h3 { color: #34415a; font-family: "Plus Jakarta Sans", sans-serif; font-size: 14px; font-weight: 750; }
+.teacher-workspace-content p { line-height: 1.6; }
+.teacher-workspace-content :is(input, select, textarea) {
+  min-height: 40px; border: 1px solid #e0e6ef; border-radius: 8px;
+  background: #fff; color: #34415a; font: inherit; font-size: 13px;
+  box-shadow: none; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.teacher-workspace-content :is(input, select, textarea):focus {
+  border-color: #9aacf8; outline: 0; box-shadow: 0 0 0 3px #4263eb18;
+}
+.teacher-workspace-content :is(button) { font-family: "DM Sans", "Segoe UI", sans-serif; transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.teacher-workspace-content :is(.teacher-attendance, .teacher-roster, .teacher-reports, .homework-card, .announcement-form, .announcement-toolbar, .announcement-card, .messaging-contacts, .messaging-list, .messaging-thread, .messaging-oversight-table) {
+  border-color: var(--teacher-border); border-radius: var(--teacher-radius); box-shadow: 0 2px 8px #1d315408;
+}
+.teacher-workspace-content :is(.teacher-roster, .teacher-reports) { max-width: none; padding: 20px; }
+.teacher-workspace-content :is(.teacher-attendance-heading, .homework-intro, .announcement-intro, .messaging-heading) { align-items: center; }
+.teacher-workspace-content :is(.teacher-attendance-heading p, .teacher-roster header p, .teacher-reports header p, .homework-intro p, .announcement-intro p, .messaging-heading p) { color: #8490a3; font-size: 12px; }
+.teacher-workspace-content :is(.teacher-attendance-summary div, .teacher-report-summary article, .teacher-timetable-summary article, .teacher-overview-cards article) {
+  border: 1px solid var(--teacher-border); border-radius: 11px; background: #fff; box-shadow: 0 2px 5px #1d315405;
+}
+.teacher-workspace-content :is(.teacher-attendance-summary strong, .teacher-report-summary strong, .teacher-timetable-summary strong, .teacher-overview-cards strong) {
+  color: #25334a; font-family: "Plus Jakarta Sans", sans-serif; font-weight: 800;
+}
+.teacher-workspace-content :is(.teacher-attendance-summary span, .teacher-report-summary span, .teacher-timetable-summary span, .teacher-overview-cards span) { color: #8490a3; font-size: 11px; }
+.teacher-workspace-content :is(.teacher-attendance-table-wrap, .teacher-roster-table-wrap, .teacher-report-table, .teacher-report-table table, .teacher-attendance-table-wrap table) { border-color: var(--teacher-border); }
+.teacher-workspace-content :is(.teacher-attendance-table-wrap th, .teacher-roster th, .teacher-report-table th, .messaging-oversight-table th) {
+  background: #f8f9fc; color: #78859b; font-size: 10px; font-weight: 750; letter-spacing: .04em;
+}
+.teacher-workspace-content :is(.teacher-attendance-table-wrap td, .teacher-roster td, .teacher-report-table td, .messaging-oversight-table td) { color: #43516a; }
+.teacher-workspace-content :is(.teacher-attendance-heading > button, .teacher-report-filters button, .homework-primary, .announcement-primary, .messaging-heading button, .messaging-contact-card button, .messaging-reply button, .messaging-thread > header button) {
+  min-height: 40px; border: 1px solid var(--teacher-primary); border-radius: 8px;
+  background: var(--teacher-primary); color: #fff; padding: 9px 14px;
+  font-size: 12px; font-weight: 750; box-shadow: 0 2px 5px #4263eb20;
+}
+.teacher-workspace-content :is(.teacher-attendance-bulk button, .teacher-timetable-view-toggle button, .announcement-secondary, .homework-item footer button) {
+  min-height: 38px; border: 1px solid var(--teacher-border); border-radius: 8px;
+  background: #fff; color: #526078; padding: 8px 12px; font-size: 12px; font-weight: 700;
+}
+.teacher-workspace-content :is(.teacher-attendance-bulk button:hover, .teacher-timetable-view-toggle button:hover, .announcement-secondary:hover, .homework-item footer button:hover) {
+  border-color: #c6d0fb; background: var(--teacher-primary-soft); color: #3154d8;
+}
+.teacher-workspace-content :is(.teacher-timetable-empty, .teacher-roster, .teacher-reports, .homework-empty, .announcement-empty) { color: #8490a3; }
+.teacher-workspace-content .teacher-timetable-period { border-color: var(--teacher-border); border-radius: 11px; box-shadow: 0 2px 7px #1d315406; }
+.teacher-workspace-content .teacher-timetable-period-main h3 { color: #34415a; }
+.teacher-workspace-content .teacher-timetable-period-time span,
+.teacher-workspace-content .teacher-timetable-room { color: #8490a3; }
+.teacher-workspace-content .teacher-overview-schedule,
+.teacher-workspace-content .teacher-overview-cards { min-width: 0; }
+@media (max-width: 760px) {
+  .teacher-timetable-page { padding: 22px 16px 36px; }
+  .teacher-timetable-header { align-items: flex-start; }
+  .teacher-workspace-content { gap: 14px; }
+  .teacher-workspace-content :is(.teacher-roster, .teacher-reports) { padding: 15px; }
+}
+@media (max-width: 520px) {
+  .teacher-timetable-header { gap: 12px; }
+  .teacher-timetable-header h1 { font-size: 24px; }
+  .teacher-timetable-header > button { padding: 8px 10px; }
+  .teacher-workspace-tabs { gap: 2px; }
+  .teacher-workspace-tabs button { padding: 10px 12px; }
+}
