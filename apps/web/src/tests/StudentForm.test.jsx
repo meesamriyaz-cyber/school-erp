@@ -27,7 +27,7 @@ describe("StudentForm", () => {
     render(<StudentForm onClose={onClose} onCreated={onCreated} />);
     expect(screen.getByRole("dialog", { name: "Add student" })).toBeInTheDocument();
     expect(screen.getByLabelText(/Admission number/i)).toBeRequired();
-    expect(screen.getByLabelText(/First name/i)).toBeRequired();
+    expect(screen.getByLabelText("Student first name *")).toBeRequired();
     expect(screen.getByLabelText(/Primary guardian name/i)).toBeRequired();
     expect(await screen.findByLabelText("Academic year *")).toHaveValue("year-1");
     expect(await screen.findByLabelText("Class *")).toHaveValue("class-1");
@@ -47,7 +47,7 @@ describe("StudentForm", () => {
     });
     render(<StudentForm onClose={onClose} onCreated={onCreated} />);
     await user.type(screen.getByLabelText(/Admission number/i), " ADM-101 ");
-    await user.type(screen.getByLabelText(/First name/i), " Ayaan ");
+    await user.type(screen.getByLabelText("Student first name *"), " Ayaan ");
     await user.type(screen.getByLabelText(/Primary guardian name/i), " Imran Khan ");
     await user.click(await screen.findByRole("button", { name: "Save student & placement" }));
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith(student));
@@ -79,7 +79,7 @@ describe("StudentForm", () => {
     });
     render(<StudentForm onClose={onClose} onCreated={onCreated} />);
     await user.type(screen.getByLabelText(/Admission number/i), "ADM-202");
-    await user.type(screen.getByLabelText(/First name/i), "Sara");
+    await user.type(screen.getByLabelText("Student first name *"), "Sara");
     await user.type(screen.getByLabelText(/Primary guardian name/i), "Imran Khan");
     await user.click(await screen.findByRole("button", { name: "Save student & placement" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Section capacity reached");
