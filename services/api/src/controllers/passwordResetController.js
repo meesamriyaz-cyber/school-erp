@@ -80,7 +80,7 @@ export const requestPasswordReset = async (req, res, next) => {
     await PasswordReset.create({
       userId: user._id, tenantId: user.tenantId ?? null,
       codeHash: hashCode(code, salt), codeSalt: salt,
-      destination: recoveryEmail, sentAt,
+      destination: recoveryEmail, recoveryGuardianId: guardianId, sentAt,
       expiresAt: new Date(sentAt.getTime() + CODE_TTL_MS),
     });
     try {
@@ -123,14 +123,36 @@ export const completePasswordReset = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Invalid or expired password reset code" });
     }
     const passwordHash = await hashPassword(newPassword);
+    if (challenge.recoveryGuardianId) {
+      const stillLinked = await StudentGuardian.exists({
+        tenantId: user.tenantId,
+        guardianId: challenge.recoveryGuardianId,
+        studentId: await Student.findOne({ tenantId: user.tenantId, userId: user._id, status: "active" }).select("_id").then((item) => item?._id),
+        status: "active", receivesCommunication: true, communicationChannels: "email",
+      });
+      const guardian = await Guardian.findOne({
+        _id: challenge.recoveryGuardianId, tenantId: user.tenantId,
+        status: "active", emailVerifiedAt: { $ne: null },
+      }).select("_id email verifiedEmail").lean();
+      const currentEmail = String(guardian?.verifiedEmail || guardian?.email || "").trim().toLowerCase();
+      if (!stillLinked || !guardian || currentEmail !== challenge.destination) {
+        challenge.consumedAt = new Date();
+        await challenge.save();
+        return res.status(400).json({ success: false, message: "Invalid or expired password reset code" });
+      }
+    }
+    const consumedAt = new Date();
+    const claimed = await PasswordReset.updateOne(
+      { _id: challenge._id, consumedAt: null, expiresAt: { $gt: consumedAt }, attempts: { $lt: MAX_ATTEMPTS } },
+      { $set: { consumedAt } },
+    );
+    if (!claimed.modifiedCount) return res.status(400).json({ success: false, message: "Invalid or expired password reset code" });
     const updated = await User.findOneAndUpdate(
       { _id: user._id, tenantId: user.tenantId ?? null, status: "active" },
       { $set: { passwordHash }, $inc: { authVersion: 1 } },
       { new: true },
     ).select("_id");
     if (!updated) return res.status(400).json({ success: false, message: "Unable to reset password for this account" });
-    challenge.consumedAt = new Date();
-    await challenge.save();
     await PasswordReset.updateMany({ userId: user._id, _id: { $ne: challenge._id }, consumedAt: null }, { $set: { consumedAt: new Date() } });
     await revokeAllUserSessions(String(user._id));
     return res.status(200).json({ success: true, message: "Password reset successfully. Please sign in with your new password." });
