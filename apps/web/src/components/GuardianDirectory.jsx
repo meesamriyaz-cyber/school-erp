@@ -47,6 +47,7 @@ export default function GuardianDirectory() {
   const [mutationError, setMutationError] = useState("");
   const [mutationNotice, setMutationNotice] = useState("");
   const [confirmStatusChange, setConfirmStatusChange] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -131,7 +132,8 @@ export default function GuardianDirectory() {
       firstName: selectedGuardian.firstName || "",
       lastName: selectedGuardian.lastName || "",
       phone: selectedGuardian.phone || "",
-      email: selectedGuardian.email || "",
+      email: selectedGuardian.pendingEmail || selectedGuardian.email || "",
+      photoUrl: selectedGuardian.photoUrl || "",
     });
     setMutationError("");
     setMutationNotice("");
@@ -146,6 +148,7 @@ export default function GuardianDirectory() {
       lastName: editForm.lastName.trim(),
       phone: editForm.phone.trim() || null,
       email: editForm.email.trim() || null,
+      photoUrl: editForm.photoUrl.trim() || null,
     };
     if (!payload.firstName) {
       setMutationError("Guardian first name is required.");
@@ -155,8 +158,12 @@ export default function GuardianDirectory() {
       setMutationError("Names must not exceed 80 characters.");
       return;
     }
-    if ((payload.phone || "").length > 20) {
-      setMutationError("Phone must not exceed 20 characters.");
+    if (payload.phone && !/^[0-9]{10}$/.test(payload.phone)) {
+      setMutationError("Phone must contain exactly 10 digits (0-9).");
+      return;
+    }
+    if ((payload.photoUrl || "") && (!/^https:\/\//i.test(payload.photoUrl) || payload.photoUrl.length > 2048)) {
+      setMutationError("Photo URL must be a valid HTTPS URL (maximum 2048 characters).");
       return;
     }
     if ((payload.email || "").length > 254 ||
@@ -190,6 +197,32 @@ export default function GuardianDirectory() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const sendVerificationCode = async () => {
+    if (!selectedGuardian) return;
+    const email = selectedGuardian.pendingEmail || selectedGuardian.email;
+    if (!email) { setMutationError("Save a parent email address before requesting verification."); return; }
+    setSaving(true); setMutationError(""); setMutationNotice("");
+    try {
+      await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}/email-verification/send`, { method: "POST", accessToken, body: { email } });
+      setMutationNotice(`A six-digit verification code was sent to ${email}.`);
+    } catch (requestError) { setMutationError(requestError.message || "Could not send verification email."); }
+    finally { setSaving(false); }
+  };
+
+  const verifyEmailCode = async () => {
+    if (!selectedGuardian || !/^\\d{6}$/.test(verificationCode.trim())) { setMutationError("Enter the six-digit code sent by email."); return; }
+    setSaving(true); setMutationError(""); setMutationNotice("");
+    try {
+      const response = await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}/email-verification/verify`, { method: "POST", accessToken, body: { code: verificationCode.trim() } });
+      if (!response?.success) throw new Error(response?.message || "Email verification failed.");
+      setSelectedGuardian((current) => ({ ...current, email: response.data.email, verifiedEmail: response.data.email, pendingEmail: null, emailVerifiedAt: response.data.emailVerifiedAt }));
+      setVerificationCode("");
+      setMutationNotice("Parent email address verified successfully.");
+      setRefreshKey((current) => current + 1);
+    } catch (requestError) { setMutationError(requestError.message || "Email verification failed."); }
+    finally { setSaving(false); }
   };
 
   const changeGuardianStatus = async () => {
@@ -393,11 +426,14 @@ export default function GuardianDirectory() {
                         </label>
                         <label>
                           Phone
-                          <input type="tel" value={editForm.phone} onChange={(event) => setEditForm((current) => ({ ...current, phone: event.target.value }))} maxLength={20} />
+                          <input type="tel" inputMode="numeric" pattern="[0-9]{10}" value={editForm.phone} onChange={(event) => setEditForm((current) => ({ ...current, phone: event.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))} maxLength={10} />
                         </label>
                         <label>
                           Email
                           <input type="email" value={editForm.email} onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))} maxLength={254} />
+                        </label>
+                        <label className="guardian-directory-edit-full">Parent photo URL (HTTPS)
+                          <input type="url" value={editForm.photoUrl} onChange={(event) => setEditForm((current) => ({ ...current, photoUrl: event.target.value }))} maxLength={2048} placeholder="https://…" />
                         </label>
                       </div>
                       <div className="guardian-directory-edit-actions">
@@ -409,7 +445,17 @@ export default function GuardianDirectory() {
                   {!editing && <div className="guardian-directory-contact">
                     <span><strong>Phone:</strong> {selectedGuardian.phone || "—"}</span>
                     <span><strong>Email:</strong> {selectedGuardian.email || "—"}</span>
+                    <span><strong>Pending email:</strong> {selectedGuardian.pendingEmail || "—"}</span>
+                    <span><strong>Email verification:</strong> {selectedGuardian.emailVerifiedAt && selectedGuardian.verifiedEmail === selectedGuardian.email ? "Verified" : "Not verified"}</span>
+                    <span><strong>Phone verification:</strong> Not performed (contact number only)</span>
                     <span><strong>Status:</strong> <GuardianStatus status={selectedGuardian.status} /></span>
+                    {selectedGuardian.photoUrl ? <img src={selectedGuardian.photoUrl} alt={`${fullName(selectedGuardian)} profile`} className="guardian-directory-photo" /> : null}
+                    {canManage && <div className="guardian-directory-verify-actions">
+                      <button type="button" onClick={sendVerificationCode} disabled={saving || !(selectedGuardian.pendingEmail || selectedGuardian.email)}>Send email OTP</button>
+                      <label>6-digit email code <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={(event) => setVerificationCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))} /></label>
+                      <button type="button" onClick={verifyEmailCode} disabled={saving || verificationCode.length !== 6}>Verify email</button>
+                    </div>}
+                  </div>
                   </div>}
                   {canLinkPortal && !editing && (
                     <div className="guardian-directory-portal-link">
