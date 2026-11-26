@@ -155,6 +155,17 @@ test('teacher mobile retry actions reload the currently selected teaching workfl
   assert.match(timetable, /getTimetable\(params\)/);
 });
 
+test('teacher mobile attendance reports support an explicit date range', async () => {
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /const \[reportFrom,setReportFrom\]=useState\(""\)/);
+  assert.match(workspace, /const \[reportTo,setReportTo\]=useState\(""\)/);
+  assert.match(workspace, /from:reportFrom\|\|/);
+  assert.match(workspace, /to:reportTo\|\|/);
+  assert.match(workspace, /from>to/);
+  assert.match(workspace, /From date \(YYYY-MM-DD\)/);
+  assert.match(workspace, /To date \(YYYY-MM-DD\)/);
+});
+
 test('teacher mobile workspace preserves separate subject assignments within the same class', async () => {
   const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
   assert.match(workspace, /id\(a\.subjectId\)\|\|"all"/);
