@@ -79,7 +79,7 @@ export function TeacherAnnouncementsScreen() {
     {form?<View style={s.panel}>
       <Text style={s.panelTitle}>Create announcement draft</Text>
       <Text style={s.label}>Assigned class / section</Text>
-      <View style={s.assignmentList}>{assignments.map(item=><TouchableOpacity key={item._id} onPress={()=>setSelectedAssignment(item._id)} style={[s.assignment,s.assignmentActive&&s.assignmentActive]}><Text style={s.assignmentText}>{assignmentLabel(item)}</Text><Text style={s.radio}>{selected?._id===item._id?"●":"○"}</Text></TouchableOpacity>)}</View>
+      <View style={s.assignmentList}>{assignments.map(item=><TouchableOpacity key={item._id} onPress={()=>setSelectedAssignment(item._id)} style={[s.assignment,selected?._id===item._id&&s.assignmentActive]}><Text style={s.assignmentText}>{assignmentLabel(item)}</Text><Text style={s.radio}>{selected?._id===item._id?"●":"○"}</Text></TouchableOpacity>)}</View>
       <Text style={s.label}>Title</Text><TextInput value={title} onChangeText={setTitle} maxLength={160} style={s.input} placeholder="Announcement title"/>
       <Text style={s.label}>Message</Text><TextInput value={body} onChangeText={setBody} multiline maxLength={10000} style={[s.input,s.multiline]} placeholder="Write the notice for your class or section"/>
       <Text style={s.label}>Category</Text><View style={s.chips}>{categories.map(([value,label])=><TouchableOpacity key={value} onPress={()=>setCategory(value)} style={[s.chip,category===value&&s.chipActive]}><Text style={[s.chipText,category===value&&s.chipTextActive]}>{label}</Text></TouchableOpacity>)}</View>
