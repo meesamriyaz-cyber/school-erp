@@ -182,7 +182,7 @@ export function StudentWorkspaceScreen({ user }) {
       <View style={styles.familyPhotos}>
         {[{ key: "student", label: "Student", name: [student?.firstName, student?.lastName].filter(Boolean).join(" "), photoUrl: student?.photoUrl }, ...["father", "mother"].map((relationship) => {
           const parent = (profile?.parents || []).find((item) => item.relationship === relationship);
-          return { key: relationship, label: relationship === "father" ? "Father" : "Mother", name: parent?.name || "Details not added", photoUrl: parent?.photoUrl, phone: parent?.phone, phoneVerified: parent?.phoneVerified };
+          return { key: relationship, label: relationship === "father" ? "Father" : "Mother", name: parent?.name || "Details not added", photoUrl: parent?.photoUrl, phone: parent?.phone, email: parent?.email, emailVerified: parent?.emailVerified };
         })].map((person) => <View key={person.key} style={styles.familyPerson}>
           <View style={styles.avatarCircle}>{person.photoUrl ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage}/> : <Text style={styles.avatarInitial}>{person.key === "student" ? "S" : person.key === "father" ? "F" : "M"}</Text>}</View>
           <Text style={styles.familyLabel}>{person.label}</Text>
@@ -194,7 +194,8 @@ export function StudentWorkspaceScreen({ user }) {
         const label = relationship === "father" ? "Father" : "Mother";
         return <View key={relationship} style={styles.parentContact}>
           <DataRow title={label} subtitle={parent?.name || "Details not added by school"}/>
-          <DataRow title={label + " contact"} subtitle={parent?.phone ? parent.phone + (parent.phoneVerified ? " · Verified" : " · Not verified") : "Not provided"}/>
+          <DataRow title={label + " phone"} subtitle={parent?.phone || "Not provided"}/>
+          <DataRow title={label + " email"} subtitle={parent?.email ? parent.email + (parent.emailVerified ? " · Email verified" : " · Email not verified") : "Not provided"}/>
         </View>;
       })}
       <DataRow title="Full name" subtitle={[student?.firstName, student?.lastName].filter(Boolean).join(" ") || "Not available"}/>
