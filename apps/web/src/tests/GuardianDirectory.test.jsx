@@ -123,6 +123,7 @@ describe("GuardianDirectory", () => {
         lastName: "Khan",
         phone: "7777777777",
         email: "nadia@example.com",
+        photoUrl: null,
       },
     });
   });
