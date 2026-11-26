@@ -8,6 +8,11 @@ import { apiRequest } from "../lib/api.js";
 vi.mock("../context/authContext.js", () => ({ useAuth: vi.fn() }));
 vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
 
+const businessOverview = {
+  success: true,
+  data: { schools: { total: 1, active: 1, byStatus: [{ _id: "active", count: 1 }] }, subscriptions: {}, invoiced: [], collected: [] },
+};
+
 const pageOne = {
   success: true,
   data: [
@@ -31,6 +36,7 @@ describe("PlatformAdminWorkspace school directory", () => {
       accessToken: "platform-access-token",
       logout: vi.fn(),
     });
+    apiRequest.mockResolvedValueOnce(businessOverview);
     apiRequest.mockResolvedValue(pageOne);
   });
 
