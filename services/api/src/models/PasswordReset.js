@@ -6,6 +6,7 @@ const passwordResetSchema = new mongoose.Schema({
   codeHash: { type: String, required: true, select: false },
   codeSalt: { type: String, required: true, select: false },
   destination: { type: String, required: true, maxlength: 254 },
+  recoveryGuardianId: { type: mongoose.Schema.Types.ObjectId, ref: "Guardian", default: null, immutable: true },
   expiresAt: { type: Date, required: true, index: true },
   sentAt: { type: Date, required: true },
   attempts: { type: Number, default: 0, min: 0 },
