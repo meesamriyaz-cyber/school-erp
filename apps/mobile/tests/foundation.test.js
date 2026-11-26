@@ -129,3 +129,14 @@ test('platform admin has a dedicated mobile workspace for cross-school directori
   assert.match(screen, /URLSearchParams/);
   assert.match(screen, /pagination/);
 });
+
+
+test('school administrator mobile overview exposes the same core school operations as its navigation', async () => {
+  const app = await readFile(new URL('../src/app/(app)/index.js', import.meta.url), 'utf8');
+  assert.match(app, /\["school_admin", "principal"\]\.includes\(user\?\.role\)/);
+  assert.match(app, /label="Net fee collection"/);
+  assert.match(app, /\["students", "attendance", "timetable", "staff"\]\.includes\(tab\.key\)/);
+  assert.match(app, /Active students/);
+  assert.match(app, /Attendance trend/);
+  assert.match(app, /Academic performance/);
+});
