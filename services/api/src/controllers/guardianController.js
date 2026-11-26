@@ -3,7 +3,7 @@ import Guardian from "../models/Guardian.js";
 import StudentGuardian from "../models/StudentGuardian.js";
 import Student from "../models/Student.js";
 
-const CREATE_FIELDS = ["firstName", "lastName", "email", "photoUrl"];
+const CREATE_FIELDS = ["firstName", "lastName", "phone", "email", "photoUrl"];
 const UPDATE_FIELDS = [...CREATE_FIELDS, "status"];
 const invalid = (res, message) => res.status(400).json({ success: false, message });
 const appendRelationshipAudit = (record, actorUserId) => {
@@ -103,9 +103,10 @@ export const createGuardian = async (req, res, next) => {
     const fields = validateBody(req.body, res, CREATE_FIELDS);
     if (!fields) return;
     if (typeof fields.firstName !== "string" || !fields.firstName.trim()) return invalid(res, "Guardian first name is required");
-    for (const field of ["lastName", "email", "photoUrl"]) {
+    for (const field of ["lastName", "phone", "email", "photoUrl"]) {
       if (fields[field] !== undefined && fields[field] !== null && typeof fields[field] !== "string") return invalid(res, `${field} must be a string`);
     }
+    if (fields.phone != null && fields.phone !== "" && (typeof fields.phone !== "string" || !/^[0-9]{10}$/.test(fields.phone))) return invalid(res, "Guardian phone number must contain exactly 10 digits (0-9)");
     const initialEmail = fields.email;
     delete fields.email;
     const guardian = await Guardian.create({
@@ -147,6 +148,7 @@ export const updateGuardian = async (req, res, next) => {
     if (!mongoose.isValidObjectId(guardianId)) return invalid(res, "Invalid guardian ID");
     const updates = validateBody(req.body, res, UPDATE_FIELDS);
     if (!updates) return;
+    if (Object.hasOwn(updates, "phone") && updates.phone != null && updates.phone !== "" && (typeof updates.phone !== "string" || !/^[0-9]{10}$/.test(updates.phone))) return invalid(res, "Guardian phone number must contain exactly 10 digits (0-9)");
     if (Object.hasOwn(updates, "email")) {
       const nextEmail = updates.email;
       delete updates.email;
@@ -159,7 +161,7 @@ export const updateGuardian = async (req, res, next) => {
     }
     if (Object.keys(updates).length === 0) return invalid(res, "Provide at least one guardian field to update");
     if (Object.hasOwn(updates, "firstName") && (typeof updates.firstName !== "string" || !updates.firstName.trim())) return invalid(res, "Guardian first name cannot be empty");
-    for (const field of ["lastName", "email", "photoUrl"]) {
+    for (const field of ["lastName", "phone", "email", "photoUrl"]) {
       if (updates[field] !== undefined && updates[field] !== null && typeof updates[field] !== "string") return invalid(res, `${field} must be a string`);
     }
 
