@@ -43,7 +43,7 @@ const navigation = [
   { label: "Messaging Oversight", icon: "✉", section: "MAIN" },
   { label: "Academic Years", icon: "▣", section: "ACADEMICS" },
   { label: "Academic Terms", icon: "▤", section: "ACADEMICS" },
-  { label: "Classes & Sections", icon: "▤", section: "ACADEMICS" },
+  { label: "Classes", icon: "▤", section: "ACADEMICS" },
   { label: "Sections", icon: "▧", section: "ACADEMICS" },
   { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
@@ -279,7 +279,7 @@ function DashboardApp() {
           <div className="welcome-row">
             <div>
               <div className="eyebrow">SCHOOL WORKSPACE</div>
-              <h1>{activePage === "Overview" ? "Good day, Administrator" : activePage}</h1>
+              <h1>{activePage === "Overview" ? "Good day, {user?.role === "principal" ? "Principal" : "Administrator"}" : activePage}</h1>
               <p className="page-subtitle">
                 {activePage === "Overview"
                   ? "Here’s an overview of your school management workspace."
@@ -309,7 +309,7 @@ function DashboardApp() {
   <AcademicTermsManagement />
 ) : activePage === "Class Curriculum" ? (
   <ClassCurriculumManagement />
-) : activePage === "Classes & Sections" ? (
+) : activePage === "Classes" ? (
   <ClassesManagement />
 ) : activePage === "Sections" ? (
   <SectionsManagement />

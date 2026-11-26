@@ -208,7 +208,7 @@ export default function AppHomeScreen() {
     {activeTab === "home" ? <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => isTeacher ? loadTeacherHome(true) : isLearnerAccount ? loadPortalHome(true) : loadDashboard(true)} tintColor={colors.primary} />}>
       {!isTeacher && !isLearnerAccount ? <View style={styles.welcomeBlock}>
         <Text style={styles.kicker}>SCHOOL OVERVIEW</Text>
-        <Text style={styles.welcomeTitle}>Good day, {user?.firstName || "Administrator"}.</Text>
+        <Text style={styles.welcomeTitle}>Good day, {user?.firstName || (user?.role === "principal" ? "Principal" : "Administrator")}.</Text>
         <Text style={styles.welcomeText}>Here’s what’s happening at your school today.</Text>
         <View style={styles.yearPill}><View style={styles.yearDot}/><Text style={styles.yearText}>{yearName}</Text></View>
       </View> : null}
