@@ -48,6 +48,7 @@ export default function GuardianDirectory() {
   const [mutationNotice, setMutationNotice] = useState("");
   const [confirmStatusChange, setConfirmStatusChange] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -197,6 +198,40 @@ export default function GuardianDirectory() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const uploadParentPhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedGuardian) return;
+    if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setMutationError("Choose a JPG or PNG image up to 5 MB.");
+      return;
+    }
+    setUploadingPhoto(true); setMutationError(""); setMutationNotice("");
+    try {
+      const signatureResponse = await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}/photo-signature`, { method: "POST", accessToken, body: {} });
+      if (!signatureResponse?.success || !signatureResponse.data) throw new Error("Could not prepare secure photo upload.");
+      const signature = signatureResponse.data;
+      const payload = new FormData();
+      payload.append("file", file);
+      payload.append("api_key", signature.apiKey);
+      payload.append("timestamp", String(signature.timestamp));
+      payload.append("folder", signature.folder);
+      payload.append("public_id", signature.publicId);
+      payload.append("allowed_formats", signature.allowedFormats);
+      payload.append("signature", signature.signature);
+      const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${signature.cloudName}/image/upload`, { method: "POST", body: payload });
+      const uploaded = await uploadResponse.json();
+      if (!uploadResponse.ok || !uploaded.secure_url) throw new Error(uploaded.error?.message || "Parent photo upload failed.");
+      const saved = await apiRequest(`/guardians/${encodeURIComponent(selectedGuardian._id)}`, { method: "PATCH", accessToken, body: { photoUrl: uploaded.secure_url } });
+      if (!saved?.success || !saved.data) throw new Error("Photo uploaded, but could not be attached to the guardian record.");
+      setSelectedGuardian((current) => ({ ...current, ...saved.data }));
+      setGuardians((current) => current.map((item) => item._id === selectedGuardian._id ? { ...item, ...saved.data } : item));
+      setEditForm((current) => current ? { ...current, photoUrl: uploaded.secure_url } : current);
+      setMutationNotice("Parent photo uploaded and saved.");
+    } catch (uploadError) { setMutationError(uploadError.message || "Unable to upload parent photo."); }
+    finally { setUploadingPhoto(false); }
   };
 
   const sendVerificationCode = async () => {
@@ -431,6 +466,10 @@ export default function GuardianDirectory() {
                         <label>
                           Email
                           <input type="email" value={editForm.email} onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))} maxLength={254} />
+                        </label>
+                        <label className="guardian-directory-edit-full">Upload parent photo (JPG/PNG, max 5 MB)
+                          <input type="file" accept="image/jpeg,image/png" onChange={uploadParentPhoto} disabled={uploadingPhoto || saving} />
+                          {uploadingPhoto ? <span role="status">Uploading photo…</span> : null}
                         </label>
                         <label className="guardian-directory-edit-full">Parent photo URL (HTTPS)
                           <input type="url" value={editForm.photoUrl} onChange={(event) => setEditForm((current) => ({ ...current, photoUrl: event.target.value }))} maxLength={2048} placeholder="https://…" />
