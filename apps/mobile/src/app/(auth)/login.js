@@ -169,6 +169,6 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, backgroundColor: "#FDECEC", padding: spacing.md, borderRadius: radius.md, lineHeight: 20 },
   footnote: { color: colors.muted, fontSize: typography.xs, textAlign: "center", lineHeight: 18 },
   resetPanel: { gap: spacing.md },
-  resetLink: { color: colors.primary, fontSize: typography.sm, fontWeight: "700", textAlign: "center", paddingVertical: spacing.sm },
+  resetLink: { color: colors.primary, fontSize: typography.sm, fontWeight: "700", textAlign: "center", paddingVertical: spacing.sm },\n  forgotPasswordAction: { alignSelf: "flex-end", paddingVertical: spacing.xs, marginTop: -spacing.xs },\n  forgotPasswordText: { color: colors.primary, fontSize: typography.sm, fontWeight: "700" },
   notice: { color: colors.primary, fontSize: typography.sm, textAlign: "center", lineHeight: 20 },
 });
