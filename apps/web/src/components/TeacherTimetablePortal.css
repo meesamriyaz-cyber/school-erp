@@ -299,3 +299,31 @@
   .teacher-workspace-content .teacher-report-filters label:first-child,.teacher-workspace-content .teacher-report-filters button { grid-column:auto; }
   .teacher-workspace-content .teacher-attendance-heading>button { width:100%; }
 }
+
+
+/* Match the school dashboard's actual layout primitives and geometry */
+.teacher-timetable-page { max-width:1600px; padding:32px clamp(18px,3vw,48px) 48px; background:#f5f7fb; color:#26344d; }
+.teacher-timetable-header,.teacher-timetable-welcome,.teacher-workspace-tabs,.teacher-workspace-content { max-width:1440px; }
+.teacher-timetable-header { margin:0 auto 20px; align-items:flex-start; }
+.teacher-timetable-welcome { margin:0 auto 18px; }
+.teacher-workspace-tabs { margin:0 auto 20px; }
+.teacher-workspace-content { margin:0 auto; }
+.teacher-overview.school-dashboard { max-width:none; margin:0; }
+.teacher-overview .school-dashboard-heading h2 { margin:5px 0 5px; color:#26344d; font-size:20px; }
+.teacher-overview .school-dashboard-heading p { margin:0; color:#8490a4; font-size:12px; }
+.teacher-overview .school-dashboard-stat { display:grid; align-content:start; gap:8px; min-height:150px; padding:18px; border:1px solid #e8edf4; border-radius:13px; background:#fff; box-shadow:0 3px 12px #1d31540a; }
+.teacher-overview .school-dashboard-stat-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:10px; font-size:18px; }
+.teacher-overview .school-dashboard-stat-label { color:#7d899d; font-size:11px; }
+.teacher-overview .school-dashboard-stat>strong { color:#26344d; font-size:23px; letter-spacing:-.6px; }
+.teacher-overview .school-dashboard-stat small { color:#929caf; font-size:10px; line-height:1.5; }
+.teacher-dashboard-schedule { min-height:220px; }
+.teacher-dashboard-period { display:grid; grid-template-columns:minmax(120px,.7fr) minmax(0,1.5fr) auto; gap:12px; align-items:center; padding:13px 0; border-top:1px solid #edf0f5; }
+.teacher-dashboard-period strong { color:#34415a; font-size:11px; }
+.teacher-dashboard-period span { color:#52617a; font-size:11px; font-weight:650; }
+.teacher-dashboard-period small { color:#929caf; font-size:10px; }
+.teacher-dashboard-actions { display:grid; gap:8px; margin-top:12px; }
+.teacher-dashboard-actions button { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:10px 12px; border:1px solid #e8edf4; border-radius:8px; background:#fff; color:#5266bd; text-align:left; font-size:11px; font-weight:700; }
+.teacher-dashboard-actions button:hover { border-color:#cbd5ff; background:#f8f9ff; }
+.teacher-dashboard-actions button span { color:#8795d8; font-size:15px; }
+@media(max-width:900px) { .teacher-workspace-content { padding:0; } .teacher-overview .school-dashboard-panels { grid-template-columns:1fr; } }
+@media(max-width:640px) { .teacher-timetable-header { margin-bottom:18px; } .teacher-dashboard-period { grid-template-columns:1fr; gap:4px; } }
