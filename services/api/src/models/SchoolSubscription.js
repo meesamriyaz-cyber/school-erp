@@ -14,7 +14,7 @@ const schoolSubscriptionSchema = new mongoose.Schema({
   currentPeriodEndsAt: { type: Date, default: null },
   nextBillingAt: { type: Date, default: null, index: true },
   cancelledAt: { type: Date, default: null },
-  lifetimeAccess: { type: Boolean, default: false, immutable: true },
+  lifetimeAccess: { type: Boolean, default: false },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, immutable: true },
   notes: { type: String, trim: true, default: "", maxlength: 500 },
 }, { timestamps: true, versionKey: false });
