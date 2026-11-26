@@ -84,9 +84,11 @@ export default function TeacherTimetablePortal() {
         <button type="button" className={activeView === "classes" ? "active" : ""} onClick={() => setActiveView("classes")}>My classes</button>
         <button type="button" className={activeView === "students" ? "active" : ""} onClick={() => setActiveView("students")}>My students</button>
         <button type="button" className={activeView === "reports" ? "active" : ""} onClick={() => setActiveView("reports")}>Reports</button>
-        <button type="button" className={activeView === "exams" ? "active" : ""} onClick={() => setActiveView("exams")}>Examination marks</button>\n        <button type="button" className={activeView === "announcements" ? "active" : ""} onClick={() => setActiveView("announcements")}>Announcements</button>
+        <button type="button" className={activeView === "exams" ? "active" : ""} onClick={() => setActiveView("exams")}>Examination marks</button>
+        <button type="button" className={activeView === "announcements" ? "active" : ""} onClick={() => setActiveView("announcements")}>Announcements</button>
         <button type="button" className={activeView === "messaging" ? "active" : ""} onClick={() => setActiveView("messaging")}>Parent messages</button>
       </nav>
+      <div className="teacher-workspace-content">
       {activeView === "overview" ? <section className="teacher-overview">
         <div className="teacher-overview-cards">
           <article><strong>{entries.length}</strong><span>Weekly periods</span></article>
@@ -204,6 +206,7 @@ export default function TeacherTimetablePortal() {
         )}
         </div>
       </>}
+      </div>
     </main>
   );
 }
