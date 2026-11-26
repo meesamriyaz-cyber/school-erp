@@ -19,7 +19,7 @@ const errorHandler = (err, req, res, next) => {
     path: req.originalUrl?.split("?")[0],
     statusCode,
     name: typeof err.name === "string" ? err.name : "Error",
-    ...(process.env.NODE_ENV !== "production" ? {
+    ...(process.env.NODE_ENV === "development" ? {
       message: typeof err.message === "string" ? err.message : "Unknown error",
       stack: typeof err.stack === "string" ? err.stack : undefined,
     } : {}),
