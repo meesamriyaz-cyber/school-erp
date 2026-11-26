@@ -207,3 +207,7 @@
 /* Keep the business KPI rows visually grouped without the large inter-section gap. */
 .platform-overview-metrics { display:grid;gap:15px;margin:0 0 24px; }
 .platform-overview-metrics .platform-summary-grid { margin:0; }
+
+.platform-current-subscription { display:grid;gap:5px;padding:13px 15px;border:1px solid #dce5f3;border-radius:10px;background:#f8faff;color:#526078;font-size:12px; }
+.platform-current-subscription strong { color:#263753;font-size:13px; }
+.platform-current-subscription small { color:#7d8ba2; }
