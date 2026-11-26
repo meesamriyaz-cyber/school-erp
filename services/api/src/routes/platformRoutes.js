@@ -8,8 +8,24 @@ import { createSchool, getSchoolDetails, listSchools, updateSchoolStatus } from 
 import { createUser, getUserDetails, listUsers, updateUser, updateUserRole, updateUserStatus } from "../controllers/userManagementController.js";
 import { listAuditLogs } from "../controllers/auditLogController.js";
 import { getAuditOutboxStatus, retryFailedAuditEvent } from "../controllers/auditOutboxController.js";
+import {
+  getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan,
+  archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices,
+  recordPlatformPayment,
+} from "../controllers/platformBillingController.js";
 
 const router = Router();
+const platformOnly = [requireTrustedOrigin, authenticate, authorizeRoles("platform_admin")];
+
+router.get("/business-overview", ...platformOnly, getBusinessOverview);
+router.get("/subscription-plans", ...platformOnly, listSubscriptionPlans);
+router.post("/subscription-plans", ...platformOnly, createSubscriptionPlan);
+router.patch("/subscription-plans/:planId", ...platformOnly, updateSubscriptionPlan);
+router.post("/subscription-plans/:planId/archive", ...platformOnly, archiveSubscriptionPlan);
+router.get("/schools/:schoolId/subscription", ...platformOnly, getSchoolSubscription);
+router.post("/schools/:schoolId/subscription", ...platformOnly, assignSchoolSubscription);
+router.get("/invoices", ...platformOnly, listPlatformInvoices);
+router.post("/invoices/:invoiceId/payments", ...platformOnly, recordPlatformPayment);
 
 router.get("/audit-logs", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), listAuditLogs);
 router.get("/audit-outbox", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), getAuditOutboxStatus);
