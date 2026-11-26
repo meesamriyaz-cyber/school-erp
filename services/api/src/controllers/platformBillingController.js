@@ -151,12 +151,18 @@ export async function recordPlatformPayment(req, res, next) {
       await invoice.save({ session });
       await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: invoice.subscriptionId, invoiceId: invoice._id, paymentId: payment._id, action: "PAYMENT_RECORDED", details: { amount: payment.amount, currency: payment.currency, method: payment.method, invoiceStatus: invoice.status } }], { session });
       if (invoice.subscriptionId && invoice.status === "paid") {
-        const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: "pending" }).session(session);
+        const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: { $in: ["pending", "active", "past_due"] } }).session(session);
         if (subscription) {
           await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
+          const wasPending = subscription.status === "pending";
+          if (!wasPending && subscription.billingInterval !== "one_time" && subscription.currentPeriodEndsAt) {
+            subscription.currentPeriodStartsAt = subscription.currentPeriodEndsAt;
+            subscription.currentPeriodEndsAt = periodEnd(subscription.currentPeriodStartsAt, subscription.billingInterval);
+            subscription.nextBillingAt = subscription.currentPeriodEndsAt;
+          }
           subscription.status = "active";
           await subscription.save({ session });
-          await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: "SUBSCRIPTION_ACTIVATED", details: { billingInterval: subscription.billingInterval, lifetimeAccess: subscription.lifetimeAccess } }], { session });
+          await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: wasPending ? "SUBSCRIPTION_ACTIVATED" : "SUBSCRIPTION_RENEWED", details: { billingInterval: subscription.billingInterval, lifetimeAccess: subscription.lifetimeAccess } }], { session });
           await Tenant.updateOne({ _id: invoice.tenantId, status: "pending" }, { $set: { status: "active" } }, { session });
         }
       }
@@ -189,4 +195,75 @@ export async function getBusinessOverview(req, res, next) {
     for (const item of lifetime) { subscriptionMetrics[item._id] ??= { mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0 }; subscriptionMetrics[item._id].lifetimeSales = item.sales; }
     return res.json({ success: true, data: { schools: { total: await Tenant.countDocuments(), active: activeSchools, byStatus: schools }, subscriptions: subscriptionMetrics, invoiced: invoiceStats, collected: paymentStats } });
   } catch (error) { return next(error); }
+}
+
+
+export async function createRenewalInvoice(req, res, next) {
+  const session = await mongoose.startSession();
+  try {
+    const { subscriptionId } = req.params;
+    if (!validId(subscriptionId)) return fail(res, 400, "Invalid subscription ID");
+    let result;
+    await session.withTransaction(async () => {
+      const subscription = await SchoolSubscription.findById(subscriptionId).session(session);
+      if (!subscription) throw Object.assign(new Error("Subscription not found"), { statusCode: 404 });
+      if (subscription.billingInterval === "one_time" || subscription.lifetimeAccess) throw Object.assign(new Error("Lifetime subscriptions do not renew"), { statusCode: 400 });
+      if (subscription.status !== "active" || !subscription.nextBillingAt || subscription.nextBillingAt > new Date()) throw Object.assign(new Error("Subscription is not due for renewal"), { statusCode: 409 });
+      const duplicate = await PlatformInvoice.findOne({ subscriptionId: subscription._id, status: { $in: ["issued", "partially_paid", "overdue"] }, notes: "Automated subscription renewal" }).session(session);
+      if (duplicate) throw Object.assign(new Error("An unpaid renewal invoice already exists"), { statusCode: 409 });
+      const school = await Tenant.findById(subscription.tenantId).select("name").session(session);
+      const now = new Date();
+      const invoiceNumber = `RN-${now.getTime()}-${String(subscription.tenantId).slice(-6)}`;
+      const [invoice] = await PlatformInvoice.create([{
+        tenantId: subscription.tenantId, subscriptionId: subscription._id, invoiceNumber,
+        items: [{ description: `${subscription.planName} renewal (${subscription.billingInterval})`, quantity: 1, unitAmount: subscription.amount, amount: subscription.amount }],
+        subtotal: subscription.amount, discountAmount: 0, totalAmount: subscription.amount, currency: subscription.currency,
+        issuedAt: now, dueAt: new Date(now.getTime() + 7 * 86400000), status: "issued",
+        notes: "Automated subscription renewal", createdBy: actorId(req),
+      }], { session });
+      subscription.status = "past_due";
+      await subscription.save({ session });
+      await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: subscription.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: "RENEWAL_INVOICED", details: { amount: invoice.totalAmount, currency: invoice.currency, schoolName: school?.name } }], { session });
+      result = { subscription, invoice };
+    });
+    return res.status(201).json({ success: true, message: "Renewal invoice created", data: result });
+  } catch (error) { if (error.statusCode) return fail(res, error.statusCode, error.message); return next(error); }
+  finally { await session.endSession(); }
+}
+
+export async function reversePlatformPayment(req, res, next) {
+  const session = await mongoose.startSession();
+  try {
+    const { paymentId } = req.params;
+    const { reason } = req.body ?? {};
+    if (!validId(paymentId)) return fail(res, 400, "Invalid payment ID");
+    if (typeof reason !== "string" || !reason.trim() || reason.trim().length > 300) return fail(res, 400, "A reversal reason of up to 300 characters is required");
+    let result;
+    await session.withTransaction(async () => {
+      const payment = await PlatformPayment.findOne({ _id: paymentId, status: "recorded" }).session(session);
+      if (!payment) throw Object.assign(new Error("Recorded payment not found"), { statusCode: 404 });
+      const invoice = await PlatformInvoice.findById(payment.invoiceId).session(session);
+      if (!invoice || invoice.tenantId.toString() !== payment.tenantId.toString()) throw Object.assign(new Error("Payment invoice not found"), { statusCode: 404 });
+      payment.status = "reversed";
+      payment.reversedAt = new Date();
+      payment.reversedBy = new mongoose.Types.ObjectId(actorId(req));
+      payment.reversalReason = reason.trim();
+      await payment.save({ session });
+      const totals = await PlatformPayment.aggregate([{ $match: { invoiceId: invoice._id, status: "recorded" } }, { $group: { _id: null, total: { $sum: "$amount" } } }]).session(session);
+      const paid = money(totals[0]?.total || 0);
+      invoice.status = paid >= invoice.totalAmount ? "paid" : paid > 0 ? "partially_paid" : "issued";
+      await invoice.save({ session });
+      if (invoice.subscriptionId && invoice.status !== "paid") {
+        const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: { $in: ["active", "past_due"] } }).session(session);
+        if (subscription && subscription.billingInterval !== "one_time") {
+          subscription.status = "past_due";
+          await subscription.save({ session });
+        }
+      }
+      await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: payment.tenantId, subscriptionId: invoice.subscriptionId, invoiceId: invoice._id, paymentId: payment._id, action: "PAYMENT_REVERSED", details: { amount: payment.amount, currency: payment.currency, reason: reason.trim(), invoiceStatus: invoice.status } }], { session });
+      result = { payment, invoice };
+    });
+    return res.json({ success: true, message: "Payment reversed and invoice balance recalculated", data: result });
+  } catch (error) { if (error.statusCode) return fail(res, error.statusCode, error.message); return next(error); }
+  finally { await session.endSession(); }
 }
