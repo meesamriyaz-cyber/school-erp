@@ -156,7 +156,15 @@ export const updateGuardian = async (req, res, next) => {
         if (typeof nextEmail !== "string" || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(nextEmail.trim())) return invalid(res, "Enter a valid guardian email address");
         updates.pendingEmail = nextEmail.trim().toLowerCase();
       } else {
+        updates.email = null;
+        updates.verifiedEmail = null;
+        updates.emailVerifiedAt = null;
         updates.pendingEmail = null;
+        updates.emailOtpHash = null;
+        updates.emailOtpSalt = null;
+        updates.emailOtpExpiresAt = null;
+        updates.emailOtpSentAt = null;
+        updates.emailOtpAttempts = 0;
       }
     }
     if (Object.keys(updates).length === 0) return invalid(res, "Provide at least one guardian field to update");
