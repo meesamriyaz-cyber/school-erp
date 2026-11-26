@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/authContext.js";
 import { apiRequest } from "../lib/api.js";
+import "./PlatformAdminWorkspace.css";
 
 const navigation = [
   { label: "Overview", icon: "▦" },
