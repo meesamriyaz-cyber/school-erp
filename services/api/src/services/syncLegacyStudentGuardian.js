@@ -15,14 +15,13 @@ const buildDetails = (student) => {
     firstName: name.firstName,
     lastName: name.lastName,
     phone: student.guardianPhone?.trim() || null,
-    email: student.guardianEmail?.trim().toLowerCase() || null,
+    pendingEmail: student.guardianEmail?.trim().toLowerCase() || null,
   };
 };
 
 const findIdentityMatches = async (tenantId, details, session) => {
   const clauses = [];
   if (details.phone) clauses.push({ phone: details.phone });
-  if (details.email) clauses.push({ email: details.email });
   if (!clauses.length) return [];
   let query = Guardian.find({ tenantId, $or: clauses });
   if (session) query = query.session(session);
@@ -43,7 +42,7 @@ const resolveIdentity = async (tenantId, details, session) => {
     error.code = "GUARDIAN_IDENTITY_CONFLICT";
     throw error;
   }
-  if (guardian && details.email && guardian.email && guardian.email.toLowerCase() !== details.email) {
+  if (guardian && details.pendingEmail && guardian.email && guardian.email.toLowerCase() !== details.pendingEmail) {
     const error = new Error("Legacy guardian email conflicts with the matched guardian record");
     error.code = "GUARDIAN_IDENTITY_CONFLICT";
     throw error;
@@ -56,7 +55,7 @@ export const previewLegacyStudentGuardian = async (student) => {
   const details = buildDetails(student);
   try {
     let guardian = await resolveIdentity(student.tenantId, details);
-    if (!guardian && !details.phone && !details.email) {
+    if (!guardian && !details.phone && !details.pendingEmail) {
       const existingLink = await StudentGuardian.findOne({ tenantId: student.tenantId, studentId: student._id, source: { $in: ["legacy_student", "manual_and_legacy"] } });
       if (existingLink) guardian = await Guardian.findOne({ _id: existingLink.guardianId, tenantId: student.tenantId }).lean();
     }
@@ -89,7 +88,7 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
   let existingLegacyQuery = StudentGuardian.findOne({ tenantId, studentId, source: { $in: ["legacy_student", "manual_and_legacy"] } });
   if (session) existingLegacyQuery = existingLegacyQuery.session(session);
   const existingLegacyLink = await existingLegacyQuery;
-  if (!guardian && !details.phone && !details.email && existingLegacyLink) {
+  if (!guardian && !details.phone && !details.pendingEmail && existingLegacyLink) {
     let linkedGuardianQuery = Guardian.findOne({ _id: existingLegacyLink.guardianId, tenantId });
     if (session) linkedGuardianQuery = linkedGuardianQuery.session(session);
     guardian = await linkedGuardianQuery;
@@ -97,6 +96,10 @@ export const syncLegacyStudentGuardian = async (student, { session, actorUserId 
   if (!guardian) {
     const [created] = await Guardian.create([{ tenantId, ...details }], { session });
     guardian = created;
+  }
+  if (details.pendingEmail && guardian.pendingEmail !== details.pendingEmail && guardian.email !== details.pendingEmail) {
+    guardian.pendingEmail = details.pendingEmail;
+    await guardian.save({ session });
   }
   if (guardian.status !== "active") {
     const error = new Error("The selected primary guardian is inactive");
