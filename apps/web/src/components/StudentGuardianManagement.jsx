@@ -18,6 +18,7 @@ const EMPTY_GUARDIAN = {
   lastName: "",
   phone: "",
   email: "",
+  photoUrl: "",
 };
 
 const EMPTY_FLAGS = {
@@ -122,12 +123,21 @@ export default function StudentGuardianManagement({
             lastName: guardianForm.lastName.trim(),
             phone: guardianForm.phone.trim(),
             email: guardianForm.email.trim(),
+            photoUrl: guardianForm.photoUrl.trim(),
           },
         });
         if (!guardianResponse?.success || !guardianResponse.data?._id) {
           throw new Error("Guardian could not be created.");
         }
         guardianId = guardianResponse.data._id;
+        if (guardianForm.email.trim()) {
+          try {
+            await apiRequest(`/guardians/${encodeURIComponent(guardianId)}/email-verification/send`, { method: "POST", accessToken, body: { email: guardianForm.email.trim() } });
+            setNotice("Guardian linked. Email verification code sent.");
+          } catch (verificationError) {
+            setNotice(`Guardian linked, but email verification could not be sent: ${verificationError.message || "Please resend from Guardian Directory."}`);
+          }
+        }
       }
 
       const linkResponse = await apiRequest(
@@ -298,11 +308,20 @@ export default function StudentGuardianManagement({
                 />
               </label>
               <label>
-                Email
+                Email (OTP verified)
                 <input
                   type="email"
                   value={guardianForm.email}
                   onChange={(event) => setGuardianForm((current) => ({ ...current, email: event.target.value }))}
+                />
+              </label>
+              <label className="student-guardian-form-full">
+                Parent photo URL (HTTPS)
+                <input
+                  type="url"
+                  value={guardianForm.photoUrl}
+                  onChange={(event) => setGuardianForm((current) => ({ ...current, photoUrl: event.target.value }))}
+                  placeholder="https://…"
                 />
               </label>
             </div>
@@ -368,8 +387,10 @@ export default function StudentGuardianManagement({
                 </div>
 
                 <div className="student-guardian-contact">
+                  {guardian?.photoUrl && <img src={guardian.photoUrl} alt={`${guardianName(guardian)} profile`} className="student-guardian-photo" />}
                   {guardian?.phone && <span>Phone: {guardian.phone}</span>}
-                  {guardian?.email && <span>Email: {guardian.email}</span>}
+                  {guardian?.email && <span>Email: {guardian.email} · {guardian.emailVerifiedAt && guardian.verifiedEmail === guardian.email ? "verified" : "not verified"}</span>}
+                  {guardian?.pendingEmail && <span>Pending email: {guardian.pendingEmail}</span>}
                 </div>
 
                 <div className="student-guardian-badges">
