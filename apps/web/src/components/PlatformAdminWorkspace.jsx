@@ -182,6 +182,7 @@ export default function PlatformAdminWorkspace() {
   const [assignNotes, setAssignNotes] = useState("");
   const [assigningSubscription, setAssigningSubscription] = useState(false);
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
+  const [startingTrial, setStartingTrial] = useState(false);
 
   const fullName = [user?.firstName, user?.lastName]
     .filter(Boolean)
@@ -456,6 +457,26 @@ export default function PlatformAdminWorkspace() {
       await apiRequest(`/platform/subscription-plans/${encodeURIComponent(plan.id || plan._id)}/archive`, { method: "POST", accessToken });
       setPlans((current) => current.map((item) => (item.id || item._id) === (plan.id || plan._id) ? { ...item, isArchived: true, isActive: false } : item));
     } catch (error) { setPlansError(error.message || "Unable to archive plan."); }
+  };
+
+  const startSchoolTrial = async () => {
+    if (!selectedSchoolId || startingTrial) return;
+    if (!window.confirm("Start the school's one-time 30-day free trial now? The 30-day period begins immediately.")) return;
+    setStartingTrial(true);
+    setSubscriptionMessage("");
+    try {
+      const response = await apiRequest(`/platform/schools/${encodeURIComponent(selectedSchoolId)}/trial`, { method: "POST", accessToken, body: {} });
+      setSchoolSubscription(response?.data?.subscription ?? null);
+      setSchoolDetails((current) => current?.school
+        ? { ...current, school: { ...current.school, ...(response?.data?.school || {}) } }
+        : current);
+      setSubscriptionMessage(response?.message || "30-day free trial started.");
+      setReloadCount((count) => count + 1);
+    } catch (error) {
+      setSubscriptionMessage(error.message || "Unable to start the free trial.");
+    } finally {
+      setStartingTrial(false);
+    }
   };
 
   const assignSubscription = async () => {
@@ -1290,7 +1311,14 @@ export default function PlatformAdminWorkspace() {
                   )}
                   <section className="platform-lifecycle-controls" aria-label="School subscription management">
                     <div><h3>Subscription</h3><p>Assign monthly, discounted annual, or negotiated lifetime access. Access activates only after the invoice is fully paid.</p></div>
-                    {schoolSubscription && <div className="platform-current-subscription"><strong>Current subscription</strong><span>{schoolSubscription.planName || "Assigned plan"} · {schoolSubscription.billingInterval === "one_time" ? "Lifetime access" : statusLabel(schoolSubscription.billingInterval)}</span><span>{statusLabel(schoolSubscription.status)} · {schoolSubscription.currency} {Number(schoolSubscription.amount || 0).toLocaleString("en-IN")}</span><small>{schoolSubscription.nextBillingAt ? `Next billing: ${formatDate(schoolSubscription.nextBillingAt)}` : schoolSubscription.lifetimeAccess ? "No renewal or expiry" : schoolSubscription.currentPeriodEndsAt ? `Period ends: ${formatDate(schoolSubscription.currentPeriodEndsAt)}` : "Billing date pending"}</small></div>}
+                    {schoolSubscription && <div className="platform-current-subscription"><strong>{schoolSubscription.isTrial ? "Free trial" : "Current subscription"}</strong><span>{schoolSubscription.planName || "Assigned plan"} · {schoolSubscription.isTrial ? "30 days" : schoolSubscription.billingInterval === "one_time" ? "Lifetime access" : statusLabel(schoolSubscription.billingInterval)}</span><span>{schoolSubscription.isTrial ? statusLabel(schoolSubscription.status) : `${statusLabel(schoolSubscription.status)} · ${schoolSubscription.currency} ${Number(schoolSubscription.amount || 0).toLocaleString("en-IN")}`}</span><small>{schoolSubscription.isTrial ? `Trial ends: ${formatDate(schoolSubscription.trialEndsAt || schoolSubscription.currentPeriodEndsAt)}` : schoolSubscription.nextBillingAt ? `Next billing: ${formatDate(schoolSubscription.nextBillingAt)}` : schoolSubscription.lifetimeAccess ? "No renewal or expiry" : schoolSubscription.currentPeriodEndsAt ? `Period ends: ${formatDate(schoolSubscription.currentPeriodEndsAt)}` : "Billing date pending"}</small></div>}
+                    {!school.trialStartedAt && !schoolSubscription && school.status !== "suspended" && school.status !== "trial_expired" && (
+                      <div className="platform-trial-offer">
+                        <div><strong>30-day free trial</strong><p>Start a one-time trial with full school access. Access is automatically restricted when the 30 days end unless a paid subscription is activated.</p></div>
+                        <button type="button" className="platform-primary-button" onClick={() => void startSchoolTrial()} disabled={startingTrial || assigningSubscription}>{startingTrial ? "Starting trial…" : "Start 30-day free trial"}</button>
+                      </div>
+                    )}
+                    {school.status === "trial_expired" && <p className="platform-trial-expired" role="status">The school's 30-day trial has expired and access is restricted. Assign a paid plan and record payment to restore access.</p>}
                     {schoolSubscriptionError && <p role="alert">{schoolSubscriptionError}</p>}
                     <div className="platform-subscription-assign">
                       <label>Plan<select value={assignPlanId} onChange={(event) => setAssignPlanId(event.target.value)}><option value="">Select a plan</option>{plans.filter((plan) => plan.isActive && !plan.isArchived).map((plan) => <option key={plan.id || plan._id} value={plan.id || plan._id}>{plan.name} · {plan.billingInterval} · {plan.currency} {plan.amount}{plan.billingInterval === "annual" ? ` · ${plan.annualDiscountPercent || 0}% discount` : ""}</option>)}</select></label>
