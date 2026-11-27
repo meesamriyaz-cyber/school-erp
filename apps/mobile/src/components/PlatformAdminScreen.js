@@ -12,6 +12,8 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState("");
   const [commercialRecords, setCommercialRecords] = useState([]);
+  const [commercialPage, setCommercialPage] = useState(1);
+  const [commercialPagination, setCommercialPagination] = useState({ total: 0, totalPages: 1 });
   const [commercialError, setCommercialError] = useState("");
   const [systemAuditRecords, setSystemAuditRecords] = useState([]);
   const [systemAuditOutbox, setSystemAuditOutbox] = useState(null);
@@ -210,14 +212,19 @@ export function PlatformAdminScreen({ user, onSignOut }) {
       return () => { mounted = false; };
     }
     const endpoint = section === "plans" ? "/platform/subscription-plans"
-      : section === "billing" ? "/platform/invoices"
-      : "/platform/commercial-events?limit=50";
+      : section === "billing" ? `/platform/invoices?page=${commercialPage}&limit=${PAGE_SIZE}`
+      : `/platform/commercial-events?page=${commercialPage}&limit=${PAGE_SIZE}`;
     apiRequest(endpoint)
-      .then((response) => { if (mounted) setCommercialRecords(Array.isArray(response?.data) ? response.data : []); })
+      .then((response) => {
+        if (!mounted) return;
+        const records = Array.isArray(response?.data) ? response.data : [];
+        setCommercialRecords(records);
+        setCommercialPagination(response?.pagination || { total: records.length, totalPages: 1 });
+      })
       .catch((requestError) => { if (mounted) setCommercialError(requestError?.message || "Unable to load commercial records."); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, [section]);
+  }, [section, commercialPage]);
 
   const saveUserProfile = async () => {
     if (!selectedUserId || userActionBusy) return;
@@ -337,6 +344,11 @@ export function PlatformAdminScreen({ user, onSignOut }) {
           </View>
           <View style={styles.statusPill}><Text style={styles.statusText}>{section === "plans" ? (item.isArchived ? "archived" : item.isActive ? "active" : "inactive") : section === "billing" ? item.status : "logged"}</Text></View>
         </View>)}
+        {section !== "plans" && !loading && commercialPagination.totalPages > 1 ? <View style={styles.pagination}>
+          <TouchableOpacity disabled={commercialPage <= 1} onPress={() => setCommercialPage((value) => Math.max(1, value - 1))} style={[styles.pageButton, commercialPage <= 1 && styles.disabled]}><Text style={styles.pageText}>Previous</Text></TouchableOpacity>
+          <Text style={styles.pageCount}>Page {commercialPage} of {commercialPagination.totalPages} · {commercialPagination.total} records</Text>
+          <TouchableOpacity disabled={commercialPage >= commercialPagination.totalPages} onPress={() => setCommercialPage((value) => Math.min(commercialPagination.totalPages, value + 1))} style={[styles.pageButton, commercialPage >= commercialPagination.totalPages && styles.disabled]}><Text style={styles.pageText}>Next</Text></TouchableOpacity>
+        </View> : null}
         <Text style={styles.metricFootnote}>Commercial controls and payment recording are available in the web platform workspace.</Text>
       </> : null}
       {section === "systemAudit" ? <>
