@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
+import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
 import { createSchool, updateSchoolStatus } from "../controllers/platformController.js";
 
@@ -22,6 +23,8 @@ vi.mock("../models/User.js", () => ({
   },
 }));
 
+vi.mock("../models/Session.js", () => ({ default: { updateMany: vi.fn() } }));
+
 vi.mock("../utils/password.js", () => ({
   hashPassword: vi.fn(),
 }));
@@ -29,6 +32,45 @@ vi.mock("../utils/password.js", () => ({
 
 
 describe("updateSchoolStatus controller", () => {
+  it("requires a reason before suspending a school", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const next = vi.fn();
+    await updateSchoolStatus({ params: { schoolId: String(schoolId) }, body: { status: "suspended" } }, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/suspension reason/i) }));
+    expect(Tenant.findById).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("stores the suspension reason, timestamp and responsible administrator", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const actorId = new mongoose.Types.ObjectId();
+    const school = { _id: schoolId, name: "Active School", status: "active" };
+    const updatedSchool = { ...school, status: "suspended", suspensionReason: "Outstanding compliance documentation" };
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const next = vi.fn();
+    Tenant.findById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(school) }) });
+    Tenant.findOneAndUpdate.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updatedSchool) }) });
+    Session.updateMany.mockResolvedValue({ modifiedCount: 1 });
+
+    await updateSchoolStatus({
+      params: { schoolId: String(schoolId) },
+      body: { status: "suspended", reason: "  Outstanding compliance documentation  " },
+      auth: { userId: actorId },
+    }, res, next);
+
+    const update = Tenant.findOneAndUpdate.mock.calls[0][1];
+    expect(update.$set).toEqual({ status: "suspended", suspensionReason: "Outstanding compliance documentation" });
+    expect(update.$push.suspensionHistory).toEqual(expect.objectContaining({
+      reason: "Outstanding compliance documentation", suspendedBy: actorId, suspendedAt: expect.any(Date),
+    }));
+    expect(Session.updateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId, revokedAt: null }, { $set: { revokedAt: expect.any(Date) } },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(next).not.toHaveBeenCalled();
+  });
   it("activates a pending school and its pending school administrators in one transaction", async () => {
     const schoolId = new mongoose.Types.ObjectId();
     const school = {
