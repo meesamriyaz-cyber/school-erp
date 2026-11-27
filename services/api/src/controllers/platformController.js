@@ -320,10 +320,6 @@ export const updateSchoolStatus = async (req, res, next) => {
       });
     }
 
-    if (status === "suspended" && (typeof reason !== "string" || reason.trim().length < 10 || reason.trim().length > 500)) {
-      return res.status(400).json({ success: false, message: "A suspension reason of 10 to 500 characters is required" });
-    }
-
     if (typeof status !== "string" || !SCHOOL_STATUSES.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -333,7 +329,6 @@ export const updateSchoolStatus = async (req, res, next) => {
 
     const school = await Tenant.findById(schoolId)
       .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
-      .populate({ path: "suspensionHistory.suspendedBy", select: "firstName lastName email" })
       .lean();
 
     if (!school) {
@@ -362,6 +357,10 @@ export const updateSchoolStatus = async (req, res, next) => {
         success: false,
         message: `Cannot change school status from ${school.status} to ${status}`,
       });
+    }
+
+    if (status === "suspended" && (typeof reason !== "string" || reason.trim().length < 10 || reason.trim().length > 500)) {
+      return res.status(400).json({ success: false, message: "A suspension reason of 10 to 500 characters is required" });
     }
 
     // Invalidate access tokens issued before suspension before allowing
