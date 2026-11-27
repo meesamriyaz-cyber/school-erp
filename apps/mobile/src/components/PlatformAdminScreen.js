@@ -23,6 +23,12 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [schoolDetails, setSchoolDetails] = useState(null);
+  const [schoolSubscription, setSchoolSubscription] = useState(null);
+  const [schoolActionBusy, setSchoolActionBusy] = useState(false);
+  const [schoolActionMessage, setSchoolActionMessage] = useState("");
+  const [suspensionReason, setSuspensionReason] = useState("");
 
   const loadDirectory = useCallback(async (refresh = false) => {
     if (!["schools", "users"].includes(section)) return;
@@ -46,6 +52,68 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   }, [page, search, section]);
 
   useEffect(() => { if (["schools", "users"].includes(section)) void loadDirectory(); }, [loadDirectory, section]);
+
+  useEffect(() => {
+    if (section !== "schools" || !selectedSchoolId) return undefined;
+    let mounted = true;
+    setLoading(true);
+    setError("");
+    Promise.all([
+      apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId)),
+      apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId) + "/subscription"),
+    ])
+      .then(([details, billing]) => {
+        if (!mounted) return;
+        setSchoolDetails(details?.data || null);
+        setSchoolSubscription(billing?.data?.subscription || null);
+      })
+      .catch((requestError) => { if (mounted) setError(requestError?.message || "Unable to load school details."); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [section, selectedSchoolId]);
+
+  const updateSchoolStatus = async (status) => {
+    if (!selectedSchoolId || schoolActionBusy) return;
+    if (status === "suspended" && suspensionReason.trim().length < 10) {
+      setSchoolActionMessage("Enter a suspension reason of at least 10 characters.");
+      return;
+    }
+    setSchoolActionBusy(true);
+    setSchoolActionMessage("");
+    try {
+      const body = status === "suspended"
+        ? { status, reason: suspensionReason.trim() }
+        : { status };
+      const response = await apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId) + "/status", { method: "PATCH", body });
+      if (!response?.data?.school) throw new Error("The server did not return the updated school. Refresh and verify the status.");
+      setSchoolDetails((current) => current ? { ...current, school: { ...current.school, ...response.data.school } } : current);
+      setSuspensionReason("");
+      setSchoolActionMessage(response.message || "School status updated.");
+      void loadDirectory(true);
+    } catch (requestError) {
+      setSchoolActionMessage(requestError?.message || "Unable to update school status.");
+    } finally {
+      setSchoolActionBusy(false);
+    }
+  };
+
+  const startSchoolTrial = async () => {
+    if (!selectedSchoolId || schoolActionBusy) return;
+    setSchoolActionBusy(true);
+    setSchoolActionMessage("");
+    try {
+      const response = await apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId) + "/trial", { method: "POST", body: {} });
+      if (!response?.data?.school) throw new Error("The server did not return the updated school. Refresh and verify the trial.");
+      setSchoolDetails((current) => current ? { ...current, school: { ...current.school, ...response.data.school } } : current);
+      setSchoolSubscription(response.data.subscription || null);
+      setSchoolActionMessage(response.message || "30-day trial started.");
+      void loadDirectory(true);
+    } catch (requestError) {
+      setSchoolActionMessage(requestError?.message || "Unable to start the trial.");
+    } finally {
+      setSchoolActionBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (section !== "overview") return undefined;
@@ -181,6 +249,50 @@ export function PlatformAdminScreen({ user, onSignOut }) {
           </View>
         </View>)}
       </> : null}
+      {section === "schools" && selectedSchoolId ? <>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>School details</Text><Text style={styles.sectionSubtitle}>School profile, administrators and lifecycle</Text></View>
+          <TouchableOpacity onPress={() => setSelectedSchoolId("")} style={styles.refresh}><Text style={styles.refreshText}>Back to schools</Text></TouchableOpacity>
+        </View>
+        {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading school details…</Text></View> : null}
+        {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => setSelectedSchoolId((value) => value)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+        {schoolDetails?.school ? <>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SCHOOL PROFILE</Text>
+            <Text style={styles.metricValue}>{schoolDetails.school.name}</Text>
+            <Text style={styles.metricHint}>{schoolDetails.school.slug} · {schoolDetails.school.contactEmail || "No contact email"}</Text>
+            <View style={styles.statusPill}><Text style={styles.statusText}>{statusOf(schoolDetails.school)}</Text></View>
+            {schoolDetails.school.suspensionReason ? <Text style={styles.metricHint}>Suspension reason: {schoolDetails.school.suspensionReason}</Text> : null}
+            {schoolDetails.school.trialStartedAt ? <Text style={styles.metricHint}>Trial: {new Date(schoolDetails.school.trialStartedAt).toLocaleDateString()} – {schoolDetails.school.trialEndsAt ? new Date(schoolDetails.school.trialEndsAt).toLocaleDateString() : "End date unavailable"}{schoolDetails.school.status === "trial_expired" ? " · Expired" : ""}</Text> : null}
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SCHOOL ADMINISTRATORS</Text>
+            {(schoolDetails.administrators || []).length ? schoolDetails.administrators.map((admin) => <View key={String(admin.id || admin._id)} style={styles.adminRow}>
+              <Text style={styles.recordName}>{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || admin.email}</Text>
+              <Text style={styles.recordSubtitle}>{admin.email} · {statusOf(admin)}</Text>
+            </View>) : <Text style={styles.metricHint}>No school administrators found.</Text>}
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SUBSCRIPTION</Text>
+            {schoolSubscription ? <>
+              <Text style={styles.recordName}>{schoolSubscription.planName || "Subscription"} · {schoolSubscription.billingInterval}</Text>
+              <Text style={styles.metricHint}>{schoolSubscription.isTrial ? "Free trial" : schoolSubscription.currency + " " + Number(schoolSubscription.amount || 0).toLocaleString("en-IN")} · {statusOf(schoolSubscription)}</Text>
+              <Text style={styles.metricHint}>{schoolSubscription.trialEndsAt || schoolSubscription.currentPeriodEndsAt ? "Ends " + new Date(schoolSubscription.trialEndsAt || schoolSubscription.currentPeriodEndsAt).toLocaleDateString() : schoolSubscription.lifetimeAccess ? "Lifetime access" : "Billing date pending"}</Text>
+            </> : <Text style={styles.metricHint}>No subscription assigned.</Text>}
+            {!schoolDetails.school.trialStartedAt && !schoolSubscription && !["suspended", "trial_expired"].includes(schoolDetails.school.status) ? <TouchableOpacity disabled={schoolActionBusy} onPress={startSchoolTrial} style={styles.actionButton}><Text style={styles.actionButtonText}>{schoolActionBusy ? "Please wait…" : "Start 30-day free trial"}</Text></TouchableOpacity> : null}
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SCHOOL ACCESS</Text>
+            {schoolDetails.school.status === "pending" ? <TouchableOpacity disabled={schoolActionBusy} onPress={() => updateSchoolStatus("active")} style={styles.actionButton}><Text style={styles.actionButtonText}>Activate school</Text></TouchableOpacity> : null}
+            {schoolDetails.school.status === "active" ? <>
+              <TextInput value={suspensionReason} onChangeText={setSuspensionReason} placeholder="Reason for suspension (10–500 characters)" placeholderTextColor={colors.muted} style={styles.search} multiline />
+              <TouchableOpacity disabled={schoolActionBusy} onPress={() => updateSchoolStatus("suspended")} style={styles.dangerButton}><Text style={styles.actionButtonText}>Suspend school</Text></TouchableOpacity>
+            </> : null}
+            {schoolDetails.school.status === "suspended" ? <TouchableOpacity disabled={schoolActionBusy} onPress={() => updateSchoolStatus("active")} style={styles.actionButton}><Text style={styles.actionButtonText}>Reactivate school</Text></TouchableOpacity> : null}
+            {schoolActionMessage ? <Text style={styles.metricHint}>{schoolActionMessage}</Text> : null}
+          </View>
+        </> : null}
+      </> : null}
       { ["schools", "users"].includes(section) ? <>
       <View style={styles.sectionHeader}>
         <View style={{ flex: 1 }}>
@@ -201,14 +313,14 @@ export function PlatformAdminScreen({ user, onSignOut }) {
       {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading directory…</Text></View> : null}
       {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => loadDirectory()}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
       {!loading && !error ? (section === "schools" ? schools : users).length ? (section === "schools" ? schools : users).map((item, index) =>
-        <View key={String(item.id || item._id || index)} style={styles.record}>
+        <TouchableOpacity key={String(item.id || item._id || index)} activeOpacity={0.8} onPress={() => { if (section === "schools") { setSelectedSchoolId(String(item.id || item._id)); setSchoolDetails(null); setSchoolSubscription(null); setSchoolActionMessage(""); } }} style={styles.record}>
           <View style={styles.recordIcon}><Text style={styles.recordIconText}>{section === "schools" ? "⌂" : "♙"}</Text></View>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={styles.recordName}>{nameOf(item)}</Text>
             <Text style={styles.recordSubtitle}>{subtitleOf(item)}</Text>
           </View>
           <View style={styles.statusPill}><Text style={styles.statusText}>{statusOf(item)}</Text></View>
-        </View>
+        </TouchableOpacity>
       ) : <View style={styles.state}><Text style={styles.stateText}>No {section} found.</Text></View> : null}
       {!loading && pagination.pages > 1 ? <View style={styles.pagination}>
         <TouchableOpacity disabled={page <= 1} onPress={() => setPage((value) => value - 1)} style={[styles.pageButton, page <= 1 && styles.disabled]}><Text style={styles.pageText}>Previous</Text></TouchableOpacity>
@@ -256,6 +368,10 @@ const styles = StyleSheet.create({
   refreshText: { color: colors.primary, fontSize: 11, fontWeight: "800" },
   search: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 13, paddingVertical: 11, color: colors.ink, fontSize: 13 },
   record: { flexDirection: "row", alignItems: "center", gap: 11, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 13 },
+  adminRow: { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 3 },
+  actionButton: { alignItems: "center", backgroundColor: colors.primary, borderRadius: radius.md, padding: 12, marginTop: 10 },
+  dangerButton: { alignItems: "center", backgroundColor: colors.danger, borderRadius: radius.md, padding: 12, marginTop: 10 },
+  actionButtonText: { color: colors.white, fontSize: 12, fontWeight: "900" },
   recordIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
   recordIconText: { color: colors.primary, fontSize: 17, fontWeight: "900" },
   recordName: { color: colors.ink, fontSize: 13, fontWeight: "800" },
