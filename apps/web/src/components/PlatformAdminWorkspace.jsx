@@ -172,7 +172,6 @@ export default function PlatformAdminWorkspace() {
   const [paymentBusyId, setPaymentBusyId] = useState("");
   const [commercialEvents, setCommercialEvents] = useState([]);
   const [commercialPagination, setCommercialPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
-  const [loadingCommercialEvents, setLoadingCommercialEvents] = useState(false);
   const [eventsError, setEventsError] = useState("");
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditPagination, setAuditPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -237,11 +236,10 @@ export default function PlatformAdminWorkspace() {
       page: String(commercialPagination.page),
       limit: String(commercialPagination.limit),
     });
-    setLoadingCommercialEvents(true);
-    setEventsError("");
     apiRequest(`/platform/commercial-events?${params.toString()}`, { accessToken, signal: controller.signal })
       .then((response) => {
         if (controller.signal.aborted) return;
+        setEventsError("");
         setCommercialEvents(Array.isArray(response?.data) ? response.data : []);
         setCommercialPagination((current) => ({ ...current, ...(response?.pagination ?? {}) }));
       })
@@ -251,7 +249,7 @@ export default function PlatformAdminWorkspace() {
           setCommercialEvents([]);
         }
       })
-      .finally(() => { if (!controller.signal.aborted) setLoadingCommercialEvents(false); });
+      ;
     return () => controller.abort();
   }, [activePage, accessToken, commercialPagination.page, commercialPagination.limit, reloadCount]);
 
@@ -1249,15 +1247,14 @@ export default function PlatformAdminWorkspace() {
                     <td>{references.length ? <details className="platform-audit-reference"><summary>View {references.length} reference{references.length > 1 ? "s" : ""}</summary><dl>{references.map((key) => <div key={key}><dt>{humanizeField(key)}</dt><dd title={details[key]}>{shortReference(details[key])}</dd></div>)}</dl></details> : "—"}</td>
                   </tr>;
                 })}
-                {loadingCommercialEvents && !commercialEvents.length && <tr><td colSpan="5" className="platform-table-message" role="status">Loading commercial events…</td></tr>}
-                {!loadingCommercialEvents && !commercialEvents.length && <tr><td colSpan="5" className="platform-table-message">{eventsError ? "Commercial events could not be loaded." : "No commercial events recorded yet."}</td></tr>}
+                {!commercialEvents.length && <tr><td colSpan="5" className="platform-table-message">{eventsError ? "Commercial events could not be loaded." : "No commercial events recorded yet."}</td></tr>}
               </tbody></table></div>
               <div className="platform-pagination">
                 <span>{commercialPagination.total === 0 ? "No results" : `Showing ${(commercialPagination.page - 1) * commercialPagination.limit + 1}–${Math.min(commercialPagination.page * commercialPagination.limit, commercialPagination.total)} of ${commercialPagination.total}`}</span>
                 <div>
-                  <button type="button" className="platform-page-button" disabled={loadingCommercialEvents || commercialPagination.page <= 1} onClick={() => setCommercialPagination((current) => ({ ...current, page: current.page - 1 }))}>Previous</button>
+                  <button type="button" className="platform-page-button" disabled={commercialPagination.page <= 1} onClick={() => setCommercialPagination((current) => ({ ...current, page: current.page - 1 }))}>Previous</button>
                   <span className="platform-page-count">Page {commercialPagination.page}{commercialPagination.totalPages > 0 ? ` of ${commercialPagination.totalPages}` : ""}</span>
-                  <button type="button" className="platform-page-button" disabled={loadingCommercialEvents || commercialPagination.totalPages === 0 || commercialPagination.page >= commercialPagination.totalPages} onClick={() => setCommercialPagination((current) => ({ ...current, page: current.page + 1 }))}>Next</button>
+                  <button type="button" className="platform-page-button" disabled={commercialPagination.totalPages === 0 || commercialPagination.page >= commercialPagination.totalPages} onClick={() => setCommercialPagination((current) => ({ ...current, page: current.page + 1 }))}>Next</button>
                 </div>
               </div>
             </section>
