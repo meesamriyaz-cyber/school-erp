@@ -141,6 +141,11 @@ export async function assignSchoolSubscription(req, res, next) {
     const { schoolId } = req.params;
     const { planId, notes = "", dueAt } = req.body ?? {};
     if (!validId(schoolId) || !validId(planId)) return fail(res, 400, "Valid school and plan IDs are required");
+    if (typeof notes !== "string" || notes.length > 500) return fail(res, 400, "Notes must be 500 characters or fewer");
+    if (dueAt !== undefined && dueAt !== null && dueAt !== "") {
+      const parsedDueAt = new Date(dueAt);
+      if (Number.isNaN(parsedDueAt.getTime())) return fail(res, 400, "Invoice due date must be a valid date");
+    }
     const [school, plan] = await Promise.all([Tenant.findById(schoolId).session(session), SubscriptionPlan.findOne({ _id: planId, isActive: true, isArchived: false }).session(session)]);
     if (!school) return fail(res, 404, "School not found");
     if (!plan) return fail(res, 404, "Active subscription plan not found");
@@ -203,8 +208,12 @@ export async function recordPlatformPayment(req, res, next) {
     const { invoiceId } = req.params;
     const { amount, paymentDate = new Date(), method, reference = "", notes = "" } = req.body ?? {};
     if (!validId(invoiceId)) return fail(res, 400, "Invalid invoice ID");
-    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return fail(res, 400, "Payment amount must be greater than zero");
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0 || money(amount) <= 0) return fail(res, 400, "Payment amount must be greater than zero");
     if (!["bank_transfer", "upi", "card", "cash", "cheque", "other"].includes(method)) return fail(res, 400, "Invalid payment method");
+    const parsedPaymentDate = new Date(paymentDate);
+    if (Number.isNaN(parsedPaymentDate.getTime())) return fail(res, 400, "Payment date must be a valid date");
+    if (typeof reference !== "string" || reference.length > 120) return fail(res, 400, "Payment reference must be 120 characters or fewer");
+    if (typeof notes !== "string" || notes.length > 500) return fail(res, 400, "Payment notes must be 500 characters or fewer");
     let result;
     await session.withTransaction(async () => {
       const invoice = await PlatformInvoice.findById(invoiceId).session(session);
@@ -214,7 +223,7 @@ export async function recordPlatformPayment(req, res, next) {
       if (Number(amount) > outstanding + 0.001) throw Object.assign(new Error("Payment exceeds invoice outstanding balance"), { statusCode: 400 });
       const [payment] = await PlatformPayment.create([{
         tenantId: invoice.tenantId, invoiceId: invoice._id, amount: money(amount), currency: invoice.currency,
-        paymentDate: new Date(paymentDate), method, reference, notes, recordedBy: actorId(req),
+        paymentDate: parsedPaymentDate, method, reference, notes, recordedBy: actorId(req),
       }], { session });
       const collected = money(outstanding - Number(amount));
       invoice.status = collected <= 0 ? "paid" : "partially_paid";
@@ -481,14 +490,20 @@ export async function reversePlatformPayment(req, res, next) {
 
 export async function listCommercialEvents(req, res, next) {
   try {
-    const page = Math.max(1, Number.parseInt(req.query.page ?? "1", 10));
-    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit ?? "25", 10)));
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 25);
+    const allowedActions = ["PLAN_CREATED", "PLAN_UPDATED", "PLAN_ARCHIVED", "SUBSCRIPTION_ASSIGNED", "SUBSCRIPTION_ACTIVATED", "SUBSCRIPTION_RENEWED", "PAYMENT_RECORDED", "PAYMENT_REVERSED", "RENEWAL_INVOICED", "TRIAL_STARTED"];
+    if (!Number.isInteger(page) || page < 1) return fail(res, 400, "Page must be a positive integer");
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) return fail(res, 400, "Limit must be between 1 and 100");
     const filter = {};
     if (req.query.schoolId !== undefined) {
       if (!validId(req.query.schoolId)) return fail(res, 400, "Invalid school ID");
       filter.tenantId = req.query.schoolId;
     }
-    if (req.query.action !== undefined) filter.action = req.query.action;
+    if (req.query.action !== undefined) {
+      if (typeof req.query.action !== "string" || !allowedActions.includes(req.query.action)) return fail(res, 400, "Invalid commercial event action");
+      filter.action = req.query.action;
+    }
     const [events, total] = await Promise.all([
       PlatformCommercialEvent.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).populate("tenantId", "name slug").lean(),
       PlatformCommercialEvent.countDocuments(filter),
