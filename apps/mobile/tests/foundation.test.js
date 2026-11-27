@@ -138,6 +138,16 @@ test('platform admin has a dedicated mobile workspace for cross-school directori
   assert.match(screen, /suspensionReason/);
   assert.match(screen, /System audit/);
   assert.match(screen, /Commercial audit/);
+  assert.match(screen, /User details/);
+  assert.match(screen, /EDIT PROFILE/);
+  assert.match(screen, /ROLE MANAGEMENT/);
+  assert.match(screen, /ACCOUNT ACCESS/);
+  assert.match(screen, /\/platform\/users\//);
+  assert.match(screen, /Save profile/);
+  assert.match(screen, /Save role/);
+  assert.match(screen, /Activate user/);
+  assert.match(screen, /Suspend user/);
+  assert.match(screen, /Reactivate user/);
 });
 
 
