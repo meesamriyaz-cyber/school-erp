@@ -91,7 +91,9 @@ if (
       if (!tenant || tenant.status !== "active") {
         return res.status(403).json({
           success: false,
-          message: "School is inactive; access is not available",
+          message: tenant?.status === "trial_expired"
+            ? "Your school's 30-day free trial has ended. Access is restricted until a paid subscription is activated."
+            : "School is inactive; access is not available",
         });
       }
     }
