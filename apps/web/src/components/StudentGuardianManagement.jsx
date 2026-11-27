@@ -238,7 +238,7 @@ export default function StudentGuardianManagement({
     setError("");
     setNotice("");
     try {
-      const response = await apiRequest(`/guardians/${encodeURIComponent(link.guardianId._id)}`, {
+      if (link.relationship === "mother") {\n        await apiRequest(`/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(link._id)}`, { method: "PATCH", accessToken, body: { receivesCommunication: false } });\n      }\n      const response = await apiRequest(`/guardians/${encodeURIComponent(link.guardianId._id)}`, {
         method: "PATCH",
         accessToken,
         body: {
@@ -390,7 +390,7 @@ export default function StudentGuardianManagement({
 
           <label>
             Relationship *
-            <select value={relationship} onChange={(event) => setRelationship(event.target.value)}>
+            <select value={relationship} onChange={(event) => {\n              const nextRelationship = event.target.value;\n              setRelationship(nextRelationship);\n              if (nextRelationship === "mother") setFlags((current) => ({ ...current, isPrimary: false, receivesCommunication: false, canAccessPortal: false }));\n            }}>
               {RELATIONSHIPS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
