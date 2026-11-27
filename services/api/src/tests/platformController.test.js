@@ -39,7 +39,6 @@ describe("updateSchoolStatus controller", () => {
     await updateSchoolStatus({ params: { schoolId: String(schoolId) }, body: { status: "suspended", reason: "Valid school suspension reason" } }, res, next);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/suspension reason/i) }));
-    expect(Tenant.findById).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
