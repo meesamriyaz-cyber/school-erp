@@ -312,6 +312,44 @@ describe("PlatformAdminWorkspace school directory", () => {
     expect(await screen.findByRole("button", { name: "Suspend school" })).toBeInTheDocument();
   });
 
+  it("requires and submits a reason when suspending a school, then displays its history", async () => {
+    const user = userEvent.setup();
+    apiRequest
+      .mockResolvedValueOnce(pageOne)
+      .mockResolvedValueOnce({ success: true, data: [] })
+      .mockResolvedValueOnce({ success: true, data: { subscription: null } })
+      .mockResolvedValueOnce({
+        success: true,
+        data: { school: { id: "school-1", name: "Green Valley School", status: "active", timezone: "Asia/Kolkata" }, administrators: [] },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        message: "School status updated to suspended",
+        data: { school: {
+          id: "school-1", name: "Green Valley School", status: "suspended",
+          suspensionReason: "Outstanding compliance documentation",
+          suspensionHistory: [{ reason: "Outstanding compliance documentation", suspendedAt: "2026-11-27T10:00:00.000Z" }],
+        } },
+      });
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Schools/ }));
+    await screen.findByText("Green Valley School");
+    await user.click(screen.getByRole("button", { name: "Green Valley School" }));
+
+    const suspendButton = await screen.findByRole("button", { name: "Suspend school" });
+    expect(suspendButton).toBeDisabled();
+    const reason = screen.getByLabelText(/Reason for suspension/);
+    await user.type(reason, "Outstanding compliance documentation");
+    await user.click(suspendButton);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("School status updated to suspended");
+    expect(apiRequest).toHaveBeenCalledWith("/platform/schools/school-1/status", expect.objectContaining({
+      method: "PATCH", body: { status: "suspended", reason: "Outstanding compliance documentation" },
+    }));
+    expect(await screen.findByText("Suspension history")).toBeInTheDocument();
+    expect(screen.getByText("Outstanding compliance documentation")).toBeInTheDocument();
+  });
+
   it("shows a useful error when a school status update fails", async () => {
     const user = userEvent.setup();
     apiRequest
