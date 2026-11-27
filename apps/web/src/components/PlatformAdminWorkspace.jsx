@@ -942,12 +942,14 @@ export default function PlatformAdminWorkspace() {
                   (businessOverview.schools?.byStatus || []).map((item) => [item._id, item.count]),
                 );
                 const subscriptionEntries = Object.entries(businessOverview.subscriptions || {});
+                const recurringEntries = subscriptionEntries.filter(([, metrics]) => metrics.activeSubscriptions > 0);
                 const invoiceEntries = businessOverview.invoiced || [];
                 const collectionEntries = businessOverview.collected || [];
                 const collectionByCurrency = new Map(collectionEntries.map((item) => [item._id, item]));
                 const financialCurrencies = [...new Set([
                   ...invoiceEntries.map((item) => item._id),
                   ...collectionEntries.map((item) => item._id),
+                  ...subscriptionEntries.map(([currency]) => currency),
                 ])];
                 const pastDueSubscriptions = businessOverview.subscriptionStatusCounts?.past_due || 0;
                 const pendingSubscriptions = businessOverview.subscriptionStatusCounts?.pending || 0;
@@ -971,7 +973,7 @@ export default function PlatformAdminWorkspace() {
 
                       <article className="platform-overview-kpi">
                         <div className="platform-overview-kpi-top"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Monthly recurring revenue</span></div>
-                        {subscriptionEntries.length ? subscriptionEntries.map(([currency, metrics]) => (
+                        {recurringEntries.length ? recurringEntries.map(([currency, metrics]) => (
                           <strong className="platform-overview-multi-value" key={currency}>{formatCurrency(metrics.mrr, currency)} <small>{currency} / month</small></strong>
                         )) : <strong>—</strong>}
                         <p>Annualised recurring value is shown below by currency.</p>
@@ -1002,7 +1004,7 @@ export default function PlatformAdminWorkspace() {
                               const recurring = businessOverview.subscriptions?.[currency] || {};
                               return (
                                 <div className="platform-finance-row" key={currency}>
-                                  <div className="platform-finance-currency"><strong>{currency}</strong><span>{formatCurrency(recurring.arr, currency)} annual recurring</span></div>
+                                  <div className="platform-finance-currency"><strong>{currency}</strong><span>{formatCurrency(recurring.arr, currency)} annual recurring · {formatCurrency(recurring.lifetimeSales, currency)} lifetime sales</span></div>
                                   <div><span>Invoiced</span><strong>{formatCurrency(invoice.invoiced, currency)}</strong></div>
                                   <div><span>Collected</span><strong>{formatCurrency(collection.collected, currency)}</strong></div>
                                   <div><span>Overdue</span><strong className={Number(invoice.overdue || 0) > 0 ? "platform-value-warning" : ""}>{formatCurrency(invoice.overdue, currency)}</strong></div>
@@ -1023,7 +1025,7 @@ export default function PlatformAdminWorkspace() {
                           <button type="button" onClick={() => setActivePage("Schools")}><span><strong>{schoolStatuses.suspended || 0}</strong><small>Suspended schools</small></span><span>Review schools →</span></button>
                           <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{pastDueSubscriptions}</strong><small>Past-due subscriptions</small></span><span>Review billing →</span></button>
                           <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{businessOverview.renewalsDueSoon || 0}</strong><small>Renewals due in 30 days</small></span><span>Review billing →</span></button>
-                          <button type="button" onClick={() => setActivePage("Plans")}><span><strong>{pendingSubscriptions}</strong><small>Pending subscriptions</small></span><span>View plans →</span></button>
+                          <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{pendingSubscriptions}</strong><small>Pending subscriptions</small></span><span>Review billing →</span></button>
                         </div>
                       </section>
                     </div>
