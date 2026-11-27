@@ -194,7 +194,7 @@ export function StudentWorkspaceScreen({ user }) {
         {["father", "mother"].map((relationship) => {
           const parent = (profile?.parents || []).find((item) => item.relationship === relationship);
           return { key: relationship, label: relationship === "father" ? "Father" : "Mother", name: parent?.name || "Details not added", photoUrl: parent?.photoUrl, phone: parent?.phone, email: parent?.email, emailVerified: parent?.emailVerified };
-        })].map((person) => <View key={person.key} style={styles.familyPerson}>
+        }).map((person) => <View key={person.key} style={styles.familyPerson}>
           <View style={styles.avatarCircle}>{person.photoUrl && !failedPhotos[person.key] ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage} onError={() => setFailedPhotos((previous) => ({ ...previous, [person.key]: true }))}/> : <Text style={styles.avatarInitial}>{person.key === "father" ? "F" : "M"}</Text>}</View>
           <Text style={styles.familyLabel}>{person.label}</Text>
           <Text style={styles.familyName} numberOfLines={2}>{person.name || "Not available"}</Text>
