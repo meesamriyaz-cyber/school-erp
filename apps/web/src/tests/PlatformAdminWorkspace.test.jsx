@@ -340,7 +340,7 @@ describe("PlatformAdminWorkspace school directory", () => {
     expect(suspendButton).toBeDisabled();
     const reason = screen.getByLabelText(/Reason for suspension/);
     await user.type(reason, "Outstanding compliance documentation");
-    await user.click(suspendButton);
+    await user.click(screen.getByRole("button", { name: "Suspend school" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent("School status updated to suspended");
     expect(apiRequest).toHaveBeenCalledWith("/platform/schools/school-1/status", expect.objectContaining({
