@@ -876,7 +876,7 @@ it("changes a user's role and updates the profile", async () => {
     await user.click(screen.getByRole("button", { name: /System audit/ }));
 
     expect(await screen.findByRole("table", { name: "System audit event log" })).toBeInTheDocument();
-    expect(screen.getByText("USER ROLE CHANGED")).toBeInTheDocument();
+    expect(screen.getByText("User role changed")).toBeInTheDocument();
     expect(screen.getByText("teacher → principal")).toBeInTheDocument();
     expect(screen.getByText("Temporary database issue")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
