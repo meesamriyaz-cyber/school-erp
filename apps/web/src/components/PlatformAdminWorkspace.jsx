@@ -136,6 +136,7 @@ export default function PlatformAdminWorkspace() {
   const [updatingSchoolStatus, setUpdatingSchoolStatus] = useState(false);
   const [schoolStatusError, setSchoolStatusError] = useState("");
   const [schoolStatusSuccess, setSchoolStatusSuccess] = useState("");
+  const [suspensionReasonInput, setSuspensionReasonInput] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [userDetails, setUserDetails] = useState(null);
   const [loadingUserDetails, setLoadingUserDetails] = useState(false);
@@ -644,7 +645,7 @@ export default function PlatformAdminWorkspace() {
   try {
     const response = await apiRequest(
       `/platform/users/${encodeURIComponent(selectedUserId)}/status`,
-      { method: "PATCH", accessToken, body: { status } },
+      { method: "PATCH", accessToken, body: status === "suspended" ? { status, reason: suspensionReasonInput.trim() } : { status } },
     );
 
     const updatedUser = response?.data?.user ?? response?.user;
@@ -796,6 +797,10 @@ export default function PlatformAdminWorkspace() {
 
   const updateSchoolStatus = async (status) => {
     if (!selectedSchoolId || updatingSchoolStatus) return;
+    if (status === "suspended" && suspensionReasonInput.trim().length < 10) {
+      setSchoolStatusError("Enter a suspension reason of at least 10 characters.");
+      return;
+    }
     setUpdatingSchoolStatus(true);
     setSchoolStatusError("");
     setSchoolStatusSuccess("");
@@ -815,6 +820,7 @@ export default function PlatformAdminWorkspace() {
           : { ...current, ...updatedSchool };
       });
       setSchoolStatusSuccess(response?.message || `School status updated to ${status}.`);
+      if (status === "suspended") setSuspensionReasonInput("");
       setReloadCount((count) => count + 1);
     } catch (error) {
       setSchoolStatusError(error.message || "Unable to update the school status. Please retry.");
@@ -1251,9 +1257,14 @@ export default function PlatformAdminWorkspace() {
                         </button>
                       )}
                       {school.status === "active" && (
-                        <button type="button" className="platform-secondary-button" onClick={() => void updateSchoolStatus("suspended")} disabled={updatingSchoolStatus}>
-                          {updatingSchoolStatus ? "Updating…" : "Suspend school"}
-                        </button>
+                        <div className="platform-suspension-form">
+                          <label htmlFor="platform-suspension-reason">Reason for suspension <span aria-hidden="true">*</span></label>
+                          <textarea id="platform-suspension-reason" value={suspensionReasonInput} onChange={(event) => { setSuspensionReasonInput(event.target.value); setSchoolStatusError(""); }} rows={3} maxLength={500} placeholder="Explain why this school is being suspended (10–500 characters)." aria-describedby="platform-suspension-help" />
+                          <small id="platform-suspension-help">{suspensionReasonInput.trim().length}/500 characters · Minimum 10 characters</small>
+                          <button type="button" className="platform-secondary-button" onClick={() => void updateSchoolStatus("suspended")} disabled={updatingSchoolStatus || suspensionReasonInput.trim().length < 10}>
+                            {updatingSchoolStatus ? "Suspending…" : "Suspend school"}
+                          </button>
+                        </div>
                       )}
                       {school.status === "suspended" && (
                         <button type="button" className="platform-primary-button" onClick={() => void updateSchoolStatus("active")} disabled={updatingSchoolStatus}>
@@ -1264,6 +1275,18 @@ export default function PlatformAdminWorkspace() {
                     {schoolStatusSuccess && <p role="status">{schoolStatusSuccess}</p>}
                     {schoolStatusError && <div className="platform-directory-error" role="alert"><p>{schoolStatusError}</p><button type="button" onClick={() => void updateSchoolStatus(school.status === "pending" || school.status === "suspended" ? "active" : "suspended")} disabled={updatingSchoolStatus}>Retry</button></div>}
                   </section>
+                  {(school.suspensionHistory?.length > 0 || school.suspensionReason) && (
+                    <section className="platform-lifecycle-controls platform-suspension-history" aria-label="School suspension history">
+                      <div><h3>Suspension history</h3><p>Recorded reasons for previous and current suspensions.</p></div>
+                      {[...(school.suspensionHistory || [])].sort((a, b) => new Date(b.suspendedAt || 0) - new Date(a.suspendedAt || 0)).map((entry, index) => (
+                        <article className="platform-suspension-record" key={entry._id || `${entry.suspendedAt}-${index}`}>
+                          <strong>{formatDate(entry.suspendedAt)}</strong>
+                          <p>{entry.reason}</p>
+                        </article>
+                      ))}
+                      {!school.suspensionHistory?.length && school.suspensionReason && <article className="platform-suspension-record"><strong>Most recent reason</strong><p>{school.suspensionReason}</p></article>}
+                    </section>
+                  )}
                   <section className="platform-lifecycle-controls" aria-label="School subscription management">
                     <div><h3>Subscription</h3><p>Assign monthly, discounted annual, or negotiated lifetime access. Access activates only after the invoice is fully paid.</p></div>
                     {schoolSubscription && <div className="platform-current-subscription"><strong>Current subscription</strong><span>{schoolSubscription.planName || "Assigned plan"} · {schoolSubscription.billingInterval === "one_time" ? "Lifetime access" : statusLabel(schoolSubscription.billingInterval)}</span><span>{statusLabel(schoolSubscription.status)} · {schoolSubscription.currency} {Number(schoolSubscription.amount || 0).toLocaleString("en-IN")}</span><small>{schoolSubscription.nextBillingAt ? `Next billing: ${formatDate(schoolSubscription.nextBillingAt)}` : schoolSubscription.lifetimeAccess ? "No renewal or expiry" : schoolSubscription.currentPeriodEndsAt ? `Period ends: ${formatDate(schoolSubscription.currentPeriodEndsAt)}` : "Billing date pending"}</small></div>}
