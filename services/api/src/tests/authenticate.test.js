@@ -11,8 +11,11 @@ vi.mock("../models/User.js", () => ({
 vi.mock("../models/Tenant.js", () => ({
   default: {
     findById: vi.fn(),
+    findOneAndUpdate: vi.fn(),
   },
 }));
+
+vi.mock("../models/SchoolSubscription.js", () => ({ default: { updateMany: vi.fn() } }));
 
 vi.mock("../utils/tokens.js", () => ({
   verifyAccessToken: vi.fn(),
@@ -20,6 +23,7 @@ vi.mock("../utils/tokens.js", () => ({
 
 import User from "../models/User.js";
 import Tenant from "../models/Tenant.js";
+import SchoolSubscription from "../models/SchoolSubscription.js";
 import { verifyAccessToken } from "../utils/tokens.js";
 import authenticate from "../middleware/authenticate.js";
 
@@ -243,6 +247,32 @@ describe("authenticate middleware", () => {
       success: false,
       message: "Account permissions have changed; sign in again",
     });
+  });
+
+  it("automatically expires a trial and restricts school access after 30 days", async () => {
+    const expiredTenant = { _id: tenantId, status: "trial_expired" };
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ _id: tenantId, status: "active", trialEndsAt: new Date(Date.now() - 1000) }),
+      }),
+    });
+    Tenant.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(expiredTenant) }),
+    });
+    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 1 });
+
+    await authenticate(req, res, next);
+
+    expect(Tenant.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: tenantId, status: "active", trialEndsAt: expect.objectContaining({ $lte: expect.any(Date) }) }),
+      expect.objectContaining({ $set: expect.objectContaining({ status: "trial_expired" }) }),
+      { new: true },
+    );
+    expect(SchoolSubscription.updateMany).toHaveBeenCalledWith(
+      { tenantId, isTrial: true, status: "active" }, { $set: { status: "expired" } },
+    );
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("rejects a school user when the school is suspended", async () => {
