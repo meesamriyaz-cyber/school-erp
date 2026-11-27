@@ -51,6 +51,8 @@ export default function StudentGuardianManagement({
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedGuardianId, setSelectedGuardianId] = useState("__new__");
   const [guardianForm, setGuardianForm] = useState(EMPTY_GUARDIAN);
+  const [guardianPhotoFile, setGuardianPhotoFile] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [relationship, setRelationship] = useState("other");
   const [flags, setFlags] = useState(EMPTY_FLAGS);
   const [saving, setSaving] = useState(false);
@@ -105,6 +107,24 @@ export default function StudentGuardianManagement({
   const linkedGuardianIds = new Set(links.map((link) => String(link.guardianId?._id || link.guardianId)));
   const availableGuardians = guardians.filter((guardian) => !linkedGuardianIds.has(String(guardian._id)));
 
+  const uploadGuardianPhoto = async (guardianId, file) => {
+    if (!file) return null;
+    if (!["image/jpeg", "image/png"].includes(file.type) || file.size > 5 * 1024 * 1024) throw new Error("Choose a JPG or PNG image up to 5 MB.");
+    const signatureResponse = await apiRequest(`/guardians/${encodeURIComponent(guardianId)}/photo-signature`, { method: "POST", accessToken, body: {} });
+    if (!signatureResponse?.success || !signatureResponse.data) throw new Error("Could not prepare secure photo upload.");
+    const signature = signatureResponse.data;
+    const payload = new FormData();
+    payload.append("file", file); payload.append("api_key", signature.apiKey); payload.append("timestamp", String(signature.timestamp));
+    payload.append("folder", signature.folder); payload.append("public_id", signature.publicId);
+    payload.append("allowed_formats", signature.allowedFormats); payload.append("signature", signature.signature);
+    const uploadResponse = await fetch(`https://api.cloudinary.com/v1_1/${signature.cloudName}/image/upload`, { method: "POST", body: payload });
+    const uploaded = await uploadResponse.json();
+    if (!uploadResponse.ok || !uploaded.secure_url) throw new Error(uploaded.error?.message || "Guardian photo upload failed.");
+    const saved = await apiRequest(`/guardians/${encodeURIComponent(guardianId)}`, { method: "PATCH", accessToken, body: { photoUrl: uploaded.secure_url } });
+    if (!saved?.success || !saved.data) throw new Error("Photo uploaded, but could not be attached to the guardian record.");
+    return uploaded.secure_url;
+  };
+
   const handleAddGuardian = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -133,6 +153,7 @@ export default function StudentGuardianManagement({
           throw new Error("Guardian could not be created.");
         }
         guardianId = guardianResponse.data._id;
+        if (guardianPhotoFile) { setUploadingPhoto(true); await uploadGuardianPhoto(guardianId, guardianPhotoFile); setUploadingPhoto(false); }
         if (guardianForm.email.trim()) {
           try {
             await apiRequest(`/guardians/${encodeURIComponent(guardianId)}/email-verification/send`, { method: "POST", accessToken, body: { email: guardianForm.email.trim() } });
@@ -163,6 +184,7 @@ export default function StudentGuardianManagement({
 
       setShowAddForm(false);
       setGuardianForm(EMPTY_GUARDIAN);
+      setGuardianPhotoFile(null);
       setSelectedGuardianId("__new__");
       setRelationship("other");
       setFlags(relationship === "mother" ? { ...EMPTY_FLAGS, receivesCommunication: false, isPrimary: false, canAccessPortal: false } : EMPTY_FLAGS);
@@ -380,14 +402,10 @@ export default function StudentGuardianManagement({
                 />
               </label>
               <label className="student-guardian-form-full">
-                Parent photo URL (HTTPS)
-                <input
-                  type="url"
-                  value={guardianForm.photoUrl}
-                  onChange={(event) => setGuardianForm((current) => ({ ...current, photoUrl: event.target.value }))}
-                  placeholder="https://…"
-                />
+                Guardian photo (JPG or PNG, up to 5 MB)
+                <input type="file" accept="image/jpeg,image/png" onChange={(event) => setGuardianPhotoFile(event.target.files?.[0] || null)} />
               </label>
+              {guardianPhotoFile && <p className="student-guardian-permission-help">Selected photo: {guardianPhotoFile.name}. It uploads securely when you save the guardian.</p>}
             </div>
           )}
 
@@ -424,7 +442,7 @@ export default function StudentGuardianManagement({
 
           <div className="student-guardian-form-actions">
             <button type="submit" className="student-guardian-primary-button" disabled={saving}>
-              {saving ? "Saving…" : "Save guardian"}
+              {uploadingPhoto ? "Uploading photo…" : saving ? "Saving…" : "Save guardian"}
             </button>
             <button type="button" onClick={() => setShowAddForm(false)} disabled={saving}>
               Cancel
