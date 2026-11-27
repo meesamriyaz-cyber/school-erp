@@ -280,7 +280,7 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
   });
 
   it("keeps the registered mother enabled as primary when importing her details", async () => {
-    const admissionNumber = `MOTHER-PRIMARY-${randomUUID()}`;
+    const admissionNumber = `MOTHER-P-${randomUUID().slice(0, 8)}`;
     const created = await request("/students", {
       method: "POST", token: adminA.token,
       body: JSON.stringify({
