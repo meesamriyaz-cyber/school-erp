@@ -10,6 +10,7 @@ const navigation = [
   { label: "Plans", icon: "◇" },
   { label: "Billing", icon: "₹" },
   { label: "Commercial audit", icon: "≡" },
+  { label: "System audit", icon: "⌁" },
 ];
 
 const PAGE_SIZE = 20;
@@ -111,6 +112,17 @@ export default function PlatformAdminWorkspace() {
   const [paymentBusyId, setPaymentBusyId] = useState("");
   const [commercialEvents, setCommercialEvents] = useState([]);
   const [eventsError, setEventsError] = useState("");
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditPagination, setAuditPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [auditActionFilter, setAuditActionFilter] = useState("");
+  const [auditTenantFilter, setAuditTenantFilter] = useState("");
+  const [auditFromFilter, setAuditFromFilter] = useState("");
+  const [auditToFilter, setAuditToFilter] = useState("");
+  const [auditLogsError, setAuditLogsError] = useState("");
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  const [auditOutbox, setAuditOutbox] = useState(null);
+  const [auditOutboxError, setAuditOutboxError] = useState("");
+  const [retryingAuditId, setRetryingAuditId] = useState("");
   const [assignPlanId, setAssignPlanId] = useState("");
   const [assignDueAt, setAssignDueAt] = useState("");
   const [assignNotes, setAssignNotes] = useState("");
@@ -163,6 +175,37 @@ export default function PlatformAdminWorkspace() {
       .catch((error) => { if (!controller.signal.aborted) setEventsError(error.message || "Unable to load commercial events."); });
     return () => controller.abort();
   }, [activePage, accessToken, reloadCount]);
+
+  useEffect(() => {
+    if (activePage !== "System audit") return undefined;
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      page: String(auditPagination.page),
+      limit: String(auditPagination.limit),
+    });
+    if (auditActionFilter) params.set("action", auditActionFilter);
+    if (auditTenantFilter.trim()) params.set("tenantId", auditTenantFilter.trim());
+    if (auditFromFilter) params.set("from", new Date(`${auditFromFilter}T00:00:00.000`).toISOString());
+    if (auditToFilter) params.set("to", new Date(`${auditToFilter}T23:59:59.999`).toISOString());
+    setLoadingAuditLogs(true);
+    setAuditLogsError("");
+    setAuditOutboxError("");
+    Promise.all([
+      apiRequest(`/platform/audit-logs?${params.toString()}`, { accessToken, signal: controller.signal }),
+      apiRequest("/platform/audit-outbox", { accessToken, signal: controller.signal }),
+    ]).then(([logsResponse, outboxResponse]) => {
+      if (controller.signal.aborted) return;
+      setAuditLogs(Array.isArray(logsResponse?.data) ? logsResponse.data : []);
+      setAuditPagination((current) => ({ ...current, ...(logsResponse?.pagination ?? {}) }));
+      setAuditOutbox(outboxResponse?.data ?? null);
+    }).catch((error) => {
+      if (controller.signal.aborted || error.name === "AbortError") return;
+      setAuditLogsError(error.message || "Unable to load system audit records.");
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoadingAuditLogs(false);
+    });
+    return () => controller.abort();
+  }, [activePage, accessToken, auditPagination.page, auditActionFilter, auditTenantFilter, auditFromFilter, auditToFilter, reloadCount]);
 
   useEffect(() => {
     if (activePage !== "Overview") return undefined;
@@ -403,6 +446,24 @@ export default function PlatformAdminWorkspace() {
       const response = await apiRequest("/platform/invoices", { accessToken });
       setInvoices(response?.data ?? []);
     } catch (error) { setBillingError(error.message || "Unable to reverse payment."); }
+  };
+
+  const retryAuditEvent = async (eventId) => {
+    if (!eventId || retryingAuditId) return;
+    setRetryingAuditId(eventId);
+    setAuditOutboxError("");
+    try {
+      await apiRequest(`/platform/audit-outbox/${encodeURIComponent(eventId)}/retry`, {
+        method: "POST",
+        accessToken,
+      });
+      const response = await apiRequest("/platform/audit-outbox", { accessToken });
+      setAuditOutbox(response?.data ?? null);
+    } catch (error) {
+      setAuditOutboxError(error.message || "Unable to retry the audit event.");
+    } finally {
+      setRetryingAuditId("");
+    }
   };
 
   const openCreateUser = () => {
@@ -893,6 +954,76 @@ export default function PlatformAdminWorkspace() {
                   <tr key={key}><td><strong>{invoice.invoiceNumber}</strong></td><td>{invoice.tenantId?.name || "School"}</td><td>{formatDate(invoice.issuedAt)} / {formatDate(invoice.dueAt)}</td><td>{invoice.currency} {Number(invoice.totalAmount).toLocaleString("en-IN")}</td><td>{statusLabel(invoice.status)}</td><td>{["paid", "void"].includes(invoice.status) ? "—" : <div className="platform-payment-inline"><input aria-label={`Payment amount for ${invoice.invoiceNumber}`} type="number" min="0.01" max={invoice.outstandingAmount} step="0.01" value={form.amount} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, amount: event.target.value } }))} /><select aria-label={`Payment method for ${invoice.invoiceNumber}`} value={form.method} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, method: event.target.value } }))}><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="card">Card</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="other">Other</option></select><input aria-label={`Payment reference for ${invoice.invoiceNumber}`} placeholder="Reference" value={form.reference || ""} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, reference: event.target.value } }))} /><button className="platform-primary-button" type="button" disabled={paymentBusyId === key || !form.amount} onClick={() => void recordPayment(invoice)}>{paymentBusyId === key ? "Saving…" : "Record"}</button></div>}</td></tr>{(invoice.payments || []).map((payment) => <tr key={payment.id || payment._id}><td colSpan="2">Payment · {formatDate(payment.paymentDate)} · {payment.method?.replaceAll("_", " ")}</td><td>{payment.reference || "—"}</td><td>{payment.currency} {Number(payment.amount).toLocaleString("en-IN")}</td><td>{statusLabel(payment.status)}</td><td>{payment.status === "recorded" && <button type="button" className="platform-secondary-button" onClick={() => void reversePayment(payment)}>Reverse</button>}</td></tr>)}</>; })}
                 {!invoices.length && <tr><td colSpan="6" className="platform-table-message">No platform invoices found.</td></tr>}
               </tbody></table></div>
+            </section>
+          ) : activePage === "System audit" ? (
+            <section className="platform-directory" aria-label="System audit records">
+              <div className="platform-form-heading">
+                <div><h2>User and access audit</h2><p>Immutable records of platform user creation, profile changes, role changes and account status changes.</p></div>
+                <button type="button" className="platform-secondary-button" onClick={() => setReloadCount((count) => count + 1)}>Refresh audit</button>
+              </div>
+              <section className="platform-summary-grid" aria-label="Audit delivery status">
+                {[
+                  ["Pending", auditOutbox?.counts?.pending],
+                  ["Processing", auditOutbox?.counts?.processing],
+                  ["Stale processing", auditOutbox?.counts?.staleProcessing],
+                  ["Delivered", auditOutbox?.counts?.delivered],
+                  ["Failed", auditOutbox?.counts?.failed],
+                ].map(([label, value]) => <article className="platform-summary-card" key={label}><span className="platform-summary-label">{label} audit events</span><strong>{value ?? "—"}</strong></article>)}
+              </section>
+              {auditOutboxError && <div className="platform-directory-error" role="alert">{auditOutboxError}</div>}
+              {auditOutbox?.failedEvents?.length > 0 && (
+                <div className="platform-table-wrap platform-audit-failures">
+                  <h3>Failed audit deliveries</h3>
+                  <table className="platform-school-table" aria-label="Failed audit deliveries">
+                    <thead><tr><th>Last updated</th><th>Attempts</th><th>Manual retries</th><th>Last error</th><th>Action</th></tr></thead>
+                    <tbody>{auditOutbox.failedEvents.map((item) => <tr key={item.id}>
+                      <td>{formatDate(item.updatedAt)}</td><td>{item.attempts}</td><td>{item.manualRetryCount}</td><td>{item.lastError || "—"}</td>
+                      <td><button type="button" className="platform-secondary-button" onClick={() => void retryAuditEvent(item.id)} disabled={Boolean(retryingAuditId)}>{retryingAuditId === item.id ? "Retrying…" : "Retry delivery"}</button></td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+              )}
+              <div className="platform-form-heading platform-audit-heading">
+                <div><h2>Audit event log</h2><p>Most recent events appear first. Filter by action, school ID or date range.</p></div>
+              </div>
+              <div className="platform-audit-filters">
+                <label>Action
+                  <select aria-label="Filter audit action" value={auditActionFilter} onChange={(event) => { setAuditActionFilter(event.target.value); setAuditPagination((current) => ({ ...current, page: 1 })); }}>
+                    <option value="">All actions</option>
+                    <option value="USER_CREATED">User created</option>
+                    <option value="USER_PROFILE_UPDATED">Profile updated</option>
+                    <option value="USER_STATUS_CHANGED">Status changed</option>
+                    <option value="USER_ROLE_CHANGED">Role changed</option>
+                  </select>
+                </label>
+                <label>School ID<input aria-label="Filter audit school ID" value={auditTenantFilter} onChange={(event) => { setAuditTenantFilter(event.target.value); setAuditPagination((current) => ({ ...current, page: 1 })); }} placeholder="MongoDB school ID" /></label>
+                <label>From<input type="date" aria-label="Audit from date" value={auditFromFilter} onChange={(event) => { setAuditFromFilter(event.target.value); setAuditPagination((current) => ({ ...current, page: 1 })); }} /></label>
+                <label>To<input type="date" aria-label="Audit to date" value={auditToFilter} onChange={(event) => { setAuditToFilter(event.target.value); setAuditPagination((current) => ({ ...current, page: 1 })); }} /></label>
+              </div>
+              {auditLogsError && <div className="platform-directory-error" role="alert">{auditLogsError}</div>}
+              {loadingAuditLogs && <p role="status">Loading system audit…</p>}
+              <div className="platform-table-wrap">
+                <table className="platform-school-table" aria-label="System audit event log">
+                  <thead><tr><th>When</th><th>Actor</th><th>Target user</th><th>School</th><th>Action</th><th>Changed fields</th><th>Change</th></tr></thead>
+                  <tbody>
+                    {auditLogs.map((item) => <tr key={item.id}>
+                      <td>{formatDate(item.createdAt)}</td>
+                      <td>{item.actorRole?.replaceAll("_", " ") || "—"}<small>{item.actorUserId}</small></td>
+                      <td>{item.targetUserId}</td><td>{item.targetTenantId || "Platform"}</td>
+                      <td>{statusLabel(item.action?.replaceAll("_", " ").toLowerCase())}</td>
+                      <td>{item.changedFields?.join(", ") || "—"}</td>
+                      <td>{item.previousValue || "—"} → {item.newValue || "—"}</td>
+                    </tr>)}
+                    {!loadingAuditLogs && !auditLogs.length && <tr><td colSpan="7" className="platform-table-message">No audit records match these filters.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div className="platform-pagination">
+                <span>{auditPagination.total} audit records</span>
+                <div><button type="button" className="platform-secondary-button" disabled={auditPagination.page <= 1 || loadingAuditLogs} onClick={() => setAuditPagination((current) => ({ ...current, page: current.page - 1 }))}>Previous</button>
+                <span>Page {auditPagination.page} of {Math.max(1, auditPagination.totalPages)}</span>
+                <button type="button" className="platform-secondary-button" disabled={auditPagination.page >= auditPagination.totalPages || loadingAuditLogs} onClick={() => setAuditPagination((current) => ({ ...current, page: current.page + 1 }))}>Next</button></div>
+              </div>
             </section>
           ) : activePage === "Commercial audit" ? (
             <section className="platform-directory" aria-label="Commercial audit events">
