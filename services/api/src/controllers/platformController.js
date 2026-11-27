@@ -225,7 +225,7 @@ export const createSchool = async (req, res, next) => {
 };
 
 
-const SCHOOL_STATUSES = ["pending", "active", "suspended"];
+const SCHOOL_STATUSES = ["pending", "active", "suspended", "trial_expired"];
 
 // GET /api/v1/platform/schools
 export const listSchools = async (req, res, next) => {
