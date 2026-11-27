@@ -97,7 +97,9 @@ describe("StudentGuardianManagement", () => {
         body: expect.objectContaining({
           guardianId: "guardian-2",
           relationship: "mother",
-          isPrimary: true,
+          isPrimary: false,
+          receivesCommunication: false,
+          canAccessPortal: false,
         }),
       }),
     );
