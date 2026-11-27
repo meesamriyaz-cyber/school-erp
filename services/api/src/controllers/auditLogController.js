@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import AuditLog, { AUDIT_ACTIONS } from "../models/AuditLog.js";
+import User from "../models/User.js";
+import Tenant from "../models/Tenant.js";
 
 const sendError = (res, status, message) =>
   res.status(status).json({ success: false, message });
@@ -78,6 +80,9 @@ export const listAuditLogs = async (req, res, next) => {
     const [logs, total] = await Promise.all([
       AuditLog.find(filter)
         .select("_id actorUserId actorRole tenantId targetUserId targetTenantId action changedFields previousValue newValue createdAt")
+        .populate({ path: "actorUserId", model: User, select: "firstName lastName email" })
+        .populate({ path: "targetUserId", model: User, select: "firstName lastName email" })
+        .populate({ path: "targetTenantId", model: Tenant, select: "name slug" })
         .sort({ createdAt: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -89,11 +94,18 @@ export const listAuditLogs = async (req, res, next) => {
       success: true,
       data: logs.map((log) => ({
         id: String(log._id),
-        actorUserId: String(log.actorUserId),
+        actorUserId: String(log.actorUserId?._id ?? log.actorUserId),
+        actorName: log.actorUserId && typeof log.actorUserId === "object"
+          ? [log.actorUserId.firstName, log.actorUserId.lastName].filter(Boolean).join(" ") || log.actorUserId.email || null
+          : null,
         actorRole: log.actorRole,
         tenantId: log.tenantId ? String(log.tenantId) : null,
-        targetUserId: String(log.targetUserId),
-        targetTenantId: log.targetTenantId ? String(log.targetTenantId) : null,
+        targetUserId: String(log.targetUserId?._id ?? log.targetUserId),
+        targetUserName: log.targetUserId && typeof log.targetUserId === "object"
+          ? [log.targetUserId.firstName, log.targetUserId.lastName].filter(Boolean).join(" ") || log.targetUserId.email || null
+          : null,
+        targetTenantId: log.targetTenantId ? String(log.targetTenantId._id ?? log.targetTenantId) : null,
+        schoolName: log.targetTenantId && typeof log.targetTenantId === "object" ? log.targetTenantId.name : null,
         action: log.action,
         changedFields: log.changedFields ?? [],
         previousValue: log.previousValue ?? null,
