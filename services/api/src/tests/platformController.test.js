@@ -36,7 +36,12 @@ describe("updateSchoolStatus controller", () => {
     const schoolId = new mongoose.Types.ObjectId();
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     const next = vi.fn();
-    await updateSchoolStatus({ params: { schoolId: String(schoolId) }, body: { status: "suspended", reason: "Valid school suspension reason" } }, res, next);
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ _id: schoolId, name: "Active School", status: "active" }),
+      }),
+    });
+    await updateSchoolStatus({ params: { schoolId: String(schoolId) }, body: { status: "suspended" } }, res, next);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/suspension reason/i) }));
     expect(next).not.toHaveBeenCalled();
