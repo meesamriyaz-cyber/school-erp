@@ -427,8 +427,13 @@ export function PlatformAdminScreen({ user, onSignOut }) {
           </View>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>ROLE MANAGEMENT</Text>
-            {["school_admin", "principal", "teacher", "student", "parent"].map((role) => <TouchableOpacity key={role} disabled={userActionBusy} onPress={() => setUserRole(role)} style={[styles.roleOption, userRole === role && styles.roleOptionActive]}><Text style={[styles.roleOptionText, userRole === role && styles.roleOptionTextActive]}>{role.replaceAll("_", " ")}</Text><Text style={styles.roleOptionText}>{userRole === role ? "Selected" : ""}</Text></TouchableOpacity>)}
-            <TouchableOpacity disabled={userActionBusy || userRole === userDetails.role} onPress={updateUserRole} style={[styles.actionButton, userRole === userDetails.role && styles.disabled]}><Text style={styles.actionButtonText}>Save role</Text></TouchableOpacity>
+            {[...new Set(["school_admin", "principal", "teacher", "student", "parent", ...(userDetails.role && ["accountant", "librarian", "transport_manager"].includes(userDetails.role) ? [userDetails.role] : [])])].map((role) => {
+              const unsupported = ["accountant", "librarian", "transport_manager"].includes(role);
+              const isSelf = String(userDetails.id) === String(user?.id || user?._id);
+              return <TouchableOpacity key={role} disabled={userActionBusy || isSelf || unsupported} onPress={() => setUserRole(role)} style={[styles.roleOption, userRole === role && styles.roleOptionActive, (isSelf || unsupported) && styles.disabled]}><Text style={[styles.roleOptionText, userRole === role && styles.roleOptionTextActive]}>{role.replaceAll("_", " ")}{unsupported ? " · unsupported in this release" : ""}</Text><Text style={styles.roleOptionText}>{userRole === role ? "Selected" : ""}</Text></TouchableOpacity>;
+            })}
+            {String(userDetails.id) === String(user?.id || user?._id) ? <Text style={styles.metricHint}>You cannot change your own role.</Text> : null}
+            <TouchableOpacity disabled={userActionBusy || String(userDetails.id) === String(user?.id || user?._id) || userRole === userDetails.role || ["accountant", "librarian", "transport_manager"].includes(userRole)} onPress={updateUserRole} style={[styles.actionButton, (userRole === userDetails.role || String(userDetails.id) === String(user?.id || user?._id)) && styles.disabled]}><Text style={styles.actionButtonText}>Save role</Text></TouchableOpacity>
           </View>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>ACCOUNT ACCESS</Text>
@@ -464,7 +469,10 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         </View>
         <TouchableOpacity onPress={() => loadDirectory(true)} style={styles.refresh}><Text style={styles.refreshText}>{refreshing ? "Refreshing…" : "Refresh"}</Text></TouchableOpacity>
       </View>
-      {section === "users" ? <TouchableOpacity onPress={() => { setCreateUserMessage(""); setShowCreateUser(true); }} style={styles.actionButton}><Text style={styles.actionButtonText}>＋ Create user</Text></TouchableOpacity> : null}
+      {section === "users" ? <>
+         <TouchableOpacity onPress={() => { setCreateUserMessage(""); setShowCreateUser(true); }} style={styles.actionButton}><Text style={styles.actionButtonText}>＋ Create user</Text></TouchableOpacity>
+         {createUserMessage ? <Text style={styles.metricHint}>{createUserMessage}</Text> : null}
+       </> : null}
       <TextInput
         value={search}
         onChangeText={(value) => { setSearch(value); setPage(1); }}
@@ -476,7 +484,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
       />
       {section === "users" ? <View style={styles.metricCard}>
         <Text style={styles.metricLabel}>ROLE FILTER</Text>
-        {["", "school_admin", "principal", "teacher", "student", "parent"].map((value) => <TouchableOpacity key={value || "all-roles"} onPress={() => { setUserRoleFilter(value); setPage(1); }} style={[styles.roleOption, userRoleFilter === value && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{value ? value.replaceAll("_", " ") : "All roles"}</Text></TouchableOpacity>)}
+        {["", "school_admin", "principal", "teacher", "accountant", "librarian", "transport_manager", "student", "parent"].map((value) => <TouchableOpacity key={value || "all-roles"} onPress={() => { setUserRoleFilter(value); setPage(1); }} style={[styles.roleOption, userRoleFilter === value && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{value ? value.replaceAll("_", " ") : "All roles"}</Text></TouchableOpacity>)}
         <Text style={styles.metricLabel}>STATUS FILTER</Text>
         {["", "pending", "active", "suspended"].map((value) => <TouchableOpacity key={value || "all-status"} onPress={() => { setUserStatusFilter(value); setPage(1); }} style={[styles.roleOption, userStatusFilter === value && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{value || "All statuses"}</Text></TouchableOpacity>)}
         <Text style={styles.metricLabel}>SCHOOL FILTER</Text>
