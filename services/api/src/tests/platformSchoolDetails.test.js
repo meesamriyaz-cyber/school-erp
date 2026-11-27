@@ -30,6 +30,7 @@ describe("getSchoolDetails", () => {
 
     schoolQuery = {
       select: vi.fn().mockReturnThis(),
+      populate: vi.fn().mockReturnThis(),
       lean: vi.fn().mockResolvedValue({
         _id: "507f1f77bcf86cd799439011",
         name: "North School",
