@@ -107,4 +107,48 @@ describe("platform subscription payment lifecycle", () => {
     expect(subscription.status).toBe("past_due");
     expect(subscription.save).toHaveBeenCalledWith({ session });
   });
+
+  it("advances a renewal period once and does not advance it again after a replacement payment", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const startsAt = date("2026-10-01T00:00:00Z");
+    const endsAt = date("2026-11-01T00:00:00Z");
+    const subscription = {
+      _id: id(), tenantId, billingInterval: "monthly", status: "past_due",
+      currentPeriodStartsAt: date("2026-09-01T00:00:00Z"), currentPeriodEndsAt: startsAt,
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    const invoice = {
+      _id: id(), tenantId, subscriptionId: subscription._id, totalAmount: 100,
+      status: "issued", notes: "Automated subscription renewal",
+      issuedAt: startsAt, billingPeriodStartsAt: startsAt, billingPeriodEndsAt: endsAt,
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    PlatformInvoice.findById.mockReturnValue(query(invoice));
+    PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
+    PlatformPayment.create.mockResolvedValue([{ _id: id(), amount: 100 }]);
+    SchoolSubscription.findOne.mockReturnValue(query(subscription));
+    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 0 });
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    const req = {
+      params: { invoiceId: invoice._id.toString() },
+      body: { amount: 100, method: "upi" },
+      auth: { userId: id().toString() },
+    };
+
+    await recordPlatformPayment(req, response(), vi.fn());
+    expect(subscription.currentPeriodStartsAt).toEqual(startsAt);
+    expect(subscription.currentPeriodEndsAt).toEqual(endsAt);
+    expect(subscription.status).toBe("active");
+
+    subscription.status = "past_due";
+    invoice.status = "issued";
+    subscription.save.mockClear();
+    await recordPlatformPayment(req, response(), vi.fn());
+
+    expect(subscription.currentPeriodStartsAt).toEqual(startsAt);
+    expect(subscription.currentPeriodEndsAt).toEqual(endsAt);
+    expect(subscription.save).toHaveBeenCalledWith({ session });
+  });
 });
