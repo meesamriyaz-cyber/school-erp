@@ -232,7 +232,7 @@ export async function recordPlatformPayment(req, res, next) {
           subscription.status = "active";
           await subscription.save({ session });
           await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: wasPending ? "SUBSCRIPTION_ACTIVATED" : "SUBSCRIPTION_RENEWED", details: { billingInterval: subscription.billingInterval, lifetimeAccess: subscription.lifetimeAccess } }], { session });
-          await Tenant.updateOne({ _id: invoice.tenantId, status: { $in: ["pending", "trial_expired"] } }, { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } }, { session });
+          await Tenant.updateOne({ _id: invoice.tenantId, status: { $in: ["pending", "active", "trial_expired"] } }, { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } }, { session });
         }
       }
       result = { payment, invoice };
