@@ -447,7 +447,6 @@ export const updateSchoolStatus = async (req, res, next) => {
       { new: true, runValidators: true },
     )
       .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
-      .populate({ path: "suspensionHistory.suspendedBy", select: "firstName lastName email" })
       .lean();
 
     if (!updatedSchool) {
