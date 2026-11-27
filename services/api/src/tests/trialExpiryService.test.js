@@ -31,7 +31,7 @@ describe("trial expiry worker", () => {
     const result = await processDueTrials({ now });
 
     expect(result).toEqual({ expired: 1, skipped: false });
-    expect(tenantFind).toHaveBeenCalledWith({ status: "active", trialEndsAt: { $lte: now } });
+    expect(tenantFind).toHaveBeenCalledWith({ status: { $in: ["active", "trial_expired"] }, trialEndsAt: { $lte: now } });
     expect(tenantUpdateOne).toHaveBeenCalledWith(
       { _id: schoolId, status: "active", trialEndsAt: { $lte: now } },
       { $set: { status: "trial_expired", trialExpiredAt: now } },

@@ -11,23 +11,19 @@ export async function processDueTrials({ now = new Date() } = {}) {
   let expired = 0;
   try {
     const dueSchools = await Tenant.find({
-      status: { $in: ["active", "trial_expired"] },
+      status: "active",
       trialEndsAt: { $lte: now },
-    }).select("_id status").lean();
+    }).select("_id").lean();
 
     for (const school of dueSchools) {
       // The guarded transition prevents a concurrent paid conversion or suspension
       // from being overwritten by a stale trial-expiry candidate.
-      if (school.status === "active") {
-        const transition = await Tenant.updateOne(
-          { _id: school._id, status: "active", trialEndsAt: { $lte: now } },
-          { $set: { status: "trial_expired", trialExpiredAt: now } },
-        );
-        if (!transition.modifiedCount) continue;
-      }
+      const transition = await Tenant.updateOne(
+        { _id: school._id, status: "active", trialEndsAt: { $lte: now } },
+        { $set: { status: "trial_expired", trialExpiredAt: now } },
+      );
+      if (!transition.modifiedCount) continue;
 
-      // Also revisit already-expired tenants so a transient subscription update
-      // failure is repaired by the next poll rather than leaving a live trial behind.
       await SchoolSubscription.updateMany(
         { tenantId: school._id, isTrial: true, status: "active" },
         { $set: { status: "expired" } },
