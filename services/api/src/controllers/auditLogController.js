@@ -105,7 +105,7 @@ export const listAuditLogs = async (req, res, next) => {
           ? [log.targetUserId.firstName, log.targetUserId.lastName].filter(Boolean).join(" ") || log.targetUserId.email || null
           : null,
         targetTenantId: log.targetTenantId ? String(log.targetTenantId._id ?? log.targetTenantId) : null,
-        schoolName: log.targetTenantId && typeof log.targetTenantId === "object" ? log.targetTenantId.name : null,
+        schoolName: (log.targetTenantId && typeof log.targetTenantId === "object" ? log.targetTenantId.name : null) || null,
         action: log.action,
         changedFields: log.changedFields ?? [],
         previousValue: log.previousValue ?? null,
