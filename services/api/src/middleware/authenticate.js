@@ -1,6 +1,7 @@
 
 import User from "../models/User.js";
 import Tenant from "../models/Tenant.js";
+import SchoolSubscription from "../models/SchoolSubscription.js";
 import { verifyAccessToken } from "../utils/tokens.js";
 
 const authenticate = async (req, res, next) => {
@@ -69,9 +70,23 @@ if (
     // A school user's account must not remain usable after the school
     // itself is suspended, even if the access token has not expired.
     if (user.role !== "platform_admin") {
-      const tenant = await Tenant.findById(user.tenantId)
-        .select("_id status")
+      let tenant = await Tenant.findById(user.tenantId)
+        .select("_id status trialEndsAt")
         .lean();
+
+      if (tenant?.status === "active" && tenant.trialEndsAt && tenant.trialEndsAt <= new Date()) {
+        tenant = await Tenant.findOneAndUpdate(
+          { _id: tenant._id, status: "active", trialEndsAt: { $lte: new Date() } },
+          { $set: { status: "trial_expired", trialExpiredAt: new Date() } },
+          { new: true },
+        ).select("_id status").lean();
+        if (tenant?.status === "trial_expired") {
+          await SchoolSubscription.updateMany(
+            { tenantId: tenant._id, isTrial: true, status: "active" },
+            { $set: { status: "expired" } },
+          );
+        }
+      }
 
       if (!tenant || tenant.status !== "active") {
         return res.status(403).json({
