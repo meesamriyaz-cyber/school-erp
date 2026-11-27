@@ -288,7 +288,7 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
         guardianName: "Sara Khan", guardianRelationship: "mother", guardianPhone: "9876543211",
       }),
     });
-    expect(created.status).toBe(201);
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
     const imported = await request("/students/bulk-mother-contacts", {
       method: "POST", token: adminA.token,
       body: JSON.stringify({ rows: [{
