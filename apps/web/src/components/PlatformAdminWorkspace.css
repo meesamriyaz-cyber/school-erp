@@ -338,3 +338,13 @@
 .platform-trial-offer p { margin:5px 0 0;color:#687792;font-size:11px;line-height:1.55;max-width:620px; }
 .platform-trial-expired { padding:12px 14px;border:1px solid #f0d8d4;border-radius:9px;background:#fff8f6;color:#a23e34;font-size:12px;line-height:1.55; }
 @media (max-width:700px) { .platform-trial-offer { align-items:stretch;flex-direction:column; } }
+
+
+.platform-trial-status { display:flex;align-items:center;justify-content:space-between;gap:16px;margin:12px 0;padding:13px 15px;border:1px solid #dce6ff;border-radius:10px;background:#f6f8ff; }
+.platform-trial-status strong,.platform-trial-status span { display:block; }
+.platform-trial-status strong { color:#304a9b;font-size:12px; }
+.platform-trial-status span { margin-top:4px;color:#71809a;font-size:10px; }
+.platform-trial-status b { color:#3655ae;font-size:11px;text-align:right; }
+.platform-trial-status.is-expired { border-color:#f0d8d4;background:#fff8f6; }
+.platform-trial-status.is-expired strong,.platform-trial-status.is-expired b { color:#a23e34; }
+@media (max-width:700px) { .platform-trial-status { align-items:flex-start;flex-direction:column; } .platform-trial-status b { text-align:left; } }
