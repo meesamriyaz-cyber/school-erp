@@ -38,7 +38,6 @@ schoolSubscriptionSchema.pre("validate", function validateBillingTerm() {
     this.lifetimeAccess = true;
     this.currentPeriodEndsAt = null;
     this.nextBillingAt = null;
-    this.cancelledAt = null;
   } else {
     this.lifetimeAccess = false;
     if (this.currentPeriodEndsAt && this.currentPeriodEndsAt <= this.currentPeriodStartsAt) {
