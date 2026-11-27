@@ -18,6 +18,7 @@ export function StudentDocumentsScreen({ onHome }) {
   const [studentId, setStudentId] = useState("");
   const [documents, setDocuments] = useState([]);
   const [category, setCategory] = useState("birth_certificate");
+  const [setAsProfilePhoto, setSetAsProfilePhoto] = useState(true);
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -85,9 +86,9 @@ export function StudentDocumentsScreen({ onHome }) {
       if (!cloudResponse.ok) throw new Error(uploaded?.error?.message || "Cloudinary upload failed.");
       await apiRequest(`/students/${encodeURIComponent(studentId)}/documents`, { method: "POST", body: {
         name: file.name || "Student document", category, fileUrl: uploaded.secure_url, publicId: uploaded.public_id,
-        resourceType: uploaded.resource_type, format: uploaded.format, bytes: uploaded.bytes, notes,
+        resourceType: uploaded.resource_type, format: uploaded.format, bytes: uploaded.bytes, notes, setAsProfilePhoto: category === "photograph" && setAsProfilePhoto,
       }});
-      setFile(null); setNotes(""); setNotice("Document uploaded successfully.");
+      setFile(null); setNotes(""); setNotice(category === "photograph" && setAsProfilePhoto ? "Photograph uploaded and set as the student profile photo." : "Document uploaded successfully.");
       await loadDocuments(studentId);
     } catch (err) { setError(err.message || "Document upload failed."); }
     finally { setSaving(false); }
@@ -119,6 +120,7 @@ export function StudentDocumentsScreen({ onHome }) {
       <Text style={styles.label}>Category</Text>
       <View style={styles.categoryList}>{categories.map(([value, label]) => <TouchableOpacity key={value} style={[styles.category, category === value && styles.categoryActive]} onPress={() => setCategory(value)}><Text style={[styles.categoryText, category === value && styles.categoryTextActive]}>{label}</Text></TouchableOpacity>)}</View>
       <TouchableOpacity style={styles.fileButton} onPress={chooseFile}><Text style={styles.fileButtonText}>{file ? file.name : "Choose PDF or image"}</Text></TouchableOpacity>
+      {category === "photograph" ? <TouchableOpacity style={styles.profilePhotoOption} onPress={() => setSetAsProfilePhoto((value) => !value)} accessibilityRole="checkbox" accessibilityState={{ checked: setAsProfilePhoto }}><View style={[styles.checkBox, setAsProfilePhoto && styles.checkBoxActive]}>{setAsProfilePhoto ? <Text style={styles.checkMark}>✓</Text> : null}</View><Text style={styles.profilePhotoOptionText}>Use this photograph as the student profile photo</Text></TouchableOpacity> : null}
       {file ? <Text style={styles.fileMeta}>{formatSize(file.size || 0)} · {file.mimeType || "File selected"}</Text> : null}
       <Text style={styles.label}>Notes (optional)</Text>
       <TextInput value={notes} onChangeText={setNotes} placeholder="Add a note about this document" placeholderTextColor={colors.muted} multiline style={styles.input}/>
@@ -148,6 +150,7 @@ const styles = StyleSheet.create({
   category: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border }, categoryActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
   categoryText: { color: colors.muted, fontSize: 11, fontWeight: "700" }, categoryTextActive: { color: colors.primary },
   fileButton: { borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, borderRadius: radius.md, padding: 16, alignItems: "center" }, fileButtonText: { color: colors.primary, fontWeight: "800" },
+  profilePhotoOption: { flexDirection: "row", alignItems: "center", gap: 9, paddingVertical: 4 }, checkBox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }, checkBoxActive: { backgroundColor: colors.primary, borderColor: colors.primary }, checkMark: { color: colors.white, fontSize: 13, fontWeight: "900" }, profilePhotoOptionText: { color: colors.ink, fontSize: 12, flex: 1 },
   fileMeta: { color: colors.muted, fontSize: 11 }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, color: colors.ink, padding: 12, minHeight: 72, textAlignVertical: "top" },
   primaryButton: { backgroundColor: colors.primary, borderRadius: radius.md, padding: 14, alignItems: "center" }, primaryText: { color: colors.white, fontWeight: "900" }, disabled: { opacity: 0.5 },
   hint: { color: colors.muted, fontSize: 10, lineHeight: 15 }, documentRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border },
