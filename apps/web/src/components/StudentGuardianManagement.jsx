@@ -60,6 +60,7 @@ export default function StudentGuardianManagement({
   const [editForm, setEditForm] = useState(null);
   const [editingGuardianId, setEditingGuardianId] = useState("");
   const [guardianEditForm, setGuardianEditForm] = useState(null);
+  const [guardianEditPhotoFile, setGuardianEditPhotoFile] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -274,6 +275,8 @@ export default function StudentGuardianManagement({
         },
       });
       if (!response?.success) throw new Error("Guardian contact details could not be updated.");
+      if (guardianEditPhotoFile) await uploadGuardianPhoto(link.guardianId._id, guardianEditPhotoFile);
+      setGuardianEditPhotoFile(null);
       if (guardianEditForm.email.trim()) {
         try {
           await apiRequest(`/guardians/${encodeURIComponent(link.guardianId._id)}/email-verification/send`, {
@@ -487,6 +490,7 @@ export default function StudentGuardianManagement({
                       <label>Last name<input value={guardianEditForm.lastName} onChange={(event) => setGuardianEditForm((current) => ({ ...current, lastName: event.target.value }))} /></label>
                       <label>Phone<input type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={guardianEditForm.phone} onChange={(event) => setGuardianEditForm((current) => ({ ...current, phone: event.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))} /></label>
                       <label>Email<input type="email" value={guardianEditForm.email} onChange={(event) => setGuardianEditForm((current) => ({ ...current, email: event.target.value }))} /></label>
+                      <label className="student-guardian-form-full">Replace photo (JPG or PNG, up to 5 MB)<input type="file" accept="image/jpeg,image/png" onChange={(event) => setGuardianEditPhotoFile(event.target.files?.[0] || null)} /></label>
                     </div>
                     {link.relationship === "mother" && <p className="student-guardian-permission-help">Mother's phone and email are stored for school records only. School communications remain directed to the primary Father contact.</p>}
                     <div className="student-guardian-form-actions">
