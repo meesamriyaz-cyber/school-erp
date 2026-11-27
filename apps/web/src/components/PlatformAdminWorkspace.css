@@ -320,3 +320,14 @@
 .platform-audit-reference dl div { display:flex;justify-content:space-between;gap:12px; }
 .platform-audit-reference dt { color:#8994a7;font-size:10px; }
 .platform-audit-reference dd { margin:0;color:#526078;font:10px ui-monospace,monospace; }
+
+
+.platform-suspension-form { display:grid;gap:8px;max-width:560px;margin-top:14px;padding:14px;border:1px solid #f0d8d4;border-radius:10px;background:#fffafa; }
+.platform-suspension-form label { color:#45536a;font-size:12px;font-weight:700; }
+.platform-suspension-form label span { color:#c4473d; }
+.platform-suspension-form textarea { width:100%;min-height:76px;padding:10px 12px;border:1px solid #dce2ed;border-radius:8px;background:#fff;color:#26364e;font:inherit;font-size:12px;resize:vertical; }
+.platform-suspension-form small { color:#8994a7;font-size:10px; }
+.platform-suspension-history { display:grid;gap:10px; }
+.platform-suspension-record { padding:12px 14px;border:1px solid #e8edf4;border-radius:9px;background:#fbfcfe; }
+.platform-suspension-record strong { color:#56647b;font-size:11px; }
+.platform-suspension-record p { margin:6px 0 0;color:#35445b;font-size:12px;line-height:1.6;white-space:pre-wrap; }
