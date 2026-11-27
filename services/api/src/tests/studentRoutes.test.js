@@ -236,6 +236,49 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
     );
   });
 
+  it("imports mother contact details without changing the existing primary guardian", async () => {
+    const admissionNumber = `MOTHER-${randomUUID()}`;
+    const created = await request("/students", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify(studentPayload(admissionNumber, "MotherImport")),
+    });
+    expect(created.status).toBe(201);
+    const studentId = created.body.data._id;
+    const primaryBefore = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, status: "active", isPrimary: true }).lean();
+    expect(primaryBefore).toBeTruthy();
+
+    const imported = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Khan",
+        motherPhone: "9876543210", motherEmail: "sara@example.test",
+      }] }),
+    });
+    expect(imported.status).toBe(200);
+    expect(imported.body.summary.updated).toBe(1);
+    const motherLink = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, relationship: "mother" }).populate("guardianId").lean();
+    expect(motherLink.guardianId.firstName).toBe("Sara");
+    expect(motherLink.guardianId.phone).toBe("9876543210");
+    expect(motherLink.guardianId.pendingEmail).toBe("sara@example.test");
+    expect(motherLink.receivesCommunication).toBe(false);
+    expect(motherLink.isPrimary).toBe(false);
+    const primaryAfter = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, status: "active", isPrimary: true }).lean();
+    expect(String(primaryAfter._id)).toBe(String(primaryBefore._id));
+
+    const updated = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Ali",
+        motherPhone: "9123456789", motherEmail: "sara2@example.test",
+      }] }),
+    });
+    expect(updated.body.summary.updated).toBe(1);
+    const motherAfter = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, relationship: "mother" }).populate("guardianId").lean();
+    expect(motherAfter.guardianId.lastName).toBe("Ali");
+    expect(motherAfter.guardianId.phone).toBe("9123456789");
+    expect(motherAfter.receivesCommunication).toBe(false);
+  });
+
   it("prevents a teacher from creating a student", async () => {
     const response = await request("/students", {
       method: "POST",
