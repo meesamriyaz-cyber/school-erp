@@ -24,6 +24,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [schoolDetailsRefresh, setSchoolDetailsRefresh] = useState(0);
   const [schoolDetails, setSchoolDetails] = useState(null);
   const [schoolSubscription, setSchoolSubscription] = useState(null);
   const [schoolActionBusy, setSchoolActionBusy] = useState(false);
@@ -70,7 +71,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
       .catch((requestError) => { if (mounted) setError(requestError?.message || "Unable to load school details."); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, [section, selectedSchoolId]);
+  }, [section, selectedSchoolId, schoolDetailsRefresh]);
 
   const updateSchoolStatus = async (status) => {
     if (!selectedSchoolId || schoolActionBusy) return;
@@ -255,7 +256,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
           <TouchableOpacity onPress={() => setSelectedSchoolId("")} style={styles.refresh}><Text style={styles.refreshText}>Back to schools</Text></TouchableOpacity>
         </View>
         {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading school details…</Text></View> : null}
-        {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => setSelectedSchoolId((value) => value)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+        {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => setSchoolDetailsRefresh((value) => value + 1)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
         {schoolDetails?.school ? <>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>SCHOOL PROFILE</Text>
