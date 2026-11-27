@@ -38,6 +38,59 @@ const pageOne = {
   pagination: { page: 1, limit: 20, total: 21, totalPages: 2 },
 };
 
+describe("PlatformAdminWorkspace overview reliability", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuth.mockReturnValue({
+      user: { firstName: "Riyaz", lastName: "Ahmed", role: "platform_admin" },
+      accessToken: "platform-access-token",
+      logout: vi.fn(),
+    });
+  });
+
+  it("clears the initial error after a successful retry", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockRejectedValueOnce(new Error("Overview unavailable"))
+      .mockResolvedValueOnce(businessOverview);
+    render(<PlatformAdminWorkspace />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Overview unavailable");
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("Registered schools")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading state while a refreshed overview is pending", async () => {
+    const user = userEvent.setup();
+    let resolveRefresh;
+    apiRequest.mockResolvedValueOnce(businessOverview)
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve; }));
+    render(<PlatformAdminWorkspace />);
+
+    expect(await screen.findByText("Registered schools")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh overview" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading platform intelligence");
+    resolveRefresh(businessOverview);
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+  });
+
+  it("keeps the last successful KPIs visible and reports an error when refresh fails", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockResolvedValueOnce(businessOverview)
+      .mockRejectedValueOnce(new Error("Refresh failed"));
+    render(<PlatformAdminWorkspace />);
+
+    expect(await screen.findByText("Registered schools")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh overview" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Refresh failed");
+    expect(screen.getByText("Registered schools")).toBeInTheDocument();
+    expect(screen.getByText("Green Valley School")).toBeInTheDocument();
+  });
+});
+
 describe("PlatformAdminWorkspace school directory", () => {
   beforeEach(() => {
     vi.clearAllMocks();
