@@ -60,7 +60,7 @@ describe("getSchoolDetails", () => {
 
     expect(findById).toHaveBeenCalledWith(req.params.schoolId);
     expect(schoolQuery.select).toHaveBeenCalledWith(
-      "_id name slug status contactEmail timezone createdAt updatedAt",
+      "_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt",
     );
     expect(find).toHaveBeenCalledWith({
       tenantId: "507f1f77bcf86cd799439011",
