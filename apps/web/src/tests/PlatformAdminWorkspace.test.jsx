@@ -909,6 +909,39 @@ it("changes a user's role and updates the profile", async () => {
   });
 
 
+  it("shows commercial audit references stored on the event and in its details", async () => {
+    const user = userEvent.setup();
+    const event = {
+      id: "commercial-event-1",
+      action: "PAYMENT_RECORDED",
+      tenantId: { name: "Green Valley School" },
+      subscriptionId: "507f1f77bcf86cd799439011",
+      invoiceId: "507f1f77bcf86cd799439012",
+      paymentId: "507f1f77bcf86cd799439013",
+      details: { planId: "507f1f77bcf86cd799439014", amount: 2500, currency: "INR" },
+      createdAt: "2026-11-26T10:00:00.000Z",
+    };
+    apiRequest.mockImplementation(async (path) => {
+      if (path === "/platform/business-overview") return businessOverview;
+      if (path.startsWith("/platform/commercial-events?")) {
+        return { success: true, data: [event], pagination: { page: 1, limit: 20, total: 1, totalPages: 1 } };
+      }
+      return { success: true, data: [] };
+    });
+
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Commercial audit/ }));
+
+    const table = await screen.findByRole("table", { name: "Commercial audit events" });
+    expect(within(table).getByText("Green Valley School")).toBeInTheDocument();
+    await user.click(within(table).getByText("View 4 references"));
+
+    expect(within(table).getByTitle(event.subscriptionId)).toBeInTheDocument();
+    expect(within(table).getByTitle(event.invoiceId)).toBeInTheDocument();
+    expect(within(table).getByTitle(event.paymentId)).toBeInTheDocument();
+    expect(within(table).getByTitle(event.details.planId)).toBeInTheDocument();
+  });
+
   it("shows system audit records, outbox health and retries failed delivery", async () => {
     const user = userEvent.setup();
     const auditRecord = {
