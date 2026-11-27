@@ -1,12 +1,14 @@
 import mongoose from "mongoose";
+import PlatformInvoice from "../models/PlatformInvoice.js";
+import PlatformPayment from "../models/PlatformPayment.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../models/Tenant.js", () => ({ default: {} }));
 vi.mock("../models/User.js", () => ({ default: {} }));
 vi.mock("../models/SubscriptionPlan.js", () => ({ default: {} }));
 vi.mock("../models/SchoolSubscription.js", () => ({ default: {} }));
-vi.mock("../models/PlatformInvoice.js", () => ({ default: {} }));
-vi.mock("../models/PlatformPayment.js", () => ({ default: {} }));
+vi.mock("../models/PlatformInvoice.js", () => ({ default: { find: vi.fn(), countDocuments: vi.fn() } }));
+vi.mock("../models/PlatformPayment.js", () => ({ default: { find: vi.fn() } }));
 vi.mock("../models/PlatformCommercialEvent.js", () => ({ default: {} }));
 
 import {
@@ -103,6 +105,40 @@ describe("platform billing request validation", () => {
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ success: false, message });
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it("returns invoice payment history with reversed payments excluded from balances", async () => {
+    const invoiceId = new mongoose.Types.ObjectId();
+    const invoice = { _id: invoiceId, totalAmount: 100, tenantId: validId };
+    const recordedPayment = { _id: new mongoose.Types.ObjectId(), invoiceId, amount: 40, status: "recorded" };
+    const reversedPayment = { _id: new mongoose.Types.ObjectId(), invoiceId, amount: 20, status: "reversed" };
+    const invoiceQuery = {
+      populate: vi.fn().mockReturnThis(),
+      sort: vi.fn().mockReturnThis(),
+      skip: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([invoice]),
+    };
+    const paymentQuery = {
+      sort: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([recordedPayment, reversedPayment]),
+    };
+    PlatformInvoice.find.mockReturnValue(invoiceQuery);
+    PlatformInvoice.countDocuments.mockResolvedValue(1);
+    PlatformPayment.find.mockReturnValue(paymentQuery);
+    const res = response();
+
+    await listPlatformInvoices({ query: { page: "1", limit: "20" } }, res, vi.fn());
+
+    expect(paymentQuery.sort).toHaveBeenCalledWith({ paymentDate: -1, _id: -1 });
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      data: [expect.objectContaining({
+        payments: [recordedPayment, reversedPayment],
+        paidAmount: 40,
+        outstandingAmount: 60,
+      })],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    }));
   });
 
   it("rejects an invalid invoice due date before querying billing records", async () => {
