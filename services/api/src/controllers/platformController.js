@@ -332,7 +332,7 @@ export const updateSchoolStatus = async (req, res, next) => {
     }
 
     const school = await Tenant.findById(schoolId)
-      .select("_id name slug status contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
       .lean();
 
     if (!school) {
@@ -397,7 +397,7 @@ export const updateSchoolStatus = async (req, res, next) => {
             { $set: { status: "active" } },
             { new: true, runValidators: true, session: dbSession },
           )
-            .select("_id name slug status contactEmail timezone createdAt updatedAt")
+            .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
             .lean();
 
           if (updatedSchool) {
@@ -488,7 +488,7 @@ export const getSchoolDetails = async (req, res, next) => {
     }
 
     const school = await Tenant.findById(schoolId)
-      .select("_id name slug status contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
       .lean();
 
     if (!school) {
