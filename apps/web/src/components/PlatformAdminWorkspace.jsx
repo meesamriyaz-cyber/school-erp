@@ -1087,6 +1087,8 @@ export default function PlatformAdminWorkspace() {
                           <button type="button" onClick={() => setActivePage("Schools")}><span><strong>{schoolStatuses.suspended || 0}</strong><small>Suspended schools</small></span><span>Review schools →</span></button>
                           <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{pastDueSubscriptions}</strong><small>Past-due subscriptions</small></span><span>Review billing →</span></button>
                           <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{businessOverview.renewalsDueSoon || 0}</strong><small>Renewals due in 30 days</small></span><span>Review billing →</span></button>
+                          <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{businessOverview.trialsEndingSoon || 0}</strong><small>Free trials ending in 30 days</small></span><span>Review trials →</span></button>
+                          <button type="button" onClick={() => setActivePage("Schools")}><span><strong>{schoolStatuses.trial_expired || 0}</strong><small>Expired trials · access restricted</small></span><span>Review schools →</span></button>
                           <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{pendingSubscriptions}</strong><small>Pending subscriptions</small></span><span>Review billing →</span></button>
                         </div>
                       </section>
