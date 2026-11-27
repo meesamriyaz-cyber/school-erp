@@ -143,7 +143,7 @@ export default function PlatformAdminWorkspace() {
   const [auditFromFilter, setAuditFromFilter] = useState("");
   const [auditToFilter, setAuditToFilter] = useState("");
   const [auditLogsError, setAuditLogsError] = useState("");
-  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(true);
   const [auditOutbox, setAuditOutbox] = useState(null);
   const [auditOutboxError, setAuditOutboxError] = useState("");
   const [retryingAuditId, setRetryingAuditId] = useState("");
@@ -211,7 +211,6 @@ export default function PlatformAdminWorkspace() {
     if (auditTenantFilter.trim()) params.set("tenantId", auditTenantFilter.trim());
     if (auditFromFilter) params.set("from", new Date(`${auditFromFilter}T00:00:00.000`).toISOString());
     if (auditToFilter) params.set("to", new Date(`${auditToFilter}T23:59:59.999`).toISOString());
-    setLoadingAuditLogs(true);
     setAuditLogsError("");
     setAuditOutboxError("");
     Promise.all([
@@ -229,7 +228,7 @@ export default function PlatformAdminWorkspace() {
       if (!controller.signal.aborted) setLoadingAuditLogs(false);
     });
     return () => controller.abort();
-  }, [activePage, accessToken, auditPagination.page, auditActionFilter, auditTenantFilter, auditFromFilter, auditToFilter, reloadCount]);
+  }, [activePage, accessToken, auditPagination.page, auditPagination.limit, auditActionFilter, auditTenantFilter, auditFromFilter, auditToFilter, reloadCount]);
 
   useEffect(() => {
     if (activePage !== "Overview") return undefined;
