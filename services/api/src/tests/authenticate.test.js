@@ -272,6 +272,10 @@ describe("authenticate middleware", () => {
       { tenantId, isTrial: true, status: "active" }, { $set: { status: "expired" } },
     );
     expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: "Your school's 30-day free trial has ended. Access is restricted until a paid subscription is activated.",
+    });
     expect(next).not.toHaveBeenCalled();
   });
 
