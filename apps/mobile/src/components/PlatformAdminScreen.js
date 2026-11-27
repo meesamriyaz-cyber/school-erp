@@ -31,6 +31,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [schoolActionMessage, setSchoolActionMessage] = useState("");
   const [suspensionReason, setSuspensionReason] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [userDetailsRefresh, setUserDetailsRefresh] = useState(0);
   const [userDetails, setUserDetails] = useState(null);
   const [userProfileForm, setUserProfileForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [userRole, setUserRole] = useState("teacher");
@@ -140,7 +141,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
       .catch((requestError) => { if (mounted) setError(requestError?.message || "Unable to load user details."); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, [section, selectedUserId]);
+  }, [section, selectedUserId, userDetailsRefresh]);
 
   useEffect(() => {
     if (section !== "overview") return undefined;
@@ -370,7 +371,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
           <TouchableOpacity onPress={() => { setSelectedUserId(""); setUserDetails(null); setError(""); }} style={styles.refresh}><Text style={styles.refreshText}>Back to users</Text></TouchableOpacity>
         </View>
         {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading user details…</Text></View> : null}
-        {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => setSelectedUserId((value) => value)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+        {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => setUserDetailsRefresh((value) => value + 1)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
         {userDetails ? <>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>ACCOUNT</Text>
