@@ -264,6 +264,15 @@ export async function getBusinessOverview(req, res, next) {
                 ],
               },
             },
+            trialsEndingSoon: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ["$status", "active"] }, { $eq: ["$billingInterval", "trial"] }, { $gte: ["$trialEndsAt", now] }, { $lte: ["$trialEndsAt", renewalWindowEnd] }] },
+                  1,
+                  0,
+                ],
+              },
+            },
           },
         },
       ]),
@@ -303,6 +312,7 @@ export async function getBusinessOverview(req, res, next) {
     const subscriptionMetrics = {};
     const subscriptionStatusCounts = {};
     let renewalsDueSoon = 0;
+    let trialsEndingSoon = 0;
     for (const group of allSubscriptions) {
       const { currency, status, billingInterval } = group._id;
       const count = group.count || 0;
@@ -317,6 +327,9 @@ export async function getBusinessOverview(req, res, next) {
         metrics.activeSubscriptions += count;
         metrics.renewalsDueSoon += group.renewalsDueSoon || 0;
         renewalsDueSoon += group.renewalsDueSoon || 0;
+        metrics.trialsEndingSoon += group.trialsEndingSoon || 0;
+        trialsEndingSoon += group.trialsEndingSoon || 0;
+        if (billingInterval === "trial") metrics.trialSubscriptions += count;
         if (billingInterval === "monthly") metrics.mrr += amount;
         else if (billingInterval === "annual") metrics.mrr += amount / 12;
         if (billingInterval !== "one_time") {
@@ -361,6 +374,7 @@ export async function getBusinessOverview(req, res, next) {
         subscriptions: subscriptionMetrics,
         subscriptionStatusCounts,
         renewalsDueSoon,
+        trialsEndingSoon,
         invoiced: invoiceStats,
         collected: paymentStats,
         recentActivity,
