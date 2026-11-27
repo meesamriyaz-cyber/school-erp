@@ -239,7 +239,7 @@ export const bulkUpsertMotherDetails = async (req, res, next) => {
 
   const results = [];
   for (const row of rows) {
-    const admissionNumber = row.admissionNumber.trim();
+    const admissionNumber = row.admissionNumber.trim().toUpperCase();
     const session = await mongoose.startSession();
     try {
       let result;
