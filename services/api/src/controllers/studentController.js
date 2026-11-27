@@ -289,7 +289,33 @@ export const bulkUpsertMotherDetails = async (req, res, next) => {
             isEmergencyContact: false, canPickup: false, receivesCommunication: false,
           }], { session });
         }
-        result = { admissionNumber, status: "updated", motherName: [guardian.firstName, guardian.lastName].filter(Boolean).join(" ") };
+        const fatherLink = await StudentGuardian.findOne({
+          tenantId: req.tenantId, studentId: student._id, relationship: "father", status: "active",
+        }).session(session);
+        if (fatherLink && !fatherLink.isPrimary) {
+          const otherPrimaries = await StudentGuardian.find({
+            tenantId: req.tenantId, studentId: student._id, status: "active",
+            isPrimary: true, _id: { $ne: fatherLink._id },
+          }).session(session);
+          for (const previous of otherPrimaries) {
+            previous.isPrimary = false;
+            previous.canAccessPortal = false;
+            previous.auditTrail.push({
+              action: "primary_demoted", actorUserId: req.auth.userId,
+              changes: [{ field: "isPrimary", from: true, to: false }, { field: "canAccessPortal", from: true, to: false }],
+              changedAt: new Date(),
+            });
+            await previous.save({ session });
+          }
+          fatherLink.isPrimary = true;
+          fatherLink.auditTrail.push({
+            action: "primary_promoted", actorUserId: req.auth.userId,
+            changes: [{ field: "isPrimary", from: false, to: true }],
+            changedAt: new Date(),
+          });
+          await fatherLink.save({ session });
+        }
+        result = { admissionNumber, status: "updated", motherName: [guardian.firstName, guardian.lastName].filter(Boolean).join(" "), fatherSetAsPrimary: Boolean(fatherLink) };
       });
       results.push(result || { admissionNumber, status: "error", message: "Record could not be processed" });
     } catch (error) {
