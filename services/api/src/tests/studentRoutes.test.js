@@ -279,6 +279,62 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
     expect(motherAfter.receivesCommunication).toBe(false);
   });
 
+  it("keeps the registered mother enabled as primary when importing her details", async () => {
+    const admissionNumber = `MOTHER-PRIMARY-${randomUUID()}`;
+    const created = await request("/students", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        ...studentPayload(admissionNumber, "MotherPrimary"),
+        guardianName: "Sara Khan", guardianRelationship: "mother", guardianPhone: "9876543210",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const imported = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Khan",
+        motherPhone: "9876543210", motherEmail: "sara@example.test",
+      }] }),
+    });
+    expect(imported.body.summary.updated).toBe(1);
+    const motherLink = await StudentGuardian.findOne({
+      tenantId: schoolA._id, studentId: created.body.data._id, relationship: "mother", status: "active",
+    }).populate("guardianId").lean();
+    expect(motherLink.isPrimary).toBe(true);
+    expect(motherLink.receivesCommunication).toBe(true);
+    expect(motherLink.guardianId.pendingEmail).toBe("sara@example.test");
+  });
+
+  it("preserves a registered non-parent guardian as primary when importing mother details", async () => {
+    const admissionNumber = `OTHER-PRIMARY-${randomUUID()}`;
+    const created = await request("/students", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        ...studentPayload(admissionNumber, "OtherPrimary"),
+        guardianName: "Amina Begum", guardianRelationship: "grandparent", guardianPhone: "9000000001",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const imported = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Khan",
+        motherPhone: "9876543210", motherEmail: "sara@example.test",
+      }] }),
+    });
+    expect(imported.body.summary.updated).toBe(1);
+    const primary = await StudentGuardian.findOne({
+      tenantId: schoolA._id, studentId: created.body.data._id, status: "active", isPrimary: true,
+    }).populate("guardianId").lean();
+    const mother = await StudentGuardian.findOne({
+      tenantId: schoolA._id, studentId: created.body.data._id, relationship: "mother",
+    }).lean();
+    expect(primary.relationship).toBe("grandparent");
+    expect(primary.guardianId.firstName).toBe("Amina");
+    expect(mother.isPrimary).toBe(false);
+    expect(mother.receivesCommunication).toBe(false);
+  });
+
   it("prevents a teacher from creating a student", async () => {
     const response = await request("/students", {
       method: "POST",
