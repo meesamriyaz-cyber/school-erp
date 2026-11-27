@@ -114,7 +114,7 @@ export default function MotherContactImport({ accessToken, onImported }) {
       )}
       {result?.summary && (
         <div role="status">
-          <p>Import complete: {result.summary.updated} updated, {result.summary.notFound} admission numbers not found, {result.summary.skipped} skipped, {result.summary.errors} errors.</p>
+          <p>Import complete: {result.summary.updated} updated, {result.summary.notFound} admission numbers not found, {result.summary.skipped} skipped, {result.summary.errors} errors.</p>\n          {result.summary.fatherLinkMissing > 0 && <p className="student-guardian-permission-help">{result.summary.fatherLinkMissing} student(s) have no linked Father relationship. Their existing primary guardian was preserved; link the Father record to make him the primary contact.</p>}
           {result.data?.some((item) => item.status !== "updated") && (
             <ul>{result.data.filter((item) => item.status !== "updated").map((item) => <li key={item.admissionNumber}>{item.admissionNumber}: {item.message}</li>)}</ul>
           )}
