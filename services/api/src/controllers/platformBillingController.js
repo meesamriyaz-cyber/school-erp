@@ -72,11 +72,65 @@ export async function archiveSubscriptionPlan(req, res, next) {
 export async function getSchoolSubscription(req, res, next) {
   try {
     if (!validId(req.params.schoolId)) return fail(res, 400, "Invalid school ID");
-    const school = await Tenant.findById(req.params.schoolId).select("_id name").lean();
+    const school = await Tenant.findById(req.params.schoolId).select("_id name status trialStartedAt trialEndsAt trialExpiredAt trialHistory").lean();
     if (!school) return fail(res, 404, "School not found");
     const subscription = await SchoolSubscription.findOne({ tenantId: school._id }).sort({ createdAt: -1 }).lean();
     return res.json({ success: true, data: { school, subscription } });
   } catch (error) { return next(error); }
+}
+
+export async function startSchoolTrial(req, res, next) {
+  const session = await mongoose.startSession();
+  try {
+    const { schoolId } = req.params;
+    if (!validId(schoolId)) return fail(res, 400, "Invalid school ID");
+    const now = new Date();
+    const endsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    let school, subscription;
+    await session.withTransaction(async () => {
+      school = await Tenant.findById(schoolId).session(session);
+      if (!school) throw Object.assign(new Error("School not found"), { statusCode: 404 });
+      if (school.status === "suspended" || school.status === "trial_expired") {
+        throw Object.assign(new Error("This school cannot start a trial while suspended or already expired"), { statusCode: 409 });
+      }
+      if (school.trialStartedAt || (school.trialHistory || []).length > 0) {
+        throw Object.assign(new Error("A free trial has already been used by this school"), { statusCode: 409 });
+      }
+      if (school.status !== "pending" && school.status !== "active") {
+        throw Object.assign(new Error("School is not eligible for a trial"), { statusCode: 409 });
+      }
+      [subscription] = await SchoolSubscription.create([{
+        tenantId: school._id, planId: null, planName: "30-day Free Trial", billingInterval: "trial",
+        amount: 0, currency: "INR", status: "active", isTrial: true, trialEndsAt: endsAt,
+        startsAt: now, currentPeriodStartsAt: now, currentPeriodEndsAt: endsAt,
+        createdBy: actorId(req), notes: "One-time 30-day platform trial",
+      }], { session });
+      school.status = "active";
+      school.trialStartedAt = now;
+      school.trialEndsAt = endsAt;
+      school.trialExpiredAt = null;
+      school.trialHistory.push({ startedAt: now, endsAt, startedBy: actorId(req) || null });
+      await school.save({ session });
+      await User.updateMany(
+        { tenantId: school._id, role: "school_admin", status: "pending" },
+        { $set: { status: "active" } },
+        { session },
+      );
+      await PlatformCommercialEvent.create([{
+        actorUserId: actorId(req), tenantId: school._id, subscriptionId: subscription._id,
+        action: "TRIAL_STARTED",
+        details: { durationDays: 30, startsAt: now, endsAt, amount: 0, currency: "INR" },
+      }], { session });
+    });
+    return res.status(201).json({
+      success: true, message: "30-day free trial started",
+      data: { school: { id: String(school._id), name: school.name, status: school.status, trialStartedAt: school.trialStartedAt, trialEndsAt: school.trialEndsAt }, subscription },
+    });
+  } catch (error) {
+    if (error.statusCode) return fail(res, error.statusCode, error.message);
+    if (error.name === "ValidationError") return fail(res, 400, "Unable to start the free trial");
+    return next(error);
+  } finally { await session.endSession(); }
 }
 
 export async function assignSchoolSubscription(req, res, next) {
@@ -177,7 +231,7 @@ export async function recordPlatformPayment(req, res, next) {
           subscription.status = "active";
           await subscription.save({ session });
           await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: wasPending ? "SUBSCRIPTION_ACTIVATED" : "SUBSCRIPTION_RENEWED", details: { billingInterval: subscription.billingInterval, lifetimeAccess: subscription.lifetimeAccess } }], { session });
-          await Tenant.updateOne({ _id: invoice.tenantId, status: "pending" }, { $set: { status: "active" } }, { session });
+          await Tenant.updateOne({ _id: invoice.tenantId, status: { $in: ["pending", "trial_expired"] } }, { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } }, { session });
         }
       }
       result = { payment, invoice };
