@@ -64,7 +64,15 @@ const isHttpsUrl = (value) => {
 const handleStudentError = (error, res, next) => {
   if (error.code === 11000) return res.status(409).json({ success: false, message: "This admission number already exists in this school" });
   if (error.name === "ValidationError" || error.name === "CastError") {
-    return res.status(400).json({ success: false, message: "One or more student fields are invalid" });
+    const details = process.env.NODE_ENV === "test" && error.errors
+      ? Object.entries(error.errors).map(([field, issue]) => ({ field, message: issue.message }))
+      : undefined;
+    return res.status(400).json({
+      success: false,
+      message: "One or more student fields are invalid",
+      ...(details ? { details } : {}),
+      ...(process.env.NODE_ENV === "test" && error.path ? { field: error.path, validationMessage: error.message } : {}),
+    });
   }
   if (["GUARDIAN_IDENTITY_CONFLICT", "PRIMARY_GUARDIAN_REQUIRED", "PRIMARY_GUARDIAN_INACTIVE"].includes(error.code)) {
     return res.status(409).json({ success: false, message: error.message, code: error.code });
