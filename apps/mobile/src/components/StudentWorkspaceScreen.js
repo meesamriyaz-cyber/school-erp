@@ -159,7 +159,7 @@ export function StudentWorkspaceScreen({ user }) {
         <Text style={styles.bannerSubtitle}>Your learning journey, school records and updates—all in one place.</Text>
         {enrollment ? <View style={styles.classPill}><Text style={styles.classPillText}>{[enrollment.classId?.name, enrollment.sectionId?.name, enrollment.academicYearId?.name].filter(Boolean).join(" · ")}</Text></View> : null}
       </View>
-      <View style={styles.bannerOrb}><Text style={styles.bannerOrbText}>✦</Text></View>
+      <View style={styles.bannerOrb}>{student?.photoUrl && !failedPhotos.student ? <Image source={{ uri: student.photoUrl }} style={styles.bannerStudentPhoto} onError={() => setFailedPhotos((previous) => ({ ...previous, student: true }))}/> : <Text style={styles.bannerOrbText}>{[student?.firstName, student?.lastName].filter(Boolean).map((part) => part[0]).join("").toUpperCase() || "S"}</Text>}</View>
     </View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
       {sections.map((item) => <TouchableOpacity key={item.key} onPress={() => { setSection(item.key); refreshSection(item.key); }} accessibilityRole="tab" accessibilityState={{ selected: section === item.key }} hitSlop={6} style={[styles.tab, section === item.key && styles.tabActive]}><Text style={[styles.tabText, section === item.key && styles.tabTextActive]}>{item.label}</Text></TouchableOpacity>)}
@@ -383,7 +383,8 @@ const styles = StyleSheet.create({
   bannerSubtitle: { color: "#E3E9FF", fontSize: 12, lineHeight: 18, maxWidth: 270 },
   classPill: { alignSelf: "flex-start", marginTop: 5, backgroundColor: "#FFFFFF24", borderWidth: 1, borderColor: "#FFFFFF40", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
   classPillText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800" },
-  bannerOrb: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#FFFFFF18", borderWidth: 1, borderColor: "#FFFFFF35", alignItems: "center", justifyContent: "center", marginLeft: -8 },
+  bannerOrb: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#FFFFFF18", borderWidth: 1, borderColor: "#FFFFFF55", alignItems: "center", justifyContent: "center", marginLeft: -8, overflow: "hidden" },
+  bannerStudentPhoto: { width: "100%", height: "100%", borderRadius: 38 },
   bannerOrbText: { color: "#FFFFFF", fontSize: 38, fontWeight: "300" },
   tabs: { gap: 8, paddingVertical: 4, paddingRight: 8 },
   tab: { borderWidth: 1, borderColor: "#E7EBF2", backgroundColor: "#FFFFFF", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
