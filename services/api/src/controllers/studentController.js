@@ -255,6 +255,9 @@ export const bulkUpsertMotherDetails = async (req, res, next) => {
           result = { admissionNumber, status: "skipped", message: "No mother details supplied" };
           return;
         }
+        // Reconcile the primary guardian from the student registration form.
+        // This may be the mother, father, or another registered guardian.
+        await syncLegacyStudentGuardian(student, { session, actorUserId: req.auth.userId });
         const existingLink = await StudentGuardian.findOne({
           tenantId: req.tenantId, studentId: student._id, relationship: "mother",
         }).sort({ status: 1, createdAt: 1 }).session(session);
@@ -272,8 +275,7 @@ export const bulkUpsertMotherDetails = async (req, res, next) => {
             guardian.verifiedEmail = null;
           }
           await guardian.save({ session });
-          existingLink.receivesCommunication = false;
-          existingLink.isPrimary = existingLink.isPrimary; // Preserve the existing primary assignment; never alter Father's record.
+          existingLink.receivesCommunication = existingLink.isPrimary === true;
           await existingLink.save({ session });
         } else {
           guardian = await Guardian.create([{
@@ -286,36 +288,13 @@ export const bulkUpsertMotherDetails = async (req, res, next) => {
           await StudentGuardian.create([{
             tenantId: req.tenantId, studentId: student._id, guardianId: guardian._id,
             relationship: "mother", source: "manual", isPrimary: false, canAccessPortal: false,
-            isEmergencyContact: false, canPickup: false, receivesCommunication: false,
+            isEmergencyContact: false, canPickup: false, receivesCommunication: student.guardianRelationship === "mother",
           }], { session });
         }
-        const fatherLink = await StudentGuardian.findOne({
-          tenantId: req.tenantId, studentId: student._id, relationship: "father", status: "active",
-        }).session(session);
-        if (fatherLink && !fatherLink.isPrimary) {
-          const otherPrimaries = await StudentGuardian.find({
-            tenantId: req.tenantId, studentId: student._id, status: "active",
-            isPrimary: true, _id: { $ne: fatherLink._id },
-          }).session(session);
-          for (const previous of otherPrimaries) {
-            previous.isPrimary = false;
-            previous.canAccessPortal = false;
-            previous.auditTrail.push({
-              action: "primary_demoted", actorUserId: req.auth.userId,
-              changes: [{ field: "isPrimary", from: true, to: false }, { field: "canAccessPortal", from: true, to: false }],
-              changedAt: new Date(),
-            });
-            await previous.save({ session });
-          }
-          fatherLink.isPrimary = true;
-          fatherLink.auditTrail.push({
-            action: "primary_promoted", actorUserId: req.auth.userId,
-            changes: [{ field: "isPrimary", from: false, to: true }],
-            changedAt: new Date(),
-          });
-          await fatherLink.save({ session });
-        }
-        result = { admissionNumber, status: "updated", motherName: [guardian.firstName, guardian.lastName].filter(Boolean).join(" "), fatherSetAsPrimary: Boolean(fatherLink) };
+        const primaryGuardian = await StudentGuardian.findOne({
+          tenantId: req.tenantId, studentId: student._id, status: "active", isPrimary: true,
+        }).populate("guardianId", "firstName lastName").session(session);
+        result = { admissionNumber, status: "updated", motherName: [guardian.firstName, guardian.lastName].filter(Boolean).join(" "), primaryGuardianRelationship: primaryGuardian?.relationship || null, primaryGuardianName: primaryGuardian?.guardianId ? [primaryGuardian.guardianId.firstName, primaryGuardian.guardianId.lastName].filter(Boolean).join(" ") : null };
       });
       results.push(result || { admissionNumber, status: "error", message: "Record could not be processed" });
     } catch (error) {
@@ -330,8 +309,8 @@ export const bulkUpsertMotherDetails = async (req, res, next) => {
     notFound: results.filter((item) => item.status === "not_found").length,
     skipped: results.filter((item) => item.status === "skipped").length,
     errors: results.filter((item) => item.status === "error").length,
-    fatherPrimarySet: results.filter((item) => item.status === "updated" && item.fatherSetAsPrimary).length,
-    fatherLinkMissing: results.filter((item) => item.status === "updated" && !item.fatherSetAsPrimary).length,
+    primaryGuardianSet: results.filter((item) => item.status === "updated" && item.primaryGuardianRelationship).length,
+    primaryGuardianMissing: results.filter((item) => item.status === "updated" && !item.primaryGuardianRelationship).length,
   };
   return res.status(200).json({ success: true, summary, data: results });
 };
