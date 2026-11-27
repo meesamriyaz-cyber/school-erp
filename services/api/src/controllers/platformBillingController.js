@@ -324,12 +324,12 @@ export async function getBusinessOverview(req, res, next) {
       };
       const metrics = subscriptionMetrics[currency];
       if (status === "active") {
-        metrics.activeSubscriptions += count;
+        if (billingInterval === "trial") metrics.trialSubscriptions += count;
+        else metrics.activeSubscriptions += count;
         metrics.renewalsDueSoon += group.renewalsDueSoon || 0;
         renewalsDueSoon += group.renewalsDueSoon || 0;
         metrics.trialsEndingSoon += group.trialsEndingSoon || 0;
         trialsEndingSoon += group.trialsEndingSoon || 0;
-        if (billingInterval === "trial") metrics.trialSubscriptions += count;
         if (billingInterval === "monthly") metrics.mrr += amount;
         else if (billingInterval === "annual") metrics.mrr += amount / 12;
         if (billingInterval !== "one_time") {
