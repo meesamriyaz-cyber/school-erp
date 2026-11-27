@@ -232,7 +232,9 @@ export default function StudentDirectory() {
         </div>
       </div>
 
-      {canManageStudents && <MotherContactImport accessToken={accessToken} onImported={() => setNotice("Mother contact import processed. Refresh a student profile to view updated details.")} />}\n\n      <div className="student-filters">
+      {canManageStudents && <MotherContactImport accessToken={accessToken} onImported={() => setNotice("Mother contact import processed. Refresh a student profile to view updated details.")} />}
+
+      <div className="student-filters">
         <label className="student-search">
           <span className="sr-only">Search students</span>
           <input
