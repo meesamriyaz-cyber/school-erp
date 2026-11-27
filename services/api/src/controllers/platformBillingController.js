@@ -193,7 +193,7 @@ export async function listPlatformInvoices(req, res, next) {
     ]);
     const invoiceIds = invoices.map((invoice) => invoice._id);
     const payments = invoiceIds.length
-      ? await PlatformPayment.find({ invoiceId: { $in: invoiceIds } }).sort({ paymentDate: -1 }).lean()
+      ? await PlatformPayment.find({ invoiceId: { $in: invoiceIds } }).sort({ paymentDate: -1, _id: -1 }).lean()
       : [];
     const paymentsByInvoice = new Map();
     for (const payment of payments) {
@@ -203,7 +203,7 @@ export async function listPlatformInvoices(req, res, next) {
     const data = invoices.map((invoice) => {
       const invoicePayments = paymentsByInvoice.get(String(invoice._id)) || [];
       const paidAmount = money(invoicePayments.filter((payment) => payment.status === "recorded").reduce((sum, payment) => sum + payment.amount, 0));
-      return { ...invoice, payments: invoicePayments, paidAmount, outstandingAmount: money(invoice.totalAmount - paidAmount) };
+      return { ...invoice, payments: invoicePayments, paidAmount, outstandingAmount: money(Math.max(invoice.totalAmount - paidAmount, 0)) };
     });
     return res.json({ success: true, data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error) { return next(error); }
