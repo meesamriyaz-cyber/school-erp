@@ -55,6 +55,35 @@ function activityDestination(action) {
   return "Schools";
 }
 
+function humanizeField(value) {
+  return String(value || "").replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ")
+    .replace(/\\b\\w/g, (character) => character.toUpperCase());
+}
+function shortReference(value) {
+  if (!value) return "—";
+  const text = String(value);
+  return text.length > 12 ? `${text.slice(0, 6)}…${text.slice(-4)}` : text;
+}
+function formatAuditValue(value) {
+  if (value === null || value === undefined || value === "") return "Not set";
+  const normalized = String(value);
+  if (/^[a-f\\d]{24}$/i.test(normalized)) return "Recorded reference";
+  return /^(pending|active|suspended|inactive|paid|overdue|cancelled|canceled|failed|recorded)$/i.test(normalized)
+    ? statusLabel(normalized) : normalized.length > 80 ? `${normalized.slice(0, 77)}…` : normalized;
+}
+function commercialDetailSummary(details = {}) {
+  const parts = [];
+  if (details.billingInterval) parts.push(`Billing: ${humanizeField(details.billingInterval)}`);
+  if (details.amount !== undefined) parts.push(`Amount: ${formatCurrency(details.amount, details.currency)}`);
+  if (details.currency && details.amount === undefined) parts.push(`Currency: ${details.currency}`);
+  if (details.status) parts.push(`Status: ${statusLabel(details.status)}`);
+  if (details.dueAt) parts.push(`Due: ${formatDate(details.dueAt)}`);
+  if (details.notes) parts.push(`Note: ${details.notes}`);
+  const refs = ["planId", "subscriptionId", "invoiceId", "paymentId"].filter((key) => details[key]).length;
+  if (refs) parts.push(`${refs} reference${refs > 1 ? "s" : ""} recorded`);
+  return parts.length ? parts.join(" · ") : "No additional details";
+}
+
 export default function PlatformAdminWorkspace() {
   const { user, logout, accessToken } = useAuth();
   const [activePage, setActivePage] = useState("Overview");
@@ -1128,19 +1157,19 @@ export default function PlatformAdminWorkspace() {
               </div>
               {auditLogsError && <div className="platform-directory-error" role="alert">{auditLogsError}</div>}
               {loadingAuditLogs && <p role="status">Loading system audit…</p>}
-              <div className="platform-table-wrap">
-                <table className="platform-school-table" aria-label="System audit event log">
-                  <thead><tr><th>When</th><th>Actor</th><th>Target user</th><th>School</th><th>Action</th><th>Changed fields</th><th>Change</th></tr></thead>
+              <div className="platform-table-wrap platform-audit-table-wrap">
+                <table className="platform-school-table platform-audit-table" aria-label="System audit event log">
+                  <thead><tr><th>Date</th><th>Performed by</th><th>Person affected</th><th>School</th><th>Activity</th><th>What changed</th></tr></thead>
                   <tbody>
                     {auditLogs.map((item) => <tr key={item.id}>
-                      <td>{formatDate(item.createdAt)}</td>
-                      <td>{item.actorRole?.replaceAll("_", " ") || "—"}<small>{item.actorUserId}</small></td>
-                      <td>{item.targetUserId}</td><td>{item.targetTenantId || "Platform"}</td>
-                      <td>{statusLabel(item.action?.replaceAll("_", " ").toLowerCase())}</td>
-                      <td>{item.changedFields?.join(", ") || "—"}</td>
-                      <td>{item.previousValue || "—"} → {item.newValue || "—"}</td>
+                      <td><strong>{formatDate(item.createdAt)}</strong><small>{item.createdAt ? new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : ""}</small></td>
+                      <td><strong>{item.actorName || humanizeField(item.actorRole) || "Platform user"}</strong><small title={item.actorUserId}>{humanizeField(item.actorRole)} · {shortReference(item.actorUserId)}</small></td>
+                      <td><strong>{item.targetUserName || "User account"}</strong><small title={item.targetUserId}>{shortReference(item.targetUserId)}</small></td>
+                      <td><strong>{item.schoolName || (item.targetTenantId ? "School" : "Platform")}</strong><small title={item.targetTenantId || ""}>{item.targetTenantId ? shortReference(item.targetTenantId) : "Platform-wide"}</small></td>
+                      <td><span className="platform-audit-action">{humanizeField(item.action)}</span></td>
+                      <td><strong>{(item.changedFields || []).map(humanizeField).join(", ") || "Account activity"}</strong>{(item.previousValue !== null || item.newValue !== null) && <small>{formatAuditValue(item.previousValue)} → {formatAuditValue(item.newValue)}</small>}</td>
                     </tr>)}
-                    {!loadingAuditLogs && !auditLogs.length && <tr><td colSpan="7" className="platform-table-message">No audit records match these filters.</td></tr>}
+                    {!loadingAuditLogs && !auditLogs.length && <tr><td colSpan="6" className="platform-table-message">No audit records match these filters.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -1155,9 +1184,19 @@ export default function PlatformAdminWorkspace() {
             <section className="platform-directory" aria-label="Commercial audit events">
               <div className="platform-form-heading"><div><h2>Commercial event history</h2><p>Plan changes, subscription assignments, activations, renewals and payment actions.</p></div><button type="button" className="platform-secondary-button" onClick={() => setReloadCount((count) => count + 1)}>Refresh</button></div>
               {eventsError && <div className="platform-directory-error" role="alert">{eventsError}</div>}
-              <div className="platform-table-wrap"><table className="platform-school-table" aria-label="Commercial audit events"><thead><tr><th>When</th><th>School</th><th>Action</th><th>Details</th></tr></thead><tbody>
-                {commercialEvents.map((item) => <tr key={item.id || item._id}><td>{formatDate(item.createdAt)}</td><td>{item.tenantId?.name || "—"}</td><td>{statusLabel(item.action?.replaceAll("_", " ").toLowerCase())}</td><td><code>{JSON.stringify(item.details || {})}</code></td></tr>)}
-                {!commercialEvents.length && <tr><td colSpan="4" className="platform-table-message">No commercial events recorded yet.</td></tr>}
+              <div className="platform-table-wrap"><table className="platform-school-table platform-commercial-table" aria-label="Commercial audit events"><thead><tr><th>Date</th><th>School</th><th>Activity</th><th>Summary</th><th>References</th></tr></thead><tbody>
+                {commercialEvents.map((item) => {
+                  const details = item.details || {};
+                  const references = ["planId", "subscriptionId", "invoiceId", "paymentId"].filter((key) => details[key]);
+                  return <tr key={item.id || item._id}>
+                    <td><strong>{formatDate(item.createdAt)}</strong><small>{item.createdAt ? new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : ""}</small></td>
+                    <td><strong>{item.tenantId?.name || "Platform-wide"}</strong></td>
+                    <td><span className="platform-audit-action">{humanizeField(item.action)}</span></td>
+                    <td>{commercialDetailSummary(details)}</td>
+                    <td>{references.length ? <details className="platform-audit-reference"><summary>View {references.length} reference{references.length > 1 ? "s" : ""}</summary><dl>{references.map((key) => <div key={key}><dt>{humanizeField(key)}</dt><dd title={details[key]}>{shortReference(details[key])}</dd></div>)}</dl></details> : "—"}</td>
+                  </tr>;
+                })}
+                {!commercialEvents.length && <tr><td colSpan="5" className="platform-table-message">No commercial events recorded yet.</td></tr>}
               </tbody></table></div>
             </section>
           ) : activePage === "CreateSchool" ? (
