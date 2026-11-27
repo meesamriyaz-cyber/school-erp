@@ -9,7 +9,7 @@ import { createUser, getUserDetails, listUsers, updateUser, updateUserRole, upda
 import { listAuditLogs } from "../controllers/auditLogController.js";
 import { getAuditOutboxStatus, retryFailedAuditEvent } from "../controllers/auditOutboxController.js";
 import {
-  getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan,
+  getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, startSchoolTrial,
   archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices,
   recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents,
 } from "../controllers/platformBillingController.js";
@@ -23,6 +23,7 @@ router.post("/subscription-plans", ...platformOnly, createSubscriptionPlan);
 router.patch("/subscription-plans/:planId", ...platformOnly, updateSubscriptionPlan);
 router.post("/subscription-plans/:planId/archive", ...platformOnly, archiveSubscriptionPlan);
 router.get("/schools/:schoolId/subscription", ...platformOnly, getSchoolSubscription);
+router.post("/schools/:schoolId/trial", ...platformOnly, startSchoolTrial);
 router.post("/schools/:schoolId/subscription", ...platformOnly, assignSchoolSubscription);
 router.get("/invoices", ...platformOnly, listPlatformInvoices);
 router.post("/invoices/:invoiceId/payments", ...platformOnly, recordPlatformPayment);
