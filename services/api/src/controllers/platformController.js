@@ -281,7 +281,7 @@ export const listSchools = async (req, res, next) => {
 
     const [schools, total] = await Promise.all([
       Tenant.find(filter)
-        .select("_id name slug status contactEmail timezone createdAt updatedAt")
+         .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
         .sort({ name: 1, _id: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -311,13 +311,17 @@ export const listSchools = async (req, res, next) => {
 export const updateSchoolStatus = async (req, res, next) => {
   try {
     const { schoolId } = req.params ?? {};
-    const { status } = req.body ?? {};
+    const { status, reason } = req.body ?? {};
 
     if (!mongoose.isObjectIdOrHexString(schoolId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid school ID",
       });
+    }
+
+    if (status === "suspended" && (typeof reason !== "string" || reason.trim().length < 10 || reason.trim().length > 500)) {
+      return res.status(400).json({ success: false, message: "A suspension reason of 10 to 500 characters is required" });
     }
 
     if (typeof status !== "string" || !SCHOOL_STATUSES.includes(status)) {
@@ -425,15 +429,23 @@ export const updateSchoolStatus = async (req, res, next) => {
     }
 
     // Include the current status in the update filter to prevent stale writes.
+    const statusUpdate = { $set: { status } };
+    if (status === "suspended") {
+      statusUpdate.$set.suspensionReason = reason.trim();
+      statusUpdate.$push = {
+        suspensionHistory: {
+          reason: reason.trim(),
+          suspendedAt: new Date(),
+          suspendedBy: req.auth?.userId || null,
+        },
+      };
+    }
     const updatedSchool = await Tenant.findOneAndUpdate(
       { _id: school._id, status: school.status },
-      { $set: { status } },
-      {
-        new: true,
-        runValidators: true,
-      },
+      statusUpdate,
+      { new: true, runValidators: true },
     )
-      .select("_id name slug status contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
       .lean();
 
     if (!updatedSchool) {
