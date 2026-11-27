@@ -836,4 +836,58 @@ it("changes a user's role and updates the profile", async () => {
     );
   });
 
+
+  it("shows system audit records, outbox health and retries failed delivery", async () => {
+    const user = userEvent.setup();
+    const auditRecord = {
+      id: "audit-1",
+      actorUserId: "actor-1",
+      actorRole: "platform_admin",
+      targetUserId: "target-1",
+      targetTenantId: "school-1",
+      action: "USER_ROLE_CHANGED",
+      changedFields: ["role"],
+      previousValue: "teacher",
+      newValue: "principal",
+      createdAt: "2026-11-26T10:00:00.000Z",
+    };
+    const failedEvent = {
+      id: "outbox-1",
+      attempts: 10,
+      manualRetryCount: 0,
+      lastError: "Temporary database issue",
+      updatedAt: "2026-11-26T10:01:00.000Z",
+    };
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === "/platform/business-overview") return businessOverview;
+      if (path.startsWith("/platform/audit-logs?")) {
+        return { success: true, data: [auditRecord], pagination: { page: 1, limit: 20, total: 1, totalPages: 1 } };
+      }
+      if (path === "/platform/audit-outbox" && options.method !== "POST") {
+        return { success: true, data: { counts: { pending: 2, processing: 1, staleProcessing: 0, delivered: 42, failed: 1 }, failedEvents: [failedEvent] } };
+      }
+      if (path === "/platform/audit-outbox/outbox-1/retry" && options.method === "POST") {
+        return { success: true, data: { id: "outbox-1", status: "pending" } };
+      }
+      return { success: true, data: { counts: { pending: 3, processing: 0, staleProcessing: 0, delivered: 42, failed: 0 }, failedEvents: [] } };
+    });
+
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /System audit/ }));
+
+    expect(await screen.findByRole("table", { name: "System audit event log" })).toBeInTheDocument();
+    expect(screen.getByText("USER ROLE CHANGED")).toBeInTheDocument();
+    expect(screen.getByText("teacher → principal")).toBeInTheDocument();
+    expect(screen.getByText("Temporary database issue")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Retry delivery" }));
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenCalledWith(
+        "/platform/audit-outbox/outbox-1/retry",
+        expect.objectContaining({ method: "POST", accessToken: "platform-access-token" }),
+      );
+    });
+  });
+
 });
