@@ -36,7 +36,7 @@ describe("updateSchoolStatus controller", () => {
     const schoolId = new mongoose.Types.ObjectId();
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     const next = vi.fn();
-    await updateSchoolStatus({ params: { schoolId: String(schoolId) }, body: { status: "suspended" } }, res, next);
+    await updateSchoolStatus({ params: { schoolId: String(schoolId) }, body: { status: "suspended", reason: "Valid school suspension reason" } }, res, next);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/suspension reason/i) }));
     expect(Tenant.findById).not.toHaveBeenCalled();
