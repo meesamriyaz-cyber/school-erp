@@ -320,7 +320,7 @@ export async function getBusinessOverview(req, res, next) {
       subscriptionStatusCounts[status] = (subscriptionStatusCounts[status] || 0) + count;
       subscriptionMetrics[currency] ??= {
         mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0,
-        pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 0,
+        pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 0, trialSubscriptions: 0, trialsEndingSoon: 0,
       };
       const metrics = subscriptionMetrics[currency];
       if (status === "active") {
@@ -352,7 +352,7 @@ export async function getBusinessOverview(req, res, next) {
     for (const item of lifetime) {
       subscriptionMetrics[item._id] ??= {
         mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0,
-        pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 0,
+        pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 0, trialSubscriptions: 0, trialsEndingSoon: 0,
       };
       subscriptionMetrics[item._id].lifetimeSales = item.sales;
     }
