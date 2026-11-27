@@ -51,7 +51,7 @@ export const createStudentDocument = async (req, res, next) => {
   try {
     const student = await getStudent(req, res);
     if (!student) return;
-    const { name, category, fileUrl, publicId, resourceType, format, bytes, notes = "" } = req.body || {};
+    const { name, category, fileUrl, publicId, resourceType, format, bytes, notes = "", setAsProfilePhoto = false } = req.body || {};
     if (typeof name !== "string" || !name.trim() || name.length > 180) return fail(res, 400, "A valid document name is required");
     if (!categories.includes(category)) return fail(res, 400, "Select a valid document category");
     let parsedUrl;
@@ -64,11 +64,18 @@ export const createStudentDocument = async (req, res, next) => {
     if (typeof format !== "string" || !/^[a-z0-9]{1,20}$/i.test(format)) return fail(res, 400, "Invalid file format");
     if (!Number.isInteger(bytes) || bytes < 1 || bytes > 10485760) return fail(res, 400, "File size must not exceed 10 MB");
     if (typeof notes !== "string" || notes.length > 500) return fail(res, 400, "Notes must not exceed 500 characters");
+    if (typeof setAsProfilePhoto !== "boolean") return fail(res, 400, "Invalid profile photo selection");
+    if (setAsProfilePhoto && (category !== "photograph" || resourceType !== "image" || !["jpg", "jpeg", "png"].includes(format.toLowerCase()))) {
+      return fail(res, 400, "Only an uploaded JPG or PNG photograph can be used as the student profile photo");
+    }
     const document = await StudentDocument.create({
       tenantId: req.tenantId, studentId: student._id, name: name.trim(), category, fileUrl: parsedUrl.toString(),
       publicId, resourceType, format: format.toLowerCase(), bytes, notes: notes.trim(), uploadedBy: req.auth.userId,
     });
-    return res.status(201).json({ success: true, data: document });
+    if (setAsProfilePhoto) {
+      await Student.updateOne({ _id: student._id, tenantId: req.tenantId }, { $set: { photoUrl: document.fileUrl } }, { runValidators: true });
+    }
+    return res.status(201).json({ success: true, data: document, profilePhotoUpdated: setAsProfilePhoto });
   } catch (error) { return next(error); }
 };
 
@@ -91,6 +98,7 @@ export const deleteStudentDocument = async (req, res, next) => {
       return fail(res, 502, cloudResult.error?.message || "Cloudinary could not delete the file");
     }
     await document.deleteOne();
+    await Student.updateOne({ _id: document.studentId, tenantId: req.tenantId, photoUrl: document.fileUrl }, { $set: { photoUrl: null } });
     return res.json({ success: true, message: "Document and Cloudinary file deleted" });
   } catch (error) { return next(error); }
 };
