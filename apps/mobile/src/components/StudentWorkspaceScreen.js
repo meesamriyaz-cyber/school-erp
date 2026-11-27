@@ -191,11 +191,11 @@ export function StudentWorkspaceScreen({ user }) {
 
     {!loading && !error && section === "profile" ? <Panel title="Student profile" subtitle="Your school identity and current academic placement">
       <View style={styles.familyPhotos}>
-        {[{ key: "student", label: "Student", name: [student?.firstName, student?.lastName].filter(Boolean).join(" "), photoUrl: student?.photoUrl }, ...["father", "mother"].map((relationship) => {
+        {["father", "mother"].map((relationship) => {
           const parent = (profile?.parents || []).find((item) => item.relationship === relationship);
           return { key: relationship, label: relationship === "father" ? "Father" : "Mother", name: parent?.name || "Details not added", photoUrl: parent?.photoUrl, phone: parent?.phone, email: parent?.email, emailVerified: parent?.emailVerified };
         })].map((person) => <View key={person.key} style={styles.familyPerson}>
-          <View style={styles.avatarCircle}>{person.photoUrl && !failedPhotos[person.key] ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage} onError={() => setFailedPhotos((previous) => ({ ...previous, [person.key]: true }))}/> : <Text style={styles.avatarInitial}>{person.key === "student" ? "S" : person.key === "father" ? "F" : "M"}</Text>}</View>
+          <View style={styles.avatarCircle}>{person.photoUrl && !failedPhotos[person.key] ? <Image source={{ uri: person.photoUrl }} style={styles.avatarImage} onError={() => setFailedPhotos((previous) => ({ ...previous, [person.key]: true }))}/> : <Text style={styles.avatarInitial}>{person.key === "father" ? "F" : "M"}</Text>}</View>
           <Text style={styles.familyLabel}>{person.label}</Text>
           <Text style={styles.familyName} numberOfLines={2}>{person.name || "Not available"}</Text>
         </View>)}
