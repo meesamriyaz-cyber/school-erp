@@ -25,7 +25,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [error, setError] = useState("");
 
   const loadDirectory = useCallback(async (refresh = false) => {
-    if (section === "overview") return;
+    if (!["schools", "users"].includes(section)) return;
     if (refresh) setRefreshing(true); else setLoading(true);
     setError("");
     try {
@@ -45,7 +45,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
     }
   }, [page, search, section]);
 
-  useEffect(() => { if (section !== "overview") void loadDirectory(); }, [loadDirectory, section]);
+  useEffect(() => { if (["schools", "users"].includes(section)) void loadDirectory(); }, [loadDirectory, section]);
 
   useEffect(() => {
     if (section !== "overview") return undefined;
