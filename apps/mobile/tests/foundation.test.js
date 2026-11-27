@@ -157,6 +157,11 @@ test('platform admin has a dedicated mobile workspace for cross-school directori
   assert.match(screen, /tenantId/);
   assert.match(screen, /userRoleFilter/);
   assert.match(screen, /userStatusFilter/);
+  assert.match(screen, /accountant.*librarian.*transport_manager/);
+  assert.match(screen, /unsupported in this release/);
+  assert.match(screen, /You cannot change your own role/);
+  assert.match(screen, /String\(userDetails.id\) === String\(user\?\.id \|\| user\?\._id\)/);
+  assert.match(screen, /createUserMessage \? <Text/);
 });
 
 
