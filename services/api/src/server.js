@@ -2,6 +2,7 @@ import app from "./app.js";
 import env from "./config/env.js";
 import { startAuditOutboxWorker, stopAuditOutboxWorker } from "./services/auditLogService.js";
 import { startNotificationDeliveryWorker, stopNotificationDeliveryWorker } from "./services/notificationDeliveryService.js";
+import { startTrialExpiryWorker, stopTrialExpiryWorker } from "./services/trialExpiryService.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -13,6 +14,7 @@ const startServer = async () => {
   await connectDatabase();
   startAuditOutboxWorker();
   startNotificationDeliveryWorker();
+  startTrialExpiryWorker();
 
   server = app.listen(env.port, () => {
     console.log(
@@ -38,6 +40,7 @@ const shutdown = async (signal) => {
     // All request handlers have completed; now stop polling and drain the active worker cycle.
     await stopAuditOutboxWorker();
     await stopNotificationDeliveryWorker();
+    await stopTrialExpiryWorker();
     await disconnectDatabase();
     process.exitCode = 0;
   } catch (error) {
@@ -60,6 +63,7 @@ startServer().catch(async (error) => {
   try {
     await stopAuditOutboxWorker();
     await stopNotificationDeliveryWorker();
+    await stopTrialExpiryWorker();
     await disconnectDatabase();
   } finally {
     process.exitCode = 1;

@@ -69,10 +69,11 @@ describe("getBusinessOverview", () => {
     commercialEventFind.mockReturnValue(eventQuery);
   });
 
-  it("returns school, subscription, receivables, collection and recent activity metrics", async () => {
+  it("returns school, subscription, receivables, collection and recent activity metrics without querying or mutating trial records", async () => {
     await getBusinessOverview({}, res, next);
 
     expect(next).not.toHaveBeenCalled();
+    expect(tenantFind).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledOnce();
 
     const { data } = res.json.mock.calls[0][0];

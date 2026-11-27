@@ -280,26 +280,9 @@ export async function recordPlatformPayment(req, res, next) {
   finally { await session.endSession(); }
 }
 
-async function expireDueTrials(now = new Date()) {
-  const dueSchools = await Tenant.find({ status: "active", trialEndsAt: { $lte: now } })
-    .select("_id")
-    .lean();
-  if (!dueSchools.length) return;
-  const tenantIds = dueSchools.map((school) => school._id);
-  await Tenant.updateMany(
-    { _id: { $in: tenantIds }, status: "active", trialEndsAt: { $lte: now } },
-    { $set: { status: "trial_expired", trialExpiredAt: now } },
-  );
-  await SchoolSubscription.updateMany(
-    { tenantId: { $in: tenantIds }, isTrial: true, status: "active" },
-    { $set: { status: "expired" } },
-  );
-}
-
 export async function getBusinessOverview(req, res, next) {
   try {
     const now = new Date();
-    await expireDueTrials(now);
     const renewalWindowEnd = new Date(now.getTime() + 30 * 86400000);
     const [schools, allSubscriptions, invoiceStats, paymentStats] = await Promise.all([
       Tenant.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
