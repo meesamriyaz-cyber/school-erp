@@ -6,14 +6,14 @@ vi.mock("../models/User.js", () => ({ default: {} }));
 vi.mock("../models/SubscriptionPlan.js", () => ({ default: {} }));
 vi.mock("../models/SchoolSubscription.js", () => ({ default: { findOne: vi.fn(), updateMany: vi.fn() } }));
 vi.mock("../models/PlatformInvoice.js", () => ({ default: { findById: vi.fn() } }));
-vi.mock("../models/PlatformPayment.js", () => ({ default: { findOne: vi.fn(), aggregate: vi.fn() } }));
+vi.mock("../models/PlatformPayment.js", () => ({ default: { findOne: vi.fn(), aggregate: vi.fn(), create: vi.fn() } }));
 vi.mock("../models/PlatformCommercialEvent.js", () => ({ default: { create: vi.fn() } }));
 
 import SchoolSubscription from "../models/SchoolSubscription.js";
 import PlatformInvoice from "../models/PlatformInvoice.js";
 import PlatformPayment from "../models/PlatformPayment.js";
 import PlatformCommercialEvent from "../models/PlatformCommercialEvent.js";
-import { reversePlatformPayment } from "../controllers/platformBillingController.js";
+import { recordPlatformPayment, reversePlatformPayment } from "../controllers/platformBillingController.js";
 
 const id = () => new mongoose.Types.ObjectId();
 const date = value => new Date(value);
