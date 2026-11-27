@@ -56,6 +56,8 @@ export default function StudentGuardianManagement({
   const [saving, setSaving] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState("");
   const [editForm, setEditForm] = useState(null);
+  const [editingGuardianId, setEditingGuardianId] = useState("");
+  const [guardianEditForm, setGuardianEditForm] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -150,7 +152,8 @@ export default function StudentGuardianManagement({
             guardianId,
             relationship,
             ...flags,
-            canAccessPortal: typeof flags.canAccessPortal === "boolean" ? flags.canAccessPortal : flags.isPrimary,
+            ...(relationship === "mother" ? { isPrimary: false, receivesCommunication: false, canAccessPortal: false } : {}),
+            canAccessPortal: relationship === "mother" ? false : (typeof flags.canAccessPortal === "boolean" ? flags.canAccessPortal : flags.isPrimary),
           },
         },
       );
@@ -162,7 +165,7 @@ export default function StudentGuardianManagement({
       setGuardianForm(EMPTY_GUARDIAN);
       setSelectedGuardianId("__new__");
       setRelationship("other");
-      setFlags(EMPTY_FLAGS);
+      setFlags(relationship === "mother" ? { ...EMPTY_FLAGS, receivesCommunication: false, isPrimary: false, canAccessPortal: false } : EMPTY_FLAGS);
       setNotice(`Guardian linked successfully.${emailVerificationNotice}`);
       refresh();
     } catch (saveError) {
@@ -180,7 +183,7 @@ export default function StudentGuardianManagement({
       isPrimary: Boolean(link.isPrimary),
       isEmergencyContact: Boolean(link.isEmergencyContact),
       canPickup: Boolean(link.canPickup),
-      receivesCommunication: link.receivesCommunication !== false,
+      receivesCommunication: link.relationship === "mother" ? false : link.receivesCommunication !== false,
       canAccessPortal: typeof link.canAccessPortal === "boolean" ? link.canAccessPortal : Boolean(link.isPrimary),
     });
     setError("");
@@ -199,7 +202,7 @@ export default function StudentGuardianManagement({
         {
           method: "PATCH",
           accessToken,
-          body: editForm,
+          body: { ...editForm, ...(editForm.relationship === "mother" ? { isPrimary: false, receivesCommunication: false, canAccessPortal: false } : {}) },
         },
       );
       if (!response?.success) throw new Error("Relationship could not be updated.");
@@ -209,6 +212,60 @@ export default function StudentGuardianManagement({
       refresh();
     } catch (saveError) {
       setError(saveError.message || "Unable to update the relationship.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const beginGuardianEdit = (link) => {
+    const guardian = link.guardianId;
+    if (!guardian?._id) return;
+    setEditingGuardianId(String(guardian._id));
+    setGuardianEditForm({
+      firstName: guardian.firstName || "",
+      lastName: guardian.lastName || "",
+      phone: guardian.phone || "",
+      email: guardian.pendingEmail || guardian.email || "",
+    });
+    setError("");
+    setNotice("");
+  };
+
+  const saveGuardianContact = async (event, link) => {
+    event.preventDefault();
+    if (!guardianEditForm || !link.guardianId?._id) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await apiRequest(`/guardians/${encodeURIComponent(link.guardianId._id)}`, {
+        method: "PATCH",
+        accessToken,
+        body: {
+          firstName: guardianEditForm.firstName.trim(),
+          lastName: guardianEditForm.lastName.trim(),
+          phone: guardianEditForm.phone.trim() || null,
+          email: guardianEditForm.email.trim() || null,
+        },
+      });
+      if (!response?.success) throw new Error("Guardian contact details could not be updated.");
+      if (guardianEditForm.email.trim()) {
+        try {
+          await apiRequest(`/guardians/${encodeURIComponent(link.guardianId._id)}/email-verification/send`, {
+            method: "POST", accessToken, body: { email: guardianEditForm.email.trim() },
+          });
+          setNotice("Guardian details saved. An email verification code was sent.");
+        } catch (verificationError) {
+          setNotice(`Guardian details saved. Email verification could not be sent: ${verificationError.message || "Please retry from Guardian Directory."}`);
+        }
+      } else {
+        setNotice("Guardian contact details saved.");
+      }
+      setEditingGuardianId("");
+      setGuardianEditForm(null);
+      refresh();
+    } catch (saveError) {
+      setError(saveError.message || "Unable to update guardian contact details.");
     } finally {
       setSaving(false);
     }
@@ -397,6 +454,23 @@ export default function StudentGuardianManagement({
                   {guardian?.pendingEmail && <span>Pending email: {guardian.pendingEmail}</span>}
                 </div>
 
+                {canManage && editingGuardianId === String(guardian?._id) && guardianEditForm && (
+                  <form className="student-guardian-form student-guardian-edit-form" onSubmit={(event) => saveGuardianContact(event, link)}>
+                    <h4>Edit {relationshipLabel(link.relationship)} contact details</h4>
+                    <div className="student-guardian-form-grid">
+                      <label>First name *<input required value={guardianEditForm.firstName} onChange={(event) => setGuardianEditForm((current) => ({ ...current, firstName: event.target.value }))} /></label>
+                      <label>Last name<input value={guardianEditForm.lastName} onChange={(event) => setGuardianEditForm((current) => ({ ...current, lastName: event.target.value }))} /></label>
+                      <label>Phone<input type="tel" inputMode="numeric" pattern="[0-9]{10}" maxLength={10} value={guardianEditForm.phone} onChange={(event) => setGuardianEditForm((current) => ({ ...current, phone: event.target.value.replace(/[^0-9]/g, "").slice(0, 10) }))} /></label>
+                      <label>Email<input type="email" value={guardianEditForm.email} onChange={(event) => setGuardianEditForm((current) => ({ ...current, email: event.target.value }))} /></label>
+                    </div>
+                    {link.relationship === "mother" && <p className="student-guardian-permission-help">Mother's phone and email are stored for school records only. School communications remain directed to the primary Father contact.</p>}
+                    <div className="student-guardian-form-actions">
+                      <button type="submit" className="student-guardian-primary-button" disabled={saving}>{saving ? "Saving…" : "Save contact details"}</button>
+                      <button type="button" onClick={() => { setEditingGuardianId(""); setGuardianEditForm(null); }} disabled={saving}>Cancel</button>
+                    </div>
+                  </form>
+                )}
+
                 <div className="student-guardian-badges">
                   {link.isPrimary && <span>Primary</span>}
                   {link.isEmergencyContact && <span>Emergency contact</span>}
@@ -466,6 +540,7 @@ export default function StudentGuardianManagement({
 
                 {canManage && !isEditing && (
                   <div className="student-guardian-item-actions">
+                    <button type="button" onClick={() => beginGuardianEdit(link)} disabled={saving}>Edit contact details</button>
                     <button type="button" onClick={() => beginEdit(link)} disabled={saving}>Edit relationship</button>
                     {link.status === "inactive" ? (
                       <button type="button" onClick={() => updateStatus(link, "active")} disabled={saving}>Reactivate</button>
