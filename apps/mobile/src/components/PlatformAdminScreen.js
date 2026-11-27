@@ -273,6 +273,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
     setUserDetails(null);
     setSection(next);
     setPage(1);
+    setCommercialPage(1);
     setSearch("");
     setError("");
   };
