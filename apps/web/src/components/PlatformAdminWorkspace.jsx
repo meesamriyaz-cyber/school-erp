@@ -31,6 +31,30 @@ function statusLabel(status) {
   return status ? status.charAt(0).toUpperCase() + status.slice(1) : "Unknown";
 }
 
+function formatCurrency(value, currency) {
+  const amount = Number(value || 0);
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: currency || "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${currency || ""} ${amount.toLocaleString("en-IN")}`.trim();
+  }
+}
+
+function activityLabel(action) {
+  return String(action || "Platform event").replaceAll("_", " ").toLowerCase()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function activityDestination(action) {
+  if (String(action || "").startsWith("PAYMENT_") || String(action || "").includes("RENEWAL")) return "Billing";
+  if (String(action || "").startsWith("PLAN_")) return "Plans";
+  return "Schools";
+}
+
 export default function PlatformAdminWorkspace() {
   const { user, logout, accessToken } = useAuth();
   const [activePage, setActivePage] = useState("Overview");
@@ -868,7 +892,7 @@ export default function PlatformAdminWorkspace() {
 
         <div className="platform-content">
           <div className="platform-eyebrow">CENTRAL ADMINISTRATION</div>
-          <h1>{({ Overview: "Platform overview", CreateSchool: "Create school", SchoolDetails: "School details", Users: "User directory", UserDetails: "User details", CreateUser: "Create user", Plans: "Subscription plans", Billing: "Platform billing", "Commercial audit": "Commercial audit trail" })[activePage] || "School directory"}</h1>
+          <h1>{({ Overview: "Platform overview", Schools: "School directory", CreateSchool: "Create school", SchoolDetails: "School details", Users: "User directory", UserDetails: "User details", CreateUser: "Create user", Plans: "Subscription plans", Billing: "Platform billing", "Commercial audit": "Commercial audit trail", "System audit": "System audit trail" })[activePage] || "School directory"}</h1>
           <p className="platform-page-description">
             {activePage === "Overview"
               ? "Manage schools and their access from one secure workspace."
@@ -886,46 +910,145 @@ export default function PlatformAdminWorkspace() {
                           ? "Review platform invoices, record payments and manage reversals."
                           : activePage === "Commercial audit"
                             ? "Trace subscription, plan and payment changes across your school portfolio."
-                            : "Search registered schools, review their status, and move through the directory."}
+                            : activePage === "System audit"\n                              ? "Review user and access changes and monitor reliable audit-event delivery."\n                              : "Search registered schools, review their status, and move through the directory."}
           </p>
 
           {activePage === "Overview" ? (
-            <>
+            <div className="platform-overview">
               <section className="platform-welcome-card">
                 <div>
-                  <span className="platform-card-kicker">SCHOOLS AT A GLANCE</span>
-                  <h2>Your platform, centrally managed.</h2>
-                  <p>Manage school onboarding and lifecycle controls from one secure workspace.</p>
-                  <button type="button" onClick={() => setActivePage("Schools")}>
-                    Open school directory <span aria-hidden="true">→</span>
-                  </button>
+                  <span className="platform-card-kicker">PLATFORM INTELLIGENCE</span>
+                  <h2>Your SchoolSuite business at a glance.</h2>
+                  <p>Monitor the school portfolio, subscription health, platform revenue and actions that need attention.</p>
+                  <div className="platform-overview-actions">
+                    <button type="button" onClick={() => setActivePage("CreateSchool")}>Register a school</button>
+                    <button type="button" className="platform-welcome-secondary" onClick={() => setReloadCount((count) => count + 1)}>Refresh overview</button>
+                  </div>
                 </div>
                 <div className="platform-card-art" aria-hidden="true">⌂</div>
               </section>
 
-              {businessOverviewError && <div className="platform-directory-error" role="alert"><p>{businessOverviewError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
-              {loadingBusinessOverview && <p role="status">Loading business metrics…</p>}
-              {businessOverview && (
-                <div className="platform-overview-metrics">
-                  <section className="platform-summary-grid" aria-label="Business overview">
-                    <article className="platform-summary-card"><span className="platform-summary-icon">⌂</span><span className="platform-summary-label">Client schools</span><strong>{businessOverview.schools?.total ?? 0}</strong><p>{businessOverview.schools?.active ?? 0} active schools</p></article>
-                    <article className="platform-summary-card"><span className="platform-summary-icon">↻</span><span className="platform-summary-label">Active subscriptions</span><strong>{Object.values(businessOverview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</strong><p>Monthly, annual and lifetime plans</p></article>
-                    <article className="platform-summary-card"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Invoiced revenue</span><strong>{(businessOverview.invoiced || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.invoiced || 0)).join(" · ") || "No invoices yet"}</strong><p>Issued platform invoices, excluding void and draft</p></article>
-                    <article className="platform-summary-card"><span className="platform-summary-icon">✓</span><span className="platform-summary-label">Cash collected</span><strong>{(businessOverview.collected || []).map(item => new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.collected || 0)).join(" · ") || "No payments yet"}</strong><p>Recorded platform payments</p></article>
-                  </section>
-                  <section className="platform-summary-grid" aria-label="Recurring revenue">
-                    {Object.entries(businessOverview.subscriptions || {}).map(([currency, metrics]) => (
-                      <article className="platform-summary-card" key={currency}><span className="platform-summary-label">{currency} recurring run rate</span><strong>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.mrr || 0)} / month</strong><p>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.arr || 0)} annualised · {new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(metrics.lifetimeSales || 0)} lifetime sales</p></article>
-                    ))}
-                  </section>
+              {businessOverviewError && (
+                <div className="platform-directory-error" role="alert">
+                  <p>{businessOverviewError}</p>
+                  <button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button>
                 </div>
               )}
-              <section className="platform-summary-grid" aria-label="Platform operations">
-                <article className="platform-summary-card"><span className="platform-summary-icon">⌂</span><span className="platform-summary-label">Client portfolio</span><strong>Manage schools</strong><p>Search school accounts and review their lifecycle.</p><button type="button" className="platform-secondary-button" onClick={() => setActivePage("Schools")}>Open schools</button></article>
-                <article className="platform-summary-card"><span className="platform-summary-icon">＋</span><span className="platform-summary-label">Onboarding</span><strong>New client</strong><p>Register a school and its initial administrator.</p><button type="button" className="platform-secondary-button" onClick={() => setActivePage("CreateSchool")}>Add school</button></article>
-                <article className="platform-summary-card"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Billing data</span><strong>Separate from school fees</strong><p>These metrics represent SchoolSuite platform invoices and payments.</p></article>
-              </section>
-            </>
+              {loadingBusinessOverview && <p role="status">Loading platform intelligence…</p>}
+
+              {businessOverview && (() => {
+                const schoolStatuses = Object.fromEntries(
+                  (businessOverview.schools?.byStatus || []).map((item) => [item._id, item.count]),
+                );
+                const subscriptionEntries = Object.entries(businessOverview.subscriptions || {});
+                const invoiceEntries = businessOverview.invoiced || [];
+                const collectionEntries = businessOverview.collected || [];
+                const collectionByCurrency = new Map(collectionEntries.map((item) => [item._id, item]));
+                const financialCurrencies = [...new Set([
+                  ...invoiceEntries.map((item) => item._id),
+                  ...collectionEntries.map((item) => item._id),
+                ])];
+                const pastDueSubscriptions = businessOverview.subscriptionStatusCounts?.past_due || 0;
+                const pendingSubscriptions = businessOverview.subscriptionStatusCounts?.pending || 0;
+
+                return (
+                  <>
+                    <section className="platform-overview-kpis" aria-label="Platform key performance indicators">
+                      <article className="platform-overview-kpi">
+                        <div className="platform-overview-kpi-top"><span className="platform-summary-icon">⌂</span><span className="platform-summary-label">Registered schools</span></div>
+                        <strong>{businessOverview.schools?.total ?? 0}</strong>
+                        <p>{schoolStatuses.active || 0} active · {schoolStatuses.pending || 0} pending · {schoolStatuses.suspended || 0} suspended</p>
+                        <button type="button" onClick={() => setActivePage("Schools")}>View school portfolio <span aria-hidden="true">→</span></button>
+                      </article>
+
+                      <article className="platform-overview-kpi">
+                        <div className="platform-overview-kpi-top"><span className="platform-summary-icon">↻</span><span className="platform-summary-label">Active subscriptions</span></div>
+                        <strong>{Object.values(businessOverview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</strong>
+                        <p>{pastDueSubscriptions} past due · {businessOverview.renewalsDueSoon || 0} renew within 30 days</p>
+                        <button type="button" onClick={() => setActivePage("Billing")}>Review billing <span aria-hidden="true">→</span></button>
+                      </article>
+
+                      <article className="platform-overview-kpi">
+                        <div className="platform-overview-kpi-top"><span className="platform-summary-icon">₹</span><span className="platform-summary-label">Monthly recurring revenue</span></div>
+                        {subscriptionEntries.length ? subscriptionEntries.map(([currency, metrics]) => (
+                          <strong className="platform-overview-multi-value" key={currency}>{formatCurrency(metrics.mrr, currency)} <small>{currency} / month</small></strong>
+                        )) : <strong>—</strong>}
+                        <p>Annualised recurring value is shown below by currency.</p>
+                        <button type="button" onClick={() => setActivePage("Plans")}>View subscription plans <span aria-hidden="true">→</span></button>
+                      </article>
+
+                      <article className="platform-overview-kpi">
+                        <div className="platform-overview-kpi-top"><span className="platform-summary-icon">!</span><span className="platform-summary-label">Outstanding receivables</span></div>
+                        {invoiceEntries.filter((item) => Number(item.outstanding || 0) > 0).length ? invoiceEntries.filter((item) => Number(item.outstanding || 0) > 0).map((item) => (
+                          <strong className="platform-overview-multi-value" key={item._id}>{formatCurrency(item.outstanding, item._id)} <small>{item._id}</small></strong>
+                        )) : <strong>None</strong>}
+                        <p>{invoiceEntries.reduce((sum, item) => sum + (item.overdueInvoiceCount || 0), 0)} overdue invoices across all currencies</p>
+                        <button type="button" onClick={() => setActivePage("Billing")}>Open platform billing <span aria-hidden="true">→</span></button>
+                      </article>
+                    </section>
+
+                    <div className="platform-overview-insights">
+                      <section className="platform-overview-panel" aria-label="Financial performance">
+                        <div className="platform-overview-panel-heading">
+                          <div><span className="platform-panel-eyebrow">COMMERCIAL PERFORMANCE</span><h2>Revenue and collections</h2></div>
+                          <button type="button" onClick={() => setActivePage("Billing")}>Billing details →</button>
+                        </div>
+                        {financialCurrencies.length ? (
+                          <div className="platform-finance-list">
+                            {financialCurrencies.map((currency) => {
+                              const invoice = invoiceEntries.find((item) => item._id === currency) || {};
+                              const collection = collectionByCurrency.get(currency) || {};
+                              const recurring = businessOverview.subscriptions?.[currency] || {};
+                              return (
+                                <div className="platform-finance-row" key={currency}>
+                                  <div className="platform-finance-currency"><strong>{currency}</strong><span>{formatCurrency(recurring.arr, currency)} annual recurring</span></div>
+                                  <div><span>Invoiced</span><strong>{formatCurrency(invoice.invoiced, currency)}</strong></div>
+                                  <div><span>Collected</span><strong>{formatCurrency(collection.collected, currency)}</strong></div>
+                                  <div><span>Overdue</span><strong className={Number(invoice.overdue || 0) > 0 ? "platform-value-warning" : ""}>{formatCurrency(invoice.overdue, currency)}</strong></div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : <p className="platform-overview-empty">No platform invoices or payments have been recorded yet.</p>}
+                        <p className="platform-overview-note">Platform subscription revenue only. School fee collections are excluded. Values remain separated by currency.</p>
+                      </section>
+
+                      <section className="platform-overview-panel" aria-label="Operational health">
+                        <div className="platform-overview-panel-heading">
+                          <div><span className="platform-panel-eyebrow">ATTENTION REQUIRED</span><h2>Operational health</h2></div>
+                        </div>
+                        <div className="platform-health-list">
+                          <button type="button" onClick={() => setActivePage("Schools")}><span><strong>{schoolStatuses.pending || 0}</strong><small>Schools awaiting activation</small></span><span>Review schools →</span></button>
+                          <button type="button" onClick={() => setActivePage("Schools")}><span><strong>{schoolStatuses.suspended || 0}</strong><small>Suspended schools</small></span><span>Review schools →</span></button>
+                          <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{pastDueSubscriptions}</strong><small>Past-due subscriptions</small></span><span>Review billing →</span></button>
+                          <button type="button" onClick={() => setActivePage("Billing")}><span><strong>{businessOverview.renewalsDueSoon || 0}</strong><small>Renewals due in 30 days</small></span><span>Review billing →</span></button>
+                          <button type="button" onClick={() => setActivePage("Plans")}><span><strong>{pendingSubscriptions}</strong><small>Pending subscriptions</small></span><span>View plans →</span></button>
+                        </div>
+                      </section>
+                    </div>
+
+                    <section className="platform-overview-panel platform-overview-activity" aria-label="Recent platform activity">
+                      <div className="platform-overview-panel-heading">
+                        <div><span className="platform-panel-eyebrow">LATEST EVENTS</span><h2>Recent commercial activity</h2></div>
+                        <button type="button" onClick={() => setActivePage("Commercial audit")}>Full activity log →</button>
+                      </div>
+                      {businessOverview.recentActivity?.length ? (
+                        <div className="platform-activity-list">
+                          {businessOverview.recentActivity.map((event) => (
+                            <div className="platform-activity-row" key={event._id || event.id}>
+                              <span className="platform-activity-marker" aria-hidden="true">•</span>
+                              <div><strong>{activityLabel(event.action)}</strong><span>{event.tenantId?.name || event.details?.schoolName || "Platform-wide activity"}</span></div>
+                              <time>{formatDate(event.createdAt)}</time>
+                              <button type="button" onClick={() => setActivePage(activityDestination(event.action))}>Open →</button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="platform-overview-empty">No commercial activity has been recorded yet.</p>}
+                    </section>
+                  </>
+                );
+              })()}
+            </div>
           ) : activePage === "Plans" ? (
             <section className="platform-directory" aria-label="Subscription plans">
               <div className="platform-form-heading"><div><h2>Commercial plans</h2><p>Annual discount applies to the listed annual price. Existing subscriptions retain their agreed price snapshot.</p></div></div>
