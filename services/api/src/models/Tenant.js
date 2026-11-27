@@ -27,7 +27,7 @@ const tenantSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "active", "suspended"],
+      enum: ["pending", "active", "suspended", "trial_expired"],
       default: "pending",
       index: true,
     },
@@ -37,6 +37,14 @@ const tenantSchema = new mongoose.Schema(
       reason: { type: String, required: true, trim: true, maxlength: 500 },
       suspendedAt: { type: Date, required: true },
       suspendedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    }],
+    trialStartedAt: { type: Date, default: null },
+    trialEndsAt: { type: Date, default: null, index: true },
+    trialExpiredAt: { type: Date, default: null },
+    trialHistory: [{
+      startedAt: { type: Date, required: true },
+      endsAt: { type: Date, required: true },
+      startedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     }],
 
     contactEmail: {
