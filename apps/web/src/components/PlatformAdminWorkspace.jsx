@@ -248,8 +248,7 @@ export default function PlatformAdminWorkspace() {
           setEventsError(error.message || "Unable to load commercial events.");
           setCommercialEvents([]);
         }
-      })
-      ;
+      });
     return () => controller.abort();
   }, [activePage, accessToken, commercialPagination.page, commercialPagination.limit, reloadCount]);
 
