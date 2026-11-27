@@ -222,3 +222,86 @@
 .platform-school-table td small { display:block;margin-top:4px;color:#929caf;font-size:10px; }
 @media(max-width:850px) { .platform-audit-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:520px) { .platform-audit-filters { grid-template-columns:1fr; } }
+
+
+/* Platform intelligence overview */
+.platform-overview { display:grid;gap:18px; }
+.platform-overview .platform-welcome-card { margin-bottom:0; }
+.platform-overview-actions { display:flex;flex-wrap:wrap;gap:9px;margin-top:17px; }
+.platform-overview-actions .platform-welcome-secondary { border:1px solid #ffffff70;background:#ffffff18;color:#fff; }
+.platform-overview-actions .platform-welcome-secondary:hover { background:#ffffff2b; }
+.platform-overview-kpis { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px; }
+.platform-overview-kpi {
+  min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:9px;
+  padding:17px 18px;border:1px solid var(--platform-border);border-radius:13px;
+  background:#fff;box-shadow:0 3px 12px #1d31540a;
+}
+.platform-overview-kpi-top { display:flex;align-items:center;gap:9px; }
+.platform-overview-kpi>strong { color:#25334a;font:800 25px "Plus Jakarta Sans",sans-serif;letter-spacing:-.6px; }
+.platform-overview-kpi>strong.platform-overview-multi-value { font-size:18px;line-height:1.35; }
+.platform-overview-multi-value small { color:#8994a7;font:700 10px "DM Sans","Segoe UI",sans-serif; }
+.platform-overview-kpi p { min-height:31px;margin:0;color:#8994a7;font-size:10px;line-height:1.55; }
+.platform-overview-kpi>button,.platform-overview-panel-heading>button {
+  margin-top:auto;padding:4px 0;border:0;background:transparent;color:var(--platform-primary);
+  font-size:10px;font-weight:800;cursor:pointer;text-align:left;
+}
+.platform-overview-kpi>button:hover,.platform-overview-panel-heading>button:hover { color:var(--platform-primary-strong);text-decoration:underline; }
+.platform-overview-insights { display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.85fr);gap:15px;align-items:stretch; }
+.platform-overview-panel {
+  min-width:0;padding:20px;border:1px solid var(--platform-border);border-radius:13px;
+  background:#fff;box-shadow:0 3px 12px #1d31540a;
+}
+.platform-overview-panel-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px; }
+.platform-overview-panel-heading h2 { margin:4px 0 0;color:#28364d;font:800 16px "Plus Jakarta Sans",sans-serif; }
+.platform-panel-eyebrow { color:#929caf;font-size:9px;font-weight:800;letter-spacing:1.1px; }
+.platform-overview-panel-heading>button { flex-shrink:0;margin:0; }
+.platform-finance-list { display:grid; }
+.platform-finance-row {
+  display:grid;grid-template-columns:1.05fr repeat(3,minmax(0,1fr));gap:10px;align-items:center;
+  padding:13px 0;border-bottom:1px solid #eef1f6;
+}
+.platform-finance-row:last-child { border-bottom:0; }
+.platform-finance-row>div { display:grid;gap:5px;min-width:0; }
+.platform-finance-row>div>span { color:#929caf;font-size:9px; }
+.platform-finance-row>div>strong { color:#34415a;font-size:12px;overflow-wrap:anywhere; }
+.platform-finance-currency>strong { color:#34415a;font-size:13px; }
+.platform-finance-currency>span { color:#929caf;font-size:9px;line-height:1.4; }
+.platform-value-warning { color:#c46a20!important; }
+.platform-overview-note { margin:12px 0 0;color:#9aa4b5;font-size:9px;line-height:1.6; }
+.platform-overview-empty { margin:0;padding:18px 0;color:#929caf;font-size:11px; }
+.platform-health-list { display:grid; }
+.platform-health-list button {
+  display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+  padding:12px 0;border:0;border-bottom:1px solid #eef1f6;background:transparent;text-align:left;cursor:pointer;
+}
+.platform-health-list button:last-child { border-bottom:0; }
+.platform-health-list button>span:first-child { display:grid;gap:3px; }
+.platform-health-list button strong { color:#34415a;font:800 18px "Plus Jakarta Sans",sans-serif; }
+.platform-health-list button small { color:#8994a7;font-size:10px; }
+.platform-health-list button>span:last-child { color:var(--platform-primary);font-size:9px;font-weight:800;white-space:nowrap; }
+.platform-health-list button:hover>span:last-child { text-decoration:underline; }
+.platform-overview-activity { margin-bottom:4px; }
+.platform-activity-list { display:grid; }
+.platform-activity-row {
+  display:grid;grid-template-columns:14px minmax(0,1fr) auto auto;gap:12px;align-items:center;
+  padding:12px 0;border-bottom:1px solid #eef1f6;
+}
+.platform-activity-row:last-child { border-bottom:0; }
+.platform-activity-marker { color:var(--platform-primary);font-size:22px;line-height:1; }
+.platform-activity-row>div { display:grid;gap:4px;min-width:0; }
+.platform-activity-row>div strong { color:#34415a;font-size:11px; }
+.platform-activity-row>div span,.platform-activity-row time { color:#929caf;font-size:10px; }
+.platform-activity-row button { padding:4px 0;border:0;background:transparent;color:var(--platform-primary);font-size:10px;font-weight:800;cursor:pointer; }
+@media(max-width:1150px) {
+  .platform-overview-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .platform-overview-insights { grid-template-columns:1fr; }
+}
+@media(max-width:650px) {
+  .platform-overview-kpis { grid-template-columns:1fr; }
+  .platform-overview-kpi { min-height:0; }
+  .platform-finance-row { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .platform-activity-row { grid-template-columns:14px minmax(0,1fr) auto; }
+  .platform-activity-row button { grid-column:2;justify-self:start; }
+  .platform-activity-row time { grid-column:3;grid-row:1; }
+  .platform-overview-panel { padding:16px; }
+}
