@@ -26,7 +26,7 @@ describe("trial expiry worker", () => {
   it("expires due active trials and their active trial subscriptions", async () => {
     const now = new Date("2026-11-27T12:00:00.000Z");
     const schoolId = "school-due";
-    tenantFind.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ _id: schoolId }]) }) });
+    tenantFind.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ _id: schoolId, status: "active" }]) }) });
 
     const result = await processDueTrials({ now });
 
@@ -43,13 +43,26 @@ describe("trial expiry worker", () => {
   });
 
   it("does not update a school whose trial was converted or otherwise changed before transition", async () => {
-    tenantFind.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ _id: "converted-school" }]) }) });
+    tenantFind.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ _id: "converted-school", status: "active" }]) }) });
     tenantUpdateOne.mockResolvedValueOnce({ modifiedCount: 0 });
 
     const result = await processDueTrials({ now: new Date("2026-11-27T12:00:00.000Z") });
 
     expect(result).toEqual({ expired: 0, skipped: false });
     expect(subscriptionUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("retries trial-subscription expiry for a tenant already marked expired", async () => {
+    tenantFind.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ _id: "expired-school", status: "trial_expired" }]) }) });
+
+    const result = await processDueTrials({ now: new Date("2026-11-27T12:00:00.000Z") });
+
+    expect(result).toEqual({ expired: 1, skipped: false });
+    expect(tenantUpdateOne).not.toHaveBeenCalled();
+    expect(subscriptionUpdateMany).toHaveBeenCalledWith(
+      { tenantId: "expired-school", isTrial: true, status: "active" },
+      { $set: { status: "expired" } },
+    );
   });
 
   it("is repeat-safe when no active trials are due", async () => {
