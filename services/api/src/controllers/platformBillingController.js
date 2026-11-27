@@ -94,7 +94,8 @@ export async function startSchoolTrial(req, res, next) {
       if (school.status === "suspended" || school.status === "trial_expired") {
         throw Object.assign(new Error("This school cannot start a trial while suspended or already expired"), { statusCode: 409 });
       }
-      if (school.trialStartedAt || (school.trialHistory || []).length > 0) {
+      const existingSubscription = await SchoolSubscription.findOne({ tenantId: school._id }).session(session);
+      if (existingSubscription || school.trialStartedAt || (school.trialHistory || []).length > 0) {
         throw Object.assign(new Error("A free trial has already been used by this school"), { statusCode: 409 });
       }
       if (school.status !== "pending" && school.status !== "active") {
