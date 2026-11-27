@@ -13,6 +13,10 @@ vi.mock("../context/authContext.js", () => ({
   useAuth: () => ({ accessToken: "test-access-token" }),
 }));
 
+vi.mock("../components/StudentGuardianManagement.jsx", () => ({
+  default: () => <div>Additional guardian management</div>,
+}));
+
 const student = {
   _id: "student-201",
   admissionNumber: "ADM-201",
