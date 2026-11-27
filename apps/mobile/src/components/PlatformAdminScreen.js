@@ -37,6 +37,14 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [userRole, setUserRole] = useState("teacher");
   const [userActionBusy, setUserActionBusy] = useState(false);
   const [userActionMessage, setUserActionMessage] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [userStatusFilter, setUserStatusFilter] = useState("");
+  const [userSchoolFilter, setUserSchoolFilter] = useState("");
+  const [userSchools, setUserSchools] = useState([]);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createUserMessage, setCreateUserMessage] = useState("");
 
   const loadDirectory = useCallback(async (refresh = false) => {
     if (!["schools", "users"].includes(section)) return;
@@ -45,6 +53,11 @@ export function PlatformAdminScreen({ user, onSignOut }) {
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
       if (search.trim()) params.set("search", search.trim());
+      if (section === "users") {
+        if (userRoleFilter) params.set("role", userRoleFilter);
+        if (userStatusFilter) params.set("status", userStatusFilter);
+        if (userSchoolFilter) params.set("tenantId", userSchoolFilter);
+      }
       const endpoint = section === "schools" ? "/platform/schools" : "/platform/users";
       const response = await apiRequest(endpoint + "?" + params.toString());
       const records = Array.isArray(response?.data) ? response.data : [];
@@ -57,9 +70,33 @@ export function PlatformAdminScreen({ user, onSignOut }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [page, search, section]);
+  }, [page, search, section, userRoleFilter, userStatusFilter, userSchoolFilter]);
 
   useEffect(() => { if (["schools", "users"].includes(section)) void loadDirectory(); }, [loadDirectory, section]);
+
+  useEffect(() => {
+    if (section !== "users") return undefined;
+    let mounted = true;
+    apiRequest("/platform/schools?page=1&limit=100")
+      .then((response) => { if (mounted) setUserSchools((response?.data || []).filter((school) => school.status === "active")); })
+      .catch(() => { if (mounted) setUserSchools([]); });
+    return () => { mounted = false; };
+  }, [section]);
+
+  const createPlatformUser = async () => {
+    if (creatingUser) return;
+    setCreatingUser(true); setCreateUserMessage("");
+    try {
+      const response = await apiRequest("/platform/users", { method: "POST", body: {
+        ...newUser, firstName: newUser.firstName.trim(), lastName: newUser.lastName.trim(),
+        email: newUser.email.trim(), phone: newUser.phone.trim() || null,
+      } });
+      setCreateUserMessage(response.message || "User created and awaiting activation.");
+      setNewUser({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
+      setShowCreateUser(false); setPage(1); void loadDirectory(true);
+    } catch (requestError) { setCreateUserMessage(requestError?.message || "Unable to create user."); }
+    finally { setCreatingUser(false); }
+  };
 
   useEffect(() => {
     if (section !== "schools" || !selectedSchoolId) return undefined;
@@ -402,7 +439,24 @@ export function PlatformAdminScreen({ user, onSignOut }) {
           </View>
         </> : null}
       </> : null}
-      { ["schools", "users"].includes(section) && !(section === "users" && selectedUserId) ? <>
+      {section === "users" && showCreateUser ? <>
+        <View style={styles.sectionHeader}><View style={{ flex: 1 }}><Text style={styles.sectionTitle}>Create school user</Text><Text style={styles.sectionSubtitle}>New accounts await activation</Text></View><TouchableOpacity onPress={() => setShowCreateUser(false)} style={styles.refresh}><Text style={styles.refreshText}>Cancel</Text></TouchableOpacity></View>
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>ACTIVE SCHOOL</Text>
+          {userSchools.map((school) => <TouchableOpacity key={String(school.id || school._id)} onPress={() => setNewUser((current) => ({ ...current, tenantId: String(school.id || school._id) }))} style={[styles.roleOption, newUser.tenantId === String(school.id || school._id) && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{school.name}</Text></TouchableOpacity>)}
+          <TextInput value={newUser.firstName} onChangeText={(value) => setNewUser((current) => ({ ...current, firstName: value }))} placeholder="First name *" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
+          <TextInput value={newUser.lastName} onChangeText={(value) => setNewUser((current) => ({ ...current, lastName: value }))} placeholder="Last name" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
+          <TextInput value={newUser.email} onChangeText={(value) => setNewUser((current) => ({ ...current, email: value }))} placeholder="Email address *" placeholderTextColor={colors.muted} style={styles.search} keyboardType="email-address" autoCapitalize="none" maxLength={254}/>
+          <TextInput value={newUser.phone} onChangeText={(value) => setNewUser((current) => ({ ...current, phone: value }))} placeholder="Phone (optional)" placeholderTextColor={colors.muted} style={styles.search} keyboardType="phone-pad" maxLength={20}/>
+          <Text style={styles.metricLabel}>ROLE</Text>
+          {["school_admin", "principal", "teacher", "student", "parent"].map((role) => <TouchableOpacity key={role} onPress={() => setNewUser((current) => ({ ...current, role }))} style={[styles.roleOption, newUser.role === role && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{role.replaceAll("_", " ")}</Text></TouchableOpacity>)}
+          <TextInput value={newUser.password} onChangeText={(value) => setNewUser((current) => ({ ...current, password: value }))} placeholder="Initial password (min. 8 characters) *" placeholderTextColor={colors.muted} style={styles.search} secureTextEntry maxLength={72}/>
+          <TouchableOpacity disabled={creatingUser || !newUser.tenantId || !newUser.firstName.trim() || !newUser.email.trim() || newUser.password.length < 8} onPress={createPlatformUser} style={styles.actionButton}><Text style={styles.actionButtonText}>{creatingUser ? "Creating…" : "Create user"}</Text></TouchableOpacity>
+          {createUserMessage ? <Text style={styles.metricHint}>{createUserMessage}</Text> : null}
+          {!userSchools.length ? <Text style={styles.metricHint}>No active schools are available.</Text> : null}
+        </View>
+      </> : null}
+      { ["schools", "users"].includes(section) && !(section === "users" && (selectedUserId || showCreateUser)) ? <>
       <View style={styles.sectionHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionTitle}>{section === "schools" ? "School directory" : "User directory"}</Text>
@@ -410,6 +464,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         </View>
         <TouchableOpacity onPress={() => loadDirectory(true)} style={styles.refresh}><Text style={styles.refreshText}>{refreshing ? "Refreshing…" : "Refresh"}</Text></TouchableOpacity>
       </View>
+      {section === "users" ? <TouchableOpacity onPress={() => { setCreateUserMessage(""); setShowCreateUser(true); }} style={styles.actionButton}><Text style={styles.actionButtonText}>＋ Create user</Text></TouchableOpacity> : null}
       <TextInput
         value={search}
         onChangeText={(value) => { setSearch(value); setPage(1); }}
@@ -419,6 +474,15 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         returnKeyType="search"
         accessibilityLabel={section === "schools" ? "Search schools" : "Search users"}
       />
+      {section === "users" ? <View style={styles.metricCard}>
+        <Text style={styles.metricLabel}>ROLE FILTER</Text>
+        {["", "school_admin", "principal", "teacher", "student", "parent"].map((value) => <TouchableOpacity key={value || "all-roles"} onPress={() => { setUserRoleFilter(value); setPage(1); }} style={[styles.roleOption, userRoleFilter === value && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{value ? value.replaceAll("_", " ") : "All roles"}</Text></TouchableOpacity>)}
+        <Text style={styles.metricLabel}>STATUS FILTER</Text>
+        {["", "pending", "active", "suspended"].map((value) => <TouchableOpacity key={value || "all-status"} onPress={() => { setUserStatusFilter(value); setPage(1); }} style={[styles.roleOption, userStatusFilter === value && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{value || "All statuses"}</Text></TouchableOpacity>)}
+        <Text style={styles.metricLabel}>SCHOOL FILTER</Text>
+        <TouchableOpacity onPress={() => { setUserSchoolFilter(""); setPage(1); }} style={[styles.roleOption, !userSchoolFilter && styles.roleOptionActive]}><Text style={styles.roleOptionText}>All schools</Text></TouchableOpacity>
+        {userSchools.map((school) => <TouchableOpacity key={String(school.id || school._id)} onPress={() => { setUserSchoolFilter(String(school.id || school._id)); setPage(1); }} style={[styles.roleOption, userSchoolFilter === String(school.id || school._id) && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{school.name}</Text></TouchableOpacity>)}
+      </View> : null}
       {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading directory…</Text></View> : null}
       {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => loadDirectory()}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
       {!loading && !error ? (section === "schools" ? schools : users).length ? (section === "schools" ? schools : users).map((item, index) =>
