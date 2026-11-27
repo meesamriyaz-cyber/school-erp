@@ -2,19 +2,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   tenantAggregate,
+  tenantFind,
   subscriptionAggregate,
   invoiceAggregate,
   paymentAggregate,
   commercialEventFind,
 } = vi.hoisted(() => ({
   tenantAggregate: vi.fn(),
+  tenantFind: vi.fn(),
   subscriptionAggregate: vi.fn(),
   invoiceAggregate: vi.fn(),
   paymentAggregate: vi.fn(),
   commercialEventFind: vi.fn(),
 }));
 
-vi.mock("../models/Tenant.js", () => ({ default: { aggregate: tenantAggregate } }));
+vi.mock("../models/Tenant.js", () => ({ default: { aggregate: tenantAggregate, find: tenantFind } }));
 vi.mock("../models/SchoolSubscription.js", () => ({ default: { aggregate: subscriptionAggregate } }));
 vi.mock("../models/PlatformInvoice.js", () => ({ default: { aggregate: invoiceAggregate } }));
 vi.mock("../models/PlatformPayment.js", () => ({ default: { aggregate: paymentAggregate } }));
@@ -31,6 +33,8 @@ describe("getBusinessOverview", () => {
     vi.clearAllMocks();
     res = { json: vi.fn().mockReturnThis() };
     next = vi.fn();
+
+    tenantFind.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([]) }) });
 
     tenantAggregate.mockResolvedValue([
       { _id: "active", count: 3 },
