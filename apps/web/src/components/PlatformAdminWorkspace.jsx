@@ -56,8 +56,8 @@ function activityDestination(action) {
 }
 
 function humanizeField(value) {
-  return String(value || "").replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ").toLowerCase()
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+  const label = String(value || "").replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ").toLowerCase();
+  return label ? label.charAt(0).toUpperCase() + label.slice(1) : "";
 }
 function shortReference(value) {
   if (!value) return "—";
