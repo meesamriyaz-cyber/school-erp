@@ -12,6 +12,7 @@ import {
   createStudent,
   getStudent,
   updateStudent,
+  bulkUpsertMotherDetails,
 } from "../controllers/studentController.js";
 
 const router = Router();
@@ -25,6 +26,13 @@ router.get(
   "/",
   authorizeRoles("school_admin", "principal", "teacher"),
   listStudents
+);
+
+// Bulk update existing mother contact records by student admission number.
+router.post(
+  "/bulk-mother-contacts",
+  authorizeRoles("school_admin", "principal"),
+  bulkUpsertMotherDetails
 );
 
 // Create a student.
