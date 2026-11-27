@@ -12,6 +12,7 @@ vi.mock("../models/PlatformCommercialEvent.js", () => ({ default: {} }));
 import {
   assignSchoolSubscription,
   listCommercialEvents,
+  listPlatformInvoices,
   recordPlatformPayment,
 } from "../controllers/platformBillingController.js";
 
@@ -82,6 +83,22 @@ describe("platform billing request validation", () => {
     const next = vi.fn();
 
     await listCommercialEvents({ query }, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ success: false, message });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ page: "0" }, "Page must be a positive integer"],
+    [{ page: "2.5" }, "Page must be a positive integer"],
+    [{ limit: "101" }, "Limit must be between 1 and 100"],
+    [{ limit: "invalid" }, "Limit must be between 1 and 100"],
+  ])("rejects invalid invoice pagination values %#", async (query, message) => {
+    const res = response();
+    const next = vi.fn();
+
+    await listPlatformInvoices({ query }, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ success: false, message });
