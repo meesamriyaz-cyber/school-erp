@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Tenant from "../models/Tenant.js";
+import User from "../models/User.js";
 import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import SchoolSubscription from "../models/SchoolSubscription.js";
 import PlatformInvoice from "../models/PlatformInvoice.js";
