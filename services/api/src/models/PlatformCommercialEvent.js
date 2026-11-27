@@ -6,7 +6,7 @@ const platformCommercialEventSchema = new mongoose.Schema({
   subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: "SchoolSubscription", default: null, immutable: true },
   invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: "PlatformInvoice", default: null, immutable: true },
   paymentId: { type: mongoose.Schema.Types.ObjectId, ref: "PlatformPayment", default: null, immutable: true },
-  action: { type: String, enum: ["PLAN_CREATED", "PLAN_UPDATED", "PLAN_ARCHIVED", "SUBSCRIPTION_ASSIGNED", "SUBSCRIPTION_ACTIVATED", "SUBSCRIPTION_RENEWED", "PAYMENT_RECORDED", "PAYMENT_REVERSED", "RENEWAL_INVOICED"], required: true, immutable: true, index: true },
+  action: { type: String, enum: ["PLAN_CREATED", "PLAN_UPDATED", "PLAN_ARCHIVED", "SUBSCRIPTION_ASSIGNED", "SUBSCRIPTION_ACTIVATED", "SUBSCRIPTION_RENEWED", "PAYMENT_RECORDED", "PAYMENT_REVERSED", "RENEWAL_INVOICED", "TRIAL_STARTED"], required: true, immutable: true, index: true },
   details: { type: mongoose.Schema.Types.Mixed, default: {}, immutable: true },
 }, { timestamps: { createdAt: true, updatedAt: false }, versionKey: false, strict: "throw" });
 
