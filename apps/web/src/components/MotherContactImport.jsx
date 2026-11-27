@@ -94,7 +94,7 @@ export default function MotherContactImport({ accessToken, onImported }) {
       <div className="student-guardian-heading">
         <div>
           <h3 id="mother-contact-import-title">Import mothers' contact details</h3>
-          <p>Match existing students by Admission Number. Father records and primary communication settings are not changed.</p>
+          <p>Match existing students by Admission Number. The primary contact follows the guardian selected on the student registration form.</p>
         </div>
         <button type="button" onClick={downloadTemplate}>Download CSV template</button>
       </div>
