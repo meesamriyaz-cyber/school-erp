@@ -189,26 +189,113 @@ export async function recordPlatformPayment(req, res, next) {
 
 export async function getBusinessOverview(req, res, next) {
   try {
-    const [schools, subscriptions, invoiceStats, paymentStats] = await Promise.all([
+    const now = new Date();
+    const renewalWindowEnd = new Date(now.getTime() + 30 * 86400000);
+    const [schools, allSubscriptions, invoiceStats, paymentStats] = await Promise.all([
       Tenant.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-      SchoolSubscription.find({ status: "active" }).lean(),
-      PlatformInvoice.aggregate([{ $match: { status: { $nin: ["draft", "void"] } } }, { $group: { _id: "$currency", invoiced: { $sum: "$totalAmount" }, invoiceCount: { $sum: 1 }, overdue: { $sum: { $cond: [{ $and: [{ $lt: ["$dueAt", new Date()] }, { $ne: ["$status", "paid"] }] }, "$totalAmount", 0] } } } }]),
-      PlatformPayment.aggregate([{ $match: { status: "recorded" } }, { $group: { _id: "$currency", collected: { $sum: "$amount" }, paymentCount: { $sum: 1 } } }]),
+      SchoolSubscription.find({}).select("billingInterval amount currency status nextBillingAt lifetimeAccess").lean(),
+      PlatformInvoice.aggregate([
+        { $match: { status: { $nin: ["draft", "void"] } } },
+        {
+          $lookup: {
+            from: "platformpayments",
+            let: { invoiceId: "$_id" },
+            pipeline: [
+              { $match: { $expr: { $and: [{ $eq: ["$invoiceId", "$$invoiceId"] }, { $eq: ["$status", "recorded"] }] } } },
+              { $group: { _id: null, paid: { $sum: "$amount" } } },
+            ],
+            as: "recordedPayments",
+          },
+        },
+        { $addFields: { paidAmount: { $ifNull: [{ $arrayElemAt: ["$recordedPayments.paid", 0] }, 0] } } },
+        { $addFields: { outstandingAmount: { $max: [{ $subtract: ["$totalAmount", "$paidAmount"] }, 0] } } },
+        {
+          $group: {
+            _id: "$currency",
+            invoiced: { $sum: "$totalAmount" },
+            outstanding: { $sum: "$outstandingAmount" },
+            overdue: { $sum: { $cond: [{ $and: [{ $lt: ["$dueAt", now] }, { $gt: ["$outstandingAmount", 0] }] }, "$outstandingAmount", 0] } },
+            invoiceCount: { $sum: 1 },
+            outstandingInvoiceCount: { $sum: { $cond: [{ $gt: ["$outstandingAmount", 0] }, 1, 0] } },
+            overdueInvoiceCount: { $sum: { $cond: [{ $and: [{ $lt: ["$dueAt", now] }, { $gt: ["$outstandingAmount", 0] }] }, 1, 0] } },
+          },
+        },
+      ]),
+      PlatformPayment.aggregate([
+        { $match: { status: "recorded" } },
+        { $group: { _id: "$currency", collected: { $sum: "$amount" }, paymentCount: { $sum: 1 } } },
+      ]),
     ]);
-    const activeSchools = await Tenant.countDocuments({ status: "active" });
+
     const subscriptionMetrics = {};
-    for (const sub of subscriptions) {
+    const subscriptionStatusCounts = {};
+    let renewalsDueSoon = 0;
+    for (const sub of allSubscriptions) {
+      subscriptionStatusCounts[sub.status] = (subscriptionStatusCounts[sub.status] || 0) + 1;
       const key = sub.currency;
-      subscriptionMetrics[key] ??= { mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0 };
-      subscriptionMetrics[key].activeSubscriptions += 1;
-      if (sub.billingInterval === "monthly") subscriptionMetrics[key].mrr += sub.amount;
-      else if (sub.billingInterval === "annual") subscriptionMetrics[key].mrr += sub.amount / 12;
-      if (sub.billingInterval !== "one_time") subscriptionMetrics[key].arr += sub.billingInterval === "annual" ? sub.amount : sub.amount * 12;
+      subscriptionMetrics[key] ??= {
+        mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0,
+        pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 0,
+      };
+      const metrics = subscriptionMetrics[key];
+      if (sub.status === "active") {
+        metrics.activeSubscriptions += 1;
+        if (sub.billingInterval === "monthly") metrics.mrr += sub.amount;
+        else if (sub.billingInterval === "annual") metrics.mrr += sub.amount / 12;
+        if (sub.billingInterval !== "one_time") {
+          metrics.arr += sub.billingInterval === "annual" ? sub.amount : sub.amount * 12;
+        }
+        if (sub.nextBillingAt && sub.nextBillingAt >= now && sub.nextBillingAt <= renewalWindowEnd) {
+          metrics.renewalsDueSoon += 1;
+          renewalsDueSoon += 1;
+        }
+      } else if (sub.status === "pending") {
+        metrics.pendingSubscriptions += 1;
+      } else if (sub.status === "past_due") {
+        metrics.pastDueSubscriptions += 1;
+      }
     }
-    const lifetime = await PlatformInvoice.aggregate([{ $match: { status: "paid", subscriptionId: { $ne: null } } }, { $lookup: { from: "schoolsubscriptions", localField: "subscriptionId", foreignField: "_id", as: "subscription" } }, { $unwind: "$subscription" }, { $match: { "subscription.billingInterval": "one_time" } }, { $group: { _id: "$currency", sales: { $sum: "$totalAmount" } } }]);
-    for (const item of lifetime) { subscriptionMetrics[item._id] ??= { mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0 }; subscriptionMetrics[item._id].lifetimeSales = item.sales; }
-    return res.json({ success: true, data: { schools: { total: await Tenant.countDocuments(), active: activeSchools, byStatus: schools }, subscriptions: subscriptionMetrics, invoiced: invoiceStats, collected: paymentStats } });
-  } catch (error) { return next(error); }
+
+    const lifetime = await PlatformInvoice.aggregate([
+      { $match: { status: "paid", subscriptionId: { $ne: null } } },
+      { $lookup: { from: "schoolsubscriptions", localField: "subscriptionId", foreignField: "_id", as: "subscription" } },
+      { $unwind: "$subscription" },
+      { $match: { "subscription.billingInterval": "one_time" } },
+      { $group: { _id: "$currency", sales: { $sum: "$totalAmount" } } },
+    ]);
+    for (const item of lifetime) {
+      subscriptionMetrics[item._id] ??= {
+        mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0,
+        pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 0,
+      };
+      subscriptionMetrics[item._id].lifetimeSales = item.sales;
+    }
+
+    const schoolStatusCounts = Object.fromEntries(schools.map((item) => [item._id, item.count]));
+    const totalSchools = schools.reduce((sum, item) => sum + item.count, 0);
+    const activeSchools = schoolStatusCounts.active || 0;
+    const recentActivity = await PlatformCommercialEvent.find({})
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(8)
+      .populate("tenantId", "name slug")
+      .lean();
+
+    return res.json({
+      success: true,
+      data: {
+        generatedAt: now,
+        schools: { total: totalSchools, active: activeSchools, byStatus: schools },
+        subscriptions: subscriptionMetrics,
+        subscriptionStatusCounts,
+        renewalsDueSoon,
+        invoiced: invoiceStats,
+        collected: paymentStats,
+        recentActivity,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
 }
 
 
