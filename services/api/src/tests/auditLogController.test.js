@@ -18,6 +18,7 @@ const makeResponse = () => ({
 });
 const queryChain = (rows) => ({
   select: vi.fn().mockReturnThis(),
+  populate: vi.fn().mockReturnThis(),
   sort: vi.fn().mockReturnThis(),
   skip: vi.fn().mockReturnThis(),
   limit: vi.fn().mockReturnThis(),
@@ -110,6 +111,9 @@ describe("audit log controller", () => {
     expect(response.data[0]).toMatchObject({
       actorUserId: actorUserId.toString(),
       targetUserId: targetUserId.toString(),
+      actorName: null,
+      targetUserName: null,
+      schoolName: null,
       action: "USER_STATUS_CHANGED",
       previousValue: "active",
       newValue: "suspended",
