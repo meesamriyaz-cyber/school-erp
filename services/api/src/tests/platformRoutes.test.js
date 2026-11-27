@@ -1,7 +1,7 @@
 import express from "express";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAuditLogs, getAuditOutboxStatus, retryFailedAuditEvent, getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents } = vi.hoisted(() => ({
+const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAuditLogs, getAuditOutboxStatus, retryFailedAuditEvent, getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, startSchoolTrial, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents } = vi.hoisted(() => ({
   listSchools: vi.fn((_req, res) => res.status(200).json({ endpoint: "listSchools" })),
   getSchoolDetails: vi.fn((_req, res) => res.status(200).json({ endpoint: "getSchoolDetails" })),
   updateSchoolStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateSchoolStatus" })),
@@ -16,6 +16,7 @@ const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAud
   archiveSubscriptionPlan: vi.fn((_req, res) => res.status(200).json({ endpoint: "archiveSubscriptionPlan" })),
   getSchoolSubscription: vi.fn((_req, res) => res.status(200).json({ endpoint: "getSchoolSubscription" })),
   assignSchoolSubscription: vi.fn((_req, res) => res.status(201).json({ endpoint: "assignSchoolSubscription" })),
+  startSchoolTrial: vi.fn((_req, res) => res.status(201).json({ endpoint: "startSchoolTrial" })),
   listPlatformInvoices: vi.fn((_req, res) => res.status(200).json({ endpoint: "listPlatformInvoices" })),
   recordPlatformPayment: vi.fn((_req, res) => res.status(201).json({ endpoint: "recordPlatformPayment" })),
   reversePlatformPayment: vi.fn((_req, res) => res.status(200).json({ endpoint: "reversePlatformPayment" })),
@@ -41,7 +42,7 @@ vi.mock("../middleware/authenticate.js", () => ({
 vi.mock("../controllers/auditLogController.js", () => ({ listAuditLogs }));
 vi.mock("../controllers/auditOutboxController.js", () => ({ getAuditOutboxStatus, retryFailedAuditEvent }));
 
-vi.mock("../controllers/platformBillingController.js", () => ({ getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents }));
+vi.mock("../controllers/platformBillingController.js", () => ({ getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, startSchoolTrial, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents }));
 
 vi.mock("../controllers/platformController.js", () => ({
   listSchools,
@@ -95,6 +96,7 @@ describe("platform school-management route authorization", () => {
     ["POST", "/subscription-plans/507f1f77bcf86cd799439011/archive", {}, archiveSubscriptionPlan],
     ["GET", "/schools/507f1f77bcf86cd799439011/subscription", undefined, getSchoolSubscription],
     ["POST", "/schools/507f1f77bcf86cd799439011/subscription", { planId: "507f1f77bcf86cd799439011" }, assignSchoolSubscription],
+    ["POST", "/schools/507f1f77bcf86cd799439011/trial", {}, startSchoolTrial],
     ["GET", "/invoices", undefined, listPlatformInvoices],
     ["POST", "/invoices/507f1f77bcf86cd799439011/payments", { amount: 100, method: "upi" }, recordPlatformPayment],
     ["POST", "/payments/507f1f77bcf86cd799439011/reverse", { reason: "Duplicate entry" }, reversePlatformPayment],
@@ -133,7 +135,7 @@ describe("platform school-management route authorization", () => {
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
 
-      expect(response.status).toBe([createSchool, createSubscriptionPlan, assignSchoolSubscription, recordPlatformPayment, createRenewalInvoice].includes(controller) ? 201 : 200);
+      expect(response.status).toBe([createSchool, createSubscriptionPlan, assignSchoolSubscription, startSchoolTrial, recordPlatformPayment, createRenewalInvoice].includes(controller) ? 201 : 200);
       expect(controller).toHaveBeenCalledOnce();
     },
   );
