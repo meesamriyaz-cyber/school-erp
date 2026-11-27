@@ -333,6 +333,7 @@ export const updateSchoolStatus = async (req, res, next) => {
 
     const school = await Tenant.findById(schoolId)
       .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
+      .populate({ path: "suspensionHistory.suspendedBy", select: "firstName lastName email" })
       .lean();
 
     if (!school) {
@@ -446,6 +447,7 @@ export const updateSchoolStatus = async (req, res, next) => {
       { new: true, runValidators: true },
     )
       .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
+      .populate({ path: "suspensionHistory.suspendedBy", select: "firstName lastName email" })
       .lean();
 
     if (!updatedSchool) {
