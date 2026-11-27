@@ -38,7 +38,6 @@ describe("getBusinessOverview", () => {
       { _id: "suspended", count: 1 },
     ]);
 
-    const now = Date.now();
     subscriptionAggregate.mockResolvedValue([
       { _id: { currency: "INR", billingInterval: "monthly", status: "active" }, count: 1, amount: 1200, renewalsDueSoon: 1 },
       { _id: { currency: "INR", billingInterval: "annual", status: "active" }, count: 1, amount: 12000, renewalsDueSoon: 0 },
