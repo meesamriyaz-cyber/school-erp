@@ -285,11 +285,15 @@ export default function PlatformAdminWorkspace() {
   useEffect(() => {
     if (activePage !== "Overview") return undefined;
     const controller = new AbortController();
-    setLoadingBusinessOverview(true);
-    setBusinessOverviewError("");
-    apiRequest("/platform/business-overview", { accessToken, signal: controller.signal })
+    Promise.resolve()
+      .then(() => {
+        if (controller.signal.aborted) return null;
+        setLoadingBusinessOverview(true);
+        setBusinessOverviewError("");
+        return apiRequest("/platform/business-overview", { accessToken, signal: controller.signal });
+      })
       .then((response) => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && response) {
           setBusinessOverview(response?.data ?? null);
           setBusinessOverviewError("");
         }
