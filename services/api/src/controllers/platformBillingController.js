@@ -193,7 +193,24 @@ export async function getBusinessOverview(req, res, next) {
     const renewalWindowEnd = new Date(now.getTime() + 30 * 86400000);
     const [schools, allSubscriptions, invoiceStats, paymentStats] = await Promise.all([
       Tenant.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-      SchoolSubscription.find({}).select("billingInterval amount currency status nextBillingAt lifetimeAccess").lean(),
+      SchoolSubscription.aggregate([
+        {
+          $group: {
+            _id: { currency: "$currency", status: "$status", billingInterval: "$billingInterval" },
+            count: { $sum: 1 },
+            amount: { $sum: "$amount" },
+            renewalsDueSoon: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ["$status", "active"] }, { $gte: ["$nextBillingAt", now] }, { $lte: ["$nextBillingAt", renewalWindowEnd] }] },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]),
       PlatformInvoice.aggregate([
         { $match: { status: { $nin: ["draft", "void"] } } },
         {
@@ -230,29 +247,29 @@ export async function getBusinessOverview(req, res, next) {
     const subscriptionMetrics = {};
     const subscriptionStatusCounts = {};
     let renewalsDueSoon = 0;
-    for (const sub of allSubscriptions) {
-      subscriptionStatusCounts[sub.status] = (subscriptionStatusCounts[sub.status] || 0) + 1;
-      const key = sub.currency;
-      subscriptionMetrics[key] ??= {
+    for (const group of allSubscriptions) {
+      const { currency, status, billingInterval } = group._id;
+      const count = group.count || 0;
+      const amount = group.amount || 0;
+      subscriptionStatusCounts[status] = (subscriptionStatusCounts[status] || 0) + count;
+      subscriptionMetrics[currency] ??= {
         mrr: 0, arr: 0, lifetimeSales: 0, activeSubscriptions: 0,
         pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 0,
       };
-      const metrics = subscriptionMetrics[key];
-      if (sub.status === "active") {
-        metrics.activeSubscriptions += 1;
-        if (sub.billingInterval === "monthly") metrics.mrr += sub.amount;
-        else if (sub.billingInterval === "annual") metrics.mrr += sub.amount / 12;
-        if (sub.billingInterval !== "one_time") {
-          metrics.arr += sub.billingInterval === "annual" ? sub.amount : sub.amount * 12;
+      const metrics = subscriptionMetrics[currency];
+      if (status === "active") {
+        metrics.activeSubscriptions += count;
+        metrics.renewalsDueSoon += group.renewalsDueSoon || 0;
+        renewalsDueSoon += group.renewalsDueSoon || 0;
+        if (billingInterval === "monthly") metrics.mrr += amount;
+        else if (billingInterval === "annual") metrics.mrr += amount / 12;
+        if (billingInterval !== "one_time") {
+          metrics.arr += billingInterval === "annual" ? amount : amount * 12;
         }
-        if (sub.nextBillingAt && sub.nextBillingAt >= now && sub.nextBillingAt <= renewalWindowEnd) {
-          metrics.renewalsDueSoon += 1;
-          renewalsDueSoon += 1;
-        }
-      } else if (sub.status === "pending") {
-        metrics.pendingSubscriptions += 1;
-      } else if (sub.status === "past_due") {
-        metrics.pastDueSubscriptions += 1;
+      } else if (status === "pending") {
+        metrics.pendingSubscriptions += count;
+      } else if (status === "past_due") {
+        metrics.pastDueSubscriptions += count;
       }
     }
 
