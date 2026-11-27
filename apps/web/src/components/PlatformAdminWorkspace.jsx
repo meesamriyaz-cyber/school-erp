@@ -57,7 +57,7 @@ function activityDestination(action) {
 
 function humanizeField(value) {
   return String(value || "").replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll("_", " ")
-    .replace(/\\b\\w/g, (character) => character.toUpperCase());
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 function shortReference(value) {
   if (!value) return "—";
