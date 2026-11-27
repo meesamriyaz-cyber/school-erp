@@ -168,6 +168,7 @@ describe("PlatformAdminWorkspace school directory", () => {
     const user = userEvent.setup();
     render(<PlatformAdminWorkspace />);
 
+    await screen.findByText("Registered schools");
     await user.click(screen.getByRole("button", { name: /View school portfolio/ }));
 
     expect(await screen.findByRole("table", { name: "School directory" })).toBeInTheDocument();
