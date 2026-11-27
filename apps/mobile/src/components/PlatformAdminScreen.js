@@ -13,6 +13,8 @@ export function PlatformAdminScreen({ user, onSignOut }) {
   const [overviewError, setOverviewError] = useState("");
   const [commercialRecords, setCommercialRecords] = useState([]);
   const [commercialError, setCommercialError] = useState("");
+  const [systemAuditRecords, setSystemAuditRecords] = useState([]);
+  const [systemAuditOutbox, setSystemAuditOutbox] = useState(null);
   const [schools, setSchools] = useState([]);
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
@@ -60,6 +62,20 @@ export function PlatformAdminScreen({ user, onSignOut }) {
     if (["overview", "schools", "users"].includes(section)) return undefined;
     let mounted = true;
     setLoading(true); setCommercialError("");
+    if (section === "systemAudit") {
+      Promise.all([
+        apiRequest("/platform/audit-logs?page=1&limit=20"),
+        apiRequest("/platform/audit-outbox"),
+      ])
+        .then(([logs, outbox]) => {
+          if (!mounted) return;
+          setSystemAuditRecords(Array.isArray(logs?.data) ? logs.data : []);
+          setSystemAuditOutbox(outbox?.data || null);
+        })
+        .catch((requestError) => { if (mounted) setCommercialError(requestError?.message || "Unable to load system audit records."); })
+        .finally(() => { if (mounted) setLoading(false); });
+      return () => { mounted = false; };
+    }
     const endpoint = section === "plans" ? "/platform/subscription-plans"
       : section === "billing" ? "/platform/invoices"
       : "/platform/commercial-events?limit=50";
@@ -104,7 +120,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         <Text style={styles.welcomeCopy}>Restricted cross-school administration</Text>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-        {[["overview", "Overview"], ["schools", "Schools"], ["users", "Users"], ["plans", "Plans"], ["billing", "Billing"], ["audit", "Audit"]].map(([key, label]) =>
+        {[["overview", "Overview"], ["schools", "Schools"], ["users", "Users"], ["plans", "Plans"], ["billing", "Billing"], ["audit", "Commercial audit"], ["systemAudit", "System audit"]].map(([key, label]) =>
           <TouchableOpacity key={key} onPress={() => switchSection(key)} style={[styles.tab, section === key && styles.tabActive]}>
             <Text style={[styles.tabText, section === key && styles.tabTextActive]}>{label}</Text>
           </TouchableOpacity>
@@ -116,6 +132,8 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         {!overviewLoading && !overviewError && !overview ? <Text style={styles.metricHint}>No business overview data is available yet.</Text> : null}
         {overview ? <>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>CLIENT SCHOOLS</Text><Text style={styles.metricValue}>{overview.schools?.total ?? 0}</Text><Text style={styles.metricHint}>{overview.schools?.active ?? 0} active</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>PENDING / SUSPENDED SCHOOLS</Text><Text style={styles.metricValue}>{(overview.schools?.byStatus || []).filter((item) => ["pending", "suspended"].includes(item._id)).reduce((sum, item) => sum + item.count, 0)}</Text><Text style={styles.metricHint}>{(overview.schools?.byStatus || []).find((item) => item._id === "pending")?.count || 0} pending · {(overview.schools?.byStatus || []).find((item) => item._id === "suspended")?.count || 0} suspended</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>TRIALS ENDING SOON</Text><Text style={styles.metricValue}>{overview.trialsEndingSoon || 0}</Text><Text style={styles.metricHint}>{(overview.schools?.byStatus || []).find((item) => item._id === "trial_expired")?.count || 0} expired · access restricted</Text></View>
           <View style={styles.metricCard}><Text style={styles.metricLabel}>ACTIVE SUBSCRIPTIONS</Text><Text style={styles.metricValue}>{Object.values(overview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</Text><Text style={styles.metricHint}>Across all billing terms</Text></View>
           {(overview.invoiced || []).map((item) => <View key={"inv-" + item._id} style={styles.metricCard}><Text style={styles.metricLabel}>INVOICED · {item._id}</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.invoiced || 0)}</Text><Text style={styles.metricHint}>Overdue: {new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.overdue || 0)}</Text></View>)}
           {(overview.collected || []).map((item) => <View key={"cash-" + item._id} style={styles.metricCard}><Text style={styles.metricLabel}>CASH COLLECTED · {item._id}</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.collected || 0)}</Text><Text style={styles.metricHint}>Recorded platform payments</Text></View>)}
@@ -144,7 +162,26 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         </View>)}
         <Text style={styles.metricFootnote}>Commercial controls and payment recording are available in the web platform workspace.</Text>
       </> : null}
-      {section !== "overview" ? <>
+      {section === "systemAudit" ? <>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>System audit</Text><Text style={styles.sectionSubtitle}>Account changes and audit delivery health</Text></View>
+          <TouchableOpacity onPress={() => switchSection(section)} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></TouchableOpacity>
+        </View>
+        {systemAuditOutbox ? <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>AUDIT DELIVERY</Text>
+          <Text style={styles.metricValue}>{systemAuditOutbox.counts?.delivered ?? 0} delivered</Text>
+          <Text style={styles.metricHint}>{systemAuditOutbox.counts?.failed ?? 0} failed · {systemAuditOutbox.counts?.pending ?? 0} pending · {systemAuditOutbox.counts?.processing ?? 0} processing</Text>
+        </View> : null}
+        {!loading && !commercialError && systemAuditRecords.length === 0 ? <View style={styles.state}><Text style={styles.stateText}>No system audit events recorded yet.</Text></View> : null}
+        {systemAuditRecords.map((item, index) => <View key={String(item.id || index)} style={styles.record}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.recordName}>{String(item.action || "Event").replaceAll("_", " ")}</Text>
+            <Text style={styles.recordSubtitle}>{item.actorName || item.actorRole || "System"} · {item.schoolName || "Platform"} · {new Date(item.createdAt).toLocaleString()}</Text>
+            <Text style={styles.recordSubtitle}>Changed: {(item.changedFields || []).join(", ") || "Not specified"}</Text>
+          </View>
+        </View>)}
+      </> : null}
+      { ["schools", "users"].includes(section) ? <>
       <View style={styles.sectionHeader}>
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionTitle}>{section === "schools" ? "School directory" : "User directory"}</Text>
