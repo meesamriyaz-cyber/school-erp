@@ -329,7 +329,7 @@ export const bulkUpsertMotherDetails = async (req, res, next) => {
     updated: results.filter((item) => item.status === "updated").length,
     notFound: results.filter((item) => item.status === "not_found").length,
     skipped: results.filter((item) => item.status === "skipped").length,
-    errors: results.filter((item) => item.status === "error").length,
+    errors: results.filter((item) => item.status === "error").length,\n    fatherPrimarySet: results.filter((item) => item.status === "updated" && item.fatherSetAsPrimary).length,\n    fatherLinkMissing: results.filter((item) => item.status === "updated" && !item.fatherSetAsPrimary).length,
   };
   return res.status(200).json({ success: true, summary, data: results });
 };
