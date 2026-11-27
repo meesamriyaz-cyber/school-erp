@@ -211,13 +211,13 @@ export default function PlatformAdminWorkspace() {
     if (auditTenantFilter.trim()) params.set("tenantId", auditTenantFilter.trim());
     if (auditFromFilter) params.set("from", new Date(`${auditFromFilter}T00:00:00.000`).toISOString());
     if (auditToFilter) params.set("to", new Date(`${auditToFilter}T23:59:59.999`).toISOString());
-    setAuditLogsError("");
-    setAuditOutboxError("");
     Promise.all([
       apiRequest(`/platform/audit-logs?${params.toString()}`, { accessToken, signal: controller.signal }),
       apiRequest("/platform/audit-outbox", { accessToken, signal: controller.signal }),
     ]).then(([logsResponse, outboxResponse]) => {
       if (controller.signal.aborted) return;
+      setAuditLogsError("");
+      setAuditOutboxError("");
       setAuditLogs(Array.isArray(logsResponse?.data) ? logsResponse.data : []);
       setAuditPagination((current) => ({ ...current, ...(logsResponse?.pagination ?? {}) }));
       setAuditOutbox(outboxResponse?.data ?? null);
