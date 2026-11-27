@@ -1237,13 +1237,13 @@ export default function PlatformAdminWorkspace() {
               <div className="platform-table-wrap"><table className="platform-school-table platform-commercial-table" aria-label="Commercial audit events"><thead><tr><th>Date</th><th>School</th><th>Activity</th><th>Summary</th><th>References</th></tr></thead><tbody>
                 {commercialEvents.map((item) => {
                   const details = item.details || {};
-                  const references = ["planId", "subscriptionId", "invoiceId", "paymentId"].filter((key) => details[key]);
+                  const references = ["planId", "subscriptionId", "invoiceId", "paymentId"].filter((key) => item[key] || details[key]);
                   return <tr key={item.id || item._id}>
                     <td><strong>{formatDate(item.createdAt)}</strong><small>{item.createdAt ? new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : ""}</small></td>
                     <td><strong>{item.tenantId?.name || "Platform-wide"}</strong></td>
                     <td><span className="platform-audit-action">{humanizeField(item.action)}</span></td>
                     <td>{commercialDetailSummary(details)}</td>
-                    <td>{references.length ? <details className="platform-audit-reference"><summary>View {references.length} reference{references.length > 1 ? "s" : ""}</summary><dl>{references.map((key) => <div key={key}><dt>{humanizeField(key)}</dt><dd title={details[key]}>{shortReference(details[key])}</dd></div>)}</dl></details> : "—"}</td>
+                    <td>{references.length ? <details className="platform-audit-reference"><summary>View {references.length} reference{references.length > 1 ? "s" : ""}</summary><dl>{references.map((key) => <div key={key}><dt>{humanizeField(key)}</dt><dd title={item[key] || details[key]}>{shortReference(item[key] || details[key])}</dd></div>)}</dl></details> : "—"}</td>
                   </tr>;
                 })}
                 {!commercialEvents.length && <tr><td colSpan="5" className="platform-table-message">{eventsError ? "Commercial events could not be loaded." : "No commercial events recorded yet."}</td></tr>}
