@@ -178,12 +178,19 @@ export async function assignSchoolSubscription(req, res, next) {
 
 export async function listPlatformInvoices(req, res, next) {
   try {
+    const page = Number(req.query.page ?? 1);
+    const limit = Number(req.query.limit ?? 100);
+    if (!Number.isInteger(page) || page < 1) return fail(res, 400, "Page must be a positive integer");
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) return fail(res, 400, "Limit must be between 1 and 100");
     const filter = {};
     if (req.query.schoolId !== undefined) {
       if (!validId(req.query.schoolId)) return fail(res, 400, "Invalid school ID");
       filter.tenantId = req.query.schoolId;
     }
-    const invoices = await PlatformInvoice.find(filter).populate("tenantId", "name slug").sort({ issuedAt: -1 }).limit(100).lean();
+    const [invoices, total] = await Promise.all([
+      PlatformInvoice.find(filter).populate("tenantId", "name slug").sort({ issuedAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      PlatformInvoice.countDocuments(filter),
+    ]);
     const invoiceIds = invoices.map((invoice) => invoice._id);
     const payments = invoiceIds.length
       ? await PlatformPayment.find({ invoiceId: { $in: invoiceIds } }).sort({ paymentDate: -1 }).lean()
@@ -198,7 +205,7 @@ export async function listPlatformInvoices(req, res, next) {
       const paidAmount = money(invoicePayments.filter((payment) => payment.status === "recorded").reduce((sum, payment) => sum + payment.amount, 0));
       return { ...invoice, payments: invoicePayments, paidAmount, outstandingAmount: money(invoice.totalAmount - paidAmount) };
     });
-    return res.json({ success: true, data });
+    return res.json({ success: true, data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error) { return next(error); }
 }
 
