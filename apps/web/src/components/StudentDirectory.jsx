@@ -5,6 +5,7 @@ import { useAuth } from "../context/authContext.js";
 import StudentForm from "./StudentForm.jsx";
 import StudentDetails from "./StudentDetails.jsx";
 import PortalAccountLink from "./PortalAccountLink.jsx";
+import MotherContactImport from "./MotherContactImport.jsx";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -231,7 +232,7 @@ export default function StudentDirectory() {
         </div>
       </div>
 
-      <div className="student-filters">
+      {canManageStudents && <MotherContactImport accessToken={accessToken} onImported={() => setNotice("Mother contact import processed. Refresh a student profile to view updated details.")} />}\n\n      <div className="student-filters">
         <label className="student-search">
           <span className="sr-only">Search students</span>
           <input
