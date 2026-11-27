@@ -10,7 +10,17 @@ vi.mock("../lib/api.js", () => ({ apiRequest: vi.fn() }));
 
 const businessOverview = {
   success: true,
-  data: { schools: { total: 1, active: 1, byStatus: [{ _id: "active", count: 1 }] }, subscriptions: {}, invoiced: [], collected: [] },
+  data: {
+    schools: { total: 3, active: 2, byStatus: [{ _id: "active", count: 2 }, { _id: "pending", count: 1 }] },
+    subscriptions: {
+      INR: { mrr: 2400, arr: 28800, lifetimeSales: 0, activeSubscriptions: 2, pendingSubscriptions: 0, pastDueSubscriptions: 0, renewalsDueSoon: 1 },
+    },
+    subscriptionStatusCounts: { active: 2, past_due: 1, pending: 1 },
+    renewalsDueSoon: 1,
+    invoiced: [{ _id: "INR", invoiced: 5000, outstanding: 1200, overdue: 400, invoiceCount: 2, outstandingInvoiceCount: 1, overdueInvoiceCount: 1 }],
+    collected: [{ _id: "INR", collected: 3800, paymentCount: 2 }],
+    recentActivity: [{ _id: "event-1", action: "PAYMENT_RECORDED", tenantId: { name: "Green Valley School" }, createdAt: "2026-11-26T10:00:00.000Z" }],
+  },
 };
 
 const pageOne = {
@@ -139,11 +149,26 @@ describe("PlatformAdminWorkspace school directory", () => {
     expect(await screen.findByText("No schools match these filters.")).toBeInTheDocument();
   });
 
+  it("presents business performance, receivables, operational health and recent activity", async () => {
+    render(<PlatformAdminWorkspace />);
+
+    expect(await screen.findByText("Registered schools")).toBeInTheDocument();
+    expect(screen.getByText("Outstanding receivables")).toBeInTheDocument();
+    expect(screen.getByText("₹1,200")).toBeInTheDocument();
+    expect(screen.getByText("₹400")).toBeInTheDocument();
+    expect(screen.getByText("Revenue and collections")).toBeInTheDocument();
+    expect(screen.getByText("Operational health")).toBeInTheDocument();
+    expect(screen.getByText("Past-due subscriptions")).toBeInTheDocument();
+    expect(screen.getByText("Recent commercial activity")).toBeInTheDocument();
+    expect(screen.getByText("Payment Recorded")).toBeInTheDocument();
+    expect(screen.getByText("Green Valley School")).toBeInTheDocument();
+  });
+
   it("opens the directory from the overview card", async () => {
     const user = userEvent.setup();
     render(<PlatformAdminWorkspace />);
 
-    await user.click(screen.getByRole("button", { name: /Open school directory/ }));
+    await user.click(screen.getByRole("button", { name: /View school portfolio/ }));
 
     expect(await screen.findByRole("table", { name: "School directory" })).toBeInTheDocument();
   });
