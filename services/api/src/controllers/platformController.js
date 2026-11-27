@@ -281,7 +281,7 @@ export const listSchools = async (req, res, next) => {
 
     const [schools, total] = await Promise.all([
       Tenant.find(filter)
-         .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
+         .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
         .sort({ name: 1, _id: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -332,7 +332,7 @@ export const updateSchoolStatus = async (req, res, next) => {
     }
 
     const school = await Tenant.findById(schoolId)
-      .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
       .populate({ path: "suspensionHistory.suspendedBy", select: "firstName lastName email" })
       .lean();
 
@@ -398,7 +398,7 @@ export const updateSchoolStatus = async (req, res, next) => {
             { $set: { status: "active" } },
             { new: true, runValidators: true, session: dbSession },
           )
-            .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
+            .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
             .lean();
 
           if (updatedSchool) {
@@ -446,7 +446,7 @@ export const updateSchoolStatus = async (req, res, next) => {
       statusUpdate,
       { new: true, runValidators: true },
     )
-      .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
       .populate({ path: "suspensionHistory.suspendedBy", select: "firstName lastName email" })
       .lean();
 
@@ -490,7 +490,7 @@ export const getSchoolDetails = async (req, res, next) => {
     }
 
     const school = await Tenant.findById(schoolId)
-      .select("_id name slug status suspensionReason suspensionHistory contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
       .lean();
 
     if (!school) {
