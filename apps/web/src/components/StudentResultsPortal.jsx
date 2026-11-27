@@ -312,7 +312,7 @@ export default function StudentResultsPortal() {
           <p>{isParent ? "Receive school notices, important notifications and messages about your ward." : "View attendance, homework, examination results, fees and the class timetable."}</p>
         </div>
         <div className="portal-account">
-          {!isParent && headerStudent?.photoUrl && <img className="portal-header-student-photo" src={headerStudent.photoUrl} alt={`${headerStudent.firstName || "Student"} profile`} />}
+          {!isParent && <div className="portal-header-student-avatar">{headerStudent?.photoUrl ? <img src={headerStudent.photoUrl} alt={`${headerStudent.firstName || "Student"} profile`} /> : <span>{[headerStudent?.firstName, headerStudent?.lastName].filter(Boolean).map((part) => part[0]).join("").toUpperCase() || "S"}</span>}</div> }
           <span>{fullName || (isParent ? "Parent account" : "Student account")}</span>
           <button type="button" className="portal-signout" onClick={() => void logout()}>Sign out</button>
         </div>
@@ -361,7 +361,7 @@ export default function StudentResultsPortal() {
         )
       ) : activeTab === "profile" ? (
         loading ? <div className="portal-state">Loading student profile…</div> : visibleProfiles.length === 0 ? <div className="portal-empty"><h2>Student profile unavailable</h2><p>Your school has not linked an active student profile to this account.</p></div> : (
-          <section className="portal-profile-list">{visibleProfiles.map(({ student, currentEnrollment }) => (
+          <section className="portal-profile-list">{visibleProfiles.map(({ student, currentEnrollment, parents = [] }) => (
             <article className="portal-profile-card" key={student._id}>
               <header className="portal-profile-heading">
                 <div><span>STUDENT PROFILE</span><h2>{[student.firstName, student.lastName].filter(Boolean).join(" ")}</h2><small>Admission number: {student.admissionNumber || "—"}</small></div>
@@ -375,7 +375,7 @@ export default function StudentResultsPortal() {
                 <div><span>Address</span><strong>{[student.address?.line1, student.address?.line2, student.address?.city, student.address?.district, student.address?.state, student.address?.postalCode].filter(Boolean).join(", ") || "—"}</strong></div>
               </div>
               <div className="portal-profile-section"><h3>Current academic placement</h3><p>{currentEnrollment ? [currentEnrollment.classId?.name, currentEnrollment.sectionId?.name, currentEnrollment.academicYearId?.name].filter(Boolean).join(" · ") : "No active enrollment"}</p></div>
-              {["father", "mother"].map((relationship) => { const parent = (visibleProfiles.find((item) => String(item.student?._id) === String(student._id))?.parents || []).find((item) => item.relationship === relationship); const label = relationship === "father" ? "Father" : "Mother"; return <div className="portal-profile-section portal-parent-section" key={relationship}><h3>{label}</h3><p><strong>{parent?.name || (relationship === "father" ? student.guardianName : "Details not added") || "Details not added"}</strong></p><p>{parent?.phone || (relationship === "father" ? student.guardianPhone : "") || "Phone not provided"}</p><p>{parent?.email ? `${parent.email} · ${parent.emailVerified ? "Email verified" : "Email not verified"}` : relationship === "father" && student.guardianEmail ? `${student.guardianEmail} · Email not verified` : "Email not provided"}</p></div>; })}
+              {["father", "mother"].map((relationship) => { const parent = parents.find((item) => item.relationship === relationship); const label = relationship === "father" ? "Father" : "Mother"; const parentName = parent?.name || (relationship === "father" ? student.guardianName : "") || "Details not added"; return <div className="portal-profile-section portal-parent-section" key={relationship}><div className="portal-parent-heading"><div className="portal-parent-avatar">{parent?.photoUrl ? <img src={parent.photoUrl} alt={`${label} profile`} /> : <span>{relationship === "father" ? "F" : "M"}</span>}</div><div><h3>{label}</h3><p><strong>{parentName}</strong></p></div></div><p>{parent?.phone || (relationship === "father" ? student.guardianPhone : "") || "Phone not provided"}</p><p>{parent?.email ? `${parent.email} · ${parent.emailVerified ? "Email verified" : "Email not verified"}` : relationship === "father" && student.guardianEmail ? `${student.guardianEmail} · Email not verified` : "Email not provided"}</p></div>; })}
             </article>
           ))}</section>
         )
