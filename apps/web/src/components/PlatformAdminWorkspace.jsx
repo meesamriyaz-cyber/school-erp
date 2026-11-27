@@ -28,7 +28,7 @@ function formatDate(value) {
 }
 
 function statusLabel(status) {
-  return status ? String(status).replaceAll("_", " ").replace(/\\b\\w/g, (character) => character.toUpperCase()) : "Unknown";
+  return status ? String(status).replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase()) : "Unknown";
 }
 
 function trialDaysRemaining(value) {
@@ -1320,7 +1320,7 @@ export default function PlatformAdminWorkspace() {
                   <section className="platform-lifecycle-controls" aria-label="School subscription management">
                     <div><h3>Subscription</h3><p>Assign monthly, discounted annual, or negotiated lifetime access. Access activates only after the invoice is fully paid.</p></div>
                     {schoolSubscription && <div className="platform-current-subscription"><strong>{schoolSubscription.isTrial ? "Free trial" : "Current subscription"}</strong><span>{schoolSubscription.planName || "Assigned plan"} · {schoolSubscription.isTrial ? "30 days" : schoolSubscription.billingInterval === "one_time" ? "Lifetime access" : statusLabel(schoolSubscription.billingInterval)}</span><span>{schoolSubscription.isTrial ? statusLabel(schoolSubscription.status) : `${statusLabel(schoolSubscription.status)} · ${schoolSubscription.currency} ${Number(schoolSubscription.amount || 0).toLocaleString("en-IN")}`}</span><small>{schoolSubscription.isTrial ? `Trial ends: ${formatDate(schoolSubscription.trialEndsAt || schoolSubscription.currentPeriodEndsAt)} · ${trialDaysRemaining(schoolSubscription.trialEndsAt || schoolSubscription.currentPeriodEndsAt)} days remaining` : schoolSubscription.nextBillingAt ? `Next billing: ${formatDate(schoolSubscription.nextBillingAt)}` : schoolSubscription.lifetimeAccess ? "No renewal or expiry" : schoolSubscription.currentPeriodEndsAt ? `Period ends: ${formatDate(schoolSubscription.currentPeriodEndsAt)}` : "Billing date pending"}</small></div>}
-                    {!school.trialStartedAt && !schoolSubscription && school.status !== "suspended" && school.status !== "trial_expired" && (
+                    {!school.trialStartedAt && !school.trialHistory?.length && !schoolSubscription && school.status !== "suspended" && school.status !== "trial_expired" && (
                       <div className="platform-trial-offer">
                         <div><strong>30-day free trial</strong><p>Start a one-time trial with full school access. Access is automatically restricted when the 30 days end unless a paid subscription is activated.</p></div>
                         <button type="button" className="platform-primary-button" onClick={() => void startSchoolTrial()} disabled={startingTrial || assigningSubscription}>{startingTrial ? "Starting trial…" : "Start 30-day free trial"}</button>
