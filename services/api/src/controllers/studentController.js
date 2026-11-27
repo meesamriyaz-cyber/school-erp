@@ -210,3 +210,100 @@ export const updateStudent = async (req, res, next) => {
     return res.status(200).json({ success: true, data: student.toObject ? student.toObject() : student });
   } catch (error) { return handleStudentError(error, res, next); }
 };
+
+
+export const bulkUpsertMotherDetails = async (req, res, next) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 500) {
+    return invalidRequest(res, "Provide between 1 and 500 mother records");
+  }
+  const seen = new Set();
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (!row || typeof row !== "object" || Array.isArray(row)
+      || Object.keys(row).some((key) => !["admissionNumber", "motherFirstName", "motherLastName", "motherPhone", "motherEmail"].includes(key))) {
+      return invalidRequest(res, `Row ${index + 1} contains unsupported fields`);
+    }
+    if (typeof row.admissionNumber !== "string" || !row.admissionNumber.trim()) return invalidRequest(res, `Row ${index + 1}: admissionNumber is required`);
+    const admissionKey = row.admissionNumber.trim().toLowerCase();
+    if (seen.has(admissionKey)) return invalidRequest(res, `Duplicate admission number in row ${index + 1}`);
+    seen.add(admissionKey);
+    const parentError = validateParent({
+      firstName: row.motherFirstName,
+      lastName: row.motherLastName,
+      phone: row.motherPhone,
+      email: row.motherEmail,
+    }, `Mother in row ${index + 1}`);
+    if (parentError) return invalidRequest(res, parentError);
+  }
+
+  const results = [];
+  for (const row of rows) {
+    const admissionNumber = row.admissionNumber.trim();
+    const session = await mongoose.startSession();
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        const student = await Student.findOne({ tenantId: req.tenantId, admissionNumber }).session(session);
+        if (!student) {
+          result = { admissionNumber, status: "not_found", message: "Student admission number was not found" };
+          return;
+        }
+        const supplied = [row.motherFirstName, row.motherLastName, row.motherPhone, row.motherEmail]
+          .some((value) => value != null && String(value).trim() !== "");
+        if (!supplied) {
+          result = { admissionNumber, status: "skipped", message: "No mother details supplied" };
+          return;
+        }
+        const existingLink = await StudentGuardian.findOne({
+          tenantId: req.tenantId, studentId: student._id, relationship: "mother",
+        }).sort({ status: 1, createdAt: 1 }).session(session);
+        let guardian;
+        if (existingLink) {
+          guardian = await Guardian.findOne({ _id: existingLink.guardianId, tenantId: req.tenantId }).session(session);
+          if (!guardian) throw new Error("Linked mother guardian record could not be found");
+          if (row.motherFirstName?.trim()) guardian.firstName = row.motherFirstName.trim();
+          if (row.motherLastName !== undefined) guardian.lastName = row.motherLastName?.trim() || "";
+          if (row.motherPhone !== undefined) guardian.phone = row.motherPhone?.trim() || null;
+          if (row.motherEmail !== undefined && row.motherEmail?.trim()) {
+            guardian.pendingEmail = row.motherEmail.trim().toLowerCase();
+            guardian.email = null;
+            guardian.emailVerifiedAt = null;
+            guardian.verifiedEmail = null;
+          }
+          await guardian.save({ session });
+          existingLink.receivesCommunication = false;
+          existingLink.isPrimary = existingLink.isPrimary; // Preserve the existing primary assignment; never alter Father's record.
+          await existingLink.save({ session });
+        } else {
+          guardian = await Guardian.create([{
+            tenantId: req.tenantId,
+            firstName: row.motherFirstName.trim(),
+            lastName: row.motherLastName?.trim() || "",
+            phone: row.motherPhone?.trim() || null,
+            ...(row.motherEmail?.trim() ? { pendingEmail: row.motherEmail.trim().toLowerCase() } : {}),
+          }], { session }).then((created) => created[0]);
+          await StudentGuardian.create([{
+            tenantId: req.tenantId, studentId: student._id, guardianId: guardian._id,
+            relationship: "mother", source: "manual", isPrimary: false, canAccessPortal: false,
+            isEmergencyContact: false, canPickup: false, receivesCommunication: false,
+          }], { session });
+        }
+        result = { admissionNumber, status: "updated", motherName: [guardian.firstName, guardian.lastName].filter(Boolean).join(" ") };
+      });
+      results.push(result || { admissionNumber, status: "error", message: "Record could not be processed" });
+    } catch (error) {
+      results.push({ admissionNumber, status: "error", message: error.message || "Record could not be processed" });
+    } finally {
+      await session.endSession();
+    }
+  }
+  const summary = {
+    total: results.length,
+    updated: results.filter((item) => item.status === "updated").length,
+    notFound: results.filter((item) => item.status === "not_found").length,
+    skipped: results.filter((item) => item.status === "skipped").length,
+    errors: results.filter((item) => item.status === "error").length,
+  };
+  return res.status(200).json({ success: true, summary, data: results });
+};
