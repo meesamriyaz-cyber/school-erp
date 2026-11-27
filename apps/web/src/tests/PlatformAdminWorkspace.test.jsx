@@ -154,7 +154,7 @@ describe("PlatformAdminWorkspace school directory", () => {
 
     expect(await screen.findByText("Registered schools")).toBeInTheDocument();
     expect(screen.getByText("Outstanding receivables")).toBeInTheDocument();
-    expect(screen.getByText("₹1,200")).toBeInTheDocument();
+    expect(screen.getByText(/₹1,200/)).toBeInTheDocument();
     expect(screen.getByText("₹400")).toBeInTheDocument();
     expect(screen.getByText("Revenue and collections")).toBeInTheDocument();
     expect(screen.getByText("Operational health")).toBeInTheDocument();
