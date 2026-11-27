@@ -225,7 +225,8 @@ export const createSchool = async (req, res, next) => {
 };
 
 
-const SCHOOL_STATUSES = ["pending", "active", "suspended", "trial_expired"];
+const SCHOOL_STATUSES = ["pending", "active", "suspended"];
+const SCHOOL_FILTER_STATUSES = [...SCHOOL_STATUSES, "trial_expired"];
 
 // GET /api/v1/platform/schools
 export const listSchools = async (req, res, next) => {
@@ -250,7 +251,7 @@ export const listSchools = async (req, res, next) => {
     if (req.query.status !== undefined) {
       if (
         typeof req.query.status !== "string" ||
-        !SCHOOL_STATUSES.includes(req.query.status)
+        !SCHOOL_FILTER_STATUSES.includes(req.query.status)
       ) {
         return res.status(400).json({
           success: false,
