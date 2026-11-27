@@ -67,7 +67,7 @@ function shortReference(value) {
 function formatAuditValue(value) {
   if (value === null || value === undefined || value === "") return "Not set";
   const normalized = String(value);
-  if (/^[a-f\\d]{24}$/i.test(normalized)) return "Recorded reference";
+  if (/^[a-f\d]{24}$/i.test(normalized)) return "Recorded reference";
   return /^(pending|active|suspended|inactive|paid|overdue|cancelled|canceled|failed|recorded)$/i.test(normalized)
     ? statusLabel(normalized) : normalized.length > 80 ? `${normalized.slice(0, 77)}…` : normalized;
 }
@@ -1281,6 +1281,7 @@ export default function PlatformAdminWorkspace() {
                       {[...(school.suspensionHistory || [])].sort((a, b) => new Date(b.suspendedAt || 0) - new Date(a.suspendedAt || 0)).map((entry, index) => (
                         <article className="platform-suspension-record" key={entry._id || `${entry.suspendedAt}-${index}`}>
                           <strong>{formatDate(entry.suspendedAt)}</strong>
+                          <small>{entry.suspendedBy && typeof entry.suspendedBy === "object" ? [entry.suspendedBy.firstName, entry.suspendedBy.lastName].filter(Boolean).join(" ") || entry.suspendedBy.email : "Administrator record"}</small>
                           <p>{entry.reason}</p>
                         </article>
                       ))}
