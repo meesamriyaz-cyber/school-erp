@@ -330,6 +330,14 @@ describe("PlatformAdminWorkspace school directory", () => {
           suspensionReason: "Outstanding compliance documentation",
           suspensionHistory: [{ reason: "Outstanding compliance documentation", suspendedAt: "2026-11-27T10:00:00.000Z" }],
         } },
+      })
+      .mockResolvedValue({
+        success: true,
+        data: { school: {
+          id: "school-1", name: "Green Valley School", status: "suspended",
+          suspensionReason: "Outstanding compliance documentation",
+          suspensionHistory: [{ reason: "Outstanding compliance documentation", suspendedAt: "2026-11-27T10:00:00.000Z" }],
+        }, administrators: [] },
       });
     render(<PlatformAdminWorkspace />);
     await user.click(screen.getByRole("button", { name: /Schools/ }));
