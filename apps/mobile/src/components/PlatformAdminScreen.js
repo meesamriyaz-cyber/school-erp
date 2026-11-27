@@ -78,7 +78,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
     if (section !== "users") return undefined;
     let mounted = true;
     apiRequest("/platform/schools?page=1&limit=100")
-      .then((response) => { if (mounted) setUserSchools((response?.data || []).filter((school) => school.status === "active")); })
+      .then((response) => { if (mounted) setUserSchools(response?.data || []); })
       .catch(() => { if (mounted) setUserSchools([]); });
     return () => { mounted = false; };
   }, [section]);
@@ -443,7 +443,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
         <View style={styles.sectionHeader}><View style={{ flex: 1 }}><Text style={styles.sectionTitle}>Create school user</Text><Text style={styles.sectionSubtitle}>New accounts await activation</Text></View><TouchableOpacity onPress={() => setShowCreateUser(false)} style={styles.refresh}><Text style={styles.refreshText}>Cancel</Text></TouchableOpacity></View>
         <View style={styles.metricCard}>
           <Text style={styles.metricLabel}>ACTIVE SCHOOL</Text>
-          {userSchools.map((school) => <TouchableOpacity key={String(school.id || school._id)} onPress={() => setNewUser((current) => ({ ...current, tenantId: String(school.id || school._id) }))} style={[styles.roleOption, newUser.tenantId === String(school.id || school._id) && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{school.name}</Text></TouchableOpacity>)}
+          {userSchools.filter((school) => school.status === "active").map((school) => <TouchableOpacity key={String(school.id || school._id)} onPress={() => setNewUser((current) => ({ ...current, tenantId: String(school.id || school._id) }))} style={[styles.roleOption, newUser.tenantId === String(school.id || school._id) && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{school.name}</Text></TouchableOpacity>)}
           <TextInput value={newUser.firstName} onChangeText={(value) => setNewUser((current) => ({ ...current, firstName: value }))} placeholder="First name *" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
           <TextInput value={newUser.lastName} onChangeText={(value) => setNewUser((current) => ({ ...current, lastName: value }))} placeholder="Last name" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
           <TextInput value={newUser.email} onChangeText={(value) => setNewUser((current) => ({ ...current, email: value }))} placeholder="Email address *" placeholderTextColor={colors.muted} style={styles.search} keyboardType="email-address" autoCapitalize="none" maxLength={254}/>
@@ -453,7 +453,7 @@ export function PlatformAdminScreen({ user, onSignOut }) {
           <TextInput value={newUser.password} onChangeText={(value) => setNewUser((current) => ({ ...current, password: value }))} placeholder="Initial password (min. 8 characters) *" placeholderTextColor={colors.muted} style={styles.search} secureTextEntry maxLength={72}/>
           <TouchableOpacity disabled={creatingUser || !newUser.tenantId || !newUser.firstName.trim() || !newUser.email.trim() || newUser.password.length < 8} onPress={createPlatformUser} style={styles.actionButton}><Text style={styles.actionButtonText}>{creatingUser ? "Creating…" : "Create user"}</Text></TouchableOpacity>
           {createUserMessage ? <Text style={styles.metricHint}>{createUserMessage}</Text> : null}
-          {!userSchools.length ? <Text style={styles.metricHint}>No active schools are available.</Text> : null}
+          {!userSchools.some((school) => school.status === "active") ? <Text style={styles.metricHint}>No active schools are available.</Text> : null}
         </View>
       </> : null}
       { ["schools", "users"].includes(section) && !(section === "users" && (selectedUserId || showCreateUser)) ? <>
