@@ -2,20 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   tenantAggregate,
-  subscriptionFind,
+  subscriptionAggregate,
   invoiceAggregate,
   paymentAggregate,
   commercialEventFind,
 } = vi.hoisted(() => ({
   tenantAggregate: vi.fn(),
-  subscriptionFind: vi.fn(),
+  subscriptionAggregate: vi.fn(),
   invoiceAggregate: vi.fn(),
   paymentAggregate: vi.fn(),
   commercialEventFind: vi.fn(),
 }));
 
 vi.mock("../models/Tenant.js", () => ({ default: { aggregate: tenantAggregate } }));
-vi.mock("../models/SchoolSubscription.js", () => ({ default: { find: subscriptionFind } }));
+vi.mock("../models/SchoolSubscription.js", () => ({ default: { aggregate: subscriptionAggregate } }));
 vi.mock("../models/PlatformInvoice.js", () => ({ default: { aggregate: invoiceAggregate } }));
 vi.mock("../models/PlatformPayment.js", () => ({ default: { aggregate: paymentAggregate } }));
 vi.mock("../models/PlatformCommercialEvent.js", () => ({ default: { find: commercialEventFind } }));
@@ -39,16 +39,12 @@ describe("getBusinessOverview", () => {
     ]);
 
     const now = Date.now();
-    const subscriptionQuery = {
-      select: vi.fn().mockReturnThis(),
-      lean: vi.fn().mockResolvedValue([
-        { currency: "INR", billingInterval: "monthly", amount: 1200, status: "active", nextBillingAt: new Date(now + 10 * 86400000) },
-        { currency: "INR", billingInterval: "annual", amount: 12000, status: "active", nextBillingAt: new Date(now + 60 * 86400000) },
-        { currency: "INR", billingInterval: "monthly", amount: 500, status: "past_due", nextBillingAt: new Date(now - 86400000) },
-        { currency: "USD", billingInterval: "monthly", amount: 700, status: "pending", nextBillingAt: null },
-      ]),
-    };
-    subscriptionFind.mockReturnValue(subscriptionQuery);
+    subscriptionAggregate.mockResolvedValue([
+      { _id: { currency: "INR", billingInterval: "monthly", status: "active" }, count: 1, amount: 1200, renewalsDueSoon: 1 },
+      { _id: { currency: "INR", billingInterval: "annual", status: "active" }, count: 1, amount: 12000, renewalsDueSoon: 0 },
+      { _id: { currency: "INR", billingInterval: "monthly", status: "past_due" }, count: 1, amount: 500, renewalsDueSoon: 0 },
+      { _id: { currency: "USD", billingInterval: "monthly", status: "pending" }, count: 1, amount: 700, renewalsDueSoon: 0 },
+    ]);
 
     invoiceAggregate
       .mockResolvedValueOnce([
