@@ -128,6 +128,16 @@ test('platform admin has a dedicated mobile workspace for cross-school directori
   assert.match(screen, /User directory/);
   assert.match(screen, /URLSearchParams/);
   assert.match(screen, /pagination/);
+  assert.match(screen, /\/platform\/schools\//);
+  assert.match(screen, /\/subscription/);
+  assert.match(screen, /School details/);
+  assert.match(screen, /Start 30-day free trial/);
+  assert.match(screen, /Activate school/);
+  assert.match(screen, /Suspend school/);
+  assert.match(screen, /Reactivate school/);
+  assert.match(screen, /suspensionReason/);
+  assert.match(screen, /System audit/);
+  assert.match(screen, /Commercial audit/);
 });
 
 
