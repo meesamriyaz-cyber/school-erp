@@ -3,6 +3,7 @@ import {  useState } from "react";
 import { apiRequest } from "../lib/api.js";
 
 import { useAuth } from "../context/authContext.js";
+import StudentGuardianManagement from "./StudentGuardianManagement.jsx";
 
 function toDateInput(value) {
   if (!value) return "";
@@ -36,7 +37,7 @@ export default function EditStudentForm({
   onCancel,
   onSaved,
 }) {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
 
   const [form, setForm] = useState(() => getInitialFields(student));
   const [saving, setSaving] = useState(false);
@@ -231,6 +232,16 @@ export default function EditStudentForm({
           </button>
         </div>
       </form>
+
+      <div className="student-edit-additional-guardians">
+        <h3>Additional guardians</h3>
+        <p>Add the mother or another guardian here without replacing the primary contact recorded above.</p>
+        <StudentGuardianManagement
+          studentId={student._id}
+          accessToken={accessToken}
+          canManage={["school_admin", "principal"].includes(user?.role)}
+        />
+      </div>
     </section>
   );
 }
