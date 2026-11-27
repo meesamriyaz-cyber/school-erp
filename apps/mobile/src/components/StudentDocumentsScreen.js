@@ -86,7 +86,7 @@ export function StudentDocumentsScreen({ onHome }) {
       if (!cloudResponse.ok) throw new Error(uploaded?.error?.message || "Cloudinary upload failed.");
       await apiRequest(`/students/${encodeURIComponent(studentId)}/documents`, { method: "POST", body: {
         name: file.name || "Student document", category, fileUrl: uploaded.secure_url, publicId: uploaded.public_id,
-        resourceType: uploaded.resource_type, format: uploaded.format, bytes: uploaded.bytes, notes, setAsProfilePhoto: category === "photograph" && setAsProfilePhoto,
+        resourceType: uploaded.resource_type, format: uploaded.format, bytes: uploaded.bytes, notes, setAsProfilePhoto: category === "photograph" && file.mimeType?.startsWith("image/") && setAsProfilePhoto,
       }});
       setFile(null); setNotes(""); setNotice(category === "photograph" && setAsProfilePhoto ? "Photograph uploaded and set as the student profile photo." : "Document uploaded successfully.");
       await loadDocuments(studentId);
@@ -120,7 +120,7 @@ export function StudentDocumentsScreen({ onHome }) {
       <Text style={styles.label}>Category</Text>
       <View style={styles.categoryList}>{categories.map(([value, label]) => <TouchableOpacity key={value} style={[styles.category, category === value && styles.categoryActive]} onPress={() => setCategory(value)}><Text style={[styles.categoryText, category === value && styles.categoryTextActive]}>{label}</Text></TouchableOpacity>)}</View>
       <TouchableOpacity style={styles.fileButton} onPress={chooseFile}><Text style={styles.fileButtonText}>{file ? file.name : "Choose PDF or image"}</Text></TouchableOpacity>
-      {category === "photograph" ? <TouchableOpacity style={styles.profilePhotoOption} onPress={() => setSetAsProfilePhoto((value) => !value)} accessibilityRole="checkbox" accessibilityState={{ checked: setAsProfilePhoto }}><View style={[styles.checkBox, setAsProfilePhoto && styles.checkBoxActive]}>{setAsProfilePhoto ? <Text style={styles.checkMark}>✓</Text> : null}</View><Text style={styles.profilePhotoOptionText}>Use this photograph as the student profile photo</Text></TouchableOpacity> : null}
+      {category === "photograph" && file?.mimeType?.startsWith("image/") ? <TouchableOpacity style={styles.profilePhotoOption} onPress={() => setSetAsProfilePhoto((value) => !value)} accessibilityRole="checkbox" accessibilityState={{ checked: setAsProfilePhoto }}><View style={[styles.checkBox, setAsProfilePhoto && styles.checkBoxActive]}>{setAsProfilePhoto ? <Text style={styles.checkMark}>✓</Text> : null}</View><Text style={styles.profilePhotoOptionText}>Use this photograph as the student profile photo</Text></TouchableOpacity> : null}
       {file ? <Text style={styles.fileMeta}>{formatSize(file.size || 0)} · {file.mimeType || "File selected"}</Text> : null}
       <Text style={styles.label}>Notes (optional)</Text>
       <TextInput value={notes} onChangeText={setNotes} placeholder="Add a note about this document" placeholderTextColor={colors.muted} multiline style={styles.input}/>
