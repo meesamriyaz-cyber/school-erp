@@ -910,7 +910,9 @@ export default function PlatformAdminWorkspace() {
                           ? "Review platform invoices, record payments and manage reversals."
                           : activePage === "Commercial audit"
                             ? "Trace subscription, plan and payment changes across your school portfolio."
-                            : activePage === "System audit"\n                              ? "Review user and access changes and monitor reliable audit-event delivery."\n                              : "Search registered schools, review their status, and move through the directory."}
+                            : activePage === "System audit"
+                              ? "Review user and access changes and monitor reliable audit-event delivery."
+                              : "Search registered schools, review their status, and move through the directory."}
           </p>
 
           {activePage === "Overview" ? (
