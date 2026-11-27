@@ -64,7 +64,7 @@ export default function StudentDocumentManagement() {
       if (!cloudResponse.ok) throw new Error(uploaded?.error?.message || "Cloudinary upload failed.");
       await apiRequest(`/students/${encodeURIComponent(studentId)}/documents`, { method: "POST", accessToken, body: {
         name: file.name, category, fileUrl: uploaded.secure_url, publicId: uploaded.public_id,
-        resourceType: uploaded.resource_type, format: uploaded.format, bytes: uploaded.bytes, notes, setAsProfilePhoto: category === "photograph" && setAsProfilePhoto,
+        resourceType: uploaded.resource_type, format: uploaded.format, bytes: uploaded.bytes, notes, setAsProfilePhoto: category === "photograph" && file.type?.startsWith("image/") && setAsProfilePhoto,
       }});
       setFile(null); setNotes(""); event.target.reset();
       setNotice(category === "photograph" && setAsProfilePhoto ? "Photograph uploaded and set as the student profile photo." : "Document uploaded and added to the student record.");
@@ -94,7 +94,7 @@ export default function StudentDocumentManagement() {
       <h3>Upload a document</h3>
       <label style={{ display: "grid", gap: 6 }}>Document category<select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label style={{ display: "grid", gap: 6 }}>File (PDF, JPG, PNG; max 10 MB)<input type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>
-      {category === "photograph" && <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13 }}><input type="checkbox" checked={setAsProfilePhoto} onChange={(event) => setSetAsProfilePhoto(event.target.checked)} /> Use this photograph as the student profile photo</label>}
+      {category === "photograph" && file?.type?.startsWith("image/") && <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13 }}><input type="checkbox" checked={setAsProfilePhoto} onChange={(event) => setSetAsProfilePhoto(event.target.checked)} /> Use this photograph as the student profile photo</label>}
       <label style={{ display: "grid", gap: 6 }}>Notes (optional)<textarea rows="2" maxLength="500" value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
       <button className="primary-button" type="submit" disabled={loading || !studentId || !file}>{loading ? "Uploading…" : "Upload document"}</button>
       <small>Files are uploaded directly to Cloudinary using a short-lived server signature. The API secret is never exposed to the browser.</small>
