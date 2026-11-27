@@ -164,6 +164,8 @@ export async function assignSchoolSubscription(req, res, next) {
       }], { session });
       [invoice] = await PlatformInvoice.create([{
         tenantId: school._id, subscriptionId: subscription._id, invoiceNumber,
+        billingPeriodStartsAt: subscription.currentPeriodStartsAt,
+        billingPeriodEndsAt: subscription.currentPeriodEndsAt,
         items: [{ description: `${plan.name} (${plan.billingInterval})`, quantity: 1, unitAmount: plan.amount, amount: plan.amount }],
         subtotal: plan.amount, discountAmount, totalAmount: charge, currency: plan.currency,
         issuedAt: now, dueAt: dueAt ? new Date(dueAt) : new Date(now.getTime() + 7 * 86400000),
@@ -241,7 +243,26 @@ export async function recordPlatformPayment(req, res, next) {
         if (subscription) {
           await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
           const wasPending = subscription.status === "pending";
-          if (!wasPending && subscription.billingInterval !== "one_time" && subscription.currentPeriodEndsAt) {
+          const invoicePeriodStartsAt = invoice.billingPeriodStartsAt;
+          const invoicePeriodEndsAt = invoice.billingPeriodEndsAt;
+          const isCurrentRenewal = !wasPending
+            && subscription.billingInterval !== "one_time"
+            && invoicePeriodStartsAt && invoicePeriodEndsAt && subscription.currentPeriodEndsAt
+            && new Date(subscription.currentPeriodEndsAt).getTime() === new Date(invoicePeriodStartsAt).getTime();
+          const alreadyAppliedRenewal = !wasPending && invoicePeriodStartsAt && invoicePeriodEndsAt
+            && subscription.currentPeriodStartsAt && subscription.currentPeriodEndsAt
+            && new Date(subscription.currentPeriodStartsAt).getTime() === new Date(invoicePeriodStartsAt).getTime()
+            && new Date(subscription.currentPeriodEndsAt).getTime() === new Date(invoicePeriodEndsAt).getTime();
+          if (isCurrentRenewal) {
+            subscription.currentPeriodStartsAt = invoicePeriodStartsAt;
+            subscription.currentPeriodEndsAt = invoicePeriodEndsAt;
+            subscription.nextBillingAt = invoicePeriodEndsAt;
+          } else if (!wasPending && !alreadyAppliedRenewal && !invoicePeriodStartsAt && invoice.notes === "Automated subscription renewal"
+            && subscription.billingInterval !== "one_time" && subscription.currentPeriodEndsAt
+            && new Date(subscription.currentPeriodEndsAt).getTime() <= new Date(invoice.issuedAt).getTime()
+            && new Date(subscription.currentPeriodStartsAt).getTime() < new Date(invoice.issuedAt).getTime()) {
+            // Legacy renewal invoice: infer its period only while the subscription is still on the period
+            // that was due when this invoice was issued. Never advance from a stale invoice.
             subscription.currentPeriodStartsAt = subscription.currentPeriodEndsAt;
             subscription.currentPeriodEndsAt = periodEnd(subscription.currentPeriodStartsAt, subscription.billingInterval);
             subscription.nextBillingAt = subscription.currentPeriodEndsAt;
@@ -435,8 +456,11 @@ export async function createRenewalInvoice(req, res, next) {
       const school = await Tenant.findById(subscription.tenantId).select("name").session(session);
       const now = new Date();
       const invoiceNumber = `RN-${now.getTime()}-${String(subscription.tenantId).slice(-6)}`;
+      const billingPeriodStartsAt = subscription.currentPeriodEndsAt;
+      const billingPeriodEndsAt = periodEnd(billingPeriodStartsAt, subscription.billingInterval);
       const [invoice] = await PlatformInvoice.create([{
         tenantId: subscription.tenantId, subscriptionId: subscription._id, invoiceNumber,
+        billingPeriodStartsAt, billingPeriodEndsAt,
         items: [{ description: `${subscription.planName} renewal (${subscription.billingInterval})`, quantity: 1, unitAmount: subscription.amount, amount: subscription.amount }],
         subtotal: subscription.amount, discountAmount: 0, totalAmount: subscription.amount, currency: subscription.currency,
         issuedAt: now, dueAt: new Date(now.getTime() + 7 * 86400000), status: "issued",
@@ -476,13 +500,18 @@ export async function reversePlatformPayment(req, res, next) {
       await invoice.save({ session });
       if (invoice.subscriptionId && invoice.status !== "paid") {
         const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: { $in: ["active", "past_due"] } }).session(session);
-        if (subscription) {
-          if (subscription.billingInterval === "one_time" || subscription.lifetimeAccess) {
-            subscription.status = "cancelled";
-            subscription.cancelledAt = new Date();
-          } else {
-            subscription.status = "past_due";
-          }
+        const invoiceMatchesCurrentPeriod = subscription && invoice.billingPeriodStartsAt && invoice.billingPeriodEndsAt
+          && subscription.currentPeriodStartsAt && subscription.currentPeriodEndsAt
+          && new Date(subscription.currentPeriodStartsAt).getTime() === new Date(invoice.billingPeriodStartsAt).getTime()
+          && new Date(subscription.currentPeriodEndsAt).getTime() === new Date(invoice.billingPeriodEndsAt).getTime();
+        if (subscription && (subscription.billingInterval === "one_time" || subscription.lifetimeAccess)) {
+          // Lifetime access is tied to its original purchase invoice; reversing it cancels that access.
+          subscription.status = "cancelled";
+          subscription.cancelledAt = new Date();
+          await subscription.save({ session });
+        } else if (subscription && invoiceMatchesCurrentPeriod) {
+          // A reversal for an older invoice must not downgrade a newer paid period.
+          subscription.status = "past_due";
           await subscription.save({ session });
         }
       }
