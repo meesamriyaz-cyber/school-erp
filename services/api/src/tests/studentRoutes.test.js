@@ -285,7 +285,7 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
       method: "POST", token: adminA.token,
       body: JSON.stringify({
         ...studentPayload(admissionNumber, "MotherPrimary"),
-        guardianName: "Sara Khan", guardianRelationship: "mother", guardianPhone: "9876543210",
+        guardianName: "Sara Khan", guardianRelationship: "mother", guardianPhone: "9876543211",
       }),
     });
     expect(created.status).toBe(201);
