@@ -43,7 +43,7 @@ describe("updateSchoolStatus", () => {
     };
     mongoose.startSession.mockResolvedValue(dbSession);
     userUpdateMany.mockResolvedValue({ modifiedCount: 1 });
-    req = { params: { schoolId }, body: { status: "suspended" } };
+    req = { params: { schoolId }, body: { status: "suspended", reason: "Valid school suspension reason" } };
     res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     next = vi.fn();
 
