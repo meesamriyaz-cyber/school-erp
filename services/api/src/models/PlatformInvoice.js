@@ -10,6 +10,8 @@ const platformInvoiceItemSchema = new mongoose.Schema({
 const platformInvoiceSchema = new mongoose.Schema({
   tenantId: { type: mongoose.Schema.Types.ObjectId, ref: "Tenant", required: true, immutable: true, index: true },
   subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: "SchoolSubscription", default: null, index: true },
+  billingPeriodStartsAt: { type: Date, default: null },
+  billingPeriodEndsAt: { type: Date, default: null },
   invoiceNumber: { type: String, required: true, trim: true, maxlength: 40 },
   items: { type: [platformInvoiceItemSchema], required: true, validate: value => value.length > 0 },
   subtotal: { type: Number, required: true, min: 0 },
