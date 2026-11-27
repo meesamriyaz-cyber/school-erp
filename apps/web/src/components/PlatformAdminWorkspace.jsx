@@ -672,7 +672,7 @@ export default function PlatformAdminWorkspace() {
   try {
     const response = await apiRequest(
       `/platform/users/${encodeURIComponent(selectedUserId)}/status`,
-      { method: "PATCH", accessToken, body: status === "suspended" ? { status, reason: suspensionReasonInput.trim() } : { status } },
+      { method: "PATCH", accessToken, body: { status } },
     );
 
     const updatedUser = response?.data?.user ?? response?.user;
@@ -834,7 +834,7 @@ export default function PlatformAdminWorkspace() {
     try {
       const response = await apiRequest(
         `/platform/schools/${encodeURIComponent(selectedSchoolId)}/status`,
-        { method: "PATCH", accessToken, body: { status } },
+        { method: "PATCH", accessToken, body: status === "suspended" ? { status, reason: suspensionReasonInput.trim() } : { status } },
       );
       const updatedSchool = response?.data?.school;
       if (!updatedSchool) {
