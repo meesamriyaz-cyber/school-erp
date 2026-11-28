@@ -15,6 +15,7 @@ vi.mock("../models/User.js", () => ({ default: { create: vi.fn(), updateMany: us
 vi.mock("../models/Session.js", () => ({ default: { updateMany } }));
 vi.mock("../utils/password.js", () => ({ hashPassword: vi.fn() }));
 vi.mock("../services/auditLogService.js", () => ({ writeAuditEvent: vi.fn().mockResolvedValue(true) }));
+vi.mock("../models/AuditOutbox.js", () => ({ default: { create: vi.fn().mockResolvedValue([{}]) } }));
 
 import { updateSchoolStatus } from "../controllers/platformController.js";
 
@@ -44,7 +45,7 @@ describe("updateSchoolStatus", () => {
     };
     mongoose.startSession.mockResolvedValue(dbSession);
     userUpdateMany.mockResolvedValue({ modifiedCount: 1 });
-    req = { params: { schoolId }, body: { status: "suspended", reason: "Valid school suspension reason" } };
+    req = { params: { schoolId }, body: { status: "suspended", reason: "Valid school suspension reason" }, auth: { userId: new mongoose.Types.ObjectId(), role: "platform_admin" } };
     res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     next = vi.fn();
 
@@ -133,6 +134,7 @@ describe("updateSchoolStatus", () => {
     expect(updateMany).toHaveBeenCalledWith(
       { tenantId: schoolId, revokedAt: null },
       { $set: { revokedAt: expect.any(Date) } },
+      { session: dbSession },
     );
     expect(userUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(
       updateMany.mock.invocationCallOrder[0],
@@ -155,6 +157,7 @@ describe("updateSchoolStatus", () => {
     expect(userUpdateMany).toHaveBeenCalledWith(
       { tenantId: schoolId },
       { $inc: { authVersion: 1 } },
+      { session: dbSession },
     );
     expect(updateMany).not.toHaveBeenCalled();
     expect(findOneAndUpdate).not.toHaveBeenCalled();

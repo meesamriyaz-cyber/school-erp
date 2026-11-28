@@ -30,8 +30,11 @@ vi.mock("../utils/password.js", () => ({
 }));
 
 vi.mock("../services/auditLogService.js", () => ({ writeAuditEvent: vi.fn().mockResolvedValue(true) }));
+vi.mock("../models/AuditOutbox.js", () => ({ default: { create: vi.fn().mockResolvedValue([{}]) } }));
 
 
+
+vi.spyOn(mongoose, "startSession");
 
 describe("updateSchoolStatus controller", () => {
   beforeEach(() => {
@@ -133,6 +136,7 @@ describe("updateSchoolStatus controller", () => {
     const req = {
       params: { schoolId: String(schoolId) },
       body: { status: "active" },
+      auth: { userId: new mongoose.Types.ObjectId(), role: "platform_admin" },
     };
 
     mongoose.startSession.mockResolvedValue(session);
@@ -196,7 +200,7 @@ describe("createSchool controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    req = { body: validBody() };
+    req = { body: validBody(), auth: { userId: new mongoose.Types.ObjectId(), role: "platform_admin" } };
 
     res = {
       status: vi.fn().mockReturnThis(),
