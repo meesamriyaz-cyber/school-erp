@@ -110,6 +110,9 @@ describe("platform subscription payment lifecycle", () => {
     }, response(), vi.fn());
 
     expect(subscription.status).toBe("past_due");
+    expect(subscription.pastDueSince).toBeInstanceOf(Date);
+    expect(subscription.graceEndsAt.getTime() - subscription.pastDueSince.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(subscription.graceExpiredAt).toBeNull();
     expect(subscription.save).toHaveBeenCalledWith({ session });
   });
 
@@ -177,8 +180,8 @@ describe("platform subscription payment lifecycle", () => {
     expect(User.updateMany).toHaveBeenCalledWith({ tenantId }, { $inc: { authVersion: 1 } }, { session });
     expect(Session.updateMany).toHaveBeenCalledWith({ tenantId, revokedAt: null }, { $set: { revokedAt: expect.any(Date) } }, { session });
     expect(Tenant.updateOne).toHaveBeenCalledWith(
-      { _id: tenantId, status: { $in: ["pending", "active", "trial_expired"] } },
-      { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } },
+      { _id: tenantId, $or: [{ status: { $in: ["pending", "active", "trial_expired"] } }, { status: "suspended", subscriptionSuspendedAt: { $ne: null } }] },
+      { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null, subscriptionSuspendedAt: null, suspensionReason: null } },
       { session },
     );
   });
