@@ -56,6 +56,7 @@ test('mobile auth implementation uses secure refresh storage and mobile client t
   assert.ok(api.includes("Authorization:"));
   assert.ok(api.includes("Bearer"));
   assert.match(api, /refreshInFlight/);
+  assert.match(api, /"X-Client-Type": "mobile"/);
 });
 
 test('design tokens expose valid palette and scales', () => {
@@ -162,6 +163,12 @@ test('platform admin has a dedicated mobile workspace for cross-school directori
   assert.match(screen, /You cannot change your own role/);
   assert.match(screen, /String\(userDetails.id\) === String\(user\?\.id \|\| user\?\._id\)/);
   assert.match(screen, /createUserMessage \? <Text/);
+  for (const section of ["plans", "billing", "audit"]) {
+  assert.ok(
+    screen.includes(`"${section}"`),
+    "platform admin mobile should expose " + section
+  );
+}
 });
 
 
