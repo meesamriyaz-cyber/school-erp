@@ -1,5 +1,5 @@
 
-import "dotenv/config";
+import env from "../config/env.js";
 
 import mongoose from "mongoose";
 
@@ -21,7 +21,7 @@ const bootstrapPlatformAdmin = async () => {
     throw new Error("Platform admin password exceeds the bcrypt limit");
   }
 
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(env.mongoUri);
 
   try {
     const existingAdmin = await User.exists({

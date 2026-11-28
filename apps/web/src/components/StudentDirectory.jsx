@@ -4,6 +4,8 @@ import { apiRequest } from "../lib/api.js";
 import { useAuth } from "../context/authContext.js";
 import StudentForm from "./StudentForm.jsx";
 import StudentDetails from "./StudentDetails.jsx";
+import PortalAccountLink from "./PortalAccountLink.jsx";
+import MotherContactImport from "./MotherContactImport.jsx";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -44,7 +46,7 @@ function StudentStatus({ status }) {
   );
 }
 
-function StudentMobileCard({ student, onView }) {
+function StudentMobileCard({ student, onView, onLinked, canLinkPortal }) {
   return (
     <article className="student-mobile-card">
       <div className="student-mobile-card-header">
@@ -88,6 +90,8 @@ function StudentMobileCard({ student, onView }) {
         </div>
       </div>
 
+      {canLinkPortal && <PortalAccountLink record={student} recordType="student" onLinked={onLinked} />}
+
       <div className="student-mobile-card-actions">
         <button
           type="button"
@@ -102,7 +106,9 @@ function StudentMobileCard({ student, onView }) {
 }
 
 export default function StudentDirectory() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const canLinkPortal = user?.role === "school_admin";
+  const canManageStudents = ["school_admin", "principal"].includes(user?.role);
 
   const [students, setStudents] = useState([]);
   const [searchInput, setSearchInput] = useState("");
@@ -211,18 +217,22 @@ export default function StudentDirectory() {
             <span>students found</span>
           </div>
 
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => {
-              setNotice("");
-              setShowStudentForm(true);
-            }}
-          >
-            + Add student
-          </button>
+          {canManageStudents && (
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setNotice("");
+                setShowStudentForm(true);
+              }}
+            >
+              + Add student
+            </button>
+          )}
         </div>
       </div>
+
+      {canManageStudents && <MotherContactImport accessToken={accessToken} onImported={() => setNotice("Mother contact import processed. Refresh a student profile to view updated details.")} />}
 
       <div className="student-filters">
         <label className="student-search">
@@ -285,25 +295,26 @@ export default function StudentDirectory() {
               <th>Admission date</th>
               <th>Status</th>
               <th>Actions</th>
+              {canLinkPortal && <th>Portal account</th>}
             </tr>
           </thead>
 
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="student-empty">
+                <td colSpan={canLinkPortal ? 7 : 6} className="student-empty">
                   Loading student records…
                 </td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={6} className="student-empty">
+                <td colSpan={canLinkPortal ? 7 : 6} className="student-empty">
                   Student records could not be loaded.
                 </td>
               </tr>
             ) : students.length === 0 ? (
               <tr>
-                <td colSpan={6} className="student-empty">
+                <td colSpan={canLinkPortal ? 7 : 6} className="student-empty">
                   No students found. Try another search or add your first
                   student.
                 </td>
@@ -350,6 +361,18 @@ export default function StudentDirectory() {
                       View
                     </button>
                   </td>
+                  {canLinkPortal && <td>
+                    <PortalAccountLink
+                      record={student}
+                      recordType="student"
+                      onLinked={(updated) => {
+                        setStudents((current) => current.map((item) => (
+                          item._id === updated._id ? { ...item, ...updated } : item
+                        )));
+                        setNotice("Student portal account linked successfully.");
+                      }}
+                    />
+                  </td>}
                 </tr>
               ))
             )}
@@ -376,6 +399,13 @@ export default function StudentDirectory() {
               key={student._id}
               student={student}
               onView={handleViewStudent}
+              canLinkPortal={canLinkPortal}
+              onLinked={(updated) => {
+                setStudents((current) => current.map((item) => (
+                  item._id === updated._id ? { ...item, ...updated } : item
+                )));
+                setNotice("Student portal account linked successfully.");
+              }}
             />
           ))
         )}

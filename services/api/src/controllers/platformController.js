@@ -3,7 +3,9 @@ import mongoose from "mongoose";
 
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
+import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
+import { writeAuditEvent } from "../services/auditLogService.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -101,6 +103,12 @@ export const createSchool = async (req, res, next) => {
       throw createHttpError(400, "Provide a valid timezone");
     }
 
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+    } catch {
+      throw createHttpError(400, "Provide a valid timezone");
+    }
+
     if (!firstName || firstName.length > 80) {
       throw createHttpError(
         400,
@@ -151,7 +159,7 @@ export const createSchool = async (req, res, next) => {
             slug,
             contactEmail: contactEmail || null,
             timezone,
-            status: "active",
+            status: "pending",
           },
         ],
         { session: dbSession }
@@ -166,11 +174,19 @@ export const createSchool = async (req, res, next) => {
             email,
             passwordHash,
             role: "school_admin",
-            status: "active",
+            status: "pending",
           },
         ],
         { session: dbSession }
       );
+      await writeAuditEvent({
+        actorUserId: req.auth?.userId,
+        actorRole: req.auth?.role,
+        targetTenantId: createdSchool._id,
+        action: "SCHOOL_CREATED",
+        changedFields: ["name", "slug", "contactEmail", "timezone", "status"],
+        newValue: "pending",
+      }, { session: dbSession });
     });
 
     return res.status(201).json({
@@ -214,5 +230,294 @@ export const createSchool = async (req, res, next) => {
     if (dbSession) {
       await dbSession.endSession();
     }
+  }
+};
+
+
+const SCHOOL_STATUSES = ["pending", "active", "suspended"];
+const SCHOOL_FILTER_STATUSES = [...SCHOOL_STATUSES, "trial_expired"];
+
+// GET /api/v1/platform/schools
+export const listSchools = async (req, res, next) => {
+  try {
+    const page = Number.parseInt(req.query.page ?? "1", 10);
+    const limit = Number.parseInt(req.query.limit ?? "20", 10);
+
+    if (
+      !Number.isInteger(page) ||
+      page < 1 ||
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Page must be positive and limit must be between 1 and 100",
+      });
+    }
+
+    const filter = {};
+    if (req.query.status !== undefined) {
+      if (
+        typeof req.query.status !== "string" ||
+        !SCHOOL_FILTER_STATUSES.includes(req.query.status)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid school status filter",
+        });
+      }
+      filter.status = req.query.status;
+    }
+
+    if (req.query.search !== undefined) {
+      if (
+        typeof req.query.search !== "string" ||
+        req.query.search.trim().length > 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Search must not exceed 100 characters",
+        });
+      }
+
+      const search = req.query.search.trim();
+      if (search) {
+        const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const pattern = new RegExp(escapedSearch, "i");
+        filter.$or = [{ name: pattern }, { slug: pattern }];
+      }
+    }
+
+    const [schools, total] = await Promise.all([
+      Tenant.find(filter)
+         .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+        .sort({ name: 1, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Tenant.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: schools.map((school) => ({
+        ...school,
+        id: String(school._id),
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// PATCH /api/v1/platform/schools/:schoolId/status
+export const updateSchoolStatus = async (req, res, next) => {
+  try {
+    const { schoolId } = req.params ?? {};
+    const { status, reason } = req.body ?? {};
+
+    if (!mongoose.isObjectIdOrHexString(schoolId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid school ID",
+      });
+    }
+
+    if (typeof status !== "string" || !SCHOOL_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be pending, active, or suspended",
+      });
+    }
+
+    const school = await Tenant.findById(schoolId)
+      .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+      .lean();
+
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    if (
+      status === "active" &&
+      school.status === "suspended" &&
+      school.subscriptionSuspendedAt
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "This school is suspended for an overdue subscription. Record the outstanding payment to restore access.",
+      });
+    }
+
+    if (school.status === status) {
+      return res.status(200).json({
+        success: true,
+        message: "School already has the requested status",
+        data: { school: { ...school, id: String(school._id) } },
+      });
+    }
+
+    const allowedTransitions = {
+      pending: ["active"],
+      active: ["suspended"],
+      suspended: ["active"],
+    };
+
+    if (!allowedTransitions[school.status]?.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot change school status from ${school.status} to ${status}`,
+      });
+    }
+
+    if (status === "suspended" && (typeof reason !== "string" || reason.trim().length < 10 || reason.trim().length > 500)) {
+      return res.status(400).json({ success: false, message: "A suspension reason of 10 to 500 characters is required" });
+    }
+
+    // Apply the school transition, related account/session changes and audit
+    // event in one transaction so an incomplete transition is never reported.
+    let dbSession;
+    let updatedSchool;
+    try {
+      dbSession = await mongoose.startSession();
+      await dbSession.withTransaction(async () => {
+        const statusUpdate = { $set: { status, subscriptionSuspendedAt: null } };
+        if (status === "active") statusUpdate.$set.suspensionReason = null;
+        if (status === "suspended") {
+          statusUpdate.$set.suspensionReason = reason.trim();
+          statusUpdate.$push = {
+            suspensionHistory: {
+              reason: reason.trim(),
+              suspendedAt: new Date(),
+              suspendedBy: req.auth?.userId || null,
+            },
+          };
+        }
+        updatedSchool = await Tenant.findOneAndUpdate(
+          { _id: school._id, status: school.status, subscriptionSuspendedAt: school.subscriptionSuspendedAt ?? null },
+          statusUpdate,
+          { new: true, runValidators: true, session: dbSession },
+        )
+          .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+          .lean();
+
+        if (!updatedSchool) return;
+
+        if (school.status === "pending" && status === "active") {
+          await User.updateMany(
+            { tenantId: school._id, role: "school_admin", status: "pending" },
+            { $set: { status: "active" } },
+            { session: dbSession },
+          );
+        }
+
+        if (school.status === "suspended" && status === "active") {
+          await User.updateMany(
+            { tenantId: school._id },
+            { $inc: { authVersion: 1 } },
+            { session: dbSession },
+          );
+          await Session.updateMany(
+            { tenantId: school._id, revokedAt: null },
+            { $set: { revokedAt: new Date() } },
+            { session: dbSession },
+          );
+        }
+
+        if (status === "suspended") {
+          await Session.updateMany(
+            { tenantId: school._id, revokedAt: null },
+            { $set: { revokedAt: new Date() } },
+            { session: dbSession },
+          );
+        }
+
+        await writeAuditEvent({
+          actorUserId: req.auth?.userId,
+          actorRole: req.auth?.role,
+          targetTenantId: school._id,
+          action: "SCHOOL_STATUS_CHANGED",
+          changedFields: status === "suspended" ? ["status", "suspensionReason"] : ["status"],
+          previousValue: school.status,
+          newValue: status,
+        }, { session: dbSession });
+      });
+    } finally {
+      if (dbSession) await dbSession.endSession();
+    }
+
+    if (!updatedSchool) {
+      return res.status(409).json({
+        success: false,
+        message: "School status changed during this request; reload and try again",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `School status updated to ${status}`,
+      data: { school: { ...updatedSchool, id: String(updatedSchool._id) } },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// GET /api/v1/platform/schools/:schoolId
+export const getSchoolDetails = async (req, res, next) => {
+  try {
+    const { schoolId } = req.params ?? {};
+
+    if (!mongoose.isObjectIdOrHexString(schoolId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid school ID",
+      });
+    }
+
+    const school = await Tenant.findById(schoolId)
+      .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+      .lean();
+
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: "School not found",
+      });
+    }
+
+    const administrators = await User.find({
+      tenantId: school._id,
+      role: "school_admin",
+    })
+      .select("_id firstName lastName email status lastLoginAt createdAt")
+      .sort({ firstName: 1, lastName: 1, _id: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        school: {
+          ...school,
+          id: String(school._id),
+        },
+        administrators: administrators.map((administrator) => ({
+          ...administrator,
+          id: String(administrator._id),
+        })),
+      },
+    });
+  } catch (error) {
+    return next(error);
   }
 };

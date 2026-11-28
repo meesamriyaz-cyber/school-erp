@@ -1,6 +1,6 @@
 
 import mongoose from "mongoose";
-import env from "../config/env.js";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import Student from "../models/Student.js";
@@ -17,7 +17,7 @@ const testAdminEmails = [
 ];
 
 try {
-  await mongoose.connect(env.mongoUri);
+  await mongoose.connect(getTestDatabaseUri());
 
   // Resolve only the explicitly named test schools.
   const tenants = await Tenant.find({

@@ -342,6 +342,55 @@ it("does not revoke another user's sessions", async () => {
 
 
 
+it("keeps a school's existing refresh token revoked after reactivation without affecting another school's session", async () => {
+  const suspendedSchoolUser = await makeUser({ tenantId: tenant._id });
+  const otherSchoolUser = await makeUser({ tenantId: secondTenant._id });
+  const suspendedSchoolSession = trackSession(
+    await createSession(suspendedSchoolUser)
+  );
+  const otherSchoolSession = trackSession(
+    await createSession(otherSchoolUser)
+  );
+
+  await Tenant.updateOne(
+    { _id: tenant._id },
+    { $set: { status: "suspended" } }
+  );
+  await Session.updateMany(
+    { tenantId: tenant._id, revokedAt: null },
+    { $set: { revokedAt: new Date() } }
+  );
+
+  const revokedSession = await Session.findById(
+    suspendedSchoolSession.sessionId
+  ).lean();
+  const unaffectedSession = await Session.findById(
+    otherSchoolSession.sessionId
+  ).lean();
+
+  expect(revokedSession.revokedAt).toBeInstanceOf(Date);
+  expect(unaffectedSession.revokedAt).toBeNull();
+
+  await Tenant.updateOne(
+    { _id: tenant._id },
+    { $set: { status: "active" } }
+  );
+
+  await expect(
+    rotateRefreshToken(suspendedSchoolSession.refreshToken, suspendedSchoolUser)
+  ).rejects.toMatchObject({ statusCode: 401 });
+
+  const sessionAfterReactivation = await Session.findById(
+    suspendedSchoolSession.sessionId
+  ).lean();
+  const otherSessionAfterReactivation = await Session.findById(
+    otherSchoolSession.sessionId
+  ).lean();
+
+  expect(sessionAfterReactivation.revokedAt).toBeInstanceOf(Date);
+  expect(otherSessionAfterReactivation.revokedAt).toBeNull();
+});
+
 it("returns false for an invalid session ID", async () => {
   const result = await revokeSession(
     "not-a-valid-object-id",

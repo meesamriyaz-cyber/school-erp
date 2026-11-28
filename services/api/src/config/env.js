@@ -1,4 +1,3 @@
-
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 
@@ -7,8 +6,106 @@ dotenv.config({
   override: false,
 });
 
+const nodeEnv = process.env.NODE_ENV || "development";
+
+if (!["development", "test", "production"].includes(nodeEnv)) {
+  throw new Error(
+    "NODE_ENV must be development, test, or production"
+  );
+}
+
+const mongoVariableByEnvironment = {
+  development: "MONGO_DEV_URI",
+  test: "MONGO_TEST_URI",
+  production: "MONGO_URI",
+};
+
+const selectedMongoVariable = mongoVariableByEnvironment[nodeEnv];
+const selectedMongoUri = process.env[selectedMongoVariable]?.trim() || "";
+
+if (!selectedMongoUri) {
+  throw new Error(
+    `${selectedMongoVariable} is required when NODE_ENV=${nodeEnv}`
+  );
+}
+
+if (!/^mongodb(?:\+srv)?:\/\//.test(selectedMongoUri)) {
+  throw new Error(
+    `${selectedMongoVariable} must start with "mongodb://" or "mongodb+srv://"`
+  );
+}
+
+const getMongoTarget = (uri) => {
+  try {
+    // WHATWG URL does not support MongoDB's comma-separated replica-set hosts.
+    // Parse the MongoDB authority and database path without altering the URI.
+    const schemeEnd = uri.indexOf("://");
+    if (schemeEnd < 0) return "";
+
+    const remainder = uri.slice(schemeEnd + 3);
+    const authorityEnd = remainder.search(/[/?#]/);
+    const authority = authorityEnd === -1
+      ? remainder
+      : remainder.slice(0, authorityEnd);
+    const pathAndQuery = authorityEnd === -1 ? "" : remainder.slice(authorityEnd);
+    const hostList = authority.slice(authority.lastIndexOf("@") + 1);
+    const hosts = hostList.split(",").map((host) => host.trim());
+
+    if (!hosts.length || hosts.some((host) => !host)) return "";
+
+    const firstHost = hosts[0];
+    const normalizedHost = firstHost.startsWith("[")
+      ? firstHost.slice(1, firstHost.indexOf("]")).toLowerCase()
+      : firstHost.replace(/:\d+$/, "").toLowerCase();
+    const databasePath = pathAndQuery.split(/[?#]/, 1)[0];
+    const databaseName = decodeURIComponent(
+      databasePath.replace(/^\/+/, "").split("/")[0] || ""
+    );
+
+    if (!normalizedHost || !databaseName) return "";
+    return `${normalizedHost}/${databaseName}`;
+  } catch {
+    return "";
+  }
+};
+
+const selectedMongoTarget = getMongoTarget(selectedMongoUri);
+
+if (!selectedMongoTarget) {
+  throw new Error(
+    `${selectedMongoVariable} must include a MongoDB host and database name`
+  );
+}
+
+for (const [variable, value] of Object.entries({
+  MONGO_DEV_URI: process.env.MONGO_DEV_URI,
+  MONGO_TEST_URI: process.env.MONGO_TEST_URI,
+  MONGO_URI: process.env.MONGO_URI,
+})) {
+  if (variable === selectedMongoVariable || !value?.trim()) continue;
+
+  if (getMongoTarget(value.trim()) === selectedMongoTarget) {
+    throw new Error(
+      `${selectedMongoVariable} must not target the same MongoDB host and database as ${variable}`
+    );
+  }
+}
+
+if (nodeEnv === "test") {
+  // getMongoTarget already parsed the MongoDB URI without WHATWG URL,
+  // which cannot handle comma-separated replica-set hosts.
+  const databaseName = selectedMongoTarget.slice(
+    selectedMongoTarget.lastIndexOf("/") + 1
+  );
+
+  if (!/test/i.test(databaseName)) {
+    throw new Error(
+      "MONGO_TEST_URI must target a database whose name includes 'test' (expected school-erp-test)"
+    );
+  }
+}
+
 const requiredEnv = [
-  "MONGO_URI",
   "JWT_ACCESS_SECRET",
   "JWT_REFRESH_SECRET",
 ];
@@ -19,14 +116,6 @@ for (const key of requiredEnv) {
       `Missing required environment variable: ${key}`
     );
   }
-}
-
-const nodeEnv = process.env.NODE_ENV || "development";
-
-if (!["development", "test", "production"].includes(nodeEnv)) {
-  throw new Error(
-    "NODE_ENV must be development, test, or production"
-  );
 }
 
 if (
@@ -84,36 +173,19 @@ if (
 
 console.log("Environment diagnostic:", {
   nodeEnv,
-  testUriConfigured: Boolean(process.env.MONGO_TEST_URI),
-  selectedUriConfigured: Boolean(
-    nodeEnv === "test"
-      ? process.env.MONGO_TEST_URI
-      : process.env.MONGO_URI
-  ),
+  selectedMongoVariable,
+  selectedUriConfigured: Boolean(selectedMongoUri),
   selectedUriScheme:
-    (nodeEnv === "test"
-      ? process.env.MONGO_TEST_URI
-      : process.env.MONGO_URI
-    )?.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)?.[0] ?? "unrecognized",
+    selectedMongoUri.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//)?.[0] ?? "unrecognized",
 });
 
 const env = Object.freeze({
   nodeEnv,
   port,
-  mongoUri:
-    nodeEnv === "test"
-      ? process.env.MONGO_TEST_URI
-      : process.env.MONGO_URI,
+  mongoUri: selectedMongoUri,
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
   webUrl: parsedWebUrl.origin,
 });
-
-if (nodeEnv === "test" && !process.env.MONGO_TEST_URI) {
-  throw new Error(
-    "MONGO_TEST_URI is required when NODE_ENV=test"
-  );
-}
-
 
 export default env;

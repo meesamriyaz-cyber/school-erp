@@ -1,6 +1,13 @@
 
 import mongoose from "mongoose";
 
+const studentAddressSchema = new mongoose.Schema({
+  line1: { type: String, trim: true, default: "", maxlength: 120 }, line2: { type: String, trim: true, default: "", maxlength: 120 },
+  city: { type: String, trim: true, default: "", maxlength: 80 }, district: { type: String, trim: true, default: "", maxlength: 80 },
+  state: { type: String, trim: true, default: "", maxlength: 80 }, postalCode: { type: String, trim: true, default: "", maxlength: 12 },
+  country: { type: String, trim: true, default: "", maxlength: 80 },
+}, { _id: false, versionKey: false });
+
 const studentSchema = new mongoose.Schema(
   {
     // Assigned by the server from the authenticated user's school.
@@ -9,6 +16,13 @@ const studentSchema = new mongoose.Schema(
       ref: "Tenant",
       required: [true, "School tenant is required"],
       immutable: true,
+    },
+
+    // Explicitly linked by a school administrator to a student login account.
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
 
     // Admission numbers must be unique within each school,
@@ -40,6 +54,18 @@ const studentSchema = new mongoose.Schema(
       default: null,
     },
 
+    photoUrl: {
+      type: String, trim: true, default: null, maxlength: 2048,
+      validate: {
+        validator(value) {
+          if (value === null || value === undefined || value === "") return true;
+          try { return new URL(value).protocol === "https:"; } catch { return false; }
+        },
+        message: "Student photo URL must be a valid HTTPS URL",
+      },
+    },
+    address: { type: studentAddressSchema, default: () => ({}) },
+
     gender: {
       type: String,
       enum: ["male", "female", "other", "not_specified"],
@@ -51,6 +77,8 @@ const studentSchema = new mongoose.Schema(
       required: [true, "Admission date is required"],
       default: Date.now,
     },
+
+    guardianRelationship: { type: String, enum: ["mother", "father", "uncle", "aunt", "legal_guardian", "grandparent", "step_parent", "sibling", "other"], default: "other" },
 
     guardianName: {
       type: String,
@@ -96,6 +124,10 @@ studentSchema.index(
 
 // Supports common school-scoped status filters.
 studentSchema.index({ tenantId: 1, status: 1 });
+studentSchema.index(
+  { tenantId: 1, userId: 1 },
+  { unique: true, partialFilterExpression: { userId: { $type: "objectId" } } },
+);
 
 const Student = mongoose.model("Student", studentSchema);
 

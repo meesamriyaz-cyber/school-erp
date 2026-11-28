@@ -161,13 +161,14 @@ describe("AuthContext session restoration", () => {
     expect(screen.getByText("School: None")).toBeInTheDocument();
   });
 
-  it("rejects platform administrator accounts from the school dashboard", async () => {
+  it("restores a platform administrator session without loading school context", async () => {
     apiRequest.mockResolvedValueOnce({
       accessToken: "platform-access-token",
       user: {
-        _id: "platform-1",
+        id: "platform-1",
         firstName: "Platform",
         role: "platform_admin",
+        tenantId: null,
       },
     });
 
@@ -178,14 +179,16 @@ describe("AuthContext session restoration", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Status: unauthenticated"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Status: authenticated")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("User: None")).toBeInTheDocument();
-
+    expect(screen.getByText("User: Platform")).toBeInTheDocument();
+    expect(screen.getByText("School: None")).toBeInTheDocument();
     expect(apiRequest).toHaveBeenCalledTimes(1);
+    expect(apiRequest).toHaveBeenCalledWith(
+      "/auth/refresh",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
   
   it("logs in a school administrator successfully", async () => {

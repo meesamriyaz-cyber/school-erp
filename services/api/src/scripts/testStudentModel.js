@@ -1,5 +1,5 @@
 
-import "dotenv/config";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
@@ -9,11 +9,7 @@ import Tenant from "../models/Tenant.js";
 import Student from "../models/Student.js";
 
 const runTests = async () => {
-  if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is missing from services/api/.env");
-  }
-
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(getTestDatabaseUri());
 
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
   const slugA = `student-test-a-${suffix}`;

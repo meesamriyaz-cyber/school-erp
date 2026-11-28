@@ -1,5 +1,9 @@
 import app from "./app.js";
 import env from "./config/env.js";
+import { startAuditOutboxWorker, stopAuditOutboxWorker } from "./services/auditLogService.js";
+import { startNotificationDeliveryWorker, stopNotificationDeliveryWorker } from "./services/notificationDeliveryService.js";
+import { startTrialExpiryWorker, stopTrialExpiryWorker } from "./services/trialExpiryService.js";
+import { startPastDueGraceWorker, stopPastDueGraceWorker } from "./services/pastDueGraceService.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -9,6 +13,10 @@ let server;
 
 const startServer = async () => {
   await connectDatabase();
+  startAuditOutboxWorker();
+  startNotificationDeliveryWorker();
+  startTrialExpiryWorker();
+  startPastDueGraceWorker();
 
   server = app.listen(env.port, () => {
     console.log(
@@ -21,6 +29,7 @@ const shutdown = async (signal) => {
   console.log(`${signal} received. Shutting down...`);
 
   try {
+    // Stop accepting new HTTP requests and wait for in-flight handlers to finish.
     if (server) {
       await new Promise((resolve, reject) => {
         server.close((error) => {
@@ -30,6 +39,11 @@ const shutdown = async (signal) => {
       });
     }
 
+    // All request handlers have completed; now stop polling and drain the active worker cycle.
+    await stopAuditOutboxWorker();
+    await stopNotificationDeliveryWorker();
+    await stopTrialExpiryWorker();
+    await stopPastDueGraceWorker();
     await disconnectDatabase();
     process.exitCode = 0;
   } catch (error) {
@@ -50,6 +64,10 @@ startServer().catch(async (error) => {
   console.error("Failed to start School ERP API:", error.message);
 
   try {
+    await stopAuditOutboxWorker();
+    await stopNotificationDeliveryWorker();
+    await stopTrialExpiryWorker();
+    await stopPastDueGraceWorker();
     await disconnectDatabase();
   } finally {
     process.exitCode = 1;

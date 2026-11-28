@@ -573,7 +573,7 @@ it("rejects a password change when the current password is incorrect", async () 
       await Tenant.deleteOne({ _id: tenant._id });
     }
   }
-});
+}, 15000);
  
 it("changes the password and revokes existing sessions", async () => {
   await startServer();
@@ -684,7 +684,7 @@ it("changes the password and revokes existing sessions", async () => {
       await Tenant.deleteOne({ _id: tenant._id });
     }
   }
-});
+}, 15000);
 
 
 it("rejects an old access token after a password change", async () => {

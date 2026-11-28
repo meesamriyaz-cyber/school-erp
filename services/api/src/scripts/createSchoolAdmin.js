@@ -1,4 +1,4 @@
-import "dotenv/config";
+import env from "../config/env.js";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import readline from "node:readline/promises";
@@ -12,10 +12,6 @@ const rl = readline.createInterface({ input: stdin, output: stdout });
 const ask = (question) => rl.question(question);
 
 async function main() {
-  if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is missing from the API environment.");
-  }
-
   const schoolName = (await ask("School name: ")).trim();
   const slug = (await ask("School ID / slug (e.g. demo-school): "))
     .trim()
@@ -46,7 +42,7 @@ async function main() {
     throw new Error("Passwords do not match.");
   }
 
-  await mongoose.connect(process.env.MONGO_URI);
+  await mongoose.connect(env.mongoUri);
 
   const existingSchool = await Tenant.findOne({ slug }).select("_id").lean();
 

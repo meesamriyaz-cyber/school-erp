@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import StudentDetails from "../components/StudentDetails.jsx";
 import { apiRequest } from "../lib/api.js";
+import { useAuth } from "../context/authContext.js";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../lib/api.js", () => ({
@@ -10,7 +11,7 @@ vi.mock("../lib/api.js", () => ({
 }));
 
 vi.mock("../context/authContext.js", () => ({
-  useAuth: () => ({ accessToken: "test-access-token" }),
+  useAuth: vi.fn(),
 }));
 
 
@@ -36,7 +37,9 @@ vi.mock("../components/EditStudentForm.jsx", () => ({
 
 describe("StudentDetails", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    useAuth.mockReturnValue({ accessToken: "test-access-token", user: { role: "school_admin" } });
+    apiRequest.mockResolvedValue({ success: true, data: [] });
   });
 
   it("loads and displays student personal and guardian details", async () => {
@@ -131,6 +134,24 @@ it("opens the edit form for the loaded student", async () => {
 
   expect(await screen.findByRole("heading", { name: "Edit form opened" }))
     .toBeInTheDocument();
+});
+
+it("does not expose student editing controls to teachers", async () => {
+  useAuth.mockReturnValue({ accessToken: "test-access-token", user: { role: "teacher" } });
+  apiRequest.mockResolvedValueOnce({
+    success: true,
+    data: {
+      _id: "student-readonly",
+      firstName: "Ayaan",
+      lastName: "Khan",
+      admissionNumber: "ADM-READONLY",
+      status: "active",
+    },
+  });
+
+  render(<StudentDetails studentId="student-readonly" onBack={vi.fn()} />);
+  expect(await screen.findByRole("heading", { name: /Ayaan Khan/ })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Edit Student" })).not.toBeInTheDocument();
 });
 
 it("updates the displayed student details after saving edits", async () => {
@@ -377,5 +398,208 @@ it("displays a student photo with an empty last name", async () => {
     await screen.findByRole("img", { name: "Ayaan" }),
   ).toHaveAttribute("src", "https://example.com/student.jpg");
 });
+
+
+it("shows the current placement and previous academic enrollment history", async () => {
+  const student = {
+    _id: "student-history-1",
+    firstName: "Ayaan",
+    lastName: "Khan",
+    admissionNumber: "ADM-HISTORY-1",
+    status: "active",
+  };
+  const enrollments = [
+    {
+      _id: "enrollment-current",
+      studentId: student,
+      academicYearId: { _id: "year-current", name: "2026-2027" },
+      classId: { _id: "class-current", name: "Class 2" },
+      sectionId: { _id: "section-current", name: "A" },
+      enrollmentDate: "2026-04-01T00:00:00.000Z",
+      status: "active",
+      endedAt: null,
+    },
+    {
+      _id: "enrollment-previous",
+      studentId: student,
+      academicYearId: { _id: "year-previous", name: "2025-2026" },
+      classId: { _id: "class-previous", name: "Class 1" },
+      sectionId: { _id: "section-previous", name: "B" },
+      enrollmentDate: "2025-04-01T00:00:00.000Z",
+      endedAt: "2026-03-31T00:00:00.000Z",
+      status: "completed",
+    },
+  ];
+  apiRequest.mockImplementation(async (path) => {
+    if (path === "/students/student-history-1") return { success: true, data: student };
+    if (path === "/enrollments?studentId=student-history-1") return { success: true, data: enrollments };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId="student-history-1" onBack={vi.fn()} />);
+
+  expect(await screen.findByText("2026-2027")).toBeInTheDocument();
+  expect(screen.getByText("Class 2")).toBeInTheDocument();
+  expect(screen.getByText("Section A")).toBeInTheDocument();
+  expect(screen.getByText("2025-2026 · Class 1 · Section B")).toBeInTheDocument();
+  expect(screen.getByText("completed")).toBeInTheDocument();
+  expect(apiRequest).toHaveBeenCalledWith(
+    "/enrollments?studentId=student-history-1",
+    expect.objectContaining({ accessToken: "test-access-token", signal: expect.any(AbortSignal) }),
+  );
+});
+
+it("shows an empty state when a student has no enrollment history", async () => {
+  apiRequest.mockImplementation(async (path) => {
+    if (path === "/students/student-no-history") {
+      return { success: true, data: { _id: "student-no-history", firstName: "Sara", lastName: "Ahmad", status: "active" } };
+    }
+    if (path === "/enrollments?studentId=student-no-history") return { success: true, data: [] };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId="student-no-history" onBack={vi.fn()} />);
+
+  expect(await screen.findByText("This student has no active academic placement.")).toBeInTheDocument();
+  expect(screen.getByText("No academic history is recorded for this student yet.")).toBeInTheDocument();
+});
+
+
+it("shows terminal enrollment outcomes in history without a current placement", async () => {
+  const studentId = "student-terminal-history";
+  const student = {
+    _id: studentId,
+    firstName: "Ayaan",
+    lastName: "Khan",
+    admissionNumber: "ADM-TERMINAL",
+    status: "active",
+  };
+  const history = [
+    { _id: "enrollment-completed", academicYearId: { name: "2023-2024" }, classId: { name: "Class 1" }, enrollmentDate: "2023-04-01", endedAt: "2024-03-31", status: "completed" },
+    { _id: "enrollment-transferred", academicYearId: { name: "2024-2025" }, classId: { name: "Class 2" }, enrollmentDate: "2024-04-01", endedAt: "2024-10-15", status: "transferred" },
+    { _id: "enrollment-withdrawn", academicYearId: { name: "2025-2026" }, classId: { name: "Class 3" }, enrollmentDate: "2025-04-01", endedAt: "2025-09-10", status: "withdrawn" },
+  ];
+
+  apiRequest.mockImplementation(async (path) => {
+    if (path === `/students/${studentId}`) return { success: true, data: student };
+    if (path === `/enrollments?studentId=${studentId}`) return { success: true, data: history };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId={studentId} onBack={vi.fn()} />);
+
+  expect(await screen.findByText("This student has no active academic placement.")).toBeInTheDocument();
+  expect(screen.getByText("2023-2024 · Class 1")).toBeInTheDocument();
+  expect(screen.getByText("2024-2025 · Class 2")).toBeInTheDocument();
+  expect(screen.getByText("2025-2026 · Class 3")).toBeInTheDocument();
+  expect(screen.getByText("completed")).toBeInTheDocument();
+  expect(screen.getByText("transferred")).toBeInTheDocument();
+  expect(screen.getByText("withdrawn")).toBeInTheDocument();
+  expect(screen.getAllByText(/Ended:/)).toHaveLength(3);
+});
+
+
+it("refreshes current placement and academic history on request", async () => {
+  const user = userEvent.setup();
+  const studentId = "student-refresh-history";
+  let historyRequestCount = 0;
+  apiRequest.mockImplementation(async (path) => {
+    if (path === `/students/${studentId}`) {
+      return { success: true, data: { _id: studentId, firstName: "Ayaan", lastName: "Khan", status: "active" } };
+    }
+    if (path === `/enrollments?studentId=${studentId}`) {
+      historyRequestCount += 1;
+      return {
+        success: true,
+        data: historyRequestCount === 1
+          ? [{ _id: "enrollment-before", academicYearId: { name: "2026-2027" }, classId: { name: "Class 1" }, status: "active", enrollmentDate: "2026-04-01" }]
+          : [{ _id: "enrollment-after", academicYearId: { name: "2026-2027" }, classId: { name: "Class 2" }, status: "active", enrollmentDate: "2026-04-01" }],
+      };
+    }
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId={studentId} onBack={vi.fn()} />);
+
+  expect(await screen.findByText("Class 1")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Refresh history" }));
+
+  expect(await screen.findByText("Class 2")).toBeInTheDocument();
+  expect(historyRequestCount).toBe(2);
+  expect(screen.queryByText("Class 1")).not.toBeInTheDocument();
+});
+
+it("loads and displays linked guardian details for the student", async () => {
+  const studentId = "student-with-guardians";
+  const student = {
+    _id: studentId,
+    firstName: "Ayaan",
+    lastName: "Khan",
+    admissionNumber: "ADM-GUARDIAN-1",
+    status: "active",
+  };
+  const guardianLinks = [
+    {
+      _id: "student-guardian-1",
+      guardianId: {
+        _id: "guardian-1",
+        firstName: "Imran",
+        lastName: "Khan",
+        phone: "9999999999",
+        email: "imran@example.com",
+      },
+      relationship: "father",
+      isPrimary: true,
+      isEmergencyContact: true,
+      canPickup: true,
+      receivesCommunication: true,
+      status: "active",
+    },
+    {
+      _id: "student-guardian-2",
+      guardianId: {
+        _id: "guardian-2",
+        firstName: "Sara",
+        lastName: "Khan",
+        phone: "8888888888",
+        email: "sara@example.com",
+      },
+      relationship: "mother",
+      isPrimary: false,
+      isEmergencyContact: false,
+      canPickup: false,
+      receivesCommunication: true,
+      status: "active",
+    },
+  ];
+
+  apiRequest.mockImplementation(async (path) => {
+    if (path === `/students/${studentId}`) return { success: true, data: student };
+    if (path === `/enrollments?studentId=${studentId}`) return { success: true, data: [] };
+    if (path === `/students/${studentId}/guardians`) return { success: true, data: guardianLinks };
+    return { success: true, data: [] };
+  });
+
+  render(<StudentDetails studentId={studentId} onBack={vi.fn()} />);
+
+  expect(await screen.findByRole("heading", { name: /Ayaan Khan/ })).toBeInTheDocument();
+  expect(await screen.findByText("Imran Khan")).toBeInTheDocument();
+  expect(screen.getByText("Sara Khan")).toBeInTheDocument();
+  expect(screen.getByText("Phone: 9999999999")).toBeInTheDocument();
+  expect(screen.getByText("Phone: 8888888888")).toBeInTheDocument();
+  expect(screen.getByText(/Email: imran@example.com/)).toBeInTheDocument();
+  expect(screen.getByText(/Email: sara@example.com/)).toBeInTheDocument();
+  expect(screen.getByText("Father")).toBeInTheDocument();
+  expect(screen.getByText("Mother")).toBeInTheDocument();
+  expect(apiRequest).toHaveBeenCalledWith(
+    `/students/${studentId}/guardians`,
+    expect.objectContaining({
+      accessToken: "test-access-token",
+      signal: expect.any(AbortSignal),
+    }),
+  );
+});
+
+
 
 });

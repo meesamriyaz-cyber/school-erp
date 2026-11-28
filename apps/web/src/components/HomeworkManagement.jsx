@@ -1,0 +1,182 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiRequest } from "../lib/api.js";
+import { useAuth } from "../context/authContext.js";
+import "./HomeworkManagement.css";
+
+const today = () => new Date().toISOString().slice(0, 10);
+const initialForm = () => ({ academicYearId: "", classId: "", sectionId: "", subjectId: "", title: "", instructions: "", assignedDate: today(), dueDate: today(), status: "published" });
+
+export default function HomeworkManagement() {
+  const { accessToken, user } = useAuth();
+  const isTeacher = user?.role === "teacher";
+  const [teacherAssignments, setTeacherAssignments] = useState([]);
+  const [years, setYears] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState(initialForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [expandedHomework, setExpandedHomework] = useState("");
+  const [submissions, setSubmissions] = useState({});
+  const [reviewForms, setReviewForms] = useState({});
+
+  const load = useCallback(async (signal) => {
+    setLoading(true);
+    try {
+      const [yearResponse, classResponse, sectionResponse, subjectResponse, homeworkResponse, assignmentResponse] = await Promise.all([
+        apiRequest("/academic-years", { accessToken, signal }),
+        apiRequest("/classes", { accessToken, signal }),
+        apiRequest("/sections", { accessToken, signal }),
+        apiRequest("/subjects", { accessToken, signal }),
+        apiRequest("/homework", { accessToken, signal }),
+        isTeacher ? apiRequest("/teacher-assignments?status=active", { accessToken, signal }) : Promise.resolve({ data: [] }),
+      ]);
+      setYears(yearResponse.data || []);
+      setClasses(classResponse.data || []);
+      setSections(sectionResponse.data || []);
+      setSubjects(subjectResponse.data || []);
+      setItems(homeworkResponse.data || []);
+      setTeacherAssignments(assignmentResponse.data || []);
+      const activeYear = (yearResponse.data || []).find((year) => year.status === "active");
+      if (activeYear) setForm((v) => v.academicYearId ? v : { ...v, academicYearId: activeYear._id });
+    } catch (err) {
+      if (err.name !== "AbortError" && !signal?.aborted) setError(err.message || "Unable to load homework workspace.");
+    } finally { if (!signal?.aborted) setLoading(false); }
+  }, [accessToken, isTeacher]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void Promise.resolve().then(() => load(controller.signal));
+    return () => controller.abort();
+  }, [load]);
+
+  const permittedAssignments = teacherAssignments.filter((item) => String(item.academicYearId?._id || item.academicYearId) === form.academicYearId && String(item.classId?._id || item.classId) === form.classId);
+  const availableSections = useMemo(() => sections.filter((item) => String(item.classId?._id || item.classId) === String(form.classId) && (!isTeacher || teacherAssignments.some((assignment) => String(assignment.classId?._id || assignment.classId) === form.classId && (!assignment.sectionId || String(assignment.sectionId?._id || assignment.sectionId) === String(item._id))))), [sections, form.classId, isTeacher, teacherAssignments]);
+  const availableClasses = useMemo(() => classes.filter((item) => (!form.academicYearId || String(item.academicYearId?._id || item.academicYearId) === String(form.academicYearId)) && (!isTeacher || teacherAssignments.some((assignment) => String(assignment.classId?._id || assignment.classId) === String(item._id)))), [classes, form.academicYearId, isTeacher, teacherAssignments]);
+  const availableSubjects = isTeacher ? subjects.filter((item) => permittedAssignments.some((assignment) => String(assignment.subjectId?._id || assignment.subjectId) === String(item._id) && (!form.sectionId ? !assignment.sectionId : !assignment.sectionId || String(assignment.sectionId?._id || assignment.sectionId) === form.sectionId))) : subjects;
+
+  const submit = async (event) => {
+    event.preventDefault(); setSaving(true); setError(""); setNotice("");
+    try {
+      const response = await apiRequest("/homework", { method: "POST", accessToken, body: { ...form, sectionId: form.sectionId || null } });
+      setItems((current) => [response.data, ...current]);
+      setNotice(form.status === "published" ? "Homework published for the selected class." : "Homework saved as a draft.");
+      setForm((v) => ({ ...initialForm(), academicYearId: v.academicYearId, classId: v.classId, sectionId: v.sectionId, subjectId: v.subjectId }));
+    } catch (err) { setError(err.message || "Unable to save homework."); }
+    finally { setSaving(false); }
+  };
+
+  const toggleSubmissions = async (item, forceRefresh = false) => {
+    if (expandedHomework === item._id && !forceRefresh) { setExpandedHomework(""); return; }
+    setExpandedHomework(item._id);
+    setSubmissions((current) => ({ ...current, [item._id]: { ...(current[item._id] || {}), loading: true } }));
+    try {
+      const response = await apiRequest(`/homework/${item._id}/submissions`, { accessToken });
+      setSubmissions((current) => ({
+        ...current,
+        [item._id]: {
+          data: response.data || [],
+          roster: response.roster || [],
+          summary: response.summary || { assigned: 0, submitted: (response.data || []).length, pending: 0, reviewed: 0 },
+          loading: false,
+        },
+      }));
+    } catch (err) {
+      setSubmissions((current) => ({ ...current, [item._id]: { ...(current[item._id] || {}), loading: false } }));
+      setError(err.message || "Unable to load submissions.");
+    }
+  };
+
+  const reviewSubmission = async (item, submission) => {
+    const form = reviewForms[submission._id] || {};
+    setError(""); setNotice("");
+    try {
+      const response = await apiRequest(`/homework/${item._id}/submissions/${submission._id}/review`, {
+        method: "PATCH", accessToken,
+        body: { marksObtained: form.marksObtained || null, maxMarks: form.maxMarks || null, feedback: form.feedback || "" },
+      });
+      setSubmissions((current) => {
+        const currentRegister = current[item._id] || { data: [], roster: [], summary: {} };
+        const data = currentRegister.data.map((row) => row._id === submission._id ? response.data : row);
+        const reviewed = data.filter((row) => row.status === "reviewed").length;
+        return {
+          ...current,
+          [item._id]: {
+            ...currentRegister,
+            data,
+            summary: { ...currentRegister.summary, reviewed },
+            roster: currentRegister.roster.map((row) => row.submissionId === submission._id
+              ? { ...row, submissionStatus: "reviewed" } : row),
+          },
+        };
+      });
+      setNotice("Submission reviewed successfully.");
+    } catch (err) { setError(err.message || "Unable to review submission."); }
+  };
+
+  const updateStatus = async (item, status) => {
+    setError(""); setNotice("");
+    try {
+      const response = await apiRequest(`/homework/${item._id}/status`, { method: "PATCH", accessToken, body: { status } });
+      setItems((current) => current.map((entry) => entry._id === item._id ? { ...entry, status: response.data.status } : entry));
+      setNotice(status === "published" ? "Homework published." : "Homework moved to drafts.");
+    } catch (err) { setError(err.message || "Unable to update homework."); }
+  };
+
+  return <section className="homework-page" aria-labelledby="homework-title">
+    <header className="homework-intro"><div><span>TEACHING & LEARNING</span><h2 id="homework-title">Homework & classwork</h2><p>Create assignments for a class or section and share instructions with students and parents.</p></div><strong>{items.length} assignments</strong></header>
+    {error && <p className="homework-error" role="alert">{error}</p>}
+    {notice && <p className="homework-notice" role="status">{notice}</p>}
+    <article className="homework-card"><h3>Create assignment</h3><form className="homework-form" onSubmit={submit}>
+      <label>Academic year<select required value={form.academicYearId} onChange={(e) => setForm((v) => ({ ...v, academicYearId: e.target.value, classId: "", sectionId: "" }))}><option value="">Select academic year</option>{years.filter((item) => !isTeacher || teacherAssignments.some((assignment) => String(assignment.academicYearId?._id || assignment.academicYearId) === String(item._id))).map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Class<select required value={form.classId} onChange={(e) => setForm((v) => ({ ...v, classId: e.target.value, sectionId: "" }))}><option value="">Select class</option>{availableClasses.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Section<select value={form.sectionId} onChange={(e) => setForm((v) => ({ ...v, sectionId: e.target.value }))}><option value="">{isTeacher ? "All sections (if assigned)" : "All sections"}</option>{availableSections.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label>Subject<select required value={form.subjectId} onChange={(e) => setForm((v) => ({ ...v, subjectId: e.target.value }))}><option value="">Select subject</option>{availableSubjects.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select></label>
+      <label className="homework-wide">Assignment title<input required minLength="3" maxLength="120" value={form.title} onChange={(e) => setForm((v) => ({ ...v, title: e.target.value }))} placeholder="e.g. Chapter 4 exercise" /></label>
+      <label className="homework-wide">Instructions<textarea required maxLength="5000" rows="4" value={form.instructions} onChange={(e) => setForm((v) => ({ ...v, instructions: e.target.value }))} placeholder="Describe the work students need to complete." /></label>
+      <label>Assigned date<input type="date" required value={form.assignedDate} onChange={(e) => setForm((v) => ({ ...v, assignedDate: e.target.value, dueDate: v.dueDate < e.target.value ? e.target.value : v.dueDate }))} /></label>
+      <label>Due date<input type="date" required min={form.assignedDate} value={form.dueDate} onChange={(e) => setForm((v) => ({ ...v, dueDate: e.target.value }))} /></label>
+      <label>Save as<select value={form.status} onChange={(e) => setForm((v) => ({ ...v, status: e.target.value }))}><option value="published">Publish now</option><option value="draft">Draft</option></select></label>
+      <div className="homework-actions"><button className="homework-primary" disabled={saving || loading}>{saving ? "Saving…" : form.status === "published" ? "Publish assignment" : "Save draft"}</button></div>
+    </form></article>
+    <article className="homework-card"><div className="homework-list-heading"><div><h3>Assignment register</h3><p>Published assignments are visible to linked students and parents from the assigned date.</p></div></div>
+      {loading ? <p className="homework-empty">Loading assignments…</p> : items.length ? <div className="homework-list">{items.map((item) => <div className="homework-item" key={item._id}>
+        <div className="homework-item-main"><div><strong>{item.title}</strong><span>{item.classId?.name || "Class"}{item.sectionId?.name ? ` · Section ${item.sectionId.name}` : " · All sections"} · {item.subjectId?.name || "Subject"}</span></div><em className={`homework-status status-${item.status}`}>{item.status}</em></div>
+        <p>{item.instructions}</p><footer><span>Assigned {new Date(item.assignedDate).toLocaleDateString("en-IN")} · Due {new Date(item.dueDate).toLocaleDateString("en-IN")}</span><div className="homework-item-actions"><button type="button" onClick={() => void toggleSubmissions(item)}>{expandedHomework === item._id ? "Hide submissions" : "View submissions"}</button><button type="button" onClick={() => void updateStatus(item, item.status === "published" ? "draft" : "published")}>{item.status === "published" ? "Move to draft" : "Publish"}</button></div></footer>
+        {expandedHomework === item._id && <div className="homework-submissions">
+          <div className="homework-register-heading"><h4>Submission register</h4><button type="button" onClick={() => void toggleSubmissions(item, true)}>Refresh register</button></div>
+          {!submissions[item._id] || submissions[item._id].loading ? <p>Loading submission register…</p> : <>
+            <div className="homework-register-summary">
+              <span><strong>{submissions[item._id].summary?.assigned ?? 0}</strong> Assigned</span>
+              <span><strong>{submissions[item._id].summary?.submitted ?? 0}</strong> Submitted</span>
+              <span><strong>{submissions[item._id].summary?.pending ?? 0}</strong> Not submitted</span>
+              <span><strong>{submissions[item._id].summary?.reviewed ?? 0}</strong> Reviewed</span>
+            </div>
+            <div className="homework-roster">
+              <h5>Assigned students</h5>
+              {submissions[item._id].roster?.length ? submissions[item._id].roster.map((row) => <div className="homework-roster-row" key={row.enrollmentId}>
+                <span>{[row.studentId?.firstName, row.studentId?.lastName].filter(Boolean).join(" ") || "Student"} · {row.studentId?.admissionNumber || "No admission number"}</span>
+                <em className={`homework-status status-${row.submissionStatus}`}>{row.submissionStatus.replaceAll("_", " ")}</em>
+              </div>) : <p>No students are currently assigned to this class scope.</p>}
+            </div>
+            <h5>Submitted answers</h5>
+            {submissions[item._id].data?.length ? submissions[item._id].data.map((submission) => <article className="homework-submission" key={submission._id}>
+              <div className="homework-submission-heading"><strong>{[submission.studentId?.firstName, submission.studentId?.lastName].filter(Boolean).join(" ") || "Student"} · {submission.studentId?.admissionNumber || ""}</strong><em className={`homework-status status-${submission.status}`}>{submission.status}</em></div>
+              <p className="homework-submission-answer">{submission.answer}</p>
+              {submission.status === "reviewed" ? <p className="homework-review-summary">{submission.marksObtained !== null ? `Marks: ${submission.marksObtained}/${submission.maxMarks}. ` : ""}{submission.feedback || "Reviewed without written feedback."}</p> : <div className="homework-review-form">
+                <label>Marks<input type="number" min="0" step="0.5" value={reviewForms[submission._id]?.marksObtained || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], marksObtained: e.target.value } }))} /></label>
+                <label>Out of<input type="number" min="0.5" step="0.5" value={reviewForms[submission._id]?.maxMarks || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], maxMarks: e.target.value } }))} /></label>
+                <label className="homework-review-feedback">Feedback<textarea rows="2" maxLength="3000" value={reviewForms[submission._id]?.feedback || ""} onChange={(e) => setReviewForms((v) => ({ ...v, [submission._id]: { ...v[submission._id], feedback: e.target.value } }))} /></label>
+                <button type="button" onClick={() => void reviewSubmission(item, submission)}>Submit review</button>
+              </div>}
+            </article>) : <p>No submissions received yet.</p>}
+          </>}
+        </div>}
+      </div>)}</div> : <p className="homework-empty">No homework has been created yet.</p>}
+    </article>
+  </section>;
+}

@@ -13,6 +13,8 @@ import env from "../config/env.js";
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
+import StudentGuardian from "../models/StudentGuardian.js";
 import { createAccessToken } from "../utils/tokens.js";
 import jwt from "jsonwebtoken";
 const EXPECTED_TEST_DATABASE = "school-erp-test";
@@ -35,6 +37,8 @@ const studentPayload = (admissionNumber, firstName) => ({
   lastName: "Test",
   admissionDate: "2026-04-01",
   gender: "not_specified",
+  guardianName: "Primary Guardian",
+  guardianRelationship: "other",
 });
 
 const request = async (path, { token, ...options } = {}) => {
@@ -189,6 +193,8 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
     // Remove only records created by this test run.
     if (mongoose.connection.readyState === 1) {
       if (createdTenantIds.length) {
+        await StudentGuardian.deleteMany({ tenantId: { $in: createdTenantIds } });
+        await Guardian.deleteMany({ tenantId: { $in: createdTenantIds } });
         await Student.deleteMany({
           tenantId: { $in: createdTenantIds },
         });
@@ -228,6 +234,105 @@ const configuredDatabase = decodeURIComponent(uriMatch[1]);
     expect(String(response.body.data.tenantId)).toBe(
       String(schoolA._id)
     );
+  });
+
+  it("imports mother contact details without changing the existing primary guardian", async () => {
+    const admissionNumber = `MOTHER-${randomUUID()}`;
+    const created = await request("/students", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify(studentPayload(admissionNumber, "MotherImport")),
+    });
+    expect(created.status).toBe(201);
+    const studentId = created.body.data._id;
+    const primaryBefore = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, status: "active", isPrimary: true }).lean();
+    expect(primaryBefore).toBeTruthy();
+
+    const imported = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Khan",
+        motherPhone: "9876543210", motherEmail: "sara@example.test",
+      }] }),
+    });
+    expect(imported.status).toBe(200);
+    expect(imported.body.summary.updated).toBe(1);
+    const motherLink = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, relationship: "mother" }).populate("guardianId").lean();
+    expect(motherLink.guardianId.firstName).toBe("Sara");
+    expect(motherLink.guardianId.phone).toBe("9876543210");
+    expect(motherLink.guardianId.pendingEmail).toBe("sara@example.test");
+    expect(motherLink.receivesCommunication).toBe(false);
+    expect(motherLink.isPrimary).toBe(false);
+    const primaryAfter = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, status: "active", isPrimary: true }).lean();
+    expect(String(primaryAfter._id)).toBe(String(primaryBefore._id));
+
+    const updated = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Ali",
+        motherPhone: "9123456789", motherEmail: "sara2@example.test",
+      }] }),
+    });
+    expect(updated.body.summary.updated).toBe(1);
+    const motherAfter = await StudentGuardian.findOne({ tenantId: schoolA._id, studentId, relationship: "mother" }).populate("guardianId").lean();
+    expect(motherAfter.guardianId.lastName).toBe("Ali");
+    expect(motherAfter.guardianId.phone).toBe("9123456789");
+    expect(motherAfter.receivesCommunication).toBe(false);
+  });
+
+  it("keeps the registered mother enabled as primary when importing her details", async () => {
+    const admissionNumber = `MOTHER-P-${randomUUID().slice(0, 8)}`;
+    const created = await request("/students", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        ...studentPayload(admissionNumber, "MotherPrimary"),
+        guardianName: "Sara Khan", guardianRelationship: "mother", guardianPhone: "9876543211",
+      }),
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const imported = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Khan",
+        motherPhone: "9876543210", motherEmail: "sara@example.test",
+      }] }),
+    });
+    expect(imported.body.summary.updated).toBe(1);
+    const motherLink = await StudentGuardian.findOne({
+      tenantId: schoolA._id, studentId: created.body.data._id, relationship: "mother", status: "active",
+    }).populate("guardianId").lean();
+    expect(motherLink.isPrimary).toBe(true);
+    expect(motherLink.receivesCommunication).toBe(true);
+    expect(motherLink.guardianId.pendingEmail).toBe("sara@example.test");
+  });
+
+  it("preserves a registered non-parent guardian as primary when importing mother details", async () => {
+    const admissionNumber = `OTHER-PRIMARY-${randomUUID()}`;
+    const created = await request("/students", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({
+        ...studentPayload(admissionNumber, "OtherPrimary"),
+        guardianName: "Amina Begum", guardianRelationship: "grandparent", guardianPhone: "9000000001",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const imported = await request("/students/bulk-mother-contacts", {
+      method: "POST", token: adminA.token,
+      body: JSON.stringify({ rows: [{
+        admissionNumber, motherFirstName: "Sara", motherLastName: "Khan",
+        motherPhone: "9876543210", motherEmail: "sara@example.test",
+      }] }),
+    });
+    expect(imported.body.summary.updated).toBe(1);
+    const primary = await StudentGuardian.findOne({
+      tenantId: schoolA._id, studentId: created.body.data._id, status: "active", isPrimary: true,
+    }).populate("guardianId").lean();
+    const mother = await StudentGuardian.findOne({
+      tenantId: schoolA._id, studentId: created.body.data._id, relationship: "mother",
+    }).lean();
+    expect(primary.relationship).toBe("grandparent");
+    expect(primary.guardianId.firstName).toBe("Amina");
+    expect(mother.isPrimary).toBe(false);
+    expect(mother.receivesCommunication).toBe(false);
   });
 
   it("prevents a teacher from creating a student", async () => {
@@ -285,6 +390,15 @@ it("rejects a student without an admission number", async () => {
 
   expect(response.status).toBe(400);
   expect(response.body.success).toBe(false);
+});
+
+it("requires a primary guardian during student registration", async () => {
+  const response = await request("/students", {
+    method: "POST", token: adminA.token,
+    body: JSON.stringify({ ...studentPayload(`NO-GUARD-${randomUUID()}`, "No Guardian"), guardianName: " " }),
+  });
+  expect(response.status).toBe(400);
+  expect(response.body.message).toMatch(/primary guardian name is required/i);
 });
 
 it("rejects duplicate admission numbers within the same school", async () => {
@@ -841,6 +955,29 @@ it("rejects a student update when the request body is missing", async () => {
     success: false,
     message: "Provide student fields to update",
   });
+});
+
+
+it("persists extended student profile fields and rejects unsafe values", async () => {
+  const payload = { ...studentPayload(`PROFILE-${randomUUID()}`, "ProfileStudent"),
+    photoUrl: "https://cdn.example.test/students/profile.jpg",
+    address: { line1: "Lal Chowk", city: "Srinagar", district: "Srinagar", state: "Jammu and Kashmir", postalCode: "190001", country: "India", unexpectedField: "no" } };
+  const created = await request("/students", { method: "POST", token: adminA.token, body: JSON.stringify(payload) });
+  expect(created.status).toBe(201);
+  expect(created.body.data.photoUrl).toBe(payload.photoUrl);
+  expect(created.body.data.address).toMatchObject({ line1: "Lal Chowk", city: "Srinagar", district: "Srinagar", state: "Jammu and Kashmir", postalCode: "190001", country: "India" });
+  expect(created.body.data.address.unexpectedField).toBeUndefined();
+  const updated = await request(`/students/${created.body.data._id}`, { method: "PATCH", token: adminA.token,
+    body: JSON.stringify({ photoUrl: "https://cdn.example.test/students/updated.jpg", address: { line1: "Raj Bagh", city: "Srinagar" } }) });
+  expect(updated.status).toBe(200);
+  expect(updated.body.data.photoUrl).toBe("https://cdn.example.test/students/updated.jpg");
+  expect(updated.body.data.address).toMatchObject({ line1: "Raj Bagh", city: "Srinagar" });
+  const badPhoto = await request("/students", { method: "POST", token: adminA.token,
+    body: JSON.stringify({ ...studentPayload(`BAD-${randomUUID()}`, "BadPhoto"), photoUrl: "http://example.test/photo.jpg" }) });
+  expect(badPhoto.status).toBe(400);
+  const badAddress = await request("/students", { method: "POST", token: adminA.token,
+    body: JSON.stringify({ ...studentPayload(`BADADDR-${randomUUID()}`, "BadAddress"), address: ["invalid"] }) });
+  expect(badAddress.status).toBe(400);
 });
 
 });

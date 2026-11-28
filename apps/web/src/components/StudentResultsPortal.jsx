@@ -1,0 +1,552 @@
+import { useEffect, useMemo, useState } from "react";
+import { apiRequest } from "../lib/api.js";
+import { useAuth } from "../context/authContext.js";
+import "./StudentResultsPortal.css";
+import MessagingWorkspace from "./MessagingWorkspace.jsx";
+
+const formatDate = (value) => value
+  ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  : "—";
+
+export default function StudentResultsPortal() {
+  const { user, accessToken, logout } = useAuth();
+  const isParent = user?.role === "parent";
+
+  const [profiles, setProfiles] = useState([]);
+  const [results, setResults] = useState([]);
+  const [homework, setHomework] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [attendanceSummary, setAttendanceSummary] = useState({ present: 0, absent: 0, late: 0, excused: 0, marked: 0, percentage: null });
+  const [fees, setFees] = useState([]);
+  const [timetable, setTimetable] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [documentsRefreshing, setDocumentsRefreshing] = useState(false);
+  const [resultsRefreshing, setResultsRefreshing] = useState(false);
+  const [sectionRefreshing, setSectionRefreshing] = useState("");
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationBusy, setNotificationBusy] = useState(false);
+  const [submissions, setSubmissions] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [submitting, setSubmitting] = useState("");
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState("");
+  const [homeworkNotice, setHomeworkNotice] = useState("");
+  const [activeTab, setActiveTab] = useState(isParent ? "announcements" : "overview");
+  const [selectedStudent] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Keep frequently changing student sections current when opened.
+  useEffect(() => {
+    if (!accessToken || isParent || !["attendance", "homework", "fees"].includes(activeTab)) return undefined;
+    const controller = new AbortController();
+    const refresh = async () => {
+      setSectionRefreshing(activeTab);
+      try {
+        if (activeTab === "attendance") {
+          const response = await apiRequest("/portal/attendance", { accessToken, signal: controller.signal });
+          if (!controller.signal.aborted && Array.isArray(response?.data)) {
+            setAttendance(response.data);
+            if (response.summary) setAttendanceSummary(response.summary);
+          }
+        } else if (activeTab === "homework") {
+          const [homeworkResponse, submissionResponse] = await Promise.all([
+            apiRequest("/portal/homework", { accessToken, signal: controller.signal }),
+            apiRequest("/portal/homework-submissions", { accessToken, signal: controller.signal }),
+          ]);
+          if (!controller.signal.aborted) {
+            if (Array.isArray(homeworkResponse?.data)) setHomework(homeworkResponse.data);
+            if (Array.isArray(submissionResponse?.data)) setSubmissions(submissionResponse.data);
+          }
+        } else {
+          const response = await apiRequest("/portal/fees", { accessToken, signal: controller.signal });
+          if (!controller.signal.aborted && Array.isArray(response?.data)) setFees(response.data);
+        }
+      } catch {
+        // Keep the last successful data visible if a section refresh fails.
+      } finally {
+        if (!controller.signal.aborted) setSectionRefreshing("");
+      }
+    };
+    void refresh();
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
+
+  // Refresh published report cards when the student opens Results so newly
+  // released marks appear without requiring a full portal reload.
+  useEffect(() => {
+    if (!accessToken || isParent || activeTab !== "results") return undefined;
+    const controller = new AbortController();
+    apiRequest("/portal/results", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted && Array.isArray(response?.data)) setResults(response.data);
+      })
+      .catch(() => {
+        // Keep the last successful report cards visible if refresh fails.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setResultsRefreshing(false);
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
+
+  // Refresh the timetable when the student opens that section. The dashboard may
+  // remain mounted while timetable changes are made elsewhere in the school workspace.
+  useEffect(() => {
+    if (!accessToken || isParent || activeTab !== "documents") return undefined;
+    const controller = new AbortController();
+    apiRequest("/portal/documents", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted && Array.isArray(response?.data)) setDocuments(response.data);
+      })
+      .catch(() => {
+        // Keep the last successful document list visible if a refresh fails.
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDocumentsRefreshing(false);
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
+
+  useEffect(() => {
+    if (!accessToken || isParent || !["announcements", "notifications"].includes(activeTab)) return undefined;
+    const controller = new AbortController();
+    const endpoint = activeTab === "announcements" ? "/portal/announcements" : "/portal/notifications";
+    apiRequest(endpoint, { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (controller.signal.aborted || !Array.isArray(response?.data)) return;
+        if (activeTab === "announcements") setAnnouncements(response.data);
+        else {
+          setNotifications(response.data);
+          setUnreadCount(Number(response.unreadCount ?? response.data.filter((item) => !item.readAt).length));
+        }
+      })
+      .catch(() => {
+        // Keep the last successful updates visible if a refresh fails.
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab, isParent]);
+
+  useEffect(() => {
+    if (!accessToken || activeTab !== "timetable") return undefined;
+    const controller = new AbortController();
+    apiRequest("/portal/timetable", { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (!controller.signal.aborted && Array.isArray(response?.data)) setTimetable(response.data);
+      })
+      .catch(() => {
+        // Keep the last successful timetable visible if a background refresh fails.
+      });
+    return () => controller.abort();
+  }, [accessToken, activeTab]);
+
+  useEffect(() => {
+    if (!accessToken) return undefined;
+    const controller = new AbortController();
+
+    // Parent accounts receive communication data only. Student academic,
+    // financial and identity endpoints are reserved for authenticated students.
+    if (isParent) {
+      Promise.allSettled([
+        apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
+        apiRequest("/portal/notifications", { accessToken, signal: controller.signal }),
+      ]).then(([announcementResponse, notificationResponse]) => {
+        if (controller.signal.aborted) return;
+        const failures = [];
+        if (announcementResponse.status === "fulfilled" && Array.isArray(announcementResponse.value?.data)) {
+          setAnnouncements(announcementResponse.value.data);
+        } else failures.push("announcements");
+        if (notificationResponse.status === "fulfilled" && Array.isArray(notificationResponse.value?.data)) {
+          setNotifications(notificationResponse.value.data);
+          setUnreadCount(Number(notificationResponse.value?.unreadCount ?? notificationResponse.value.data.filter((item) => !item.readAt).length));
+        } else failures.push("notifications");
+        setLoadError(failures.length ? "Some communication sections could not be loaded: " + failures.join(", ") + ". Retry to load them again." : "");
+        setError("");
+      }).finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+      return () => controller.abort();
+    }
+
+    Promise.allSettled([
+      apiRequest("/portal/profile", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/results", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/homework", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/homework-submissions", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/attendance", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/fees", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/timetable", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/announcements", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/documents", { accessToken, signal: controller.signal }),
+      apiRequest("/portal/notifications", { accessToken, signal: controller.signal }),
+    ]).then(([profileResponse, resultResponse, homeworkResponse, submissionResponse, attendanceResponse, feesResponse, timetableResponse, announcementResponse, documentResponse, notificationResponse]) => {
+      if (controller.signal.aborted) return;
+      const failures = [];
+      const applyList = (response, setter, label) => {
+        if (response.status === "fulfilled" && Array.isArray(response.value?.data)) {
+          setter(response.value.data);
+        } else {
+          setter([]);
+          failures.push(label);
+        }
+      };
+
+      applyList(profileResponse, setProfiles, "student profile");
+      applyList(resultResponse, setResults, "published results");
+      applyList(homeworkResponse, setHomework, "homework");
+      applyList(submissionResponse, setSubmissions, "homework submissions");
+      applyList(attendanceResponse, setAttendance, "attendance");
+      setAttendanceSummary(attendanceResponse.status === "fulfilled" && attendanceResponse.value?.summary ? attendanceResponse.value.summary : { present: 0, absent: 0, late: 0, excused: 0, marked: 0, percentage: null });
+      applyList(feesResponse, setFees, "fees");
+      applyList(timetableResponse, setTimetable, "timetable");
+      applyList(announcementResponse, setAnnouncements, "announcements");
+      applyList(documentResponse, setDocuments, "student documents");
+      applyList(notificationResponse, setNotifications, "notifications");
+
+      setUnreadCount(notificationResponse.status === "fulfilled" && Array.isArray(notificationResponse.value?.data)
+        ? Number(notificationResponse.value?.unreadCount ?? notificationResponse.value.data.filter((item) => !item.readAt).length)
+        : 0);
+      setError(resultResponse.status === "rejected"
+        ? resultResponse.reason?.message || "Unable to load published results."
+        : "");
+      setLoadError(failures.length
+        ? "Some portal sections could not be loaded: " + failures.join(", ") + ". Retry to load them again."
+        : "");
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
+  }, [accessToken, isParent, retryCount]);
+
+  const visibleDocuments = useMemo(() => selectedStudent === "all"
+    ? documents
+    : documents.filter((item) => String(item.student?._id) === selectedStudent),
+  [documents, selectedStudent]);
+
+  const visibleNotifications = useMemo(() => selectedStudent === "all" || !isParent
+    ? notifications
+    : notifications.filter((item) => item.relatedStudentIds?.some((id) => String(id) === selectedStudent)), [notifications, selectedStudent, isParent]);
+
+  const markNotificationRead = async (notificationId) => {
+    setNotificationBusy(true);
+    try {
+      const response = await apiRequest(`/portal/notifications/${notificationId}/read`, { method: "PATCH", accessToken });
+      if (!response?.success) throw new Error("Unable to update this notification.");
+      setNotifications((current) => current.map((item) => item._id === notificationId ? { ...item, readAt: response.data?.readAt || new Date().toISOString() } : item));
+      setUnreadCount((current) => Math.max(0, current - 1));
+    } catch (err) { setError(err.message || "Unable to update this notification."); }
+    finally { setNotificationBusy(false); }
+  };
+
+  const markAllNotificationsRead = async () => {
+    setNotificationBusy(true);
+    try {
+      const response = await apiRequest("/portal/notifications/read-all", { method: "PATCH", accessToken, body: {} });
+      if (!response?.success) throw new Error("Unable to mark notifications as read.");
+      const now = new Date().toISOString();
+      setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt || now })));
+      setUnreadCount(0);
+    } catch (err) { setError(err.message || "Unable to update notifications."); }
+    finally { setNotificationBusy(false); }
+  };
+
+  const visibleResults = useMemo(() => selectedStudent === "all"
+    ? results
+    : results.filter((item) => String(item.student?._id) === selectedStudent),
+  [results, selectedStudent]);
+
+  const visibleHomework = useMemo(() => selectedStudent === "all"
+    ? homework
+    : homework.filter((item) => String(item.student?._id) === selectedStudent),
+  [homework, selectedStudent]);
+
+  const visibleAttendance = useMemo(() => selectedStudent === "all"
+    ? attendance
+    : attendance.filter((item) => String(item.student?._id) === selectedStudent),
+  [attendance, selectedStudent]);
+
+  const visibleFees = useMemo(() => selectedStudent === "all"
+    ? fees
+    : fees.filter((item) => String(item.student?._id) === selectedStudent),
+  [fees, selectedStudent]);
+
+  const visibleTimetable = useMemo(() => selectedStudent === "all"
+    ? timetable
+    : timetable.filter((item) => String(item.student?._id) === selectedStudent),
+  [timetable, selectedStudent]);
+
+  const visibleSubmissions = useMemo(() => selectedStudent === "all"
+    ? submissions
+    : submissions.filter((item) => String(item.studentId?._id || item.studentId) === selectedStudent),
+  [submissions, selectedStudent]);
+
+  const visibleProfiles = useMemo(() => selectedStudent === "all"
+    ? profiles
+    : profiles.filter((item) => String(item.student?._id) === selectedStudent),
+  [profiles, selectedStudent]);
+
+  const attendanceConsidered = visibleAttendance.filter((record) =>
+    ["present", "late", "absent"].includes(record.status),
+  );
+  const attendanceRate = attendanceConsidered.length
+    ? Math.round((attendanceConsidered.filter((record) => ["present", "late"].includes(record.status)).length / attendanceConsidered.length) * 1000) / 10
+    : null;
+  const pendingHomeworkCount = visibleHomework.filter((item) => !visibleSubmissions.some((submission) =>
+    String(submission.homeworkId?._id || submission.homeworkId) === String(item.homework?._id) &&
+    String(submission.studentId?._id || submission.studentId) === String(item.student?._id),
+  )).length;
+  const outstandingFees = visibleFees.reduce((total, invoice) => total + Number(invoice.balance || 0), 0);
+
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ");
+  const headerStudent = visibleProfiles[0]?.student;
+
+  return (
+    <main className="student-portal">
+      <header className="student-portal-header">
+        <div>
+          <div className="portal-eyebrow">{isParent ? "SCHOOLSUITE · FAMILY COMMUNICATION" : "SCHOOLSUITE · STUDENT PORTAL"}</div>
+          <h1>{isParent ? "School communications" : "My student dashboard"}</h1>
+          <p>{isParent ? "Receive school notices, important notifications and messages about your ward." : "View attendance, homework, examination results, fees and the class timetable."}</p>
+        </div>
+        <div className="portal-account">
+          {!isParent && <div className="portal-header-student-avatar">{headerStudent?.photoUrl ? <img src={headerStudent.photoUrl} alt={`${headerStudent.firstName || "Student"} profile`} /> : <span>{[headerStudent?.firstName, headerStudent?.lastName].filter(Boolean).map((part) => part[0]).join("").toUpperCase() || "S"}</span>}</div> }
+          <span>{fullName || (isParent ? "Parent account" : "Student account")}</span>
+          <button type="button" className="portal-signout" onClick={() => void logout()}>Sign out</button>
+        </div>
+      </header>
+
+      {loadError && (
+        <div className="portal-state portal-error" role="alert">
+          <span>{loadError}</span>
+          <button type="button" onClick={() => {
+              setLoading(true);
+              setLoadError("");
+              setRetryCount((count) => count + 1);
+            }} disabled={loading}>
+            {loading ? "Retrying…" : "Retry failed sections"}
+          </button>
+        </div>
+      )}
+
+      <nav className="portal-tabs no-print" aria-label={isParent ? "School communications" : "Student portal sections"}>
+        {!isParent && <>
+          <button type="button" className={activeTab === "overview" ? "active" : ""} aria-pressed={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</button>
+          <button type="button" className={activeTab === "profile" ? "active" : ""} aria-pressed={activeTab === "profile"} onClick={() => setActiveTab("profile")}>Profile</button>
+          <button type="button" className={activeTab === "results" ? "active" : ""} aria-pressed={activeTab === "results"} onClick={() => setActiveTab("results")}>Results</button>
+          <button type="button" className={activeTab === "attendance" ? "active" : ""} aria-pressed={activeTab === "attendance"} onClick={() => setActiveTab("attendance")}>Attendance</button>
+          <button type="button" className={activeTab === "homework" ? "active" : ""} aria-pressed={activeTab === "homework"} onClick={() => setActiveTab("homework")}>Homework ({visibleHomework.length})</button>
+          <button type="button" className={activeTab === "fees" ? "active" : ""} aria-pressed={activeTab === "fees"} onClick={() => setActiveTab("fees")}>Fees</button>
+          <button type="button" className={activeTab === "timetable" ? "active" : ""} aria-pressed={activeTab === "timetable"} onClick={() => setActiveTab("timetable")}>Timetable</button>
+          <button type="button" className={activeTab === "documents" ? "active" : ""} aria-pressed={activeTab === "documents"} onClick={() => setActiveTab("documents")}>Documents ({documents.length})</button>
+        </>}
+        <button type="button" className={activeTab === "announcements" ? "active" : ""} aria-pressed={activeTab === "announcements"} onClick={() => setActiveTab("announcements")}>Notices ({announcements.length})</button>
+        <button type="button" className={activeTab === "notifications" ? "active" : ""} aria-pressed={activeTab === "notifications"} onClick={() => setActiveTab("notifications")}>Notifications {unreadCount > 0 ? `(${unreadCount})` : ""}</button>
+        {isParent && <button type="button" className={activeTab === "messaging" ? "active" : ""} aria-pressed={activeTab === "messaging"} onClick={() => setActiveTab("messaging")}>Messages</button>}
+      </nav>
+      {activeTab === "overview" ? (
+        loading ? <div className="portal-state">Loading your school overview…</div> : (
+          <section className="portal-overview">
+            <div className="portal-overview-heading"><div><span>AT A GLANCE</span><h2>Portal overview</h2></div><p>{isParent ? (selectedStudent === "all" ? "Combined view of your linked children" : "Selected child's academic snapshot") : "Your academic snapshot"}</p></div>
+            <div className="portal-overview-metrics">
+              <article><span>Attendance rate</span><strong>{attendanceRate === null ? "—" : `${attendanceRate}%`}</strong><small>{attendanceConsidered.length} attendance records considered</small></article>
+              <article><span>Pending homework</span><strong>{pendingHomeworkCount}</strong><small>Published assignments awaiting submission</small></article>
+              <article><span>Published results</span><strong>{visibleResults.length}</strong><small>Available examination report cards</small></article>
+              <article><span>Outstanding fees</span><strong>₹{outstandingFees.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</strong><small>Balance across visible fee invoices</small></article>
+            </div>
+            <div className="portal-overview-note"><strong>Keep track of school progress</strong><p>Use the sections above to review detailed attendance, homework, examination results, fee statements and the class timetable.</p></div>
+          </section>
+        )
+      ) : activeTab === "profile" ? (
+        loading ? <div className="portal-state">Loading student profile…</div> : visibleProfiles.length === 0 ? <div className="portal-empty"><h2>Student profile unavailable</h2><p>Your school has not linked an active student profile to this account.</p></div> : (
+          <section className="portal-profile-list">{visibleProfiles.map(({ student, currentEnrollment, parents = [] }) => (
+            <article className="portal-profile-card" key={student._id}>
+              <header className="portal-profile-heading">
+                <div><span>STUDENT PROFILE</span><h2>{[student.firstName, student.lastName].filter(Boolean).join(" ")}</h2><small>Admission number: {student.admissionNumber || "—"}</small></div>
+                
+              </header>
+              <div className="portal-profile-grid">
+                <div><span>Date of birth</span><strong>{formatDate(student.dateOfBirth)}</strong></div>
+                <div><span>Gender</span><strong>{(student.gender || "not_specified").replaceAll("_", " ")}</strong></div>
+                <div><span>Admission date</span><strong>{formatDate(student.admissionDate)}</strong></div>
+                <div><span>Status</span><strong>{student.status || "—"}</strong></div>
+                <div><span>Address</span><strong>{[student.address?.line1, student.address?.line2, student.address?.city, student.address?.district, student.address?.state, student.address?.postalCode].filter(Boolean).join(", ") || "—"}</strong></div>
+              </div>
+              <div className="portal-profile-section"><h3>Current academic placement</h3><p>{currentEnrollment ? [currentEnrollment.classId?.name, currentEnrollment.sectionId?.name, currentEnrollment.academicYearId?.name].filter(Boolean).join(" · ") : "No active enrollment"}</p></div>
+              {["father", "mother"].map((relationship) => { const parent = parents.find((item) => item.relationship === relationship); const label = relationship === "father" ? "Father" : "Mother"; const parentName = parent?.name || (relationship === "father" ? student.guardianName : "") || "Details not added"; return <div className="portal-profile-section portal-parent-section" key={relationship}><div className="portal-parent-heading"><div className="portal-parent-avatar">{parent?.photoUrl ? <img src={parent.photoUrl} alt={`${label} profile`} /> : <span>{relationship === "father" ? "F" : "M"}</span>}</div><div><h3>{label}</h3><p><strong>{parentName}</strong></p></div></div><p>{parent?.phone || (relationship === "father" ? student.guardianPhone : "") || "Phone not provided"}</p><p>{parent?.email ? `${parent.email} · ${parent.emailVerified ? "Email verified" : "Email not verified"}` : relationship === "father" && student.guardianEmail ? `${student.guardianEmail} · Email not verified` : "Email not provided"}</p></div>; })}
+            </article>
+          ))}</section>
+        )
+      ) : activeTab === "attendance" ? (
+        loading ? <div className="portal-state">Loading attendance…</div> : visibleAttendance.length === 0 ? <div className="portal-empty"><h2>No attendance records</h2><p>Attendance records shared by your school will appear here.</p></div> : (
+          <>
+            <section className="portal-attendance-summary" aria-label="Attendance summary"><span className="portal-section-refresh" aria-live="polite">{sectionRefreshing === "attendance" ? "Refreshing attendance…" : ""}</span>
+              <article className="portal-attendance-rate"><span>Attendance rate</span><strong>{attendanceSummary.percentage == null ? "—" : String(attendanceSummary.percentage) + "%"}</strong><div className="portal-attendance-track"><span style={{ width: String(Math.max(0, Math.min(100, Number(attendanceSummary.percentage || 0)))) + "%" }}/></div><small>{attendanceSummary.marked || visibleAttendance.length} marked records</small></article>
+              <div className="portal-attendance-counts">
+                <article className="attendance-count attendance-count-present"><span>Present</span><strong>{attendanceSummary.present || 0}</strong></article>
+                <article className="attendance-count attendance-count-absent"><span>Absent</span><strong>{attendanceSummary.absent || 0}</strong></article>
+                <article className="attendance-count attendance-count-late"><span>Late</span><strong>{attendanceSummary.late || 0}</strong></article>
+                <article className="attendance-count attendance-count-excused"><span>Excused</span><strong>{attendanceSummary.excused || 0}</strong></article>
+              </div>
+            </section>
+            <section className="portal-data-panel"><div className="portal-data-heading"><h2>Attendance history</h2><span>{visibleAttendance.length} records · recent 12 months</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Date</th>{isParent && <th>Student</th>}<th>Status</th><th>Remarks</th></tr></thead><tbody>{visibleAttendance.map((record) => <tr key={record._id}><td>{formatDate(record.date)}</td>{isParent && <td>{[record.student?.firstName, record.student?.lastName].filter(Boolean).join(" ")}</td>}<td><span className={"portal-attendance-status attendance-" + record.status}>{record.status}</span></td><td>{record.remarks || "—"}</td></tr>)}</tbody></table></div></section>
+          </>
+        )
+      ) : activeTab === "fees" ? (
+        loading ? <div className="portal-state">Loading fee statements…</div> : visibleFees.length === 0 ? <div className="portal-empty"><h2>No fee invoices</h2><p>Fee invoices and receipts issued by your school will appear here.</p></div> : (
+          <section className="portal-fee-list"><div className="portal-data-heading"><span>{sectionRefreshing === "fees" ? "Refreshing fee statements…" : `${visibleFees.length} fee invoices`}</span></div>{visibleFees.map((invoice) => {
+            const expanded = expandedInvoiceId === String(invoice._id);
+            return <article className="portal-fee-card" key={invoice._id}>
+              <div className="portal-fee-heading"><div><span>{invoice.invoiceNumber} · {invoice.academicYearId?.name || "Academic year"}</span><h2>{isParent ? [invoice.student?.firstName, invoice.student?.lastName].filter(Boolean).join(" ") : "Fee statement"}</h2></div><div className="portal-fee-heading-actions"><strong className={"portal-fee-status fee-" + invoice.status}>{invoice.status}</strong><button type="button" className="portal-fee-detail-toggle" aria-expanded={expanded} onClick={() => setExpandedInvoiceId(expanded ? "" : String(invoice._id))}>{expanded ? "Hide details" : "View details"}</button></div></div>
+              <div className="portal-fee-totals"><div><span>Total</span><strong>₹{Number(invoice.totalAmount || 0).toLocaleString("en-IN")}</strong></div><div><span>Paid</span><strong>₹{Number(invoice.paidAmount || 0).toLocaleString("en-IN")}</strong></div><div><span>Balance</span><strong>₹{Number(invoice.balance || 0).toLocaleString("en-IN")}</strong></div><div><span>Due date</span><strong>{formatDate(invoice.dueDate)}</strong></div></div>
+              {expanded && <div className="portal-fee-details">
+                <div className="portal-fee-line-items"><strong>Invoice breakdown</strong>{(invoice.items || []).length ? invoice.items.map((line, index) => <div key={index}><span>{line.name} · {(line.frequency || "one_time").replaceAll("_", " ")}</span><b>₹{Number(line.amount || 0).toLocaleString("en-IN")}</b></div>) : <p>No itemised fee details are available.</p>}</div>
+                <div className="portal-receipts"><strong>Payment history & receipts</strong>{invoice.payments?.length > 0 ? invoice.payments.map((payment) => <div key={payment._id}><span><b>{payment.receiptNumber || "Receipt"}</b> · {formatDate(payment.paymentDate)} · {payment.method?.replaceAll("_", " ") || "Payment"}{payment.reference ? ` · Ref: ${payment.reference}` : ""}{payment.reversalReason ? ` · Reversal: ${payment.reversalReason}` : ""}</span><b>₹{Number(payment.amount || 0).toLocaleString("en-IN")} · {payment.status}</b></div>) : <p>No payments have been recorded for this invoice.</p>}</div>
+              </div>}
+            </article>;
+          })}</section>
+        )
+      ) : activeTab === "timetable" ? (
+        loading ? <div className="portal-state">Loading timetable…</div> : visibleTimetable.length === 0 || visibleTimetable.every((item) => !item.entries?.length) ? <div className="portal-empty"><h2>No timetable available</h2><p>Your current class timetable will appear here once it is published in the school workspace.</p></div> : (
+          <section className="portal-timetable-list">{visibleTimetable.map((item) => <article className="portal-data-panel" key={String(item.student?._id)}><div className="portal-data-heading"><h2>{isParent ? [item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ") : "My timetable"}</h2><span>{[item.enrollment?.classId?.name, item.enrollment?.sectionId?.name, item.enrollment?.academicYearId?.name].filter(Boolean).join(" · ")}</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Day</th><th>Period</th><th>Time</th><th>Subject</th><th>Teacher</th><th>Room</th></tr></thead><tbody>{item.entries.map((entry) => <tr key={entry._id}><td>{["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][entry.dayOfWeek]}</td><td>{entry.periodNumber}</td><td>{entry.startTime}–{entry.endTime}</td><td>{entry.assignmentId?.subjectId?.name || "—"}</td><td>{[entry.assignmentId?.teacherId?.firstName, entry.assignmentId?.teacherId?.lastName].filter(Boolean).join(" ") || "—"}</td><td>{entry.room || "—"}</td></tr>)}</tbody></table></div></article>)}</section>
+        )
+      ) : activeTab === "announcements" ? (
+        announcements.length === 0 ? <div className="portal-empty"><h2>No current notices</h2><p>Published school announcements will appear here.</p></div> : (
+          <section className="portal-announcement-list" aria-label="School announcements">
+            {announcements.map((item) => <article className="portal-announcement-card" key={item._id}>
+              <div className="portal-announcement-meta"><span>{(item.category || "general").replaceAll("_", " ")}</span><time dateTime={item.publishedAt}>{formatDate(item.publishedAt)}</time></div>
+              <h2>{item.title}</h2><p>{item.body}</p>
+              {item.expiresAt && <footer>Available until {formatDate(item.expiresAt)}</footer>}
+            </article>)}
+          </section>
+        )
+      ) : activeTab === "documents" ? (
+        visibleDocuments.length === 0 ? <div className="portal-empty"><h2>No shared documents</h2><p>Documents made available by your school will appear here.</p></div> : (
+          <section className="portal-data-panel"><div className="portal-data-heading"><h2>Student documents</h2><span>{documentsRefreshing ? "Refreshing…" : `${visibleDocuments.length} files`}</span></div><div className="portal-table-wrap"><table className="portal-data-table"><thead><tr><th>Document</th>{isParent && <th>Student</th>}<th>Category</th><th>Uploaded</th><th>File</th></tr></thead><tbody>{visibleDocuments.map((document) => <tr key={document._id}><td>{document.name}</td>{isParent && <td>{[document.student?.firstName, document.student?.lastName].filter(Boolean).join(" ")}</td>}<td>{(document.category || "other").replaceAll("_", " ")}</td><td>{formatDate(document.createdAt)}</td><td><a href={document.fileUrl} target="_blank" rel="noreferrer">Open</a></td></tr>)}</tbody></table></div></section>
+        )
+      ) : activeTab === "messaging" ? (
+        <MessagingWorkspace mode="parent" />
+      ) : activeTab === "notifications" ? (
+        <section className="portal-notification-panel" aria-label="Notifications">
+          <div className="portal-data-heading"><div><h2>Notifications</h2><span>{unreadCount} unread</span></div>
+            {unreadCount > 0 && <button type="button" className="portal-notification-action" disabled={notificationBusy} onClick={() => void markAllNotificationsRead()}>Mark all as read</button>}
+          </div>
+          {visibleNotifications.length === 0 ? <div className="portal-empty"><h2>No notifications</h2><p>New school updates will appear here.</p></div> : (
+            <div className="portal-notification-list">
+              {visibleNotifications.map((item) => <article className={"portal-notification-card" + (item.readAt ? "" : " unread")} key={item._id}>
+                <div className="portal-notification-card-heading"><strong>{item.title}</strong><time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time></div>
+                <p>{item.body}</p>
+                {!item.readAt && <button type="button" className="portal-notification-action" disabled={notificationBusy} onClick={() => void markNotificationRead(item._id)}>Mark as read</button>}
+              </article>)}
+            </div>
+          )}
+        </section>
+      ) : activeTab === "homework" ? (
+        loading ? <div className="portal-state">Loading homework…</div> : visibleHomework.length === 0 ? <div className="portal-empty"><h2>No published homework</h2><p>Assignments shared by your school will appear here.</p></div> : (
+          <>
+          {homeworkNotice && <div className="portal-homework-notice" role="status">{homeworkNotice}</div>}
+          <div className="portal-homework-list"><div className="portal-data-heading"><span>{sectionRefreshing === "homework" ? "Refreshing assignments…" : `${visibleHomework.length} assignments`}</span></div>{visibleHomework.map((item) => <article className="portal-homework-card" key={String(item.homework._id) + String(item.student?._id)}>
+            <div className="portal-homework-heading"><div><span>{item.homework.subjectId?.name || "Subject"} · {item.homework.classId?.name || "Class"}{item.homework.sectionId?.name ? ` · ${item.homework.sectionId.name}` : ""}</span><h2>{item.homework.title}</h2></div><strong>Due {formatDate(item.homework.dueDate)}</strong></div>
+            {isParent && <p className="portal-homework-student">For: {[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</p>}
+            <p className="portal-homework-instructions">{item.homework.instructions}</p>
+            {(() => {
+              const submission = visibleSubmissions.find((entry) => String(entry.homeworkId?._id || entry.homeworkId) === String(item.homework._id) && String(entry.studentId?._id || entry.studentId) === String(item.student?._id));
+              return submission ? <div className="portal-submission-state">
+                <strong>Your submission · {submission.status}</strong>
+                <p>{submission.answer}</p>
+                {submission.status === "reviewed" && <div className="portal-review-feedback">{submission.marksObtained !== null ? `Marks: ${submission.marksObtained}/${submission.maxMarks}. ` : ""}{submission.feedback || "Your teacher has reviewed this work."}</div>}
+                <small>Submitted {formatDate(submission.submittedAt)}</small>
+              </div> : !isParent ? <form className="portal-submit-form" onSubmit={async (event) => {
+                event.preventDefault(); setSubmitting(item.homework._id); setError(""); setHomeworkNotice("");
+                try {
+                  await apiRequest(`/homework/${item.homework._id}/submissions`, { method: "POST", accessToken, body: { answer: answers[item.homework._id] || "" } });
+                  const response = await apiRequest("/portal/homework-submissions", { accessToken });
+                  setSubmissions(response.data || []); setHomeworkNotice("Your homework has been submitted.");
+                } catch (err) { setError(err.message || "Unable to submit homework."); }
+                finally { setSubmitting(""); }
+              }}>
+                <label htmlFor={`answer-${item.homework._id}`}>Your answer</label>
+                <textarea id={`answer-${item.homework._id}`} required maxLength="10000" rows="4" value={answers[item.homework._id] || ""} onChange={(event) => setAnswers((current) => ({ ...current, [item.homework._id]: event.target.value }))} placeholder="Write your answer here…" />
+                <button type="submit" disabled={submitting === item.homework._id}>{submitting === item.homework._id ? "Submitting…" : "Submit homework"}</button>
+              </form> : <p className="portal-homework-student">No submission recorded yet.</p>;
+            })()}
+            <footer>Assigned {formatDate(item.homework.assignedDate)} · {item.homework.teacherId ? `By ${[item.homework.teacherId.firstName, item.homework.teacherId.lastName].filter(Boolean).join(" ")}` : "School assignment"}</footer>
+          </article>)}</div>
+          </>
+        )
+      ) : <>
+
+
+      {loading ? (
+        <div className="portal-state">Loading published results…</div>
+      ) : error ? (
+        <div className="portal-state portal-error" role="alert">{error}</div>
+      ) : visibleResults.length === 0 ? (
+        <div className="portal-empty">
+          <div className="portal-empty-icon">▤</div>
+          <h2>No published results yet</h2>
+          <p>Your school’s examination results will appear here once they are finalized and published.</p>
+        </div>
+      ) : (
+        <div className="portal-results">
+          <div className="portal-results-toolbar no-print">
+            <span>{visibleResults.length} published result{visibleResults.length === 1 ? "" : "s"}{resultsRefreshing ? " · Refreshing…" : ""}</span>
+            <button type="button" onClick={() => window.print()}>Print report card</button>
+          </div>
+          {visibleResults.map((item) => (
+            <article className="report-card" key={String(item.examination._id) + String(item.result.enrollmentId)}>
+              <div className="report-card-heading">
+                <div>
+                  <div className="report-school-name">{item.school?.name || "School"}</div>
+                  {item.school?.contactEmail && <p className="report-school-contact">{item.school.contactEmail}</p>}
+                  <div className="report-kicker">OFFICIAL EXAMINATION RESULT</div>
+                  <h2>{item.examination.name}</h2>
+                  <p>{formatDate(item.examination.startDate)} – {formatDate(item.examination.endDate)}</p>
+                  {item.examination.gradingScale && <p>Grading scale: {item.examination.gradingScale}</p>}
+                </div>
+                <div className="report-school-mark">{(item.school?.name || "S").slice(0, 1).toUpperCase()}</div>
+              </div>
+              <div className="report-student">
+                <div><span>Student</span><strong>{[item.student?.firstName, item.student?.lastName].filter(Boolean).join(" ")}</strong></div>
+                <div><span>Admission No.</span><strong>{item.student?.admissionNumber || "—"}</strong></div>
+                <div><span>Academic year</span><strong>{item.examination.academicYear?.name || "—"}</strong></div>
+                {item.examination.academicTerm?.name && <div><span>Academic term</span><strong>{item.examination.academicTerm.name}</strong></div>}
+                <div><span>Class</span><strong>{item.examination.class?.name || "—"}</strong></div>
+                <div><span>Section</span><strong>{item.examination.section?.name || "All sections"}</strong></div>
+                <div><span>Examination period</span><strong>{formatDate(item.examination.startDate)} – {formatDate(item.examination.endDate)}</strong></div>
+              </div>
+              <div className="report-table-wrap">
+                <table className="report-table">
+                  <thead><tr><th>Subject</th><th>Maximum</th><th>Pass mark</th><th>Marks obtained</th><th>Grade</th><th>Status</th><th>Remarks</th></tr></thead>
+                  <tbody>
+                    {item.result.subjects.map((subject) => (
+                      <tr key={String(subject.examSubjectId)}>
+                        <td>{subject.subject?.name || "Subject"}</td>
+                        <td>{subject.maxMarks}</td>
+                        <td>{subject.passMarks}</td>
+                        <td>{subject.absent ? "Absent" : subject.marksObtained ?? "—"}</td>
+                        <td>{subject.grade || "—"}</td>
+                        <td><span className={"result-status status-" + subject.status}>{subject.status}</span></td>
+                        <td>{subject.remarks || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="report-summary">
+                <div><span>Total</span><strong>{item.result.totalObtained} / {item.result.totalMaximum}</strong></div>
+                <div><span>Percentage</span><strong>{item.result.percentage}%</strong></div>
+                <div><span>Grade</span><strong>{item.result.grade || "—"}</strong></div>
+                <div><span>Result</span><strong className={"overall-" + item.result.status}>{item.result.status.toUpperCase()}</strong></div>
+              </div>
+              <footer className="report-footer">This result is system-generated and reflects the published school record.</footer>
+            </article>
+          ))}
+        </div>
+      )}
+      </>}
+    </main>
+  );
+}

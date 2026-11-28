@@ -1,0 +1,590 @@
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { AppScreen } from "./AppScreen";
+import { apiRequest } from "../services/apiClient";
+import { colors, radius, spacing } from "../theme/tokens";
+
+const PAGE_SIZE = 20;
+
+export function PlatformAdminScreen({ user, onSignOut }) {
+  const [section, setSection] = useState("overview");
+  const [overview, setOverview] = useState(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState("");
+  const [commercialRecords, setCommercialRecords] = useState([]);
+  const [commercialPage, setCommercialPage] = useState(1);
+  const [commercialPagination, setCommercialPagination] = useState({ total: 0, totalPages: 1 });
+  const [commercialError, setCommercialError] = useState("");
+  const [systemAuditRecords, setSystemAuditRecords] = useState([]);
+  const [systemAuditOutbox, setSystemAuditOutbox] = useState(null);
+  const [schools, setSchools] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [schoolDetailsRefresh, setSchoolDetailsRefresh] = useState(0);
+  const [schoolDetails, setSchoolDetails] = useState(null);
+  const [schoolSubscription, setSchoolSubscription] = useState(null);
+  const [schoolActionBusy, setSchoolActionBusy] = useState(false);
+  const [schoolActionMessage, setSchoolActionMessage] = useState("");
+  const [suspensionReason, setSuspensionReason] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [userDetailsRefresh, setUserDetailsRefresh] = useState(0);
+  const [userDetails, setUserDetails] = useState(null);
+  const [userProfileForm, setUserProfileForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [userRole, setUserRole] = useState("teacher");
+  const [userActionBusy, setUserActionBusy] = useState(false);
+  const [userActionMessage, setUserActionMessage] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [userStatusFilter, setUserStatusFilter] = useState("");
+  const [userSchoolFilter, setUserSchoolFilter] = useState("");
+  const [userSchools, setUserSchools] = useState([]);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [createUserMessage, setCreateUserMessage] = useState("");
+
+  const loadDirectory = useCallback(async (refresh = false) => {
+    if (!["schools", "users"].includes(section)) return;
+    if (refresh) setRefreshing(true); else setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      if (search.trim()) params.set("search", search.trim());
+      if (section === "users") {
+        if (userRoleFilter) params.set("role", userRoleFilter);
+        if (userStatusFilter) params.set("status", userStatusFilter);
+        if (userSchoolFilter) params.set("tenantId", userSchoolFilter);
+      }
+      const endpoint = section === "schools" ? "/platform/schools" : "/platform/users";
+      const response = await apiRequest(endpoint + "?" + params.toString());
+      const records = Array.isArray(response?.data) ? response.data : [];
+      if (section === "schools") setSchools(records); else setUsers(records);
+      setPagination(response?.pagination || { total: records.length, pages: 1 });
+    } catch (requestError) {
+      setError(requestError?.message || "Unable to load the platform directory.");
+      if (section === "schools") setSchools([]); else setUsers([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [page, search, section, userRoleFilter, userStatusFilter, userSchoolFilter]);
+
+  useEffect(() => { if (["schools", "users"].includes(section)) void loadDirectory(); }, [loadDirectory, section]);
+
+  useEffect(() => {
+    if (section !== "users") return undefined;
+    let mounted = true;
+    apiRequest("/platform/schools?page=1&limit=100")
+      .then((response) => { if (mounted) setUserSchools(response?.data || []); })
+      .catch(() => { if (mounted) setUserSchools([]); });
+    return () => { mounted = false; };
+  }, [section]);
+
+  const createPlatformUser = async () => {
+    if (creatingUser) return;
+    setCreatingUser(true); setCreateUserMessage("");
+    try {
+      const response = await apiRequest("/platform/users", { method: "POST", body: {
+        ...newUser, firstName: newUser.firstName.trim(), lastName: newUser.lastName.trim(),
+        email: newUser.email.trim(), phone: newUser.phone.trim() || null,
+      } });
+      setCreateUserMessage(response.message || "User created and awaiting activation.");
+      setNewUser({ tenantId: "", firstName: "", lastName: "", email: "", phone: "", role: "teacher", password: "" });
+      setShowCreateUser(false); setPage(1); void loadDirectory(true);
+    } catch (requestError) { setCreateUserMessage(requestError?.message || "Unable to create user."); }
+    finally { setCreatingUser(false); }
+  };
+
+  useEffect(() => {
+    if (section !== "schools" || !selectedSchoolId) return undefined;
+    let mounted = true;
+    setLoading(true);
+    setError("");
+    Promise.all([
+      apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId)),
+      apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId) + "/subscription"),
+    ])
+      .then(([details, billing]) => {
+        if (!mounted) return;
+        setSchoolDetails(details?.data || null);
+        setSchoolSubscription(billing?.data?.subscription || null);
+      })
+      .catch((requestError) => { if (mounted) setError(requestError?.message || "Unable to load school details."); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [section, selectedSchoolId, schoolDetailsRefresh]);
+
+  const updateSchoolStatus = async (status) => {
+    if (!selectedSchoolId || schoolActionBusy) return;
+    if (status === "suspended" && suspensionReason.trim().length < 10) {
+      setSchoolActionMessage("Enter a suspension reason of at least 10 characters.");
+      return;
+    }
+    setSchoolActionBusy(true);
+    setSchoolActionMessage("");
+    try {
+      const body = status === "suspended"
+        ? { status, reason: suspensionReason.trim() }
+        : { status };
+      const response = await apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId) + "/status", { method: "PATCH", body });
+      if (!response?.data?.school) throw new Error("The server did not return the updated school. Refresh and verify the status.");
+      setSchoolDetails((current) => current ? { ...current, school: { ...current.school, ...response.data.school } } : current);
+      setSuspensionReason("");
+      setSchoolActionMessage(response.message || "School status updated.");
+      void loadDirectory(true);
+    } catch (requestError) {
+      setSchoolActionMessage(requestError?.message || "Unable to update school status.");
+    } finally {
+      setSchoolActionBusy(false);
+    }
+  };
+
+  const startSchoolTrial = async () => {
+    if (!selectedSchoolId || schoolActionBusy) return;
+    setSchoolActionBusy(true);
+    setSchoolActionMessage("");
+    try {
+      const response = await apiRequest("/platform/schools/" + encodeURIComponent(selectedSchoolId) + "/trial", { method: "POST", body: {} });
+      if (!response?.data?.school) throw new Error("The server did not return the updated school. Refresh and verify the trial.");
+      setSchoolDetails((current) => current ? { ...current, school: { ...current.school, ...response.data.school } } : current);
+      setSchoolSubscription(response.data.subscription || null);
+      setSchoolActionMessage(response.message || "30-day trial started.");
+      void loadDirectory(true);
+    } catch (requestError) {
+      setSchoolActionMessage(requestError?.message || "Unable to start the trial.");
+    } finally {
+      setSchoolActionBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (section !== "users" || !selectedUserId) return undefined;
+    let mounted = true;
+    setLoading(true);
+    setError("");
+    apiRequest("/platform/users/" + encodeURIComponent(selectedUserId))
+      .then((response) => {
+        if (!mounted) return;
+        const record = response?.data?.user || null;
+        setUserDetails(record);
+        if (record) {
+          setUserProfileForm({ firstName: record.firstName || "", lastName: record.lastName || "", email: record.email || "", phone: record.phone || "" });
+          setUserRole(record.role || "teacher");
+        }
+      })
+      .catch((requestError) => { if (mounted) setError(requestError?.message || "Unable to load user details."); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [section, selectedUserId, userDetailsRefresh]);
+
+  useEffect(() => {
+    if (section !== "overview") return undefined;
+    let mounted = true;
+    setOverviewLoading(true); setOverviewError("");
+    apiRequest("/platform/business-overview")
+      .then((response) => { if (mounted) setOverview(response?.data ?? null); })
+      .catch((error) => { if (mounted) setOverviewError(error?.message || "Unable to load business overview."); })
+      .finally(() => { if (mounted) setOverviewLoading(false); });
+    return () => { mounted = false; };
+  }, [section]);
+
+  useEffect(() => {
+    if (["overview", "schools", "users"].includes(section)) return undefined;
+    let mounted = true;
+    setLoading(true); setCommercialError("");
+    if (section === "systemAudit") {
+      Promise.all([
+        apiRequest("/platform/audit-logs?page=1&limit=20"),
+        apiRequest("/platform/audit-outbox"),
+      ])
+        .then(([logs, outbox]) => {
+          if (!mounted) return;
+          setSystemAuditRecords(Array.isArray(logs?.data) ? logs.data : []);
+          setSystemAuditOutbox(outbox?.data || null);
+        })
+        .catch((requestError) => { if (mounted) setCommercialError(requestError?.message || "Unable to load system audit records."); })
+        .finally(() => { if (mounted) setLoading(false); });
+      return () => { mounted = false; };
+    }
+    const endpoint = section === "plans" ? "/platform/subscription-plans"
+      : section === "billing" ? `/platform/invoices?page=${commercialPage}&limit=${PAGE_SIZE}`
+      : `/platform/commercial-events?page=${commercialPage}&limit=${PAGE_SIZE}`;
+    apiRequest(endpoint)
+      .then((response) => {
+        if (!mounted) return;
+        const records = Array.isArray(response?.data) ? response.data : [];
+        setCommercialRecords(records);
+        setCommercialPagination(response?.pagination || { total: records.length, totalPages: 1 });
+      })
+      .catch((requestError) => { if (mounted) setCommercialError(requestError?.message || "Unable to load commercial records."); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [section, commercialPage]);
+
+  const saveUserProfile = async () => {
+    if (!selectedUserId || userActionBusy) return;
+    setUserActionBusy(true); setUserActionMessage("");
+    try {
+      const response = await apiRequest("/platform/users/" + encodeURIComponent(selectedUserId), {
+        method: "PATCH",
+        body: { firstName: userProfileForm.firstName.trim(), lastName: userProfileForm.lastName.trim(), email: userProfileForm.email.trim(), phone: userProfileForm.phone.trim() || null },
+      });
+      const updated = response?.data?.user;
+      if (!updated) throw new Error("The server did not return the updated user. Refresh and verify the profile.");
+      setUserDetails(updated);
+      setUserProfileForm({ firstName: updated.firstName || "", lastName: updated.lastName || "", email: updated.email || "", phone: updated.phone || "" });
+      setUserActionMessage(response.message || "User profile updated.");
+      void loadDirectory(true);
+    } catch (requestError) { setUserActionMessage(requestError?.message || "Unable to update user profile."); }
+    finally { setUserActionBusy(false); }
+  };
+
+  const updateUserStatus = async (status) => {
+    if (!selectedUserId || userActionBusy) return;
+    setUserActionBusy(true); setUserActionMessage("");
+    try {
+      const response = await apiRequest("/platform/users/" + encodeURIComponent(selectedUserId) + "/status", { method: "PATCH", body: { status } });
+      const updated = response?.data?.user;
+      if (!updated) throw new Error("The server did not return the updated user. Refresh and verify the status.");
+      setUserDetails(updated); setUserActionMessage(response.message || "User status updated."); void loadDirectory(true);
+    } catch (requestError) { setUserActionMessage(requestError?.message || "Unable to update user status."); }
+    finally { setUserActionBusy(false); }
+  };
+
+  const updateUserRole = async () => {
+    if (!selectedUserId || userActionBusy || !userRole || userRole === userDetails?.role) return;
+    setUserActionBusy(true); setUserActionMessage("");
+    try {
+      const response = await apiRequest("/platform/users/" + encodeURIComponent(selectedUserId) + "/role", { method: "PATCH", body: { role: userRole } });
+      const updated = response?.data?.user;
+      if (!updated) throw new Error("The server did not return the updated user. Refresh and verify the role.");
+      setUserDetails(updated); setUserRole(updated.role); setUserActionMessage(response.message || "User role updated."); void loadDirectory(true);
+    } catch (requestError) { setUserActionMessage(requestError?.message || "Unable to update user role."); }
+    finally { setUserActionBusy(false); }
+  };
+
+  const switchSection = (next) => {
+    setSelectedUserId("");
+    setUserDetails(null);
+    setSection(next);
+    setPage(1);
+    setCommercialPage(1);
+    setSearch("");
+    setError("");
+  };
+
+  const nameOf = (item) => section === "schools"
+    ? item.name || item.schoolName || "Unnamed school"
+    : [item.firstName, item.lastName].filter(Boolean).join(" ") || item.name || "Unnamed user";
+  const subtitleOf = (item) => section === "schools"
+    ? item.slug || item.code || item.email || "School account"
+    : item.email || item.role?.replaceAll("_", " ") || "User account";
+  const statusOf = (item) => String(item.status || (item.isActive === false ? "suspended" : "active")).replaceAll("_", " ");
+
+  return <AppScreen style={styles.screen} edges={["top", "bottom"]}>
+    <View style={styles.header}>
+      <View style={styles.brandMark}><Text style={styles.brandMarkText}>SE</Text></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.brandName}>SCHOOLSUITE</Text>
+        <Text style={styles.brandCaption}>PLATFORM CONTROL</Text>
+      </View>
+      <TouchableOpacity onPress={onSignOut} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></TouchableOpacity>
+    </View>
+    <ScrollView contentContainerStyle={styles.content}>
+      <Text style={styles.kicker}>CENTRAL ADMINISTRATION</Text>
+      <Text style={styles.title}>Platform workspace</Text>
+      <Text style={styles.description}>Manage school organisations and user accounts across the platform.</Text>
+      <View style={styles.welcome}>
+        <Text style={styles.welcomeLabel}>SIGNED IN AS</Text>
+        <Text style={styles.welcomeName}>{[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Platform administrator"}</Text>
+        <Text style={styles.welcomeCopy}>Restricted cross-school administration</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+        {[["overview", "Overview"], ["schools", "Schools"], ["users", "Users"], ["plans", "Plans"], ["billing", "Billing"], ["audit", "Commercial audit"], ["systemAudit", "System audit"]].map(([key, label]) =>
+          <TouchableOpacity key={key} onPress={() => switchSection(key)} style={[styles.tab, section === key && styles.tabActive]}>
+            <Text style={[styles.tabText, section === key && styles.tabTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+      {section === "overview" ? <View style={styles.metricsWrap}>
+        {overviewLoading ? <ActivityIndicator color={colors.primary}/> : null}
+        {overviewError ? <View style={styles.error}><Text style={styles.errorText}>{overviewError}</Text></View> : null}
+        {!overviewLoading && !overviewError && !overview ? <Text style={styles.metricHint}>No business overview data is available yet.</Text> : null}
+        {overview ? <>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>CLIENT SCHOOLS</Text><Text style={styles.metricValue}>{overview.schools?.total ?? 0}</Text><Text style={styles.metricHint}>{overview.schools?.active ?? 0} active</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>PENDING / SUSPENDED SCHOOLS</Text><Text style={styles.metricValue}>{(overview.schools?.byStatus || []).filter((item) => ["pending", "suspended"].includes(item._id)).reduce((sum, item) => sum + item.count, 0)}</Text><Text style={styles.metricHint}>{(overview.schools?.byStatus || []).find((item) => item._id === "pending")?.count || 0} pending · {(overview.schools?.byStatus || []).find((item) => item._id === "suspended")?.count || 0} suspended</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>TRIALS ENDING SOON</Text><Text style={styles.metricValue}>{overview.trialsEndingSoon || 0}</Text><Text style={styles.metricHint}>{(overview.schools?.byStatus || []).find((item) => item._id === "trial_expired")?.count || 0} expired · access restricted</Text></View>
+          <View style={styles.metricCard}><Text style={styles.metricLabel}>ACTIVE SUBSCRIPTIONS</Text><Text style={styles.metricValue}>{Object.values(overview.subscriptions || {}).reduce((sum, item) => sum + (item.activeSubscriptions || 0), 0)}</Text><Text style={styles.metricHint}>Across all billing terms</Text></View>
+          {(overview.invoiced || []).map((item) => <View key={"inv-" + item._id} style={styles.metricCard}><Text style={styles.metricLabel}>INVOICED · {item._id}</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.invoiced || 0)}</Text><Text style={styles.metricHint}>Overdue: {new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.overdue || 0)}</Text></View>)}
+          {(overview.collected || []).map((item) => <View key={"cash-" + item._id} style={styles.metricCard}><Text style={styles.metricLabel}>CASH COLLECTED · {item._id}</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: item._id, maximumFractionDigits: 0 }).format(item.collected || 0)}</Text><Text style={styles.metricHint}>Recorded platform payments</Text></View>)}
+          {Object.entries(overview.subscriptions || {}).map(([currency, item]) => <View key={"runrate-" + currency} style={styles.metricCard}><Text style={styles.metricLabel}>{currency} RECURRING RUN RATE</Text><Text style={styles.metricValue}>{new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(item.mrr || 0)} / mo</Text><Text style={styles.metricHint}>Lifetime sales: {new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(item.lifetimeSales || 0)}</Text></View>)}
+        </> : null}
+        <Text style={styles.metricFootnote}>Platform revenue only. Student fee collections remain separate within each school.</Text>
+      </View> : null}
+
+      {["plans", "billing", "audit"].includes(section) ? <>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionTitle}>{section === "plans" ? "Subscription plans" : section === "billing" ? "Platform billing" : "Commercial audit"}</Text>
+            <Text style={styles.sectionSubtitle}>{section === "plans" ? "Monthly, annual and lifetime offers" : section === "billing" ? "Platform invoices and recorded payments" : "Plan, subscription and payment history"}</Text>
+          </View>
+          <TouchableOpacity onPress={() => switchSection(section)} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></TouchableOpacity>
+        </View>
+        {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading…</Text></View> : null}
+        {commercialError ? <View style={styles.error}><Text style={styles.errorText}>{commercialError}</Text><TouchableOpacity onPress={() => switchSection(section)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+        {!loading && !commercialError && commercialRecords.length === 0 ? <View style={styles.state}><Text style={styles.stateText}>{section === "plans" ? "No subscription plans created yet." : section === "billing" ? "No platform invoices yet." : "No commercial events recorded yet."}</Text></View> : null}
+        {commercialRecords.map((item, index) => <View key={String(item.id || item._id || index)} style={styles.record}>
+          <View style={{ flex: 1, gap: 5 }}>
+            <Text style={styles.recordName}>{section === "plans" ? item.name : section === "billing" ? item.invoiceNumber : String(item.action || "Event").replaceAll("_", " ")}</Text>
+            <Text style={styles.recordSubtitle}>{section === "plans" ? (item.billingInterval === "one_time" ? "Lifetime · single payment" : item.billingInterval + " · " + item.currency + " " + item.amount) : section === "billing" ? (item.tenantId?.name || "School") + " · " + item.status : (item.tenantId?.name || "Platform") + " · " + new Date(item.createdAt).toLocaleDateString()}</Text>
+          </View>
+          <View style={styles.statusPill}><Text style={styles.statusText}>{section === "plans" ? (item.isArchived ? "archived" : item.isActive ? "active" : "inactive") : section === "billing" ? item.status : "logged"}</Text></View>
+        </View>)}
+        {section !== "plans" && !loading && commercialPagination.totalPages > 1 ? <View style={styles.pagination}>
+          <TouchableOpacity disabled={commercialPage <= 1} onPress={() => setCommercialPage((value) => Math.max(1, value - 1))} style={[styles.pageButton, commercialPage <= 1 && styles.disabled]}><Text style={styles.pageText}>Previous</Text></TouchableOpacity>
+          <Text style={styles.pageCount}>Page {commercialPage} of {commercialPagination.totalPages} · {commercialPagination.total} records</Text>
+          <TouchableOpacity disabled={commercialPage >= commercialPagination.totalPages} onPress={() => setCommercialPage((value) => Math.min(commercialPagination.totalPages, value + 1))} style={[styles.pageButton, commercialPage >= commercialPagination.totalPages && styles.disabled]}><Text style={styles.pageText}>Next</Text></TouchableOpacity>
+        </View> : null}
+        <Text style={styles.metricFootnote}>Commercial controls and payment recording are available in the web platform workspace.</Text>
+      </> : null}
+      {section === "systemAudit" ? <>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>System audit</Text><Text style={styles.sectionSubtitle}>Account changes and audit delivery health</Text></View>
+          <TouchableOpacity onPress={() => switchSection(section)} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></TouchableOpacity>
+        </View>
+        {systemAuditOutbox ? <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>AUDIT DELIVERY</Text>
+          <Text style={styles.metricValue}>{systemAuditOutbox.counts?.delivered ?? 0} delivered</Text>
+          <Text style={styles.metricHint}>{systemAuditOutbox.counts?.failed ?? 0} failed · {systemAuditOutbox.counts?.pending ?? 0} pending · {systemAuditOutbox.counts?.processing ?? 0} processing</Text>
+        </View> : null}
+        {!loading && !commercialError && systemAuditRecords.length === 0 ? <View style={styles.state}><Text style={styles.stateText}>No system audit events recorded yet.</Text></View> : null}
+        {systemAuditRecords.map((item, index) => <View key={String(item.id || index)} style={styles.record}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.recordName}>{String(item.action || "Event").replaceAll("_", " ")}</Text>
+            <Text style={styles.recordSubtitle}>{item.actorName || item.actorRole || "System"} · {item.schoolName || "Platform"} · {new Date(item.createdAt).toLocaleString()}</Text>
+            <Text style={styles.recordSubtitle}>Changed: {(item.changedFields || []).join(", ") || "Not specified"}</Text>
+          </View>
+        </View>)}
+      </> : null}
+      {section === "schools" && selectedSchoolId ? <>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>School details</Text><Text style={styles.sectionSubtitle}>School profile, administrators and lifecycle</Text></View>
+          <TouchableOpacity onPress={() => setSelectedSchoolId("")} style={styles.refresh}><Text style={styles.refreshText}>Back to schools</Text></TouchableOpacity>
+        </View>
+        {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading school details…</Text></View> : null}
+        {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => setSchoolDetailsRefresh((value) => value + 1)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+        {schoolDetails?.school ? <>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SCHOOL PROFILE</Text>
+            <Text style={styles.metricValue}>{schoolDetails.school.name}</Text>
+            <Text style={styles.metricHint}>{schoolDetails.school.slug} · {schoolDetails.school.contactEmail || "No contact email"}</Text>
+            <View style={styles.statusPill}><Text style={styles.statusText}>{statusOf(schoolDetails.school)}</Text></View>
+            {schoolDetails.school.suspensionReason ? <Text style={styles.metricHint}>Suspension reason: {schoolDetails.school.suspensionReason}</Text> : null}
+            {schoolDetails.school.trialStartedAt ? <Text style={styles.metricHint}>Trial: {new Date(schoolDetails.school.trialStartedAt).toLocaleDateString()} – {schoolDetails.school.trialEndsAt ? new Date(schoolDetails.school.trialEndsAt).toLocaleDateString() : "End date unavailable"}{schoolDetails.school.status === "trial_expired" ? " · Expired" : ""}</Text> : null}
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SCHOOL ADMINISTRATORS</Text>
+            {(schoolDetails.administrators || []).length ? schoolDetails.administrators.map((admin) => <View key={String(admin.id || admin._id)} style={styles.adminRow}>
+              <Text style={styles.recordName}>{[admin.firstName, admin.lastName].filter(Boolean).join(" ") || admin.email}</Text>
+              <Text style={styles.recordSubtitle}>{admin.email} · {statusOf(admin)}</Text>
+            </View>) : <Text style={styles.metricHint}>No school administrators found.</Text>}
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SUBSCRIPTION</Text>
+            {schoolSubscription ? <>
+              <Text style={styles.recordName}>{schoolSubscription.planName || "Subscription"} · {schoolSubscription.billingInterval}</Text>
+              <Text style={styles.metricHint}>{schoolSubscription.isTrial ? "Free trial" : schoolSubscription.currency + " " + Number(schoolSubscription.amount || 0).toLocaleString("en-IN")} · {statusOf(schoolSubscription)}</Text>
+              <Text style={styles.metricHint}>{schoolSubscription.trialEndsAt || schoolSubscription.currentPeriodEndsAt ? "Ends " + new Date(schoolSubscription.trialEndsAt || schoolSubscription.currentPeriodEndsAt).toLocaleDateString() : schoolSubscription.lifetimeAccess ? "Lifetime access" : "Billing date pending"}</Text>
+            </> : <Text style={styles.metricHint}>No subscription assigned.</Text>}
+            {!schoolDetails.school.trialStartedAt && !schoolSubscription && !["suspended", "trial_expired"].includes(schoolDetails.school.status) ? <TouchableOpacity disabled={schoolActionBusy} onPress={startSchoolTrial} style={styles.actionButton}><Text style={styles.actionButtonText}>{schoolActionBusy ? "Please wait…" : "Start 30-day free trial"}</Text></TouchableOpacity> : null}
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>SCHOOL ACCESS</Text>
+            {schoolDetails.school.status === "pending" ? <TouchableOpacity disabled={schoolActionBusy} onPress={() => updateSchoolStatus("active")} style={styles.actionButton}><Text style={styles.actionButtonText}>Activate school</Text></TouchableOpacity> : null}
+            {schoolDetails.school.status === "active" ? <>
+              <TextInput value={suspensionReason} onChangeText={setSuspensionReason} placeholder="Reason for suspension (10–500 characters)" placeholderTextColor={colors.muted} style={styles.search} multiline />
+              <TouchableOpacity disabled={schoolActionBusy} onPress={() => updateSchoolStatus("suspended")} style={styles.dangerButton}><Text style={styles.actionButtonText}>Suspend school</Text></TouchableOpacity>
+            </> : null}
+            {schoolDetails.school.status === "suspended" ? <TouchableOpacity disabled={schoolActionBusy} onPress={() => updateSchoolStatus("active")} style={styles.actionButton}><Text style={styles.actionButtonText}>Reactivate school</Text></TouchableOpacity> : null}
+            {schoolActionMessage ? <Text style={styles.metricHint}>{schoolActionMessage}</Text> : null}
+          </View>
+        </> : null}
+      </> : null}
+      {section === "users" && selectedUserId ? <>
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1 }}><Text style={styles.sectionTitle}>User details</Text><Text style={styles.sectionSubtitle}>Profile, role and account access</Text></View>
+          <TouchableOpacity onPress={() => { setSelectedUserId(""); setUserDetails(null); setError(""); }} style={styles.refresh}><Text style={styles.refreshText}>Back to users</Text></TouchableOpacity>
+        </View>
+        {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading user details…</Text></View> : null}
+        {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => setUserDetailsRefresh((value) => value + 1)}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+        {userDetails ? <>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>ACCOUNT</Text>
+            <Text style={styles.metricValue}>{[userDetails.firstName, userDetails.lastName].filter(Boolean).join(" ") || "Unnamed user"}</Text>
+            <Text style={styles.metricHint}>{userDetails.email} · {userDetails.role?.replaceAll("_", " ")}</Text>
+            <Text style={styles.metricHint}>Created {userDetails.createdAt ? new Date(userDetails.createdAt).toLocaleDateString() : "date unavailable"} · Last login {userDetails.lastLoginAt ? new Date(userDetails.lastLoginAt).toLocaleString() : "Never"}</Text>
+            <View style={styles.statusPill}><Text style={styles.statusText}>{statusOf(userDetails)}</Text></View>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>EDIT PROFILE</Text>
+            <TextInput value={userProfileForm.firstName} onChangeText={(value) => setUserProfileForm((current) => ({ ...current, firstName: value }))} placeholder="First name" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
+            <TextInput value={userProfileForm.lastName} onChangeText={(value) => setUserProfileForm((current) => ({ ...current, lastName: value }))} placeholder="Last name" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
+            <TextInput value={userProfileForm.email} onChangeText={(value) => setUserProfileForm((current) => ({ ...current, email: value }))} placeholder="Email address" placeholderTextColor={colors.muted} style={styles.search} keyboardType="email-address" autoCapitalize="none" maxLength={254}/>
+            <TextInput value={userProfileForm.phone} onChangeText={(value) => setUserProfileForm((current) => ({ ...current, phone: value }))} placeholder="Phone (optional)" placeholderTextColor={colors.muted} style={styles.search} keyboardType="phone-pad" maxLength={20}/>
+            <TouchableOpacity disabled={userActionBusy || !userProfileForm.firstName.trim() || !userProfileForm.email.trim()} onPress={saveUserProfile} style={styles.actionButton}><Text style={styles.actionButtonText}>{userActionBusy ? "Please wait…" : "Save profile"}</Text></TouchableOpacity>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>ROLE MANAGEMENT</Text>
+            {[...new Set(["school_admin", "principal", "teacher", "student", "parent", ...(userDetails.role && ["accountant", "librarian", "transport_manager"].includes(userDetails.role) ? [userDetails.role] : [])])].map((role) => {
+              const unsupported = ["accountant", "librarian", "transport_manager"].includes(role);
+              const isSelf = String(userDetails.id) === String(user?.id || user?._id);
+              return <TouchableOpacity key={role} disabled={userActionBusy || isSelf || unsupported} onPress={() => setUserRole(role)} style={[styles.roleOption, userRole === role && styles.roleOptionActive, (isSelf || unsupported) && styles.disabled]}><Text style={[styles.roleOptionText, userRole === role && styles.roleOptionTextActive]}>{role.replaceAll("_", " ")}{unsupported ? " · unsupported in this release" : ""}</Text><Text style={styles.roleOptionText}>{userRole === role ? "Selected" : ""}</Text></TouchableOpacity>;
+            })}
+            {String(userDetails.id) === String(user?.id || user?._id) ? <Text style={styles.metricHint}>You cannot change your own role.</Text> : null}
+            <TouchableOpacity disabled={userActionBusy || String(userDetails.id) === String(user?.id || user?._id) || userRole === userDetails.role || ["accountant", "librarian", "transport_manager"].includes(userRole)} onPress={updateUserRole} style={[styles.actionButton, (userRole === userDetails.role || String(userDetails.id) === String(user?.id || user?._id)) && styles.disabled]}><Text style={styles.actionButtonText}>Save role</Text></TouchableOpacity>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>ACCOUNT ACCESS</Text>
+            {userDetails.status === "pending" ? <TouchableOpacity disabled={userActionBusy} onPress={() => updateUserStatus("active")} style={styles.actionButton}><Text style={styles.actionButtonText}>Activate user</Text></TouchableOpacity> : null}
+            {userDetails.status === "active" && String(userDetails.id) !== String(user?.id || user?._id) ? <TouchableOpacity disabled={userActionBusy} onPress={() => updateUserStatus("suspended")} style={styles.dangerButton}><Text style={styles.actionButtonText}>Suspend user</Text></TouchableOpacity> : null}
+            {userDetails.status === "suspended" ? <TouchableOpacity disabled={userActionBusy} onPress={() => updateUserStatus("active")} style={styles.actionButton}><Text style={styles.actionButtonText}>Reactivate user</Text></TouchableOpacity> : null}
+            {userActionMessage ? <Text style={styles.metricHint}>{userActionMessage}</Text> : null}
+          </View>
+        </> : null}
+      </> : null}
+      {section === "users" && showCreateUser ? <>
+        <View style={styles.sectionHeader}><View style={{ flex: 1 }}><Text style={styles.sectionTitle}>Create school user</Text><Text style={styles.sectionSubtitle}>New accounts await activation</Text></View><TouchableOpacity onPress={() => setShowCreateUser(false)} style={styles.refresh}><Text style={styles.refreshText}>Cancel</Text></TouchableOpacity></View>
+        <View style={styles.metricCard}>
+          <Text style={styles.metricLabel}>ACTIVE SCHOOL</Text>
+          {userSchools.filter((school) => school.status === "active").map((school) => <TouchableOpacity key={String(school.id || school._id)} onPress={() => setNewUser((current) => ({ ...current, tenantId: String(school.id || school._id) }))} style={[styles.roleOption, newUser.tenantId === String(school.id || school._id) && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{school.name}</Text></TouchableOpacity>)}
+          <TextInput value={newUser.firstName} onChangeText={(value) => setNewUser((current) => ({ ...current, firstName: value }))} placeholder="First name *" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
+          <TextInput value={newUser.lastName} onChangeText={(value) => setNewUser((current) => ({ ...current, lastName: value }))} placeholder="Last name" placeholderTextColor={colors.muted} style={styles.search} maxLength={80}/>
+          <TextInput value={newUser.email} onChangeText={(value) => setNewUser((current) => ({ ...current, email: value }))} placeholder="Email address *" placeholderTextColor={colors.muted} style={styles.search} keyboardType="email-address" autoCapitalize="none" maxLength={254}/>
+          <TextInput value={newUser.phone} onChangeText={(value) => setNewUser((current) => ({ ...current, phone: value }))} placeholder="Phone (optional)" placeholderTextColor={colors.muted} style={styles.search} keyboardType="phone-pad" maxLength={20}/>
+          <Text style={styles.metricLabel}>ROLE</Text>
+          {["school_admin", "principal", "teacher", "student", "parent"].map((role) => <TouchableOpacity key={role} onPress={() => setNewUser((current) => ({ ...current, role }))} style={[styles.roleOption, newUser.role === role && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{role.replaceAll("_", " ")}</Text></TouchableOpacity>)}
+          <TextInput value={newUser.password} onChangeText={(value) => setNewUser((current) => ({ ...current, password: value }))} placeholder="Initial password (min. 8 characters) *" placeholderTextColor={colors.muted} style={styles.search} secureTextEntry maxLength={72}/>
+          <TouchableOpacity disabled={creatingUser || !newUser.tenantId || !newUser.firstName.trim() || !newUser.email.trim() || newUser.password.length < 8} onPress={createPlatformUser} style={styles.actionButton}><Text style={styles.actionButtonText}>{creatingUser ? "Creating…" : "Create user"}</Text></TouchableOpacity>
+          {createUserMessage ? <Text style={styles.metricHint}>{createUserMessage}</Text> : null}
+          {!userSchools.some((school) => school.status === "active") ? <Text style={styles.metricHint}>No active schools are available.</Text> : null}
+        </View>
+      </> : null}
+      { ["schools", "users"].includes(section) && !(section === "users" && (selectedUserId || showCreateUser)) ? <>
+      <View style={styles.sectionHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.sectionTitle}>{section === "schools" ? "School directory" : "User directory"}</Text>
+          <Text style={styles.sectionSubtitle}>{pagination.total || 0} records across the platform</Text>
+        </View>
+        <TouchableOpacity onPress={() => loadDirectory(true)} style={styles.refresh}><Text style={styles.refreshText}>{refreshing ? "Refreshing…" : "Refresh"}</Text></TouchableOpacity>
+      </View>
+      {section === "users" ? <>
+         <TouchableOpacity onPress={() => { setCreateUserMessage(""); setShowCreateUser(true); }} style={styles.actionButton}><Text style={styles.actionButtonText}>＋ Create user</Text></TouchableOpacity>
+         {createUserMessage ? <Text style={styles.metricHint}>{createUserMessage}</Text> : null}
+       </> : null}
+      <TextInput
+        value={search}
+        onChangeText={(value) => { setSearch(value); setPage(1); }}
+        placeholder={section === "schools" ? "Search schools…" : "Search users…"}
+        placeholderTextColor={colors.muted}
+        style={styles.search}
+        returnKeyType="search"
+        accessibilityLabel={section === "schools" ? "Search schools" : "Search users"}
+      />
+      {section === "users" ? <View style={styles.metricCard}>
+        <Text style={styles.metricLabel}>ROLE FILTER</Text>
+        {["", "school_admin", "principal", "teacher", "accountant", "librarian", "transport_manager", "student", "parent"].map((value) => <TouchableOpacity key={value || "all-roles"} onPress={() => { setUserRoleFilter(value); setPage(1); }} style={[styles.roleOption, userRoleFilter === value && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{value ? value.replaceAll("_", " ") : "All roles"}</Text></TouchableOpacity>)}
+        <Text style={styles.metricLabel}>STATUS FILTER</Text>
+        {["", "pending", "active", "suspended"].map((value) => <TouchableOpacity key={value || "all-status"} onPress={() => { setUserStatusFilter(value); setPage(1); }} style={[styles.roleOption, userStatusFilter === value && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{value || "All statuses"}</Text></TouchableOpacity>)}
+        <Text style={styles.metricLabel}>SCHOOL FILTER</Text>
+        <TouchableOpacity onPress={() => { setUserSchoolFilter(""); setPage(1); }} style={[styles.roleOption, !userSchoolFilter && styles.roleOptionActive]}><Text style={styles.roleOptionText}>All schools</Text></TouchableOpacity>
+        {userSchools.map((school) => <TouchableOpacity key={String(school.id || school._id)} onPress={() => { setUserSchoolFilter(String(school.id || school._id)); setPage(1); }} style={[styles.roleOption, userSchoolFilter === String(school.id || school._id) && styles.roleOptionActive]}><Text style={styles.roleOptionText}>{school.name}</Text></TouchableOpacity>)}
+      </View> : null}
+      {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary}/><Text style={styles.stateText}>Loading directory…</Text></View> : null}
+      {error ? <View style={styles.error}><Text style={styles.errorText}>{error}</Text><TouchableOpacity onPress={() => loadDirectory()}><Text style={styles.retry}>Try again</Text></TouchableOpacity></View> : null}
+      {!loading && !error ? (section === "schools" ? schools : users).length ? (section === "schools" ? schools : users).map((item, index) =>
+        <TouchableOpacity key={String(item.id || item._id || index)} activeOpacity={0.8} onPress={() => { if (section === "schools") { setSelectedSchoolId(String(item.id || item._id)); setSchoolDetails(null); setSchoolSubscription(null); setSchoolActionMessage(""); } else { setSelectedUserId(String(item.id || item._id)); setUserDetails(null); setUserActionMessage(""); setError(""); } }} style={styles.record}>
+          <View style={styles.recordIcon}><Text style={styles.recordIconText}>{section === "schools" ? "⌂" : "♙"}</Text></View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.recordName}>{nameOf(item)}</Text>
+            <Text style={styles.recordSubtitle}>{subtitleOf(item)}</Text>
+          </View>
+          <View style={styles.statusPill}><Text style={styles.statusText}>{statusOf(item)}</Text></View>
+        </TouchableOpacity>
+      ) : <View style={styles.state}><Text style={styles.stateText}>No {section} found.</Text></View> : null}
+      {!loading && pagination.pages > 1 ? <View style={styles.pagination}>
+        <TouchableOpacity disabled={page <= 1} onPress={() => setPage((value) => value - 1)} style={[styles.pageButton, page <= 1 && styles.disabled]}><Text style={styles.pageText}>Previous</Text></TouchableOpacity>
+        <Text style={styles.pageCount}>Page {page} of {pagination.pages}</Text>
+        <TouchableOpacity disabled={page >= pagination.pages} onPress={() => setPage((value) => value + 1)} style={[styles.pageButton, page >= pagination.pages && styles.disabled]}><Text style={styles.pageText}>Next</Text></TouchableOpacity>
+      </View> : null}
+      </> : null}
+      <Text style={styles.footer}>SchoolSuite · Platform administration</Text>
+    </ScrollView>
+  </AppScreen>;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: spacing.lg, paddingVertical: 13, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  brandMark: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  brandMarkText: { color: colors.white, fontSize: 15, fontWeight: "900" },
+  brandName: { color: colors.ink, fontSize: 13, fontWeight: "900", letterSpacing: 1.1 },
+  brandCaption: { color: colors.muted, fontSize: 9, fontWeight: "800", letterSpacing: 1, marginTop: 3 },
+  signOut: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 11, paddingVertical: 8 },
+  signOutText: { color: colors.muted, fontSize: 11, fontWeight: "800" },
+  content: { padding: spacing.lg, paddingBottom: 36, gap: spacing.md },
+  kicker: { color: colors.primary, fontSize: 10, fontWeight: "900", letterSpacing: 1.4, marginTop: 5 },
+  title: { color: colors.ink, fontSize: 26, fontWeight: "900", letterSpacing: -0.6 },
+  description: { color: colors.muted, fontSize: 13, lineHeight: 20 },
+  welcome: { backgroundColor: colors.primary, borderRadius: radius.lg, padding: 20, gap: 6, marginVertical: 5 },
+  welcomeLabel: { color: "#DCE5FF", fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
+  welcomeName: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  welcomeCopy: { color: "#E3E9FF", fontSize: 11 },
+  metricsWrap: { gap: 9 },
+  metricCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 15, gap: 5 },
+  metricLabel: { color: colors.muted, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  metricValue: { color: colors.ink, fontSize: 21, fontWeight: "900" },
+  metricHint: { color: colors.muted, fontSize: 10 },
+  metricFootnote: { color: colors.muted, fontSize: 10, lineHeight: 15 },
+  tabs: { flexDirection: "row", gap: 7, backgroundColor: colors.surface, padding: 5, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  tab: { minWidth: 76, alignItems: "center", paddingHorizontal: 12, paddingVertical: 11, borderRadius: radius.sm },
+  tabActive: { backgroundColor: colors.primarySoft },
+  tabText: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  tabTextActive: { color: colors.primary },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 7 },
+  sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: "900" },
+  sectionSubtitle: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  refresh: { padding: 9 },
+  refreshText: { color: colors.primary, fontSize: 11, fontWeight: "800" },
+  search: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 13, paddingVertical: 11, color: colors.ink, fontSize: 13 },
+  record: { flexDirection: "row", alignItems: "center", gap: 11, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 13 },
+  adminRow: { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 3 },
+  actionButton: { alignItems: "center", backgroundColor: colors.primary, borderRadius: radius.md, padding: 12, marginTop: 10 },
+  dangerButton: { alignItems: "center", backgroundColor: colors.danger, borderRadius: radius.md, padding: 12, marginTop: 10 },
+  actionButtonText: { color: colors.white, fontSize: 12, fontWeight: "900" },
+  roleOption: { flexDirection: "row", justifyContent: "space-between", padding: 11, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, marginTop: 6 },
+  roleOptionActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  roleOptionText: { color: colors.muted, fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
+  roleOptionTextActive: { color: colors.primary },
+  recordIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  recordIconText: { color: colors.primary, fontSize: 17, fontWeight: "900" },
+  recordName: { color: colors.ink, fontSize: 13, fontWeight: "800" },
+  recordSubtitle: { color: colors.muted, fontSize: 10 },
+  statusPill: { backgroundColor: colors.primarySoft, paddingHorizontal: 8, paddingVertical: 5, borderRadius: radius.pill },
+  statusText: { color: colors.primary, fontSize: 9, fontWeight: "800", textTransform: "capitalize" },
+  state: { alignItems: "center", padding: 25, gap: 10, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  stateText: { color: colors.muted, fontSize: 12 },
+  error: { padding: 14, borderRadius: radius.md, backgroundColor: "#FFF0EF", gap: 8 },
+  errorText: { color: colors.danger, fontSize: 12 },
+  retry: { color: colors.primary, fontWeight: "900", fontSize: 12 },
+  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 },
+  pageButton: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  pageText: { color: colors.primary, fontSize: 11, fontWeight: "800" },
+  pageCount: { color: colors.muted, fontSize: 11, fontWeight: "700" },
+  disabled: { opacity: 0.35 },
+  footer: { textAlign: "center", color: colors.muted, fontSize: 10, marginTop: 14 },
+});

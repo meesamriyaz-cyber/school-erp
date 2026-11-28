@@ -9,6 +9,7 @@ import env from "./config/env.js";
 import routes from "./routes/index.js";
 import NotFound from "./middleware/NotFound.js";
 import errorHandler from "./middleware/errorHandler.js";
+import { receiveResendWebhook } from "./controllers/resendWebhookController.js";
 
 const app = express();
 
@@ -35,6 +36,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.post("/api/v1/webhooks/resend", express.raw({ type: "application/json", limit: "256kb" }), receiveResendWebhook);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

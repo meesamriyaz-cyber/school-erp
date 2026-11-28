@@ -25,7 +25,7 @@ describe("LoginPage", () => {
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
 
     expect(
-      screen.getByRole("button", { name: "Sign in to workspace" }),
+      screen.getByRole("button", { name: "Sign in to school workspace" }),
     ).toBeInTheDocument();
   });
 
@@ -43,7 +43,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText("Password"), "SecurePass123!");
 
     await user.click(
-      screen.getByRole("button", { name: "Sign in to workspace" }),
+      screen.getByRole("button", { name: "Sign in to school workspace" }),
     );
 
     await waitFor(() => {
@@ -51,6 +51,38 @@ describe("LoginPage", () => {
         tenantSlug: "green-valley-school",
         email: "admin@school.com",
         password: "SecurePass123!",
+        workspace: "school",
+      });
+    });
+  });
+
+
+  it("allows platform administrators to sign in without a School ID", async () => {
+    const user = userEvent.setup();
+    login.mockResolvedValueOnce(undefined);
+
+    render(<LoginPage />);
+
+    await user.click(screen.getByRole("button", { name: "Platform Admin" }));
+
+    expect(screen.queryByLabelText("School ID")).not.toBeInTheDocument();
+
+    await user.type(
+      screen.getByLabelText("Email address"),
+      "platform@example.com",
+    );
+    await user.type(screen.getByLabelText("Password"), "SecurePass123!");
+
+    await user.click(
+      screen.getByRole("button", { name: "Sign in to Platform Admin" }),
+    );
+
+    await waitFor(() => {
+      expect(login).toHaveBeenCalledWith({
+        tenantSlug: "",
+        email: "platform@example.com",
+        password: "SecurePass123!",
+        workspace: "platform",
       });
     });
   });
@@ -69,7 +101,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText("Password"), "WrongPassword123!");
 
     await user.click(
-      screen.getByRole("button", { name: "Sign in to workspace" }),
+      screen.getByRole("button", { name: "Sign in to school workspace" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -98,7 +130,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText("Password"), "SecurePass123!");
 
     await user.click(
-      screen.getByRole("button", { name: "Sign in to workspace" }),
+      screen.getByRole("button", { name: "Sign in to school workspace" }),
     );
 
     expect(
@@ -129,7 +161,7 @@ it("displays a fallback error when the login error has no message", async () => 
   );
 
   await user.click(
-    screen.getByRole("button", { name: "Sign in to workspace" }),
+    screen.getByRole("button", { name: "Sign in to school workspace" }),
   );
 
   expect(await screen.findByRole("alert")).toHaveTextContent(

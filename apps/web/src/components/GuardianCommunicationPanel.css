@@ -1,0 +1,106 @@
+.guardian-communication-card {
+  margin-top: 22px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  color: #172033;
+}
+.guardian-communication-heading,
+.guardian-communication-history-top,
+.guardian-communication-submit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.guardian-communication-heading h3 { margin: 0; font-size: 19px; }
+.guardian-communication-heading p { margin: 6px 0 0; color: #64748b; font-size: 13px; }
+.guardian-communication-card button {
+  border: 1px solid #d7dfec;
+  border-radius: 9px;
+  padding: 9px 14px;
+  background: #fff;
+  color: #263b76;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guardian-communication-card button:disabled { opacity: .55; cursor: not-allowed; }
+.guardian-communication-guardians,
+.guardian-communication-channels {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+.guardian-communication-guardians legend,
+.guardian-communication-channels legend { padding: 0 6px; font-weight: 800; font-size: 13px; }
+.guardian-communication-contact {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 4px;
+  border-top: 1px solid #edf1f6;
+  cursor: pointer;
+}
+.guardian-communication-contact input,
+.guardian-communication-channel-options input { margin-top: 3px; accent-color: #435ee8; }
+.guardian-communication-contact-copy { display: grid; gap: 4px; min-width: 0; }
+.guardian-communication-contact-copy strong { font-size: 13px; }
+.guardian-communication-contact-copy span { color: #64748b; font-size: 12px; overflow-wrap: anywhere; }
+.guardian-communication-contact-copy .guardian-communication-warning { color: #b45309; }
+.guardian-communication-contact.is-disabled { cursor: not-allowed; opacity: .65; }
+.guardian-communication-channel-options { display: flex; flex-wrap: wrap; gap: 9px; }
+.guardian-communication-channel-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid #d7dfec;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.guardian-communication-channel-options label.is-selected { border-color: #435ee8; background: #eef2ff; color: #344bc2; }
+.guardian-communication-field { display: grid; gap: 7px; margin: 14px 0; font-size: 13px; font-weight: 700; }
+.guardian-communication-field input,
+.guardian-communication-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d7dfec;
+  border-radius: 9px;
+  padding: 11px 12px;
+  color: #172033;
+  background: #fff;
+  font: inherit;
+  font-weight: 400;
+}
+.guardian-communication-field textarea { resize: vertical; min-height: 110px; }
+.guardian-communication-field small { color: #64748b; text-align: right; font-weight: 400; }
+.guardian-communication-submit-row { margin-top: 16px; }
+.guardian-communication-submit-row span { color: #64748b; font-size: 12px; }
+.guardian-communication-submit-row button { background: #435ee8; border-color: #435ee8; color: #fff; padding: 11px 17px; }
+.guardian-communication-error { color: #b91c1c; font-size: 13px; }
+.guardian-communication-notice { color: #047857; font-size: 13px; }
+.guardian-communication-history { margin-top: 24px; border-top: 1px solid #e8edf4; padding-top: 18px; }
+.guardian-communication-history h4 { margin: 0 0 12px; font-size: 14px; }
+.guardian-communication-history > p { color: #64748b; font-size: 13px; }
+.guardian-communication-history article { padding: 13px 0; border-top: 1px solid #edf1f6; }
+.guardian-communication-history-top strong { font-size: 13px; }
+.guardian-communication-history time { color: #64748b; font-size: 11px; }
+.guardian-communication-history article p { margin: 7px 0; color: #475569; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.guardian-communication-outcomes { display: flex; flex-wrap: wrap; gap: 7px; }
+.guardian-communication-outcomes span { padding: 4px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 800; }
+.guardian-communication-outcomes .status-accepted { background: #dcfce7; color: #166534; }
+.guardian-communication-outcomes .status-failed { background: #fee2e2; color: #991b1b; }
+.guardian-communication-outcomes .status-skipped { background: #fef3c7; color: #92400e; }
+@media (max-width: 640px) {
+  .guardian-communication-card { padding: 15px; }
+  .guardian-communication-heading { align-items: flex-start; }
+  .guardian-communication-submit-row { align-items: stretch; flex-direction: column; }
+  .guardian-communication-submit-row button { width: 100%; }
+  .guardian-communication-history-top { align-items: flex-start; flex-direction: column; gap: 4px; }
+}

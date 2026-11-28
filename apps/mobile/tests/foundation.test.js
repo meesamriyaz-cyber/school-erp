@@ -129,5 +129,97 @@ test('platform admin has a dedicated mobile workspace for cross-school directori
   assert.match(screen, /User directory/);
   assert.match(screen, /URLSearchParams/);
   assert.match(screen, /pagination/);
-  for (const section of ["plans", "billing", "audit"]) assert.ok(screen.includes(`"${section}"`), "platform admin mobile should expose " + section);
+  assert.match(screen, /\/platform\/schools\//);
+  assert.match(screen, /\/subscription/);
+  assert.match(screen, /School details/);
+  assert.match(screen, /Start 30-day free trial/);
+  assert.match(screen, /Activate school/);
+  assert.match(screen, /Suspend school/);
+  assert.match(screen, /Reactivate school/);
+  assert.match(screen, /suspensionReason/);
+  assert.match(screen, /System audit/);
+  assert.match(screen, /Commercial audit/);
+  assert.match(screen, /User details/);
+  assert.match(screen, /EDIT PROFILE/);
+  assert.match(screen, /ROLE MANAGEMENT/);
+  assert.match(screen, /ACCOUNT ACCESS/);
+  assert.match(screen, /\/platform\/users\//);
+  assert.match(screen, /Save profile/);
+  assert.match(screen, /Save role/);
+  assert.match(screen, /Activate user/);
+  assert.match(screen, /Suspend user/);
+  assert.match(screen, /Reactivate user/);
+  assert.match(screen, /Create school user/);
+  assert.match(screen, /Create user/);
+  assert.match(screen, /\/platform\/users/);
+  assert.match(screen, /ROLE FILTER/);
+  assert.match(screen, /STATUS FILTER/);
+  assert.match(screen, /SCHOOL FILTER/);
+  assert.match(screen, /tenantId/);
+  assert.match(screen, /userRoleFilter/);
+  assert.match(screen, /userStatusFilter/);
+  assert.match(screen, /accountant.*librarian.*transport_manager/);
+  assert.match(screen, /unsupported in this release/);
+  assert.match(screen, /You cannot change your own role/);
+  assert.match(screen, /String\(userDetails.id\) === String\(user\?\.id \|\| user\?\._id\)/);
+  assert.match(screen, /createUserMessage \? <Text/);
+  for (const section of ["plans", "billing", "audit"]) {
+  assert.ok(
+    screen.includes(`"${section}"`),
+    "platform admin mobile should expose " + section
+  );
+}
+});
+
+
+test('school administrator mobile overview exposes the same core school operations as its navigation', async () => {
+  const app = await readFile(new URL('../src/app/(app)/index.js', import.meta.url), 'utf8');
+  assert.match(app, /\["school_admin", "principal"\]\.includes\(user\?\.role\)/);
+  assert.match(app, /label="Net fee collection"/);
+  assert.match(app, /\["students", "attendance", "timetable", "staff"\]\.includes\(tab\.key\)/);
+  assert.match(app, /Active students/);
+  assert.match(app, /Attendance trend/);
+  assert.match(app, /Academic performance/);
+});
+
+
+test('teacher mobile retry actions reload the currently selected teaching workflow', async () => {
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  const announcements = await readFile(new URL('../src/components/TeacherAnnouncementsScreen.js', import.meta.url), 'utf8');
+  const timetable = await readFile(new URL('../src/components/TimetableScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /if\(tab==="homework"\)return activeHomework\?loadSubmissions\(activeHomework\):loadBase\(\)/);
+  assert.match(workspace, /if\(tab==="exams"\)return selectedExam\?loadExamRoster\(selectedExam\):loadBase\(\)/);
+  assert.match(workspace, /if\(tab==="reports"\)return runReport\(\)/);
+  assert.match(workspace, /onPress=\{retryCurrentTab\}/);
+  assert.match(announcements, /onPress=\{load\}/);
+  assert.match(timetable, /const params = isTeacher \? \{\}/);
+  assert.match(timetable, /getTimetable\(params\)/);
+});
+
+test('teacher mobile attendance reports support an explicit date range', async () => {
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /const \[reportFrom,setReportFrom\]=useState\(""\)/);
+  assert.match(workspace, /const \[reportTo,setReportTo\]=useState\(""\)/);
+  assert.match(workspace, /const from=reportFrom\|\|/);
+  assert.match(workspace, /const to=reportTo\|\|/);
+  assert.match(workspace, /from>to/);
+  assert.match(workspace, /From date \(YYYY-MM-DD\)/);
+  assert.match(workspace, /To date \(YYYY-MM-DD\)/);
+});
+
+test('student section refresh reports partial failures deterministically', async () => {
+  const workspace = await readFile(new URL('../src/components/StudentWorkspaceScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /const updates = \{\}/);
+  assert.match(workspace, /else failed\.push\(name\)/);
+  assert.match(workspace, /if \(Object\.keys\(updates\)\.length\) setData/);
+  assert.match(workspace, /setPartialErrors\(\(previous\) => .*failed/);
+  assert.match(workspace, /Previously loaded information has been kept/);
+});
+
+test('teacher mobile workspace preserves separate subject assignments within the same class', async () => {
+  const workspace = await readFile(new URL('../src/components/TeacherWorkspaceScreen.js', import.meta.url), 'utf8');
+  assert.match(workspace, /id\(a\.subjectId\)\|\|"all"/);
+  assert.match(workspace, /\[\["attendance","Attendance"\],\["students","My students"\],\["homework","Homework"\],\["exams","Exams"\]/);
+  assert.match(workspace, /\["announcements","Announcements"\],\["messages","Parent messages"\]/);
+  assert.match(workspace, /\/teacher-assignments\?status=active/);
 });

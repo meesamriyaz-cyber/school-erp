@@ -1,40 +1,102 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiRequest } from "./lib/api.js";
 import "./App.css";
+import "./components/Phase7Management.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { useAuth } from "./context/authContext.js";
 import LoginPage from "./components/LoginPage.jsx";
 import StudentDirectory from "./components/StudentDirectory.jsx";
+import AcademicYearManagement from "./components/AcademicYearManagement.jsx";
+import AcademicTermsManagement from "./components/AcademicTermsManagement.jsx";
+import ClassCurriculumManagement from "./components/ClassCurriculumManagement.jsx";
+import ClassesManagement from "./components/ClassesManagement.jsx";
+import SectionsManagement from "./components/SectionsManagement.jsx";
+import EnrollmentsManagement from "./components/EnrollmentsManagement.jsx";
+import PlatformAdminWorkspace from "./components/PlatformAdminWorkspace.jsx";
+import SchoolUserDirectory from "./components/SchoolUserDirectory.jsx";
+import GuardianDirectory from "./components/GuardianDirectory.jsx";
+import AttendanceManagement from "./components/AttendanceManagement.jsx";
+import AttendanceReports from "./components/AttendanceReports.jsx";
+import SubjectManagement from "./components/SubjectManagement.jsx";
+import TeacherAssignments from "./components/TeacherAssignments.jsx";
+import TimetableManagement from "./components/TimetableManagement.jsx";
+import ExaminationManagement from "./components/ExaminationManagement.jsx";
+import GradingScaleManagement from "./components/GradingScaleManagement.jsx";
+import StudentResultsPortal from "./components/StudentResultsPortal.jsx";
+import HomeworkManagement from "./components/HomeworkManagement.jsx";
+import FeeManagement from "./components/FeeManagement.jsx";
+import StaffManagement from "./components/StaffManagement.jsx";
+import TeacherTimetablePortal from "./components/TeacherTimetablePortal.jsx";
+import AnnouncementManagement from "./components/AnnouncementManagement.jsx";
+import MessagingWorkspace from "./components/MessagingWorkspace.jsx";
+import CertificatesReports from "./components/CertificatesReports.jsx";
+import StudentDocumentManagement from "./components/StudentDocumentManagement.jsx";
+import SchoolDashboard from "./components/SchoolDashboard.jsx";
 const navigation = [
   { label: "Overview", icon: "▦", section: "MAIN" },
   { label: "Students", icon: "♙", section: "MAIN" },
+  { label: "Student Documents", icon: "▤", section: "MAIN" },
   { label: "Guardians", icon: "♧", section: "MAIN" },
   { label: "Teachers & Staff", icon: "♙", section: "MAIN" },
-  { label: "Classes & Sections", icon: "▤", section: "ACADEMICS" },
+  { label: "Announcements", icon: "▤", section: "MAIN" },
+  { label: "Messaging Oversight", icon: "✉", section: "MAIN" },
+  { label: "Academic Years", icon: "▣", section: "ACADEMICS" },
+  { label: "Academic Terms", icon: "▤", section: "ACADEMICS" },
+  { label: "Classes", icon: "▤", section: "ACADEMICS" },
+  { label: "Sections", icon: "▧", section: "ACADEMICS" },
+  { label: "Enrollments", icon: "♙", section: "ACADEMICS" },
   { label: "Attendance", icon: "✓", section: "ACADEMICS" },
+  { label: "Attendance Reports", icon: "▥", section: "ACADEMICS" },
+  { label: "Certificates & Reports", icon: "▤", section: "ACADEMICS" },
+  { label: "Subjects", icon: "▤", section: "ACADEMICS" },
+  { label: "Class Curriculum", icon: "▦", section: "ACADEMICS" },
+  { label: "Teacher Assignments", icon: "♙", section: "ACADEMICS" },
   { label: "Timetable", icon: "▦", section: "ACADEMICS" },
   { label: "Examinations", icon: "▤", section: "ACADEMICS" },
+  { label: "Grading Scales", icon: "▧", section: "ACADEMICS" },
+  { label: "Homework & Classwork", icon: "✎", section: "ACADEMICS" },
   { label: "Fees & Payments", icon: "₹", section: "FINANCE" },
-  { label: "Reports", icon: "▥", section: "FINANCE" },
-  { label: "Settings", icon: "⚙", section: "SYSTEM" },
+  { label: "User Management", icon: "♙", section: "SYSTEM" },
 ];
 
-const stats = [
-  { label: "Total students", value: "—", note: "Live data will appear here", icon: "♙" },
-  { label: "Present today", value: "—", note: "Attendance module pending", icon: "✓" },
-  { label: "Teaching staff", value: "—", note: "Staff module pending", icon: "♧" },
-  { label: "Fee collection", value: "—", note: "Finance module pending", icon: "₹" },
-];
 
 function DashboardApp() {
-   const { status, user, schoolContext, logout } = useAuth();
+   const { status, user, schoolContext, logout, accessToken } = useAuth();
+   const [activeAcademicYear, setActiveAcademicYear] = useState(null);
    const [activePage, setActivePage] = useState("Overview");
    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+   useEffect(() => {
+        if (
+      status !== "authenticated" ||
+      !accessToken ||
+      !["school_admin", "principal"].includes(user?.role)
+    ) {
+      return undefined;
+    }
+
+     const controller = new AbortController();
+     apiRequest("/academic-years?status=active", {
+       accessToken,
+       signal: controller.signal,
+     }).then((response) => {
+       if (!controller.signal.aborted) {
+         setActiveAcademicYear(Array.isArray(response?.data) ? response.data[0] || null : null);
+       }
+     }).catch((error) => {
+       if (error.name !== "AbortError" && !controller.signal.aborted) {
+         setActiveAcademicYear(null);
+       }
+     });
+
+     return () => controller.abort();
+   }, [accessToken, status, user?.role]);
      if (status === "loading") {
     return (
       <main className="auth-loading">
         <div className="auth-brand-mark">S</div>
-        <p>Restoring your school session…</p>
+        <p>Restoring your session…</p>
       </main>
     );
   }
@@ -42,6 +104,44 @@ function DashboardApp() {
   if (status !== "authenticated") {
     return <LoginPage />;
   }
+
+  if (user?.role === "student" || user?.role === "parent") {
+    return <StudentResultsPortal />;
+  }
+
+  if (user?.role === "teacher") {
+    return <TeacherTimetablePortal />;
+  }
+
+  if (user?.role === "platform_admin") {
+    return <PlatformAdminWorkspace />;
+  }
+  if (!["school_admin", "principal"].includes(user?.role)) {
+  return (
+    <main className="auth-loading">
+      <div className="auth-brand-mark">S</div>
+      <h1>Workspace unavailable</h1>
+      <p>
+        {user?.role === "accountant"
+          ? "The advanced Accounts workspace is a separately enabled module and is not currently available for this school account. Core fee collection remains part of the school workspace."
+          : user?.role === "transport_manager"
+            ? "The Transport workspace is a separately enabled module and is not currently available for this school account."
+            : user?.role === "librarian"
+              ? "A dedicated librarian workspace is not currently available for this account."
+              : "Your account does not currently have access to the school administration workspace."}
+      </p>
+      <button
+        className="logout-button"
+        type="button"
+        onClick={() => {
+          void logout();
+        }}
+      >
+        Sign out
+      </button>
+    </main>
+  );
+}
 
   const schoolName = schoolContext?.school?.name || "School workspace";
   const fullName = [user?.firstName, user?.lastName]
@@ -101,6 +201,7 @@ function DashboardApp() {
               <div className="nav-heading">{section}</div>
               {navigation
                 .filter((item) => item.section === section)
+                .filter((item) => item.label !== "User Management" || user?.role === "school_admin")
                 .map((item) => (
                   <button
                     key={item.label}
@@ -148,7 +249,7 @@ function DashboardApp() {
           <div className="topbar-actions">
             <div className="academic-year">
               <span className="year-dot" />
-              Academic year <strong>2026–27</strong>
+              Academic year <strong>{activeAcademicYear?.name || "Not set"}</strong>
             </div>
             <button className="icon-button notification-button" aria-label="Notifications">
               ♧<span className="notification-dot" />
@@ -178,7 +279,7 @@ function DashboardApp() {
           <div className="welcome-row">
             <div>
               <div className="eyebrow">SCHOOL WORKSPACE</div>
-              <h1>{activePage === "Overview" ? "Good day, Administrator" : activePage}</h1>
+              <h1>{activePage === "Overview" ? (user?.role === "principal" ? "Good day, Principal" : "Good day, Administrator") : activePage}</h1>
               <p className="page-subtitle">
                 {activePage === "Overview"
                   ? "Here’s an overview of your school management workspace."
@@ -188,138 +289,58 @@ function DashboardApp() {
             <div className="date-chip">
               <span aria-hidden="true">▦</span>
               <span>Academic session</span>
-              <strong>2026–27</strong>
+              <strong>{activeAcademicYear?.name || "Not set"}</strong>
             </div>
           </div>
 
           {activePage === "Overview" ? (
-            <>
-              <section className="welcome-banner">
-                <div className="banner-copy">
-                  <span className="banner-kicker">YOUR SCHOOL, ONE WORKSPACE</span>
-                  <h2>Everything in one place.</h2>
-                  <p>
-                    Build a connected school experience, from student records
-                    to academics and administration.
-                  </p>
-                  <button className="banner-button" onClick={() => selectPage("Students")}>
-                    Explore students <span aria-hidden="true">→</span>
-                  </button>
-                </div>
-                <div className="banner-art" aria-hidden="true">
-                  <div className="art-circle art-circle-one" />
-                  <div className="art-circle art-circle-two" />
-                  <div className="art-card art-card-back">✓</div>
-                  <div className="art-card art-card-front">
-                    <div className="art-card-top"><span /> <span /> <span /></div>
-                    <div className="art-avatar">S</div>
-                    <div className="art-line art-line-long" />
-                    <div className="art-line art-line-short" />
-                    <div className="art-check">✓</div>
-                  </div>
-                </div>
-              </section>
-
-              <div className="section-heading">
-                <div>
-                  <h2>School at a glance</h2>
-                  <p>Key indicators from your school workspace</p>
-                </div>
-                <span className="demo-label">Awaiting live data</span>
-              </div>
-
-              <section className="stats-grid">
-                {stats.map((stat, index) => (
-                  <article className="stat-card" key={stat.label}>
-                    <div className={`stat-icon stat-icon-${index}`}>
-                      {stat.icon}
-                    </div>
-                    <div className="stat-label">{stat.label}</div>
-                    <div className="stat-value">{stat.value}</div>
-                    <div className="stat-note">{stat.note}</div>
-                  </article>
-                ))}
-              </section>
-
-              <section className="lower-grid">
-                <article className="content-card module-card">
-                  <div className="card-heading">
-                    <div>
-                      <h2>Workspace modules</h2>
-                      <p>Build your school's digital workflow</p>
-                    </div>
-                    <span className="card-heading-icon">▦</span>
-                  </div>
-                  <button className="module-row" onClick={() => selectPage("Students")}>
-                    <span className="module-symbol module-symbol-blue">♙</span>
-                    <span className="module-copy">
-                      <strong>Student management</strong>
-                      <span>Admissions, student records and guardians</span>
-                    </span>
-                    <span className="module-status status-ready">API ready</span>
-                    <span className="module-arrow">→</span>
-                  </button>
-                  <div className="module-row module-row-muted">
-                    <span className="module-symbol module-symbol-violet">✓</span>
-                    <span className="module-copy">
-                      <strong>Attendance management</strong>
-                      <span>Daily attendance and summaries</span>
-                    </span>
-                    <span className="module-status">Planned</span>
-                  </div>
-                  <div className="module-row module-row-muted">
-                    <span className="module-symbol module-symbol-amber">₹</span>
-                    <span className="module-copy">
-                      <strong>Fees & payments</strong>
-                      <span>Fee structures, invoices and receipts</span>
-                    </span>
-                    <span className="module-status">Planned</span>
-                  </div>
-                </article>
-
-                <article className="content-card activity-card">
-                  <div className="card-heading">
-                    <div>
-                      <h2>Getting started</h2>
-                      <p>Your implementation progress</p>
-                    </div>
-                    <span className="progress-count">01 / 04</span>
-                  </div>
-                  <div className="progress-track"><div className="progress-fill" /></div>
-                  <div className="progress-caption">Core foundation completed</div>
-                  <div className="checklist-item">
-                    <span className="checklist-check">✓</span>
-                    <span>
-                      <strong>School and account foundation</strong>
-                      <small>Authentication and tenant isolation</small>
-                    </span>
-                  </div>
-                  <div className="checklist-item">
-                    <span className="checklist-pending">2</span>
-                    <span>
-                      <strong>Student management interface</strong>
-                      <small>Currently being built</small>
-                    </span>
-                  </div>
-                  <div className="checklist-item">
-                    <span className="checklist-pending">3</span>
-                    <span>
-                      <strong>Academic operations</strong>
-                      <small>Upcoming development phase</small>
-                    </span>
-                  </div>
-                  <div className="checklist-item">
-                    <span className="checklist-pending">4</span>
-                    <span>
-                      <strong>Mobile experience</strong>
-                      <small>Shared API for web and mobile</small>
-                    </span>
-                  </div>
-                </article>
-              </section>
-            </>
+            <SchoolDashboard accessToken={accessToken} academicYearId={activeAcademicYear?._id} onNavigate={selectPage} />
           ) : activePage === "Students" ? (
   <StudentDirectory />
+) : activePage === "Student Documents" ? (
+  <StudentDocumentManagement />
+) : activePage === "Guardians" ? (
+  <GuardianDirectory />
+) : activePage === "Teachers & Staff" ? (
+  <StaffManagement />
+ ) : activePage === "Academic Years" ? (
+  <AcademicYearManagement />
+) : activePage === "Academic Terms" ? (
+  <AcademicTermsManagement />
+) : activePage === "Class Curriculum" ? (
+  <ClassCurriculumManagement />
+) : activePage === "Classes" ? (
+  <ClassesManagement />
+) : activePage === "Sections" ? (
+  <SectionsManagement />
+) : activePage === "Enrollments" ? (
+  <EnrollmentsManagement />
+) : activePage === "Attendance" ? (
+  <AttendanceManagement />
+) : activePage === "Attendance Reports" ? (
+  <AttendanceReports />
+) : activePage === "Certificates & Reports" || activePage === "Reports" ? (
+  <CertificatesReports />
+) : activePage === "Subjects" ? (
+  <SubjectManagement />
+) : activePage === "Teacher Assignments" ? (
+  <TeacherAssignments />
+) : activePage === "Timetable" ? (
+  <TimetableManagement />
+ ) : activePage === "Examinations" ? (
+  <ExaminationManagement />
+) : activePage === "Grading Scales" ? (
+  <GradingScaleManagement />
+) : activePage === "Homework & Classwork" ? (
+  <HomeworkManagement />
+) : activePage === "Announcements" ? (
+  <AnnouncementManagement />
+) : activePage === "Messaging Oversight" ? (
+  <MessagingWorkspace mode="admin" />
+) : activePage === "Fees & Payments" ? (
+  <FeeManagement />
+ ) : activePage === "User Management" && user?.role === "school_admin" ? (
+  <SchoolUserDirectory />
 ) : (
   <section className="content-card placeholder-page">
     <div className="placeholder-icon">▦</div>

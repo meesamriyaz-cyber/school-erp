@@ -3,6 +3,7 @@ import {  useState } from "react";
 import { apiRequest } from "../lib/api.js";
 
 import { useAuth } from "../context/authContext.js";
+import StudentGuardianManagement from "./StudentGuardianManagement.jsx";
 
 function toDateInput(value) {
   if (!value) return "";
@@ -19,10 +20,12 @@ function getInitialFields(student) {
     admissionNumber: student.admissionNumber || "",
     firstName: student.firstName || "",
     lastName: student.lastName || "",
-    dateOfBirth: toDateInput(student.dateOfBirth),
+    dateOfBirth: toDateInput(student.dateOfBirth), photoUrl: student.photoUrl || "",
+    address: { line1: student.address?.line1 || "", line2: student.address?.line2 || "", city: student.address?.city || "", district: student.address?.district || "", state: student.address?.state || "", postalCode: student.address?.postalCode || "", country: student.address?.country || "" },
     gender: student.gender || "not_specified",
     admissionDate: toDateInput(student.admissionDate),
     guardianName: student.guardianName || "",
+    guardianRelationship: student.guardianRelationship || "other",
     guardianPhone: student.guardianPhone || "",
     guardianEmail: student.guardianEmail || "",
     status: student.status || "active",
@@ -34,7 +37,7 @@ export default function EditStudentForm({
   onCancel,
   onSaved,
 }) {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
 
   const [form, setForm] = useState(() => getInitialFields(student));
   const [saving, setSaving] = useState(false);
@@ -43,11 +46,11 @@ export default function EditStudentForm({
  
   function handleChange(event) {
     const { name, value } = event.target;
-
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
+  }
+  function handleAddressChange(event) {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, address: { ...current.address, [name]: value } }));
   }
 
   async function handleSubmit(event) {
@@ -59,6 +62,8 @@ export default function EditStudentForm({
       ...form,
       dateOfBirth: form.dateOfBirth || null,
       admissionDate: form.admissionDate || null,
+      photoUrl: form.photoUrl.trim() || null,
+      address: Object.fromEntries(Object.entries(form.address).map(([key, value]) => [key, value.trim()])),
     };
 
     try {
@@ -160,15 +165,29 @@ export default function EditStudentForm({
           />
         </label>
 
+        <h3>Address & profile</h3>
+        <label>Student Photo URL (HTTPS)<input type="url" name="photoUrl" value={form.photoUrl} onChange={handleChange} maxLength={2048} placeholder="https://…" /></label>
+        {[
+          ["line1", "Address Line 1", 120], ["line2", "Address Line 2", 120], ["city", "City / Town", 80],
+          ["district", "District", 80], ["state", "State", 80], ["postalCode", "Postal Code", 12], ["country", "Country", 80],
+        ].map(([name, label, maxLength]) => <label key={name}>{label}<input name={name} value={form.address[name]} onChange={handleAddressChange} maxLength={maxLength} /></label>)}
+        <h3>Guardian Information</h3>
         <label>
-          Guardian Name
+          Primary Guardian Name *
           <input
             name="guardianName"
             value={form.guardianName}
+            required
             onChange={handleChange}
           />
         </label>
 
+        <label>
+          Relationship to Student
+          <select name="guardianRelationship" value={form.guardianRelationship} onChange={handleChange} required>
+            <option value="mother">Mother</option><option value="father">Father</option><option value="uncle">Uncle</option><option value="aunt">Aunt</option><option value="grandparent">Grandparent</option><option value="step_parent">Step-parent</option><option value="sibling">Brother / Sister</option><option value="legal_guardian">Legal guardian</option><option value="other">Other</option>
+          </select>
+        </label>
         <label>
           Guardian Phone
           <input
@@ -213,6 +232,16 @@ export default function EditStudentForm({
           </button>
         </div>
       </form>
+
+      <div className="student-edit-additional-guardians">
+        <h3>Additional guardians</h3>
+        <p>Add the mother or another guardian here without replacing the primary contact recorded above.</p>
+        <StudentGuardianManagement
+          studentId={student._id}
+          accessToken={accessToken}
+          canManage={["school_admin", "principal"].includes(user?.role)}
+        />
+      </div>
     </section>
   );
 }

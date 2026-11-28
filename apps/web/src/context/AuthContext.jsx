@@ -34,14 +34,15 @@ export function AuthProvider({ children }) {
         throw new Error("The session response was incomplete.");
       }
 
-      if (response.user.role === "platform_admin") {
-        throw new Error("A school administrator account is required.");
-      }
-
       setAccessToken(response.accessToken);
       setUser(response.user);
 
-      await loadSchoolContext(response.accessToken);
+      if (response.user.role === "platform_admin") {
+        setSchoolContext(null);
+      } else {
+        await loadSchoolContext(response.accessToken);
+      }
+
       setStatus("authenticated");
     } catch {
       setAccessToken(null);
@@ -67,11 +68,14 @@ useEffect(() => {
 }, [restoreSession]);
 
   const login = useCallback(
-    async ({ tenantSlug, email, password }) => {
+    async ({ tenantSlug, email, password, workspace = "school" }) => {
+      const normalizedTenantSlug = tenantSlug?.trim().toLowerCase();
       const response = await apiRequest("/auth/login", {
         method: "POST",
         body: {
-          tenantSlug: tenantSlug.trim().toLowerCase(),
+          ...(workspace === "school" && normalizedTenantSlug
+            ? { tenantSlug: normalizedTenantSlug }
+            : {}),
           email: email.trim().toLowerCase(),
           password,
           clientType: "web",
@@ -82,20 +86,26 @@ useEffect(() => {
         throw new Error("The login response was incomplete.");
       }
 
-      if (response.user.role === "platform_admin") {
-        // Do not retain a platform-admin session in the school dashboard.
-        await apiRequest("/auth/logout", {
-          method: "POST",
-          body: {},
-        });
+      const isPlatformAdmin = response.user.role === "platform_admin";
 
-        throw new Error(
-          "Use a school administrator account to access this dashboard.",
-        );
+      if (workspace === "platform" && !isPlatformAdmin) {
+        await apiRequest("/auth/logout", { method: "POST", body: {} });
+        throw new Error("This account is not a Platform Administrator account.");
+      }
+
+      if (workspace === "school" && isPlatformAdmin) {
+        await apiRequest("/auth/logout", { method: "POST", body: {} });
+        throw new Error("Use the Platform Administrator sign-in option.");
       }
 
       setAccessToken(response.accessToken);
       setUser(response.user);
+
+      if (isPlatformAdmin) {
+        setSchoolContext(null);
+        setStatus("authenticated");
+        return;
+      }
 
       try {
         await loadSchoolContext(response.accessToken);

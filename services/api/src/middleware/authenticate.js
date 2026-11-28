@@ -1,82 +1,67 @@
 
 import User from "../models/User.js";
+import Tenant from "../models/Tenant.js";
 import { verifyAccessToken } from "../utils/tokens.js";
 
 const authenticate = async (req, res, next) => {
   const authorization = req.headers.authorization;
 
-  if (
-    typeof authorization !== "string" ||
-    !authorization.startsWith("Bearer ")
-  ) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required",
-    });
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
   }
 
   const token = authorization.slice(7).trim();
-
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required",
-    });
+    return res.status(401).json({ success: false, message: "Authentication required" });
   }
 
   try {
     const payload = verifyAccessToken(token);
-
-    if (
-      typeof payload.sub !== "string" ||
-      !payload.sub
-    ) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or expired access token",
-      });
+    if (typeof payload.sub !== "string" || !payload.sub) {
+      return res.status(401).json({ success: false, message: "Invalid or expired access token" });
     }
 
-   const user = await User.findById(payload.sub)
-  .select("tenantId role status authVersion")
-  .lean();
+    const user = await User.findById(payload.sub)
+      .select("tenantId role status authVersion")
+      .lean();
 
     if (!user || user.status !== "active") {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid or inactive account",
-      });
+      return res.status(401).json({ success: false, message: "Invalid or inactive account" });
     }
-const currentAuthVersion = Number.isInteger(user.authVersion)
-  ? user.authVersion
-  : 0;
 
-if (
-  !Number.isInteger(payload.authVersion) ||
-  payload.authVersion !== currentAuthVersion
-) {
-  return res.status(401).json({
-    success: false,
-    message: "Session invalidated; please sign in again",
-  });
-}
-   
-    const actualTenantId = user.tenantId
-      ? String(user.tenantId)
-      : null;
+    const currentAuthVersion = Number.isInteger(user.authVersion) ? user.authVersion : 0;
+    if (!Number.isInteger(payload.authVersion) || payload.authVersion !== currentAuthVersion) {
+      return res.status(401).json({ success: false, message: "Session invalidated; please sign in again" });
+    }
 
-    // The database, not the request or token alone,
-    // determines the user's current role and school.
+    const actualTenantId = user.tenantId ? String(user.tenantId) : null;
+
+    // Trial expiry is owned by the background worker. Authentication only
+    // enforces the persisted tenant state and never mutates billing records.
+    if (user.role !== "platform_admin") {
+      const tenant = await Tenant.findById(user.tenantId)
+        .select("_id status")
+        .lean();
+
+      if (!tenant || tenant.status !== "active") {
+        return res.status(403).json({
+          success: false,
+          message: tenant?.status === "trial_expired"
+            ? "Your school's 30-day free trial has ended. Access is restricted until a paid subscription is activated."
+            : "School is inactive; access is not available",
+        });
+      }
+    }
+
+    // The database, not the request or token alone, determines current
+    // role and school membership.
     if (
       (user.role === "platform_admin" && actualTenantId !== null) ||
       (user.role !== "platform_admin" && actualTenantId === null) ||
       payload.role !== user.role ||
       payload.tenantId !== actualTenantId
     ) {
-      return res.status(401).json({
-        success: false,
-        message: "Account permissions have changed; sign in again",
-      });
+      return res.status(401).json({ success: false, message: "Account permissions have changed; sign in again" });
     }
 
     req.auth = {
@@ -87,10 +72,7 @@ if (
 
     return next();
   } catch {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid or expired access token",
-    });
+    return res.status(401).json({ success: false, message: "Invalid or expired access token" });
   }
 };
 

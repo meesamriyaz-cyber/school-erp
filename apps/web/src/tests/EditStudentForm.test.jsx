@@ -13,6 +13,10 @@ vi.mock("../context/authContext.js", () => ({
   useAuth: () => ({ accessToken: "test-access-token" }),
 }));
 
+vi.mock("../components/StudentGuardianManagement.jsx", () => ({
+  default: () => <div>Additional guardian management</div>,
+}));
+
 const student = {
   _id: "student-201",
   admissionNumber: "ADM-201",
@@ -24,6 +28,8 @@ const student = {
   guardianName: "Imran Khan",
   guardianPhone: "9999999999",
   guardianEmail: "imran@example.com",
+  photoUrl: "https://cdn.example.test/ayaan.jpg",
+  address: { line1: "Lal Chowk", city: "Srinagar", postalCode: "190001" },
   status: "active",
 };
 
@@ -45,7 +51,10 @@ describe("EditStudentForm", () => {
     expect(screen.getByLabelText("First Name")).toHaveValue("Ayaan");
     expect(screen.getByLabelText("Last Name")).toHaveValue("Khan");
     expect(screen.getByLabelText("Gender")).toHaveValue("male");
-    expect(screen.getByLabelText("Guardian Name")).toHaveValue("Imran Khan");
+    expect(screen.getByLabelText("Primary Guardian Name *")).toHaveValue("Imran Khan");
+    expect(screen.getByLabelText("Student Photo URL (HTTPS)")).toHaveValue("https://cdn.example.test/ayaan.jpg");
+    expect(screen.getByLabelText("Address Line 1")).toHaveValue("Lal Chowk");
+    expect(screen.getByLabelText("City / Town")).toHaveValue("Srinagar");
     expect(screen.getByLabelText("Status")).toHaveValue("active");
   });
 
@@ -85,6 +94,8 @@ describe("EditStudentForm", () => {
         accessToken: "test-access-token",
         body: expect.objectContaining({
           firstName: "Ayaan Updated",
+          photoUrl: "https://cdn.example.test/ayaan.jpg",
+          address: expect.objectContaining({ line1: "Lal Chowk", city: "Srinagar" }),
         }),
       }),
     );
@@ -180,7 +191,7 @@ it("uses defaults for missing student fields and invalid dates", () => {
   expect(screen.getByLabelText("Date of Birth")).toHaveValue("");
   expect(screen.getByLabelText("Gender")).toHaveValue("not_specified");
   expect(screen.getByLabelText("Admission Date")).toHaveValue("");
-  expect(screen.getByLabelText("Guardian Name")).toHaveValue("");
+  expect(screen.getByLabelText("Primary Guardian Name *")).toHaveValue("");
   expect(screen.getByLabelText("Guardian Phone")).toHaveValue("");
   expect(screen.getByLabelText("Guardian Email")).toHaveValue("");
   expect(screen.getByLabelText("Status")).toHaveValue("active");

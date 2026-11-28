@@ -4,26 +4,175 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
+import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
-import { createSchool } from "../controllers/platformController.js";
+import { writeAuditEvent } from "../services/auditLogService.js";
+import { createSchool, updateSchoolStatus } from "../controllers/platformController.js";
 
 vi.mock("../models/Tenant.js", () => ({
   default: {
     create: vi.fn(),
+    findById: vi.fn(),
+    findOneAndUpdate: vi.fn(),
   },
 }));
 
 vi.mock("../models/User.js", () => ({
   default: {
     create: vi.fn(),
+    updateMany: vi.fn(),
   },
 }));
+
+vi.mock("../models/Session.js", () => ({ default: { updateMany: vi.fn() } }));
 
 vi.mock("../utils/password.js", () => ({
   hashPassword: vi.fn(),
 }));
 
+vi.mock("../services/auditLogService.js", () => ({ writeAuditEvent: vi.fn().mockResolvedValue(true) }));
+vi.mock("../models/AuditOutbox.js", () => ({ default: { create: vi.fn().mockResolvedValue([{}]) } }));
 
+
+
+vi.spyOn(mongoose, "startSession");
+
+describe("updateSchoolStatus controller", () => {
+  beforeEach(() => {
+    const session = {
+      withTransaction: vi.fn(async (callback) => callback()),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    mongoose.startSession.mockResolvedValue(session);
+  });
+
+  it("does not allow a manual override of billing suspension", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const next = vi.fn();
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({
+          _id: schoolId,
+          name: "Billing Suspended School",
+          status: "suspended",
+          subscriptionSuspendedAt: new Date("2026-11-20T00:00:00.000Z"),
+        }),
+      }),
+    });
+
+    await updateSchoolStatus({
+      params: { schoolId: String(schoolId) },
+      body: { status: "active" },
+      auth: { userId: new mongoose.Types.ObjectId() },
+    }, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(Tenant.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+
+  it("requires a reason before suspending a school", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const next = vi.fn();
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ _id: schoolId, name: "Active School", status: "active" }),
+      }),
+    });
+    await updateSchoolStatus({ params: { schoolId: String(schoolId) }, body: { status: "suspended" } }, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/suspension reason/i) }));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("stores the suspension reason, timestamp and responsible administrator", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const actorId = new mongoose.Types.ObjectId();
+    const school = { _id: schoolId, name: "Active School", status: "active" };
+    const updatedSchool = { ...school, status: "suspended", suspensionReason: "Outstanding compliance documentation" };
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const next = vi.fn();
+    Tenant.findById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(school) }) });
+    Tenant.findOneAndUpdate.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updatedSchool) }) });
+    Session.updateMany.mockResolvedValue({ modifiedCount: 1 });
+
+    await updateSchoolStatus({
+      params: { schoolId: String(schoolId) },
+      body: { status: "suspended", reason: "  Outstanding compliance documentation  " },
+      auth: { userId: actorId },
+    }, res, next);
+
+    const update = Tenant.findOneAndUpdate.mock.calls[0][1];
+    expect(update.$set).toEqual({ status: "suspended", subscriptionSuspendedAt: null, suspensionReason: "Outstanding compliance documentation" });
+    expect(update.$push.suspensionHistory).toEqual(expect.objectContaining({
+      reason: "Outstanding compliance documentation", suspendedBy: actorId, suspendedAt: expect.any(Date),
+    }));
+    expect(Session.updateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId, revokedAt: null }, { $set: { revokedAt: expect.any(Date) } }, { session: expect.any(Object) },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(next).not.toHaveBeenCalled();
+  });
+  it("activates a pending school and its pending school administrators in one transaction", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const school = {
+      _id: schoolId,
+      name: "Pending School",
+      slug: "pending-school",
+      status: "pending",
+    };
+    const updatedSchool = { ...school, status: "active" };
+    const session = {
+      withTransaction: vi.fn(async (callback) => callback()),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    };
+    const next = vi.fn();
+    const req = {
+      params: { schoolId: String(schoolId) },
+      body: { status: "active" },
+      auth: { userId: new mongoose.Types.ObjectId(), role: "platform_admin" },
+    };
+
+    mongoose.startSession.mockResolvedValue(session);
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(school) }),
+    });
+    Tenant.findOneAndUpdate.mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updatedSchool) }),
+    });
+    User.updateMany.mockResolvedValue({ modifiedCount: 1 });
+
+    await updateSchoolStatus(req, res, next);
+
+    expect(session.withTransaction).toHaveBeenCalledOnce();
+    expect(Tenant.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: schoolId, status: "pending", subscriptionSuspendedAt: null },
+      { $set: { status: "active", suspensionReason: null, subscriptionSuspendedAt: null } },
+      { new: true, runValidators: true, session },
+    );
+    expect(User.updateMany).toHaveBeenCalledWith(
+      { tenantId: schoolId, role: "school_admin", status: "pending" },
+      { $set: { status: "active" } },
+      { session },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        data: { school: expect.objectContaining({ status: "active" }) },
+      }),
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+});
 
 describe("createSchool controller", () => {
   let req;
@@ -52,7 +201,7 @@ describe("createSchool controller", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    req = { body: validBody() };
+    req = { body: validBody(), auth: { userId: new mongoose.Types.ObjectId(), role: "platform_admin" } };
 
     res = {
       status: vi.fn().mockReturnThis(),
@@ -101,6 +250,17 @@ describe("createSchool controller", () => {
     expect(User.create.mock.calls[0][1]).toEqual({
       session: dbSession,
     });
+    expect(writeAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: req.auth.userId,
+        actorRole: "platform_admin",
+        targetTenantId: expect.any(mongoose.Types.ObjectId),
+        action: "SCHOOL_CREATED",
+        changedFields: ["name", "slug", "contactEmail", "timezone", "status"],
+        newValue: "pending",
+      }),
+      { session: dbSession },
+    );
 
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(
@@ -111,13 +271,13 @@ describe("createSchool controller", () => {
           school: expect.objectContaining({
             name: "Test School",
             slug: "test-school",
-            status: "active",
+            status: "pending",
           }),
           admin: expect.objectContaining({
             firstName: "School",
             email: "admin@example.com",
             role: "school_admin",
-            status: "active",
+            status: "pending",
           }),
         }),
       }),
@@ -125,6 +285,21 @@ describe("createSchool controller", () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(dbSession.endSession).toHaveBeenCalledOnce();
+  });
+
+  it("creates both the school and its administrator as pending until platform-admin activation", async () => {
+    await createSchool(req, res, next);
+
+    expect(Tenant.create.mock.calls[0][0][0].status).toBe("pending");
+    expect(User.create.mock.calls[0][0][0].status).toBe("pending");
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          school: expect.objectContaining({ status: "pending" }),
+          admin: expect.objectContaining({ status: "pending" }),
+        }),
+      }),
+    );
   });
 
   it("normalizes school and administrator fields", async () => {
@@ -198,6 +373,7 @@ describe("createSchool controller", () => {
     ["slug too long", { slug: "a".repeat(81) }, "Slug must contain lowercase letters, numbers, and single hyphens"],
     ["invalid contact email", { contactEmail: "not-an-email" }, "Provide a valid school contact email"],
     ["empty timezone", { timezone: "   " }, "Provide a valid timezone"],
+    ["unknown timezone", { timezone: "Mars/Olympus_Mons" }, "Provide a valid timezone"],
     ["first name missing", { adminFirstName: "   " }, "Administrator first name is required and must not exceed 80 characters"],
     ["last name too long", { adminLastName: "L".repeat(81) }, "Administrator last name must not exceed 80 characters"],
     ["invalid administrator email", { adminEmail: "bad-email" }, "Provide a valid administrator email"],
@@ -276,6 +452,20 @@ describe("createSchool controller", () => {
     expect(next).toHaveBeenCalledWith(
       expect.objectContaining({ message: "Unexpected failure" }),
     );
+    expect(dbSession.endSession).toHaveBeenCalledOnce();
+  });
+
+  it("forwards administrator creation failures and always ends the transaction session", async () => {
+    const error = new Error("Administrator creation failed");
+    User.create.mockRejectedValue(error);
+
+    await createSchool(req, res, next);
+
+    expect(withTransaction).toHaveBeenCalledOnce();
+    expect(Tenant.create).toHaveBeenCalledOnce();
+    expect(User.create).toHaveBeenCalledOnce();
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.status).not.toHaveBeenCalled();
     expect(dbSession.endSession).toHaveBeenCalledOnce();
   });
 

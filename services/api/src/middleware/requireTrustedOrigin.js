@@ -33,7 +33,11 @@ const requireTrustedOrigin = (req, res, next) => {
 
   // Allow originless native-client requests only when
   // they explicitly use the mobile authentication flow.
-  if (!origin && req.body?.clientType !== "mobile") {
+  const isNativeMobileClient =
+    req.get("x-client-type") === "mobile" ||
+    req.body?.clientType === "mobile";
+
+  if (!origin && !isNativeMobileClient) {
     return res.status(403).json({
       success: false,
       message: "Request origin is required",

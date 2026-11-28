@@ -1,12 +1,12 @@
 
-import "dotenv/config";
+import { getTestDatabaseUri } from "./utils/testDatabase.js";
 
 import mongoose from "mongoose";
 import Tenant from "../models/Tenant.js";
 
 const testTenantModel = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(getTestDatabaseUri());
 
     const tenant = new Tenant({
       name: "Green Valley Public School",

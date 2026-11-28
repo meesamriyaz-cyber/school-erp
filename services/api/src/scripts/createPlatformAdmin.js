@@ -1,4 +1,4 @@
-import "dotenv/config";
+import env from "../config/env.js";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import readline from "node:readline/promises";
@@ -9,12 +9,6 @@ import User from "../models/User.js";
 const rl = readline.createInterface({ input: stdin, output: stdout });
 
 async function main() {
-  const mongoUri = process.env.MONGO_URI;
-
-  if (!mongoUri) {
-    throw new Error("MONGO_URI is missing from the API environment.");
-  }
-
   const firstName = (await rl.question("Administrator first name: ")).trim();
   const lastName = (await rl.question("Administrator last name: ")).trim();
   const email = (
@@ -44,7 +38,7 @@ async function main() {
     throw new Error("Passwords do not match.");
   }
 
-  await mongoose.connect(mongoUri);
+  await mongoose.connect(env.mongoUri);
 
   // Refuse duplicates; this script creates accounts but does not
   // silently reset existing accounts or change their privileges.
