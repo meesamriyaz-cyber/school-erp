@@ -14,6 +14,7 @@ vi.mock("../models/Tenant.js", () => ({
 vi.mock("../models/User.js", () => ({ default: { create: vi.fn(), updateMany: userUpdateMany } }));
 vi.mock("../models/Session.js", () => ({ default: { updateMany } }));
 vi.mock("../utils/password.js", () => ({ hashPassword: vi.fn() }));
+vi.mock("../services/auditLogService.js", () => ({ writeAuditEvent: vi.fn().mockResolvedValue(true) }));
 
 import { updateSchoolStatus } from "../controllers/platformController.js";
 
@@ -69,7 +70,7 @@ describe("updateSchoolStatus", () => {
         $set: { status: "suspended", subscriptionSuspendedAt: null, suspensionReason: "Valid school suspension reason" },
         $push: { suspensionHistory: expect.objectContaining({ reason: "Valid school suspension reason", suspendedBy: null, suspendedAt: expect.any(Date) }) },
       }),
-      { new: true, runValidators: true },
+      { new: true, runValidators: true, session: dbSession },
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -81,6 +82,7 @@ describe("updateSchoolStatus", () => {
     expect(updateMany).toHaveBeenCalledWith(
       { tenantId: schoolId, revokedAt: null },
       { $set: { revokedAt: expect.any(Date) } },
+      { session: dbSession },
     );
     expect(next).not.toHaveBeenCalled();
   });
@@ -126,6 +128,7 @@ describe("updateSchoolStatus", () => {
     expect(userUpdateMany).toHaveBeenCalledWith(
       { tenantId: schoolId },
       { $inc: { authVersion: 1 } },
+      { session: dbSession },
     );
     expect(updateMany).toHaveBeenCalledWith(
       { tenantId: schoolId, revokedAt: null },

@@ -29,9 +29,19 @@ vi.mock("../utils/password.js", () => ({
   hashPassword: vi.fn(),
 }));
 
+vi.mock("../services/auditLogService.js", () => ({ writeAuditEvent: vi.fn().mockResolvedValue(true) }));
+
 
 
 describe("updateSchoolStatus controller", () => {
+  beforeEach(() => {
+    const session = {
+      withTransaction: vi.fn(async (callback) => callback()),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    mongoose.startSession.mockResolvedValue(session);
+  });
+
   it("does not allow a manual override of billing suspension", async () => {
     const schoolId = new mongoose.Types.ObjectId();
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
@@ -97,7 +107,7 @@ describe("updateSchoolStatus controller", () => {
       reason: "Outstanding compliance documentation", suspendedBy: actorId, suspendedAt: expect.any(Date),
     }));
     expect(Session.updateMany).toHaveBeenCalledWith(
-      { tenantId: schoolId, revokedAt: null }, { $set: { revokedAt: expect.any(Date) } },
+      { tenantId: schoolId, revokedAt: null }, { $set: { revokedAt: expect.any(Date) } }, { session: expect.any(Object) },
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(next).not.toHaveBeenCalled();
@@ -138,7 +148,7 @@ describe("updateSchoolStatus controller", () => {
 
     expect(session.withTransaction).toHaveBeenCalledOnce();
     expect(Tenant.findOneAndUpdate).toHaveBeenCalledWith(
-      { _id: schoolId, status: "pending" },
+      { _id: schoolId, status: "pending", subscriptionSuspendedAt: null },
       { $set: { status: "active", suspensionReason: null, subscriptionSuspendedAt: null } },
       { new: true, runValidators: true, session },
     );
