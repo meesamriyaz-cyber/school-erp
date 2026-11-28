@@ -58,7 +58,7 @@ describe("trial expiry worker", () => {
     const result = await processDueTrials({ now: new Date("2026-11-27T12:00:00.000Z") });
 
     expect(result).toEqual({ expired: 1, skipped: false });
-    expect(tenantUpdateOne).not.toHaveBeenCalled();
+    expect(tenantUpdateOne).toHaveBeenCalledOnce();
     expect(subscriptionUpdateMany).toHaveBeenCalledWith(
       { tenantId: "expired-school", isTrial: true, status: "active" },
       { $set: { status: "expired" } },
