@@ -263,19 +263,25 @@ export default function PlatformAdminWorkspace() {
     if (auditTenantFilter.trim()) params.set("tenantId", auditTenantFilter.trim());
     if (auditFromFilter) params.set("from", new Date(`${auditFromFilter}T00:00:00.000`).toISOString());
     if (auditToFilter) params.set("to", new Date(`${auditToFilter}T23:59:59.999`).toISOString());
-    Promise.all([
-      apiRequest(`/platform/audit-logs?${params.toString()}`, { accessToken, signal: controller.signal }),
-      apiRequest("/platform/audit-outbox", { accessToken, signal: controller.signal }),
-    ]).then(([logsResponse, outboxResponse]) => {
+    setLoadingAuditLogs(true);
+    setAuditLogsError("");
+    setAuditOutboxError("");
+    const logsRequest = apiRequest(`/platform/audit-logs?${params.toString()}`, { accessToken, signal: controller.signal });
+    const outboxRequest = apiRequest("/platform/audit-outbox", { accessToken, signal: controller.signal });
+    Promise.allSettled([logsRequest, outboxRequest]).then(([logsResult, outboxResult]) => {
       if (controller.signal.aborted) return;
-      setAuditLogsError("");
-      setAuditOutboxError("");
-      setAuditLogs(Array.isArray(logsResponse?.data) ? logsResponse.data : []);
-      setAuditPagination((current) => ({ ...current, ...(logsResponse?.pagination ?? {}) }));
-      setAuditOutbox(outboxResponse?.data ?? null);
-    }).catch((error) => {
-      if (controller.signal.aborted || error.name === "AbortError") return;
-      setAuditLogsError(error.message || "Unable to load system audit records.");
+      if (logsResult.status === "fulfilled") {
+        const logsResponse = logsResult.value;
+        setAuditLogs(Array.isArray(logsResponse?.data) ? logsResponse.data : []);
+        setAuditPagination((current) => ({ ...current, ...(logsResponse?.pagination ?? {}) }));
+      } else if (logsResult.reason?.name !== "AbortError") {
+        setAuditLogsError(logsResult.reason?.message || "Unable to load system audit records.");
+      }
+      if (outboxResult.status === "fulfilled") {
+        setAuditOutbox(outboxResult.value?.data ?? null);
+      } else if (outboxResult.reason?.name !== "AbortError") {
+        setAuditOutboxError(outboxResult.reason?.message || "Unable to load audit delivery status.");
+      }
     }).finally(() => {
       if (!controller.signal.aborted) setLoadingAuditLogs(false);
     });
@@ -1208,6 +1214,8 @@ export default function PlatformAdminWorkspace() {
                     <option value="USER_PROFILE_UPDATED">Profile updated</option>
                     <option value="USER_STATUS_CHANGED">Status changed</option>
                     <option value="USER_ROLE_CHANGED">Role changed</option>
+                    <option value="SCHOOL_CREATED">School created</option>
+                    <option value="SCHOOL_STATUS_CHANGED">School status changed</option>
                   </select>
                 </label>
                 <label>School ID<input aria-label="Filter audit school ID" value={auditTenantFilter} onChange={(event) => { setAuditTenantFilter(event.target.value); setAuditPagination((current) => ({ ...current, page: 1 })); }} placeholder="MongoDB school ID" /></label>
@@ -1223,7 +1231,7 @@ export default function PlatformAdminWorkspace() {
                     {auditLogs.map((item) => <tr key={item.id}>
                       <td><strong>{formatDate(item.createdAt)}</strong><small>{item.createdAt ? new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit" }).format(new Date(item.createdAt)) : ""}</small></td>
                       <td><strong>{item.actorName || humanizeField(item.actorRole) || "Platform user"}</strong><small title={item.actorUserId}>{humanizeField(item.actorRole)} · {shortReference(item.actorUserId)}</small></td>
-                      <td><strong>{item.targetUserName || "User account"}</strong><small title={item.targetUserId}>{shortReference(item.targetUserId)}</small></td>
+                      <td><strong>{item.targetUserName || (item.targetType === "school" ? "School record" : "User account")}</strong><small title={item.targetUserId || item.targetTenantId || ""}>{shortReference(item.targetUserId || item.targetTenantId)}</small></td>
                       <td><strong>{item.schoolName || (item.targetTenantId ? "School" : "Platform")}</strong><small title={item.targetTenantId || ""}>{item.targetTenantId ? shortReference(item.targetTenantId) : "Platform-wide"}</small></td>
                       <td><span className="platform-audit-action">{humanizeField(item.action)}</span></td>
                       <td><strong>{(item.changedFields || []).map(humanizeField).join(", ") || "Account activity"}</strong>{(item.previousValue !== null || item.newValue !== null) && <small>{formatAuditValue(item.previousValue)} → {formatAuditValue(item.newValue)}</small>}</td>

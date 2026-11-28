@@ -5,6 +5,7 @@ import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
+import { writeAuditEvent } from "../services/auditLogService.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -178,6 +179,14 @@ export const createSchool = async (req, res, next) => {
         ],
         { session: dbSession }
       );
+      await writeAuditEvent({
+        actorUserId: req.auth?.userId,
+        actorRole: req.auth?.role,
+        targetTenantId: createdSchool._id,
+        action: "SCHOOL_CREATED",
+        changedFields: ["name", "slug", "contactEmail", "timezone", "status"],
+        newValue: "pending",
+      }, { session: dbSession });
     });
 
     return res.status(201).json({
@@ -364,107 +373,83 @@ export const updateSchoolStatus = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "A suspension reason of 10 to 500 characters is required" });
     }
 
-    // Invalidate access tokens issued before suspension before allowing
-    // the school to become active again. Access tokens do not consult the
-    // session store, so revoking refresh sessions alone is not sufficient.
-    // If this fails, the school remains suspended.
-    if (school.status === "suspended" && status === "active") {
-      await User.updateMany(
-        { tenantId: school._id },
-        { $inc: { authVersion: 1 } },
-      );
-
-      // Retry revocation in case an earlier suspension could not revoke every
-      // session. A revocation error must leave the school suspended.
-      await Session.updateMany(
-        { tenantId: school._id, revokedAt: null },
-        { $set: { revokedAt: new Date() } },
-      );
-    }
-
-    // Activating a newly created school must activate its pending school
-    // administrators in the same transaction, so the school cannot become
-    // active while its initial administrator remains unable to sign in.
-    if (school.status === "pending" && status === "active") {
-      let dbSession;
-      let updatedSchool;
-
-      try {
-        dbSession = await mongoose.startSession();
-
-        await dbSession.withTransaction(async () => {
-          updatedSchool = await Tenant.findOneAndUpdate(
-            { _id: school._id, status: "pending" },
-            { $set: { status: "active", suspensionReason: null, subscriptionSuspendedAt: null } },
-            { new: true, runValidators: true, session: dbSession },
-          )
-            .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
-            .lean();
-
-          if (updatedSchool) {
-            await User.updateMany(
-              { tenantId: school._id, role: "school_admin", status: "pending" },
-              { $set: { status: "active" } },
-              { session: dbSession },
-            );
-          }
-        });
-      } finally {
-        if (dbSession) {
-          await dbSession.endSession();
+    // Apply the school transition, related account/session changes and audit
+    // event in one transaction so an incomplete transition is never reported.
+    let dbSession;
+    let updatedSchool;
+    try {
+      dbSession = await mongoose.startSession();
+      await dbSession.withTransaction(async () => {
+        const statusUpdate = { $set: { status, subscriptionSuspendedAt: null } };
+        if (status === "active") statusUpdate.$set.suspensionReason = null;
+        if (status === "suspended") {
+          statusUpdate.$set.suspensionReason = reason.trim();
+          statusUpdate.$push = {
+            suspensionHistory: {
+              reason: reason.trim(),
+              suspendedAt: new Date(),
+              suspendedBy: req.auth?.userId || null,
+            },
+          };
         }
-      }
+        updatedSchool = await Tenant.findOneAndUpdate(
+          { _id: school._id, status: school.status },
+          statusUpdate,
+          { new: true, runValidators: true, session: dbSession },
+        )
+          .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+          .lean();
 
-      if (!updatedSchool) {
-        return res.status(409).json({
-          success: false,
-          message: "School status changed during this request; reload and try again",
-        });
-      }
+        if (!updatedSchool) return;
 
-      return res.status(200).json({
-        success: true,
-        message: "School status updated to active",
-        data: { school: { ...updatedSchool, id: String(updatedSchool._id) } },
+        if (school.status === "pending" && status === "active") {
+          await User.updateMany(
+            { tenantId: school._id, role: "school_admin", status: "pending" },
+            { $set: { status: "active" } },
+            { session: dbSession },
+          );
+        }
+
+        if (school.status === "suspended" && status === "active") {
+          await User.updateMany(
+            { tenantId: school._id },
+            { $inc: { authVersion: 1 } },
+            { session: dbSession },
+          );
+          await Session.updateMany(
+            { tenantId: school._id, revokedAt: null },
+            { $set: { revokedAt: new Date() } },
+            { session: dbSession },
+          );
+        }
+
+        if (status === "suspended") {
+          await Session.updateMany(
+            { tenantId: school._id, revokedAt: null },
+            { $set: { revokedAt: new Date() } },
+            { session: dbSession },
+          );
+        }
+
+        await writeAuditEvent({
+          actorUserId: req.auth?.userId,
+          actorRole: req.auth?.role,
+          targetTenantId: school._id,
+          action: "SCHOOL_STATUS_CHANGED",
+          changedFields: status === "suspended" ? ["status", "suspensionReason"] : ["status"],
+          previousValue: school.status,
+          newValue: status,
+        }, { session: dbSession });
       });
+    } finally {
+      if (dbSession) await dbSession.endSession();
     }
-
-    // Include the current status in the update filter to prevent stale writes.
-    const statusUpdate = { $set: { status, subscriptionSuspendedAt: null } };
-    if (status === "active") statusUpdate.$set.suspensionReason = null;
-    if (status === "suspended") {
-      statusUpdate.$set.suspensionReason = reason.trim();
-      statusUpdate.$push = {
-        suspensionHistory: {
-          reason: reason.trim(),
-          suspendedAt: new Date(),
-          suspendedBy: req.auth?.userId || null,
-        },
-      };
-    }
-    const updatedSchool = await Tenant.findOneAndUpdate(
-      { _id: school._id, status: school.status },
-      statusUpdate,
-      { new: true, runValidators: true },
-    )
-      .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
-      .lean();
 
     if (!updatedSchool) {
       return res.status(409).json({
         success: false,
         message: "School status changed during this request; reload and try again",
       });
-    }
-
-    // Revoke every outstanding school session when suspending it. Access-token
-    // checks block use immediately; revocation also prevents old refresh tokens
-    // from becoming usable if the school is later reactivated.
-    if (status === "suspended") {
-      await Session.updateMany(
-        { tenantId: school._id, revokedAt: null },
-        { $set: { revokedAt: new Date() } },
-      );
     }
 
     return res.status(200).json({

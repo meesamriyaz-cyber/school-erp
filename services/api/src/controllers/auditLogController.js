@@ -94,13 +94,14 @@ export const listAuditLogs = async (req, res, next) => {
       success: true,
       data: logs.map((log) => ({
         id: String(log._id),
-        actorUserId: String(log.actorUserId?._id ?? log.actorUserId),
+        actorUserId: log.actorUserId?._id || log.actorUserId ? String(log.actorUserId?._id ?? log.actorUserId) : null,
         actorName: log.actorUserId && typeof log.actorUserId === "object"
           ? [log.actorUserId.firstName, log.actorUserId.lastName].filter(Boolean).join(" ") || log.actorUserId.email || null
           : null,
         actorRole: log.actorRole,
         tenantId: log.tenantId ? String(log.tenantId) : null,
-        targetUserId: String(log.targetUserId?._id ?? log.targetUserId),
+        targetUserId: log.targetUserId?._id || log.targetUserId ? String(log.targetUserId?._id ?? log.targetUserId) : null,
+        targetType: log.targetUserId ? "user" : "school",
         targetUserName: log.targetUserId && typeof log.targetUserId === "object"
           ? [log.targetUserId.firstName, log.targetUserId.lastName].filter(Boolean).join(" ") || log.targetUserId.email || null
           : null,

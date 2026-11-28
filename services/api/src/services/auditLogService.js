@@ -12,6 +12,7 @@ const AUDITABLE_ROLES = new Set([
   "librarian", "transport_manager", "student", "parent",
 ]);
 const AUDITABLE_STATUSES = new Set(["pending", "active", "suspended"]);
+const AUDITABLE_SCHOOL_FIELDS = new Set(["name", "slug", "contactEmail", "timezone", "suspensionReason"]);
 const MAX_ATTEMPTS = 10;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
 const POLL_INTERVAL_MS = 5000;
@@ -28,7 +29,10 @@ function safeAuditValue(action, value, isNewValue) {
   if (action === "USER_ROLE_CHANGED") {
     return AUDITABLE_ROLES.has(normalized) ? normalized : null;
   }
-  if (action === "USER_CREATED" && isNewValue && normalized === "pending") {
+  if ((action === "USER_CREATED" || action === "SCHOOL_CREATED") && isNewValue && normalized === "pending") {
+    return normalized;
+  }
+  if (action === "SCHOOL_STATUS_CHANGED" && AUDITABLE_STATUSES.has(normalized)) {
     return normalized;
   }
   return null;
@@ -38,14 +42,17 @@ function buildSafeEvent({
   actorUserId, actorRole, tenantId = null, targetUserId, targetTenantId = null,
   action, changedFields = [], previousValue = null, newValue = null,
 }) {
+  const allowedFields = action.startsWith("SCHOOL_")
+    ? new Set(["status", ...AUDITABLE_SCHOOL_FIELDS])
+    : AUDITABLE_FIELDS;
   const safeFields = [...new Set(changedFields)].filter((field) =>
-    AUDITABLE_FIELDS.has(field)
+    allowedFields.has(field)
   );
   return {
     actorUserId: new mongoose.Types.ObjectId(String(actorUserId)),
     actorRole,
     tenantId: tenantId ? new mongoose.Types.ObjectId(String(tenantId)) : null,
-    targetUserId: new mongoose.Types.ObjectId(String(targetUserId)),
+    targetUserId: targetUserId ? new mongoose.Types.ObjectId(String(targetUserId)) : null,
     targetTenantId: targetTenantId
       ? new mongoose.Types.ObjectId(String(targetTenantId))
       : null,
@@ -208,7 +215,7 @@ export async function withAuditTransaction(work) {
   return result;
 }
 
-export async function writeUserAudit(input, { session = null } = {}) {
+export async function writeAuditEvent(input, { session = null } = {}) {
   let event;
   try {
     event = { eventId: new mongoose.Types.ObjectId(), ...buildSafeEvent(input) };
@@ -224,11 +231,16 @@ export async function writeUserAudit(input, { session = null } = {}) {
       action: input?.action,
       actorUserId: input?.actorUserId == null ? null : String(input.actorUserId),
       targetUserId: input?.targetUserId == null ? null : String(input.targetUserId),
+      targetTenantId: input?.targetTenantId == null ? null : String(input.targetTenantId),
       errorName: error?.name ?? "Error",
       errorMessage: safeErrorMessage(error),
     });
-    // A failed enqueue inside a transaction must abort the user mutation too.
+    // A failed enqueue inside a transaction must abort the audited mutation too.
     if (session) throw error;
     return false;
   }
+}
+
+export async function writeUserAudit(input, options = {}) {
+  return writeAuditEvent(input, options);
 }

@@ -5,6 +5,8 @@ const AUDIT_ACTIONS = [
   "USER_PROFILE_UPDATED",
   "USER_STATUS_CHANGED",
   "USER_ROLE_CHANGED",
+  "SCHOOL_CREATED",
+  "SCHOOL_STATUS_CHANGED",
 ];
 
 const auditLogSchema = new mongoose.Schema(
@@ -34,7 +36,8 @@ const auditLogSchema = new mongoose.Schema(
     targetUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
+      default: null,
       index: true,
     },
     targetTenantId: {
@@ -54,7 +57,7 @@ const auditLogSchema = new mongoose.Schema(
       default: [],
       validate: {
         validator: (fields) => fields.every((field) =>
-          ["firstName", "lastName", "email", "phone", "role", "status"].includes(field)
+          ["firstName", "lastName", "email", "phone", "role", "status", "name", "slug", "contactEmail", "timezone", "suspensionReason"].includes(field)
         ),
         message: "Audit changedFields contains an unsupported field",
       },

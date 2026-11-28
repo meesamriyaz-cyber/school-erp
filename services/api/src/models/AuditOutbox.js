@@ -63,9 +63,20 @@ const auditOutboxSchema = new mongoose.Schema(
   },
 );
 
+const USER_AUDIT_ACTIONS = new Set([
+  "USER_CREATED", "USER_PROFILE_UPDATED", "USER_STATUS_CHANGED", "USER_ROLE_CHANGED",
+]);
+const SCHOOL_AUDIT_ACTIONS = new Set(["SCHOOL_CREATED", "SCHOOL_STATUS_CHANGED"]);
+
 auditOutboxSchema.path("event").validate((event) =>
-  Boolean(event && event.action && AUDIT_ACTIONS.includes(event.action) &&
-    event.actorUserId && event.targetUserId && event.actorRole),
+  Boolean(
+    event &&
+    AUDIT_ACTIONS.includes(event.action) &&
+    event.actorUserId &&
+    event.actorRole &&
+    ((USER_AUDIT_ACTIONS.has(event.action) && event.targetUserId) ||
+      (SCHOOL_AUDIT_ACTIONS.has(event.action) && event.targetTenantId))
+  ),
   "Audit outbox event is missing required audit fields",
 );
 
