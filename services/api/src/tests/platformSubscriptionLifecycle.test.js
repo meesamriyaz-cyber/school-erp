@@ -64,8 +64,6 @@ describe("platform subscription payment lifecycle", () => {
     SchoolSubscription.findOne.mockReturnValue(query(subscription));
     PlatformCommercialEvent.create.mockResolvedValue(undefined);
     Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
-    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
-    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
 
     const res = response();
     await reversePlatformPayment({
@@ -158,4 +156,51 @@ describe("platform subscription payment lifecycle", () => {
     expect(subscription.currentPeriodEndsAt).toEqual(endsAt);
     expect(subscription.save).toHaveBeenCalledWith({ session });
   });
+  it("invalidates existing credentials when payment reactivates a trial-expired school", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const subscription = { _id: id(), tenantId, billingInterval: "monthly", status: "pending", currentPeriodStartsAt: date("2026-11-28T00:00:00Z"), currentPeriodEndsAt: date("2026-12-28T00:00:00Z"), save: vi.fn().mockResolvedValue(undefined) };
+    const invoice = { _id: id(), tenantId, subscriptionId: subscription._id, totalAmount: 100, status: "issued", save: vi.fn().mockResolvedValue(undefined) };
+    PlatformInvoice.findById.mockReturnValue(query(invoice));
+    PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
+    PlatformPayment.create.mockResolvedValue([{ _id: id(), amount: 100 }]);
+    SchoolSubscription.findOne.mockReturnValue(query(subscription));
+    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 0 });
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "trial_expired" }));
+    Tenant.updateOne.mockResolvedValue({ modifiedCount: 1 });
+
+    await recordPlatformPayment({ params: { invoiceId: invoice._id.toString() }, body: { amount: 100, method: "upi" }, auth: { userId: id().toString() } }, response(), vi.fn());
+
+    expect(User.updateMany).toHaveBeenCalledWith({ tenantId }, { $inc: { authVersion: 1 } }, { session });
+    expect(Session.updateMany).toHaveBeenCalledWith({ tenantId, revokedAt: null }, { $set: { revokedAt: expect.any(Date) } }, { session });
+    expect(Tenant.updateOne).toHaveBeenCalledWith(
+      { _id: tenantId, status: { $in: ["pending", "active", "trial_expired"] } },
+      { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } },
+      { session },
+    );
+  });
+
+  it("does not invalidate credentials for a school that was already active", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const subscription = { _id: id(), tenantId, billingInterval: "monthly", status: "pending", currentPeriodStartsAt: date("2026-11-28T00:00:00Z"), currentPeriodEndsAt: date("2026-12-28T00:00:00Z"), save: vi.fn().mockResolvedValue(undefined) };
+    const invoice = { _id: id(), tenantId, subscriptionId: subscription._id, totalAmount: 100, status: "issued", save: vi.fn().mockResolvedValue(undefined) };
+    PlatformInvoice.findById.mockReturnValue(query(invoice));
+    PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
+    PlatformPayment.create.mockResolvedValue([{ _id: id(), amount: 100 }]);
+    SchoolSubscription.findOne.mockReturnValue(query(subscription));
+    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 0 });
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
+    Tenant.updateOne.mockResolvedValue({ modifiedCount: 1 });
+
+    await recordPlatformPayment({ params: { invoiceId: invoice._id.toString() }, body: { amount: 100, method: "upi" }, auth: { userId: id().toString() } }, response(), vi.fn());
+
+    expect(User.updateMany).not.toHaveBeenCalled();
+    expect(Session.updateMany).not.toHaveBeenCalled();
+  });
+
 });
