@@ -282,7 +282,7 @@ export const listSchools = async (req, res, next) => {
 
     const [schools, total] = await Promise.all([
       Tenant.find(filter)
-         .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+         .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
         .sort({ name: 1, _id: 1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -395,7 +395,7 @@ export const updateSchoolStatus = async (req, res, next) => {
         await dbSession.withTransaction(async () => {
           updatedSchool = await Tenant.findOneAndUpdate(
             { _id: school._id, status: "pending" },
-            { $set: { status: "active" } },
+            { $set: { status: "active", suspensionReason: null, subscriptionSuspendedAt: null } },
             { new: true, runValidators: true, session: dbSession },
           )
             .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
@@ -430,7 +430,8 @@ export const updateSchoolStatus = async (req, res, next) => {
     }
 
     // Include the current status in the update filter to prevent stale writes.
-    const statusUpdate = { $set: { status } };
+    const statusUpdate = { $set: { status, subscriptionSuspendedAt: null } };
+    if (status === "active") statusUpdate.$set.suspensionReason = null;
     if (status === "suspended") {
       statusUpdate.$set.suspensionReason = reason.trim();
       statusUpdate.$push = {
