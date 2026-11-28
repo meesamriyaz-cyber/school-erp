@@ -1,14 +1,18 @@
 import mongoose from "mongoose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../models/Tenant.js", () => ({ default: { updateOne: vi.fn() } }));
-vi.mock("../models/User.js", () => ({ default: {} }));
+vi.mock("../models/Tenant.js", () => ({ default: { findById: vi.fn(), updateOne: vi.fn() } }));
+vi.mock("../models/User.js", () => ({ default: { updateMany: vi.fn() } }));
+vi.mock("../models/Session.js", () => ({ default: { updateMany: vi.fn() } }));
 vi.mock("../models/SubscriptionPlan.js", () => ({ default: {} }));
 vi.mock("../models/SchoolSubscription.js", () => ({ default: { findOne: vi.fn(), updateMany: vi.fn() } }));
 vi.mock("../models/PlatformInvoice.js", () => ({ default: { findById: vi.fn() } }));
 vi.mock("../models/PlatformPayment.js", () => ({ default: { findOne: vi.fn(), aggregate: vi.fn(), create: vi.fn() } }));
 vi.mock("../models/PlatformCommercialEvent.js", () => ({ default: { create: vi.fn() } }));
 
+import Tenant from "../models/Tenant.js";
+import User from "../models/User.js";
+import Session from "../models/Session.js";
 import SchoolSubscription from "../models/SchoolSubscription.js";
 import PlatformInvoice from "../models/PlatformInvoice.js";
 import PlatformPayment from "../models/PlatformPayment.js";
@@ -59,6 +63,9 @@ describe("platform subscription payment lifecycle", () => {
     PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
     SchoolSubscription.findOne.mockReturnValue(query(subscription));
     PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
 
     const res = response();
     await reversePlatformPayment({
