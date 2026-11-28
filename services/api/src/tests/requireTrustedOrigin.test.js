@@ -113,6 +113,17 @@ describe("requireTrustedOrigin middleware", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("allows an originless authenticated native request identified by the mobile client header", () => {
+    req.get.mockImplementation((header) =>
+      header.toLowerCase() === "x-client-type" ? "mobile" : undefined,
+    );
+
+    requireTrustedOrigin(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
   it("allows an originless native mobile request without a refresh cookie", () => {
     req.body.clientType = "mobile";
 
