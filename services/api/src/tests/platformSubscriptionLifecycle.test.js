@@ -39,7 +39,7 @@ function response() {
 }
 
 describe("platform subscription payment lifecycle", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => { vi.clearAllMocks(); vi.restoreAllMocks(); });
 
   it("does not downgrade a newer paid period when an older invoice payment is reversed", async () => {
     const session = sessionStub();
@@ -330,6 +330,43 @@ describe("platform subscription payment lifecycle", () => {
     expect(subscription.graceExpiredAt).toBeNull();
     expect(subscription.save).toHaveBeenCalledWith({ session });
     expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+
+  it("does not reactivate an expired subscription or cancel a newer subscription for a stale invoice payment", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const subscription = {
+      _id: id(), tenantId, billingInterval: "monthly", status: "expired",
+      graceExpiredAt: date("2026-11-08T00:00:00Z"),
+      currentPeriodStartsAt: date("2026-10-01T00:00:00Z"),
+      currentPeriodEndsAt: date("2026-11-01T00:00:00Z"),
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    const invoice = {
+      _id: id(), tenantId, subscriptionId: subscription._id, totalAmount: 100, status: "issued",
+      billingPeriodStartsAt: date("2026-09-01T00:00:00Z"),
+      billingPeriodEndsAt: date("2026-10-01T00:00:00Z"),
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    PlatformInvoice.findById.mockReturnValue(query(invoice));
+    PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
+    PlatformPayment.create.mockResolvedValue([{ _id: id(), amount: 100 }]);
+    SchoolSubscription.findOne.mockReturnValue(query(subscription));
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+
+    await recordPlatformPayment({
+      params: { invoiceId: invoice._id.toString() },
+      body: { amount: 100, method: "upi" },
+      auth: { userId: id().toString() },
+    }, response(), vi.fn());
+
+    expect(subscription.status).toBe("expired");
+    expect(subscription.save).not.toHaveBeenCalled();
+    expect(SchoolSubscription.updateMany).not.toHaveBeenCalled();
+    expect(Tenant.findById).not.toHaveBeenCalled();
+    expect(Tenant.updateOne).not.toHaveBeenCalled();
   });
 
 });
