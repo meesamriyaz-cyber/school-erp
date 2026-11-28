@@ -3,6 +3,7 @@ import env from "./config/env.js";
 import { startAuditOutboxWorker, stopAuditOutboxWorker } from "./services/auditLogService.js";
 import { startNotificationDeliveryWorker, stopNotificationDeliveryWorker } from "./services/notificationDeliveryService.js";
 import { startTrialExpiryWorker, stopTrialExpiryWorker } from "./services/trialExpiryService.js";
+import { startPastDueGraceWorker, stopPastDueGraceWorker } from "./services/pastDueGraceService.js";
 import {
   connectDatabase,
   disconnectDatabase,
@@ -15,6 +16,7 @@ const startServer = async () => {
   startAuditOutboxWorker();
   startNotificationDeliveryWorker();
   startTrialExpiryWorker();
+  startPastDueGraceWorker();
 
   server = app.listen(env.port, () => {
     console.log(
@@ -41,6 +43,8 @@ const shutdown = async (signal) => {
     await stopAuditOutboxWorker();
     await stopNotificationDeliveryWorker();
     await stopTrialExpiryWorker();
+    await stopPastDueGraceWorker();
+    await stopPastDueGraceWorker();
     await disconnectDatabase();
     process.exitCode = 0;
   } catch (error) {
