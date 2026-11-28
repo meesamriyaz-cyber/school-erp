@@ -305,8 +305,8 @@ export async function recordPlatformPayment(req, res, next) {
           const wasTrialExpired = tenant?.status === "trial_expired";
           const wasGraceSuspended = tenant?.status === "suspended" && Boolean(tenant?.subscriptionSuspendedAt);
           if (wasTrialExpired || wasGraceSuspended) {
-            // A trial-expired school must not regain access with credentials
-            // issued before expiry. Keep invalidation in the payment transaction.
+            // A school returning from trial or subscription suspension must not
+            // regain access with credentials issued before access was revoked.
             await User.updateMany(
               { tenantId: tenant._id },
               { $inc: { authVersion: 1 } },
@@ -579,7 +579,7 @@ export async function listCommercialEvents(req, res, next) {
   try {
     const page = Number(req.query.page ?? 1);
     const limit = Number(req.query.limit ?? 25);
-    const allowedActions = ["PLAN_CREATED", "PLAN_UPDATED", "PLAN_ARCHIVED", "SUBSCRIPTION_ASSIGNED", "SUBSCRIPTION_ACTIVATED", "SUBSCRIPTION_RENEWED", "PAYMENT_RECORDED", "PAYMENT_REVERSED", "RENEWAL_INVOICED", "TRIAL_STARTED"];
+    const allowedActions = ["PLAN_CREATED", "PLAN_UPDATED", "PLAN_ARCHIVED", "SUBSCRIPTION_ASSIGNED", "SUBSCRIPTION_ACTIVATED", "SUBSCRIPTION_RENEWED", "PAYMENT_RECORDED", "PAYMENT_REVERSED", "RENEWAL_INVOICED", "TRIAL_STARTED", "SUBSCRIPTION_GRACE_EXPIRED"];
     if (!Number.isInteger(page) || page < 1) return fail(res, 400, "Page must be a positive integer");
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) return fail(res, 400, "Limit must be between 1 and 100");
     const filter = {};
