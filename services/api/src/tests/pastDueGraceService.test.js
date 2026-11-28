@@ -48,17 +48,18 @@ describe("past-due subscription grace worker", () => {
     const now = new Date("2026-12-06T09:30:00.000Z");
     const subscriptionId = new mongoose.Types.ObjectId();
     const tenantId = new mongoose.Types.ObjectId();
+    const graceEndsAt = new Date("2026-12-05T09:30:00.000Z");
     const startSession = vi.spyOn(mongoose, "startSession").mockResolvedValue(sessionStub());
     SchoolSubscription.find.mockReturnValue({
       select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue([{ _id: subscriptionId, tenantId }]),
+        lean: vi.fn().mockResolvedValue([{ _id: subscriptionId, tenantId, graceEndsAt }]),
       }),
     });
 
     const result = await processDuePastDueSubscriptions({ now });
 
     expect(result).toEqual({ expired: 1, skipped: false });
-    expect(SchoolSubscription.find).toHaveBeenCalledWith({ status: "past_due", graceEndsAt: { $lte: now } });
+    expect(SchoolSubscription.find).toHaveBeenCalledWith({ status: "past_due", $or: [{ graceEndsAt: { $lte: now } }, { graceEndsAt: null }] });
     expect(SchoolSubscription.updateOne).toHaveBeenCalledWith(
       { _id: subscriptionId, tenantId, status: "past_due", graceEndsAt: { $lte: now } },
       { $set: { status: "expired", graceExpiredAt: now } },
@@ -88,7 +89,7 @@ describe("past-due subscription grace worker", () => {
     vi.spyOn(mongoose, "startSession").mockResolvedValue(sessionStub());
     SchoolSubscription.find.mockReturnValue({
       select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue([{ _id: subscriptionId, tenantId }]),
+        lean: vi.fn().mockResolvedValue([{ _id: subscriptionId, tenantId, graceEndsAt: new Date("2026-12-05T09:30:00.000Z") }]),
       }),
     });
     Tenant.updateOne.mockResolvedValue({ modifiedCount: 0 });
@@ -111,7 +112,7 @@ describe("past-due subscription grace worker", () => {
     vi.spyOn(mongoose, "startSession").mockResolvedValue(sessionStub());
     SchoolSubscription.find.mockReturnValue({
       select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue([{ _id: subscriptionId, tenantId }]),
+        lean: vi.fn().mockResolvedValue([{ _id: subscriptionId, tenantId, graceEndsAt: new Date("2026-12-05T09:30:00.000Z") }]),
       }),
     });
     SchoolSubscription.updateOne.mockResolvedValue({ modifiedCount: 0 });
