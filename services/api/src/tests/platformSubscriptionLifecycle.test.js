@@ -369,4 +369,44 @@ describe("platform subscription payment lifecycle", () => {
     expect(Tenant.updateOne).not.toHaveBeenCalled();
   });
 
+
+  it("allows a matching legacy renewal invoice to recover a grace-expired subscription", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const subscription = {
+      _id: id(), tenantId, billingInterval: "monthly", status: "expired",
+      graceExpiredAt: date("2026-11-08T00:00:00Z"),
+      currentPeriodStartsAt: date("2026-09-01T00:00:00Z"),
+      currentPeriodEndsAt: date("2026-10-01T00:00:00Z"),
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    const invoice = {
+      _id: id(), tenantId, subscriptionId: subscription._id, totalAmount: 100,
+      status: "issued", notes: "Automated subscription renewal",
+      issuedAt: date("2026-10-01T00:00:00Z"),
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    PlatformInvoice.findById.mockReturnValue(query(invoice));
+    PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
+    PlatformPayment.create.mockResolvedValue([{ _id: id(), amount: 100 }]);
+    SchoolSubscription.findOne.mockReturnValue(query(subscription));
+    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 0 });
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "suspended", subscriptionSuspendedAt: date("2026-11-08T00:00:00Z") }));
+    Tenant.updateOne.mockResolvedValue({ modifiedCount: 1 });
+
+    await recordPlatformPayment({
+      params: { invoiceId: invoice._id.toString() },
+      body: { amount: 100, method: "upi" },
+      auth: { userId: id().toString() },
+    }, response(), vi.fn());
+
+    expect(subscription.status).toBe("active");
+    expect(subscription.currentPeriodStartsAt).toEqual(date("2026-10-01T00:00:00Z"));
+    expect(subscription.currentPeriodEndsAt).toEqual(date("2026-11-01T00:00:00Z"));
+    expect(subscription.graceExpiredAt).toBeNull();
+    expect(Tenant.updateOne).toHaveBeenCalled();
+  });
+
 });
