@@ -28,8 +28,10 @@ export async function processDuePastDueSubscriptions({ now = new Date() } = {}) 
 
     for (const candidate of dueSubscriptions) {
       const session = await mongoose.startSession();
+      let didExpire = false;
       try {
         await session.withTransaction(async () => {
+          didExpire = false;
           // Backfill subscriptions that were already past due before the grace
           // fields were introduced. Their seven-day clock starts at rollout,
           // unless a recorded pastDueSince timestamp is available.
@@ -102,8 +104,9 @@ export async function processDuePastDueSubscriptions({ now = new Date() } = {}) 
               reason: GRACE_EXPIRED_REASON,
             },
           }], { session });
-          expired += 1;
+          didExpire = true;
         });
+        if (didExpire) expired += 1;
       } finally {
         await session.endSession();
       }
