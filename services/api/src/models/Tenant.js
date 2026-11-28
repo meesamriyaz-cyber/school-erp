@@ -33,6 +33,7 @@ const tenantSchema = new mongoose.Schema(
     },
 
     suspensionReason: { type: String, trim: true, maxlength: 500, default: null },
+    subscriptionSuspendedAt: { type: Date, default: null, index: true },
     suspensionHistory: [{
       reason: { type: String, required: true, trim: true, maxlength: 500 },
       suspendedAt: { type: Date, required: true },
