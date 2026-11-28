@@ -18,6 +18,7 @@ vi.mock("../services/auditLogService.js", () => ({ writeAuditEvent: vi.fn().mock
 vi.mock("../models/AuditOutbox.js", () => ({ default: { create: vi.fn().mockResolvedValue([{}]) } }));
 
 import { updateSchoolStatus } from "../controllers/platformController.js";
+import { writeAuditEvent } from "../services/auditLogService.js";
 
 vi.spyOn(mongoose, "startSession");
 
@@ -83,6 +84,18 @@ describe("updateSchoolStatus", () => {
     expect(updateMany).toHaveBeenCalledWith(
       { tenantId: schoolId, revokedAt: null },
       { $set: { revokedAt: expect.any(Date) } },
+      { session: dbSession },
+    );
+    expect(writeAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: req.auth.userId,
+        actorRole: "platform_admin",
+        targetTenantId: schoolId,
+        action: "SCHOOL_STATUS_CHANGED",
+        changedFields: ["status", "suspensionReason"],
+        previousValue: "active",
+        newValue: "suspended",
+      }),
       { session: dbSession },
     );
     expect(next).not.toHaveBeenCalled();

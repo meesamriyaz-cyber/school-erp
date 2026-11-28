@@ -6,6 +6,7 @@ import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
 import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
+import { writeAuditEvent } from "../services/auditLogService.js";
 import { createSchool, updateSchoolStatus } from "../controllers/platformController.js";
 
 vi.mock("../models/Tenant.js", () => ({
@@ -249,6 +250,17 @@ describe("createSchool controller", () => {
     expect(User.create.mock.calls[0][1]).toEqual({
       session: dbSession,
     });
+    expect(writeAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: req.auth.userId,
+        actorRole: "platform_admin",
+        targetTenantId: expect.any(mongoose.Types.ObjectId),
+        action: "SCHOOL_CREATED",
+        changedFields: ["name", "slug", "contactEmail", "timezone", "status"],
+        newValue: "pending",
+      }),
+      { session: dbSession },
+    );
 
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(
