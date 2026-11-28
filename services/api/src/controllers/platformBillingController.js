@@ -264,10 +264,15 @@ export async function recordPlatformPayment(req, res, next) {
             && subscription.currentPeriodEndsAt
             && new Date(subscription.currentPeriodEndsAt).getTime() === new Date(invoice.billingPeriodStartsAt).getTime()
             && new Date(invoice.billingPeriodEndsAt).getTime() > new Date(invoice.billingPeriodStartsAt).getTime();
+          const matchesLegacyRenewal = !invoice.billingPeriodStartsAt
+            && invoice.notes === "Automated subscription renewal"
+            && subscription.currentPeriodStartsAt && subscription.currentPeriodEndsAt && invoice.issuedAt
+            && new Date(subscription.currentPeriodEndsAt).getTime() <= new Date(invoice.issuedAt).getTime()
+            && new Date(subscription.currentPeriodStartsAt).getTime() < new Date(invoice.issuedAt).getTime();
           // An expired grace-period subscription may recover only from its
           // current invoice or the renewal invoice for the immediately due period.
           // Paying a stale invoice must never cancel a newer active subscription.
-          const mayReactivate = !isGraceExpiredSubscription || matchesCurrentPaidPeriod || matchesNextRenewalPeriod;
+          const mayReactivate = !isGraceExpiredSubscription || matchesCurrentPaidPeriod || matchesNextRenewalPeriod || matchesLegacyRenewal;
           if (mayReactivate) {
             await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
           const wasPending = subscription.status === "pending";
