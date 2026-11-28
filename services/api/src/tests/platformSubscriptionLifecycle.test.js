@@ -207,4 +207,92 @@ describe("platform subscription payment lifecycle", () => {
     expect(Session.updateMany).not.toHaveBeenCalled();
   });
 
+
+  it("reactivates a school suspended by grace expiry when its overdue invoice is paid late", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const startsAt = date("2026-10-01T00:00:00Z");
+    const endsAt = date("2026-11-01T00:00:00Z");
+    const subscription = {
+      _id: id(), tenantId, billingInterval: "monthly", status: "expired",
+      graceExpiredAt: date("2026-11-08T00:00:00Z"),
+      pastDueSince: date("2026-11-01T00:00:00Z"),
+      graceEndsAt: date("2026-11-08T00:00:00Z"),
+      currentPeriodStartsAt: date("2026-09-01T00:00:00Z"),
+      currentPeriodEndsAt: startsAt,
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    const invoice = {
+      _id: id(), tenantId, subscriptionId: subscription._id, totalAmount: 100,
+      status: "issued", billingPeriodStartsAt: startsAt, billingPeriodEndsAt: endsAt,
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    PlatformInvoice.findById.mockReturnValue(query(invoice));
+    PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
+    PlatformPayment.create.mockResolvedValue([{ _id: id(), amount: 100 }]);
+    SchoolSubscription.findOne.mockReturnValue(query(subscription));
+    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 0 });
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    Tenant.findById.mockReturnValue(query({
+      _id: tenantId, status: "suspended", subscriptionSuspendedAt: date("2026-11-08T00:00:00Z"),
+    }));
+    Tenant.updateOne.mockResolvedValue({ modifiedCount: 1 });
+
+    const res = response();
+    await recordPlatformPayment({
+      params: { invoiceId: invoice._id.toString() },
+      body: { amount: 100, method: "upi" },
+      auth: { userId: id().toString() },
+    }, res, vi.fn());
+
+    expect(subscription.status).toBe("active");
+    expect(subscription.pastDueSince).toBeNull();
+    expect(subscription.graceEndsAt).toBeNull();
+    expect(subscription.graceExpiredAt).toBeNull();
+    expect(User.updateMany).toHaveBeenCalledWith({ tenantId }, { $inc: { authVersion: 1 } }, { session });
+    expect(Session.updateMany).toHaveBeenCalledWith({ tenantId, revokedAt: null }, { $set: { revokedAt: expect.any(Date) } }, { session });
+    expect(Tenant.updateOne).toHaveBeenCalledWith(
+      { _id: tenantId, $or: [{ status: { $in: ["pending", "active", "trial_expired"] } }, { status: "suspended", subscriptionSuspendedAt: { $ne: null } }] },
+      { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null, subscriptionSuspendedAt: null, suspensionReason: null } },
+      { session },
+    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+  });
+
+  it("does not automatically reactivate a manually suspended school when an invoice is paid", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const subscription = {
+      _id: id(), tenantId, billingInterval: "monthly", status: "past_due",
+      currentPeriodStartsAt: date("2026-10-01T00:00:00Z"),
+      currentPeriodEndsAt: date("2026-11-01T00:00:00Z"),
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    const invoice = {
+      _id: id(), tenantId, subscriptionId: subscription._id, totalAmount: 100, status: "issued",
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    PlatformInvoice.findById.mockReturnValue(query(invoice));
+    PlatformPayment.aggregate.mockReturnValue({ session: vi.fn().mockResolvedValue([{ total: 0 }]) });
+    PlatformPayment.create.mockResolvedValue([{ _id: id(), amount: 100 }]);
+    SchoolSubscription.findOne.mockReturnValue(query(subscription));
+    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 0 });
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "suspended", subscriptionSuspendedAt: null }));
+    Tenant.updateOne.mockResolvedValue({ modifiedCount: 0 });
+
+    await recordPlatformPayment({
+      params: { invoiceId: invoice._id.toString() },
+      body: { amount: 100, method: "upi" },
+      auth: { userId: id().toString() },
+    }, response(), vi.fn());
+
+    expect(subscription.status).toBe("active");
+    expect(Tenant.updateOne).toHaveBeenCalled();
+    expect(User.updateMany).not.toHaveBeenCalled();
+    expect(Session.updateMany).not.toHaveBeenCalled();
+  });
+
 });
