@@ -130,4 +130,28 @@ describe("past-due subscription grace worker", () => {
     expect(result).toEqual({ expired: 0, skipped: false });
     expect(mocks.subscriptionUpdateOne).not.toHaveBeenCalled();
   });
+
+  it("starts a fresh seven-day window for legacy past-due subscriptions without grace metadata", async () => {
+    const now = new Date("2026-12-06T09:30:00.000Z");
+    const tenantId = new mongoose.Types.ObjectId();
+    const subscriptionId = new mongoose.Types.ObjectId();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(sessionStub());
+    SchoolSubscription.find.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue([{ _id: subscriptionId, tenantId, graceEndsAt: null, pastDueSince: null }]),
+      }),
+    });
+
+    const result = await processDuePastDueSubscriptions({ now });
+
+    expect(result).toEqual({ expired: 0, skipped: false });
+    expect(SchoolSubscription.updateOne).toHaveBeenCalledWith(
+      { _id: subscriptionId, tenantId, status: "past_due", graceEndsAt: null },
+      { $set: { pastDueSince: now, graceEndsAt: new Date("2026-12-13T09:30:00.000Z") } },
+      { session: expect.any(Object) },
+    );
+    expect(Tenant.updateOne).not.toHaveBeenCalled();
+    expect(PlatformCommercialEvent.create).not.toHaveBeenCalled();
+  });
+
 });
