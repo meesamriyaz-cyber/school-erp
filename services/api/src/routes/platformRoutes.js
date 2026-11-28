@@ -8,6 +8,7 @@ import { createSchool, getSchoolDetails, listSchools, updateSchoolStatus } from 
 import { createUser, getUserDetails, listUsers, updateUser, updateUserRole, updateUserStatus } from "../controllers/userManagementController.js";
 import { listAuditLogs } from "../controllers/auditLogController.js";
 import { getAuditOutboxStatus, retryFailedAuditEvent } from "../controllers/auditOutboxController.js";
+import { getPlatformOperationalHealth } from "../controllers/platformOperationsController.js";
 import {
   getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, startSchoolTrial,
   archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, listPlatformInvoices,
@@ -31,6 +32,7 @@ router.post("/payments/:paymentId/reverse", ...platformOnly, reversePlatformPaym
 router.post("/subscriptions/:subscriptionId/renewal-invoice", ...platformOnly, createRenewalInvoice);
 router.get("/commercial-events", ...platformOnly, listCommercialEvents);
 
+router.get("/operations", ...platformOnly, getPlatformOperationalHealth);
 router.get("/audit-logs", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), listAuditLogs);
 router.get("/audit-outbox", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), getAuditOutboxStatus);
 router.post("/audit-outbox/:outboxId/retry", requireTrustedOrigin, authenticate, authorizeRoles("platform_admin"), retryFailedAuditEvent);

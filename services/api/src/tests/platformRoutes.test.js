@@ -1,7 +1,8 @@
 import express from "express";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAuditLogs, getAuditOutboxStatus, retryFailedAuditEvent, getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, startSchoolTrial, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents } = vi.hoisted(() => ({
+const { getPlatformOperationalHealth, listSchools, getSchoolDetails, updateSchoolStatus, createSchool, listAuditLogs, getAuditOutboxStatus, retryFailedAuditEvent, getBusinessOverview, listSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, archiveSubscriptionPlan, getSchoolSubscription, assignSchoolSubscription, startSchoolTrial, listPlatformInvoices, recordPlatformPayment, reversePlatformPayment, createRenewalInvoice, listCommercialEvents } = vi.hoisted(() => ({
+  getPlatformOperationalHealth: vi.fn((_req, res) => res.status(200).json({ endpoint: "getPlatformOperationalHealth" })),
   listSchools: vi.fn((_req, res) => res.status(200).json({ endpoint: "listSchools" })),
   getSchoolDetails: vi.fn((_req, res) => res.status(200).json({ endpoint: "getSchoolDetails" })),
   updateSchoolStatus: vi.fn((_req, res) => res.status(200).json({ endpoint: "updateSchoolStatus" })),
@@ -39,6 +40,7 @@ vi.mock("../middleware/authenticate.js", () => ({
   },
 }));
 
+vi.mock("../controllers/platformOperationsController.js", () => ({ getPlatformOperationalHealth }));
 vi.mock("../controllers/auditLogController.js", () => ({ listAuditLogs }));
 vi.mock("../controllers/auditOutboxController.js", () => ({ getAuditOutboxStatus, retryFailedAuditEvent }));
 
@@ -82,6 +84,7 @@ describe("platform school-management route authorization", () => {
   });
 
   const protectedRequests = [
+    ["GET", "/operations", undefined, getPlatformOperationalHealth],
     ["GET", "/audit-outbox", undefined, getAuditOutboxStatus],
     ["POST", "/audit-outbox/507f1f77bcf86cd799439011/retry", {}, retryFailedAuditEvent],
     ["GET", "/audit-logs", undefined, listAuditLogs],

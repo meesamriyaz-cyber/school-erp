@@ -40,8 +40,7 @@ The API readiness endpoint is:
 GET /api/v1/health/ready
 ```
 
-Readiness requires a connected MongoDB database and both background workers to
-have completed an initial polling cycle. Each worker refreshes its heartbeat
+Readiness requires a connected MongoDB database and all four critical background workers (audit outbox, notification delivery, trial expiry, and past-due grace) to have completed an initial polling cycle. Each worker refreshes its heartbeat
 when a cycle begins and while it scans a batch. A heartbeat older than 30
 seconds is reported as `stale` and makes the endpoint return HTTP 503. A
 worker that reports an error is `degraded`; a worker that has not completed

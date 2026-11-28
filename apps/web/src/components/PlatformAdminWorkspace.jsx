@@ -187,6 +187,8 @@ export default function PlatformAdminWorkspace() {
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(true);
   const [auditOutbox, setAuditOutbox] = useState(null);
   const [auditOutboxError, setAuditOutboxError] = useState("");
+  const [operationsHealth, setOperationsHealth] = useState(null);
+  const [operationsHealthError, setOperationsHealthError] = useState("");
   const [retryingAuditId, setRetryingAuditId] = useState("");
   const [assignPlanId, setAssignPlanId] = useState("");
   const [assignDueAt, setAssignDueAt] = useState("");
@@ -287,12 +289,14 @@ export default function PlatformAdminWorkspace() {
       setLoadingAuditLogs(true);
       setAuditLogsError("");
       setAuditOutboxError("");
+      setOperationsHealthError("");
       const logsRequest = apiRequest(`/platform/audit-logs?${params.toString()}`, { accessToken, signal: controller.signal });
       const outboxRequest = apiRequest("/platform/audit-outbox", { accessToken, signal: controller.signal });
-      return Promise.allSettled([logsRequest, outboxRequest]);
+      const operationsRequest = apiRequest("/platform/operations", { accessToken, signal: controller.signal });
+      return Promise.allSettled([logsRequest, outboxRequest, operationsRequest]);
     }).then((results) => {
       if (controller.signal.aborted || !results) return;
-      const [logsResult, outboxResult] = results;
+      const [logsResult, outboxResult, operationsResult] = results;
       if (logsResult.status === "fulfilled") {
         const logsResponse = logsResult.value;
         setAuditLogs(Array.isArray(logsResponse?.data) ? logsResponse.data : []);
@@ -304,6 +308,11 @@ export default function PlatformAdminWorkspace() {
         setAuditOutbox(outboxResult.value?.data ?? null);
       } else if (outboxResult.reason?.name !== "AbortError") {
         setAuditOutboxError(outboxResult.reason?.message || "Unable to load audit delivery status.");
+      }
+      if (operationsResult.status === "fulfilled") {
+        setOperationsHealth(operationsResult.value?.data ?? null);
+      } else if (operationsResult.reason?.name !== "AbortError") {
+        setOperationsHealthError(operationsResult.reason?.message || "Unable to load platform operational health.");
       }
     }).finally(() => {
       if (!controller.signal.aborted) setLoadingAuditLogs(false);
@@ -1210,6 +1219,26 @@ export default function PlatformAdminWorkspace() {
                 <div><h2>User and access audit</h2><p>Immutable records of platform user creation, profile changes, role changes and account status changes.</p></div>
                 <button type="button" className="platform-secondary-button" onClick={() => setReloadCount((count) => count + 1)}>Refresh audit</button>
               </div>
+              <section className="platform-directory" aria-label="Platform operational health">
+                <div className="platform-form-heading">
+                  <div><h2>Platform operational health</h2><p>Live readiness snapshot for the database and all background workers.</p></div>
+                  <span className={`platform-audit-action ${operationsHealth?.ready ? "is-healthy" : "is-attention"}`}>{operationsHealth ? statusLabel(operationsHealth.status) : "Unavailable"}</span>
+                </div>
+                {operationsHealthError && <div className="platform-directory-error" role="alert">{operationsHealthError}</div>}
+                <section className="platform-summary-grid" aria-label="Service and worker health">
+                  <article className="platform-summary-card"><span className="platform-summary-label">Database</span><strong>{operationsHealth?.database ? statusLabel(operationsHealth.database) : "—"}</strong></article>
+                  {Object.entries(operationsHealth?.workers?.workers || {}).map(([name, worker]) => (
+                    <article className="platform-summary-card" key={name}>
+                      <span className="platform-summary-label">{humanizeField(name)}</span>
+                      <strong>{statusLabel(worker.status)}</strong>
+                      <small>Last cycle: {worker.lastCycleAt ? new Date(worker.lastCycleAt).toLocaleString("en-IN") : "Not completed"}</small>
+                      <small>Last processed: {worker.lastProcessed ?? 0}</small>
+                      {worker.lastErrorName && <small role="status">Last error type: {worker.lastErrorName}</small>}
+                    </article>
+                  ))}
+                </section>
+                {operationsHealth?.sampledAt && <p className="platform-section-note">Health snapshot: {new Date(operationsHealth.sampledAt).toLocaleString("en-IN")}</p>}
+              </section>
               <section className="platform-summary-grid" aria-label="Audit delivery status">
                 {[
                   ["Pending", auditOutbox?.counts?.pending],

@@ -1021,6 +1021,17 @@ it("changes a user's role and updates the profile", async () => {
       if (path.startsWith("/platform/audit-logs?")) {
         return { success: true, data: [auditRecord], pagination: { page: 1, limit: 20, total: 1, totalPages: 1 } };
       }
+      if (path === "/platform/operations") {
+        return { success: true, data: {
+          status: "healthy", ready: true, database: "connected",
+          workers: { ready: true, workers: {
+            auditOutbox: { status: "healthy", lastProcessed: 3, lastCycleAt: "2026-11-28T10:00:00.000Z", lastErrorName: null },
+            notificationDelivery: { status: "healthy", lastProcessed: 1, lastCycleAt: "2026-11-28T10:00:00.000Z", lastErrorName: null },
+            trialExpiry: { status: "healthy", lastProcessed: 0, lastCycleAt: "2026-11-28T10:00:00.000Z", lastErrorName: null },
+            pastDueGrace: { status: "healthy", lastProcessed: 0, lastCycleAt: "2026-11-28T10:00:00.000Z", lastErrorName: null },
+          } },
+        } };
+      }
       if (path === "/platform/audit-outbox" && options.method !== "POST") {
         return { success: true, data: { counts: { pending: 2, processing: 1, staleProcessing: 0, delivered: 42, failed: 1 }, failedEvents: [failedEvent] } };
       }
@@ -1034,6 +1045,9 @@ it("changes a user's role and updates the profile", async () => {
     await user.click(screen.getByRole("button", { name: /System audit/ }));
 
     expect(await screen.findByRole("table", { name: "System audit event log" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Platform operational health" })).toBeInTheDocument();
+    expect(screen.getByText("Past Due Grace")).toBeInTheDocument();
+    expect(screen.getAllByText("Healthy").length).toBeGreaterThan(0);
     expect(screen.getByText("User role changed")).toBeInTheDocument();
     expect(screen.getByText("teacher → principal")).toBeInTheDocument();
     expect(screen.getByText("Temporary database issue")).toBeInTheDocument();

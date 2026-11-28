@@ -1,5 +1,12 @@
 export const WORKER_HEARTBEAT_TIMEOUT_MS = 30_000;
 
+export const BACKGROUND_WORKER_NAMES = Object.freeze([
+  "auditOutbox",
+  "notificationDelivery",
+  "trialExpiry",
+  "pastDueGrace",
+]);
+
 const createWorkerState = () => ({
   started: false,
   running: false,
@@ -10,10 +17,7 @@ const createWorkerState = () => ({
   lastErrorName: null,
 });
 
-const states = {
-  auditOutbox: createWorkerState(),
-  notificationDelivery: createWorkerState(),
-};
+const states = Object.fromEntries(BACKGROUND_WORKER_NAMES.map((name) => [name, createWorkerState()]));
 
 function getState(name) {
   const state = states[name];
