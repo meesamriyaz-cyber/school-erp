@@ -7,6 +7,11 @@ import PlatformCommercialEvent from "../models/PlatformCommercialEvent.js";
 
 const POLL_INTERVAL_MS = 60 * 1000;
 const GRACE_EXPIRED_REASON = "Subscription payment grace period expired";
+const addCalendarDays = (value, days) => {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+};
 let workerTimer = null;
 let workerRunning = false;
 
@@ -18,13 +23,26 @@ export async function processDuePastDueSubscriptions({ now = new Date() } = {}) 
   try {
     const dueSubscriptions = await SchoolSubscription.find({
       status: "past_due",
-      graceEndsAt: { $lte: now },
-    }).select("_id tenantId").lean();
+      $or: [{ graceEndsAt: { $lte: now } }, { graceEndsAt: null }],
+    }).select("_id tenantId pastDueSince graceEndsAt").lean();
 
     for (const candidate of dueSubscriptions) {
       const session = await mongoose.startSession();
       try {
         await session.withTransaction(async () => {
+          // Backfill subscriptions that were already past due before the grace
+          // fields were introduced. Their seven-day clock starts at rollout,
+          // unless a recorded pastDueSince timestamp is available.
+          if (!candidate.graceEndsAt) {
+            const pastDueSince = candidate.pastDueSince || now;
+            await SchoolSubscription.updateOne(
+              { _id: candidate._id, tenantId: candidate.tenantId, status: "past_due", graceEndsAt: null },
+              { $set: { pastDueSince, graceEndsAt: addCalendarDays(pastDueSince, 7) } },
+              { session },
+            );
+            return;
+          }
+
           // This conditional write is the concurrency boundary: a payment that
           // clears grace first makes this transition a no-op.
           const transition = await SchoolSubscription.updateOne(
