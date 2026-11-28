@@ -66,7 +66,7 @@ describe("updateSchoolStatus", () => {
     expect(findOneAndUpdate).toHaveBeenCalledWith(
       { _id: schoolId, status: "active" },
       expect.objectContaining({
-        $set: { status: "suspended", suspensionReason: "Valid school suspension reason" },
+        $set: { status: "suspended", subscriptionSuspendedAt: null, suspensionReason: "Valid school suspension reason" },
         $push: { suspensionHistory: expect.objectContaining({ reason: "Valid school suspension reason", suspendedBy: null, suspendedAt: expect.any(Date) }) },
       }),
       { new: true, runValidators: true },
@@ -159,7 +159,7 @@ describe("updateSchoolStatus", () => {
 
     expect(findOneAndUpdate).toHaveBeenCalledWith(
       { _id: schoolId, status: "pending" },
-      { $set: { status: "active" } },
+      { $set: { status: "active", suspensionReason: null, subscriptionSuspendedAt: null } },
       { new: true, runValidators: true, session: dbSession },
     );
     expect(userUpdateMany).toHaveBeenCalledWith(
