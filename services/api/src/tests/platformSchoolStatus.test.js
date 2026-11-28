@@ -136,11 +136,11 @@ describe("updateSchoolStatus", () => {
       { $set: { revokedAt: expect.any(Date) } },
       { session: dbSession },
     );
+    expect(findOneAndUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      userUpdateMany.mock.invocationCallOrder[0],
+    );
     expect(userUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(
       updateMany.mock.invocationCallOrder[0],
-    );
-    expect(updateMany.mock.invocationCallOrder[0]).toBeLessThan(
-      findOneAndUpdate.mock.invocationCallOrder[0],
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(next).not.toHaveBeenCalled();
@@ -173,7 +173,9 @@ describe("updateSchoolStatus", () => {
     await updateSchoolStatus(req, res, next);
 
     expect(updateMany).toHaveBeenCalled();
-    expect(findOneAndUpdate).not.toHaveBeenCalled();
+    // The tenant write happens first inside the transaction; a later session
+    // revocation failure aborts the transaction and rolls the write back.
+    expect(findOneAndUpdate).toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith(error);
   });
 
