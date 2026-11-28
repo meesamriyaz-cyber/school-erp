@@ -65,7 +65,7 @@ describe("updateSchoolStatus controller", () => {
     }, res, next);
 
     const update = Tenant.findOneAndUpdate.mock.calls[0][1];
-    expect(update.$set).toEqual({ status: "suspended", suspensionReason: "Outstanding compliance documentation" });
+    expect(update.$set).toEqual({ status: "suspended", subscriptionSuspendedAt: null, suspensionReason: "Outstanding compliance documentation" });
     expect(update.$push.suspensionHistory).toEqual(expect.objectContaining({
       reason: "Outstanding compliance documentation", suspendedBy: actorId, suspendedAt: expect.any(Date),
     }));
@@ -112,7 +112,7 @@ describe("updateSchoolStatus controller", () => {
     expect(session.withTransaction).toHaveBeenCalledOnce();
     expect(Tenant.findOneAndUpdate).toHaveBeenCalledWith(
       { _id: schoolId, status: "pending" },
-      { $set: { status: "active" } },
+      { $set: { status: "active", suspensionReason: null, subscriptionSuspendedAt: null } },
       { new: true, runValidators: true, session },
     );
     expect(User.updateMany).toHaveBeenCalledWith(
