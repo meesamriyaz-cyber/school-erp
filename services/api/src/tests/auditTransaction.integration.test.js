@@ -48,12 +48,13 @@ integrationDescribe("audit transaction MongoDB integration", () => {
     const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const actorUserId = new mongoose.Types.ObjectId();
     const userId = new mongoose.Types.ObjectId();
+    const tenantId = new mongoose.Types.ObjectId();
     const eventId = new mongoose.Types.ObjectId();
     let outboxId;
 
     await withAuditTransaction(async (session) => {
       await User.create([{
-        _id: userId, tenantId: new mongoose.Types.ObjectId(), firstName: "Audit",
+        _id: userId, tenantId, firstName: "Audit",
         lastName: "Transaction", email: `audit-transaction-${suffix}@example.test`,
         passwordHash: "integration-test-hash", role: "teacher", status: "pending",
       }], { session });
@@ -61,7 +62,7 @@ integrationDescribe("audit transaction MongoDB integration", () => {
       const [outbox] = await AuditOutbox.create([{
         event: {
           eventId, actorUserId, actorRole: "platform_admin", tenantId: null,
-          targetUserId: userId, targetTenantId: null, action: "USER_CREATED",
+          targetUserId: userId, targetTenantId: tenantId, action: "USER_CREATED",
           changedFields: ["status"], previousValue: null, newValue: "pending",
         },
       }], { session });
