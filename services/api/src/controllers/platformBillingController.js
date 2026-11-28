@@ -255,7 +255,21 @@ export async function recordPlatformPayment(req, res, next) {
           ],
         }).session(session);
         if (subscription) {
-          await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
+          const isGraceExpiredSubscription = subscription.status === "expired" && Boolean(subscription.graceExpiredAt);
+          const matchesCurrentPaidPeriod = invoice.billingPeriodStartsAt && invoice.billingPeriodEndsAt
+            && subscription.currentPeriodStartsAt && subscription.currentPeriodEndsAt
+            && new Date(subscription.currentPeriodStartsAt).getTime() === new Date(invoice.billingPeriodStartsAt).getTime()
+            && new Date(subscription.currentPeriodEndsAt).getTime() === new Date(invoice.billingPeriodEndsAt).getTime();
+          const matchesNextRenewalPeriod = invoice.billingPeriodStartsAt && invoice.billingPeriodEndsAt
+            && subscription.currentPeriodEndsAt
+            && new Date(subscription.currentPeriodEndsAt).getTime() === new Date(invoice.billingPeriodStartsAt).getTime()
+            && new Date(invoice.billingPeriodEndsAt).getTime() > new Date(invoice.billingPeriodStartsAt).getTime();
+          // An expired grace-period subscription may recover only from its
+          // current invoice or the renewal invoice for the immediately due period.
+          // Paying a stale invoice must never cancel a newer active subscription.
+          const mayReactivate = !isGraceExpiredSubscription || matchesCurrentPaidPeriod || matchesNextRenewalPeriod;
+          if (mayReactivate) {
+            await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
           const wasPending = subscription.status === "pending";
           const invoicePeriodStartsAt = invoice.billingPeriodStartsAt;
           const invoicePeriodEndsAt = invoice.billingPeriodEndsAt;
@@ -304,17 +318,18 @@ export async function recordPlatformPayment(req, res, next) {
               { session },
             );
           }
-          await Tenant.updateOne(
-            {
-              _id: invoice.tenantId,
-              $or: [
-                { status: { $in: ["pending", "active", "trial_expired"] } },
-                { status: "suspended", subscriptionSuspendedAt: { $ne: null } },
-              ],
-            },
-            { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null, subscriptionSuspendedAt: null, suspensionReason: null } },
-            { session },
-          );
+            await Tenant.updateOne(
+              {
+                _id: invoice.tenantId,
+                $or: [
+                  { status: { $in: ["pending", "active", "trial_expired"] } },
+                  { status: "suspended", subscriptionSuspendedAt: { $ne: null } },
+                ],
+              },
+              { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null, subscriptionSuspendedAt: null, suspensionReason: null } },
+              { session },
+            );
+          }
         }
       }
       result = { payment, invoice };
