@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { staffModel, userModel, tenantModel, sessionModel, hashPassword, auditWrite, auditTransaction } = vi.hoisted(() => ({
-  staffModel: { updateMany: vi.fn() },
+const { staffModel, studentModel, guardianModel, userModel, tenantModel, sessionModel, hashPassword, auditWrite, auditTransaction } = vi.hoisted(() => ({
+  staffModel: { updateMany: vi.fn(), findOne: vi.fn() },
+  studentModel: { updateMany: vi.fn(), findOne: vi.fn() },
+  guardianModel: { updateMany: vi.fn(), findOne: vi.fn() },
   userModel: {
     find: vi.fn(),
     countDocuments: vi.fn(),
@@ -24,6 +26,8 @@ vi.mock("../models/User.js", () => ({
 }));
 vi.mock("../models/Tenant.js", () => ({ default: tenantModel }));
 vi.mock("../models/Staff.js", () => ({ default: staffModel }));
+vi.mock("../models/Student.js", () => ({ default: studentModel }));
+vi.mock("../models/Guardian.js", () => ({ default: guardianModel }));
 vi.mock("../models/Session.js", () => ({ default: sessionModel }));
 vi.mock("../utils/password.js", () => ({ hashPassword }));
 vi.mock("../services/auditLogService.js", () => ({ writeUserAudit: auditWrite, withAuditTransaction: auditTransaction }));
@@ -53,6 +57,16 @@ describe("user management controller", () => {
     vi.clearAllMocks();
     auditWrite.mockResolvedValue(true);
     staffModel.updateMany.mockResolvedValue({ acknowledged: true, modifiedCount: 1 });
+    const emptyProfileLookup = {
+      select: vi.fn().mockReturnThis(),
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(null),
+    };
+    staffModel.findOne.mockReturnValue(emptyProfileLookup);
+    studentModel.findOne.mockReturnValue(emptyProfileLookup);
+    guardianModel.findOne.mockReturnValue(emptyProfileLookup);
+    studentModel.updateMany.mockResolvedValue({ acknowledged: true, modifiedCount: 0 });
+    guardianModel.updateMany.mockResolvedValue({ acknowledged: true, modifiedCount: 0 });
     req = {
       auth: { userId: new mongoose.Types.ObjectId().toString(), tenantId: tenantId.toString(), role: "school_admin" },
       params: { userId: userId.toString() },
@@ -187,6 +201,96 @@ describe("user management controller", () => {
     );
     expect(res.status).toHaveBeenCalledWith(200);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it("synchronizes linked student and guardian names in the same profile transaction", async () => {
+    const existing = { _id: userId, tenantId, firstName: "Sam", lastName: "Parent", email: "sam@example.com", role: "parent", status: "active" };
+    const updated = { ...existing, firstName: "Samuel", lastName: "Parent Updated" };
+    userModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }) });
+    userModel.findOneAndUpdate.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updated) }) });
+    req.body = { firstName: "Samuel", lastName: "Parent Updated" };
+
+    await updateUser(req, res, next);
+
+    expect(studentModel.updateMany).toHaveBeenCalledWith(
+      { tenantId, userId },
+      { $set: { firstName: "Samuel", lastName: "Parent Updated" } },
+      { session: {} },
+    );
+    expect(guardianModel.updateMany).toHaveBeenCalledWith(
+      { tenantId, userId },
+      { $set: { firstName: "Samuel", lastName: "Parent Updated" } },
+      { session: {} },
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("does not copy a guardian login email into the verified guardian-contact email", async () => {
+    const existing = { _id: userId, tenantId, firstName: "Sam", lastName: "Parent", email: "sam@example.com", role: "parent", status: "active" };
+    const updated = { ...existing, email: "new.sam@example.com" };
+    userModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }) });
+    userModel.findOneAndUpdate.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(updated) }) });
+    req.body = { email: "new.sam@example.com" };
+
+    await updateUser(req, res, next);
+
+    expect(guardianModel.updateMany).not.toHaveBeenCalled();
+    expect(studentModel.updateMany).not.toHaveBeenCalled();
+    expect(staffModel.updateMany).toHaveBeenCalledWith(
+      { tenantId, userId },
+      expect.objectContaining({ $set: { email: "new.sam@example.com" } }),
+      { session: {} },
+    );
+  });
+
+  it("blocks changing a linked teaching staff account to a non-teacher role", async () => {
+    const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 2 };
+    userModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }) });
+    const linkedStaff = {
+      select: vi.fn().mockReturnThis(),
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue({ employeeType: "teaching" }),
+    };
+    staffModel.findOne.mockReturnValue(linkedStaff);
+    req.body = { role: "principal" };
+
+    await updateUserRole(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(auditWrite).not.toHaveBeenCalled();
+    expect(sessionModel.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("blocks changing a linked student account to a non-student role", async () => {
+    const existing = { _id: userId, tenantId, role: "student", status: "active", authVersion: 2 };
+    userModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }) });
+    studentModel.findOne.mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue({ _id: new mongoose.Types.ObjectId() }),
+    });
+    req.body = { role: "teacher" };
+
+    await updateUserRole(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(sessionModel.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not increment authVersion or revoke sessions for an unchanged role", async () => {
+    const existing = { _id: userId, tenantId, role: "teacher", status: "active", authVersion: 2 };
+    userModel.findOne.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(existing) }) });
+    req.body = { role: "teacher" };
+
+    await updateUserRole(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(userModel.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(sessionModel.updateMany).not.toHaveBeenCalled();
+    expect(auditWrite).not.toHaveBeenCalled();
   });
 
   it("increments authVersion and revokes sessions when a user is suspended", async () => {

@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import Tenant from "../models/Tenant.js";
 import User, { USER_ROLES } from "../models/User.js";
 import Staff from "../models/Staff.js";
+import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
 import Session from "../models/Session.js";
 import { hashPassword } from "../utils/password.js";
 import { writeUserAudit, withAuditTransaction } from "../services/auditLogService.js";
@@ -16,6 +18,7 @@ const SCHOOL_ROLES = LISTABLE_SCHOOL_ROLES.filter(
   (role) => !UNSUPPORTED_SCHOOL_ROLES.has(role),
 );
 const PROFILE_FIELDS = ["firstName", "lastName", "email", "phone"];
+const NAME_FIELDS = ["firstName", "lastName"];
 const sendError = (res, status, message) => res.status(status).json({ success: false, message });
 
 // authVersion is incremented atomically with role/status changes, so stale access
@@ -216,6 +219,30 @@ export const getUserDetails = async (req, res, next) => {
   }
 };
 
+async function linkedProfileRoleConflict(userId, tenantId, role, session) {
+  const [staff, student, guardian] = await Promise.all([
+    Staff.findOne({ tenantId, userId }).select("employeeType").session(session).lean(),
+    Student.findOne({ tenantId, userId }).select("_id").session(session).lean(),
+    Guardian.findOne({ tenantId, userId }).select("_id").session(session).lean(),
+  ]);
+
+  if (staff) {
+    const compatible = staff.employeeType === "teaching"
+      ? role === "teacher"
+      : ["principal", "accountant", "librarian", "transport_manager"].includes(role);
+    if (!compatible) {
+      return "This account is linked to a staff profile. Update its staff classification before changing the account role.";
+    }
+  }
+  if (student && role !== "student") {
+    return "This account is linked to a student profile and must keep the student role.";
+  }
+  if (guardian && role !== "parent") {
+    return "This account is linked to a guardian profile and must keep the parent role.";
+  }
+  return null;
+}
+
 export const updateUser = async (req, res, next) => {
   try {
     const body = req.body ?? {};
@@ -250,7 +277,7 @@ export const updateUser = async (req, res, next) => {
       ).select("_id tenantId firstName lastName email phone role status authVersion lastLoginAt createdAt updatedAt").lean();
       if (!updatedUser) return null;
       const staffIdentity = Object.fromEntries(
-        ["firstName", "lastName", "email", "phone"]
+        PROFILE_FIELDS
           .filter((field) => Object.hasOwn(update, field))
           .map((field) => [field, updatedUser[field] ?? (field === "lastName" ? "" : null)]),
       );
@@ -272,6 +299,28 @@ export const updateUser = async (req, res, next) => {
           },
           { session },
         );
+      }
+
+      const linkedName = Object.fromEntries(
+        NAME_FIELDS
+          .filter((field) => Object.hasOwn(update, field))
+          .map((field) => [field, updatedUser[field] ?? ""]),
+      );
+      if (Object.keys(linkedName).length) {
+        await Promise.all([
+          Student.updateMany(
+            { tenantId: updatedUser.tenantId, userId: updatedUser._id },
+            { $set: linkedName },
+            { session },
+          ),
+          // Guardian email is deliberately excluded: it is governed by the
+          // guardian's separate verified/pending email workflow.
+          Guardian.updateMany(
+            { tenantId: updatedUser.tenantId, userId: updatedUser._id },
+            { $set: linkedName },
+            { session },
+          ),
+        ]);
       }
       await writeUserAudit({
         actorUserId: req.auth.userId, actorRole: req.auth.role, tenantId: req.auth.tenantId,
@@ -340,9 +389,18 @@ export const updateUserRole = async (req, res, next) => {
     if (typeof role !== "string" || !allowedRolesFor(req).includes(role)) return sendError(res, 400, "You cannot assign this role");
     const current = await User.findOne({ _id: userId, ...scopeFor(req) }).select("_id tenantId role status authVersion").lean();
     if (!current) return sendError(res, 404, "User not found");
+    if (current.role === role) {
+      return res.status(200).json({
+        success: true,
+        message: "User already has the requested role",
+        data: { user: serializeUser(current) },
+      });
+    }
     const updated = await withAuditTransaction(async (session) => {
+      const conflict = await linkedProfileRoleConflict(current._id, current.tenantId, role, session);
+      if (conflict) return { conflict };
       const updatedUser = await User.findOneAndUpdate(
-        { _id: userId, ...scopeFor(req), status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
+        { _id: userId, ...scopeFor(req), role: current.role, status: current.status, $or: [{ authVersion: current.authVersion ?? 0 }, { authVersion: { $exists: false } }] },
         { $set: { role }, $inc: { authVersion: 1 } },
         { new: true, runValidators: true, session },
       ).select("_id tenantId firstName lastName email phone role status lastLoginAt createdAt updatedAt").lean();
@@ -355,6 +413,7 @@ export const updateUserRole = async (req, res, next) => {
       }, { session });
       return updatedUser;
     });
+    if (updated?.conflict) return sendError(res, 409, updated.conflict);
     if (!updated) return sendError(res, 409, "User changed during this request; reload and try again");
     await revokeSessionsAfterAuthChange(updated._id);
     return res.status(200).json({ success: true, message: "User role updated", data: { user: serializeUser(updated) } });
