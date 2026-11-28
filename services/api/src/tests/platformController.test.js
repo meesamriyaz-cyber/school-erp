@@ -32,6 +32,33 @@ vi.mock("../utils/password.js", () => ({
 
 
 describe("updateSchoolStatus controller", () => {
+  it("does not allow a manual override of billing suspension", async () => {
+    const schoolId = new mongoose.Types.ObjectId();
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const next = vi.fn();
+    Tenant.findById.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue({
+          _id: schoolId,
+          name: "Billing Suspended School",
+          status: "suspended",
+          subscriptionSuspendedAt: new Date("2026-11-20T00:00:00.000Z"),
+        }),
+      }),
+    });
+
+    await updateSchoolStatus({
+      params: { schoolId: String(schoolId) },
+      body: { status: "active" },
+      auth: { userId: new mongoose.Types.ObjectId() },
+    }, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(Tenant.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+
   it("requires a reason before suspending a school", async () => {
     const schoolId = new mongoose.Types.ObjectId();
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };

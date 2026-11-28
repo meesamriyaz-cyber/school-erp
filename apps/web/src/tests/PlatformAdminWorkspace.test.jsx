@@ -1049,3 +1049,66 @@ it("changes a user's role and updates the profile", async () => {
   });
 
 });
+
+describe("PlatformAdminWorkspace billing and commercial audit navigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuth.mockReturnValue({
+      user: { firstName: "Platform", lastName: "Admin", role: "platform_admin" },
+      accessToken: "platform-access-token",
+      logout: vi.fn(),
+    });
+  });
+
+  it("paginates platform invoices instead of silently limiting the directory to the first page", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation((url) => {
+      if (url === "/platform/business-overview") return Promise.resolve(businessOverview);
+      if (url === "/platform/invoices?page=1&limit=20") {
+        return Promise.resolve({
+          success: true,
+          data: [{ _id: "invoice-1", invoiceNumber: "INV-001", totalAmount: 100, currency: "INR", status: "issued", issuedAt: "2026-11-01", dueAt: "2026-11-08", tenantId: { name: "Green Valley School" }, payments: [], outstandingAmount: 100 }],
+          pagination: { page: 1, limit: 20, total: 21, totalPages: 2 },
+        });
+      }
+      if (url === "/platform/invoices?page=2&limit=20") {
+        return Promise.resolve({
+          success: true,
+          data: [{ _id: "invoice-21", invoiceNumber: "INV-021", totalAmount: 200, currency: "INR", status: "issued", issuedAt: "2026-11-02", dueAt: "2026-11-09", tenantId: { name: "North School" }, payments: [], outstandingAmount: 200 }],
+          pagination: { page: 2, limit: 20, total: 21, totalPages: 2 },
+        });
+      }
+      return Promise.resolve({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
+    });
+
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Billing/ }));
+    expect(await screen.findByText("INV-001")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("INV-021")).toBeInTheDocument();
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(
+      "/platform/invoices?page=2&limit=20",
+      expect.objectContaining({ accessToken: "platform-access-token" }),
+    ));
+  });
+
+  it("filters commercial events by action using the server-side filter", async () => {
+    const user = userEvent.setup();
+    apiRequest.mockImplementation((url) => {
+      if (url === "/platform/business-overview") return Promise.resolve(businessOverview);
+      if (url.startsWith("/platform/commercial-events?")) {
+        return Promise.resolve({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
+      }
+      return Promise.resolve({ success: true, data: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } });
+    });
+
+    render(<PlatformAdminWorkspace />);
+    await user.click(screen.getByRole("button", { name: /Commercial audit/ }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Filter commercial event action" }), "PAYMENT_REVERSED");
+
+    await waitFor(() => expect(apiRequest).toHaveBeenLastCalledWith(
+      "/platform/commercial-events?page=1&limit=20&action=PAYMENT_REVERSED",
+      expect.objectContaining({ accessToken: "platform-access-token" }),
+    ));
+  });
+});

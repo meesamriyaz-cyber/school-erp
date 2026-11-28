@@ -64,7 +64,7 @@ describe("updateSchoolStatus", () => {
 
     expect(findById).toHaveBeenCalledWith(schoolId);
     expect(findOneAndUpdate).toHaveBeenCalledWith(
-      { _id: schoolId, status: "active" },
+      { _id: schoolId, status: "active", subscriptionSuspendedAt: null },
       expect.objectContaining({
         $set: { status: "suspended", subscriptionSuspendedAt: null, suspensionReason: "Valid school suspension reason" },
         $push: { suspensionHistory: expect.objectContaining({ reason: "Valid school suspension reason", suspendedBy: null, suspendedAt: expect.any(Date) }) },
@@ -82,6 +82,27 @@ describe("updateSchoolStatus", () => {
       { tenantId: schoolId, revokedAt: null },
       { $set: { revokedAt: expect.any(Date) } },
     );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("blocks manual reactivation when the school is suspended by overdue billing", async () => {
+    req.body.status = "active";
+    schoolQuery.lean.mockResolvedValue({
+      ...activeSchool,
+      status: "suspended",
+      subscriptionSuspendedAt: new Date("2026-11-20T00:00:00.000Z"),
+    });
+
+    await updateSchoolStatus(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: "This school is suspended for an overdue subscription. Record the outstanding payment to restore access.",
+    });
+    expect(findOneAndUpdate).not.toHaveBeenCalled();
+    expect(userUpdateMany).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -158,7 +179,7 @@ describe("updateSchoolStatus", () => {
     await updateSchoolStatus(req, res, next);
 
     expect(findOneAndUpdate).toHaveBeenCalledWith(
-      { _id: schoolId, status: "pending" },
+      { _id: schoolId, status: "pending", subscriptionSuspendedAt: null },
       { $set: { status: "active", suspensionReason: null, subscriptionSuspendedAt: null } },
       { new: true, runValidators: true, session: dbSession },
     );

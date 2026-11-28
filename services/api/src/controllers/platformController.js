@@ -338,13 +338,24 @@ export const updateSchoolStatus = async (req, res, next) => {
     }
 
     const school = await Tenant.findById(schoolId)
-      .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
       .lean();
 
     if (!school) {
       return res.status(404).json({
         success: false,
         message: "School not found",
+      });
+    }
+
+    if (
+      status === "active" &&
+      school.status === "suspended" &&
+      school.subscriptionSuspendedAt
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "This school is suspended for an overdue subscription. Record the outstanding payment to restore access.",
       });
     }
 
@@ -393,11 +404,11 @@ export const updateSchoolStatus = async (req, res, next) => {
           };
         }
         updatedSchool = await Tenant.findOneAndUpdate(
-          { _id: school._id, status: school.status },
+          { _id: school._id, status: school.status, subscriptionSuspendedAt: school.subscriptionSuspendedAt ?? null },
           statusUpdate,
           { new: true, runValidators: true, session: dbSession },
         )
-          .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+          .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
           .lean();
 
         if (!updatedSchool) return;
@@ -475,7 +486,7 @@ export const getSchoolDetails = async (req, res, next) => {
     }
 
     const school = await Tenant.findById(schoolId)
-      .select("_id name slug status suspensionReason suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
+      .select("_id name slug status suspensionReason subscriptionSuspendedAt suspensionHistory trialStartedAt trialEndsAt trialExpiredAt trialHistory contactEmail timezone createdAt updatedAt")
       .lean();
 
     if (!school) {

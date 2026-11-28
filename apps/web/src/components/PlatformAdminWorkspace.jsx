@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useAuth } from "../context/authContext.js";
 import { apiRequest } from "../lib/api.js";
 import "./PlatformAdminWorkspace.css";
@@ -115,6 +115,7 @@ export default function PlatformAdminWorkspace() {
   const [userSchoolFilter, setUserSchoolFilter] = useState("");
   const [userSchools, setUserSchools] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingPlans, setLoadingPlans] = useState(false);
   const [usersError, setUsersError] = useState("");
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [schoolsError, setSchoolsError] = useState("");
@@ -167,10 +168,13 @@ export default function PlatformAdminWorkspace() {
   const [savingPlan, setSavingPlan] = useState(false);
   const [planMessage, setPlanMessage] = useState("");
   const [invoices, setInvoices] = useState([]);
+  const [invoicePagination, setInvoicePagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [billingError, setBillingError] = useState("");
   const [paymentForms, setPaymentForms] = useState({});
   const [paymentBusyId, setPaymentBusyId] = useState("");
   const [commercialEvents, setCommercialEvents] = useState([]);
+  const [commercialActionFilter, setCommercialActionFilter] = useState("");
+  const [commercialSchoolFilter, setCommercialSchoolFilter] = useState("");
   const [commercialPagination, setCommercialPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [eventsError, setEventsError] = useState("");
   const [auditLogs, setAuditLogs] = useState([]);
@@ -206,9 +210,12 @@ export default function PlatformAdminWorkspace() {
     if (activePage !== "Plans" && activePage !== "SchoolDetails") return undefined;
     const controller = new AbortController();
     if (activePage === "Plans") {
+      setLoadingPlans(true);
+      setPlansError("");
       apiRequest("/platform/subscription-plans?includeArchived=true", { accessToken, signal: controller.signal })
         .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
-        .catch((error) => { if (!controller.signal.aborted) setPlansError(error.message || "Unable to load subscription plans."); });
+        .catch((error) => { if (!controller.signal.aborted) setPlansError(error.message || "Unable to load subscription plans."); })
+        .finally(() => { if (!controller.signal.aborted) setLoadingPlans(false); });
     } else {
       apiRequest("/platform/subscription-plans", { accessToken, signal: controller.signal })
         .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
@@ -218,16 +225,22 @@ export default function PlatformAdminWorkspace() {
         .catch((error) => { if (!controller.signal.aborted) setSchoolSubscriptionError(error.message || "Unable to load subscription."); });
     }
     return () => controller.abort();
-  }, [activePage, accessToken, selectedSchoolId]);
+  }, [activePage, accessToken, selectedSchoolId, reloadCount]);
 
   useEffect(() => {
     if (activePage !== "Billing") return undefined;
     const controller = new AbortController();
-    apiRequest("/platform/invoices", { accessToken, signal: controller.signal })
-      .then((response) => { if (!controller.signal.aborted) setInvoices(response?.data ?? []); })
+    setBillingError("");
+    const params = new URLSearchParams({ page: String(invoicePagination.page), limit: String(invoicePagination.limit) });
+    apiRequest(`/platform/invoices?${params.toString()}`, { accessToken, signal: controller.signal })
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        setInvoices(Array.isArray(response?.data) ? response.data : []);
+        setInvoicePagination((current) => ({ ...current, ...(response?.pagination ?? {}) }));
+      })
       .catch((error) => { if (!controller.signal.aborted) setBillingError(error.message || "Unable to load invoices."); });
     return () => controller.abort();
-  }, [activePage, accessToken, reloadCount]);
+  }, [activePage, accessToken, reloadCount, invoicePagination.page, invoicePagination.limit]);
 
   useEffect(() => {
     if (activePage !== "Commercial audit") return undefined;
@@ -236,6 +249,9 @@ export default function PlatformAdminWorkspace() {
       page: String(commercialPagination.page),
       limit: String(commercialPagination.limit),
     });
+    if (commercialActionFilter) params.set("action", commercialActionFilter);
+    if (commercialSchoolFilter.trim()) params.set("schoolId", commercialSchoolFilter.trim());
+    setEventsError("");
     apiRequest(`/platform/commercial-events?${params.toString()}`, { accessToken, signal: controller.signal })
       .then((response) => {
         if (controller.signal.aborted) return;
@@ -250,7 +266,7 @@ export default function PlatformAdminWorkspace() {
         }
       });
     return () => controller.abort();
-  }, [activePage, accessToken, commercialPagination.page, commercialPagination.limit, reloadCount]);
+  }, [activePage, accessToken, commercialPagination.page, commercialPagination.limit, commercialActionFilter, commercialSchoolFilter, reloadCount]);
 
   useEffect(() => {
     if (activePage !== "System audit") return undefined;
@@ -542,8 +558,6 @@ export default function PlatformAdminWorkspace() {
       });
       setPaymentForms((current) => ({ ...current, [key]: { amount: "", method: "bank_transfer", reference: "", notes: "" } }));
       setReloadCount((count) => count + 1);
-      const response = await apiRequest("/platform/invoices", { accessToken });
-      setInvoices(response?.data ?? []);
     } catch (error) { setBillingError(error.message || "Unable to record payment."); }
     finally { setPaymentBusyId(""); }
   };
@@ -553,8 +567,7 @@ export default function PlatformAdminWorkspace() {
     if (!reason?.trim()) return;
     try {
       await apiRequest(`/platform/payments/${encodeURIComponent(payment.id || payment._id)}/reverse`, { method: "POST", accessToken, body: { reason: reason.trim() } });
-      const response = await apiRequest("/platform/invoices", { accessToken });
-      setInvoices(response?.data ?? []);
+      setReloadCount((count) => count + 1);
     } catch (error) { setBillingError(error.message || "Unable to reverse payment."); }
   };
 
@@ -806,8 +819,8 @@ export default function PlatformAdminWorkspace() {
       setCreateSchoolError("School ID must use lowercase letters, numbers, and single hyphens only.");
       return;
     }
-    if (schoolForm.adminPassword.length < 8) {
-      setCreateSchoolError("The initial administrator password must be at least 8 characters.");
+    if (schoolForm.adminPassword.length < 8 || new TextEncoder().encode(schoolForm.adminPassword).length > 72) {
+      setCreateSchoolError("The initial administrator password must be 8–72 UTF-8 bytes.");
       return;
     }
     setCreatingSchool(true);
@@ -1149,7 +1162,8 @@ export default function PlatformAdminWorkspace() {
           ) : activePage === "Plans" ? (
             <section className="platform-directory" aria-label="Subscription plans">
               <div className="platform-form-heading"><div><h2>Commercial plans</h2><p>Annual discount applies to the listed annual price. Existing subscriptions retain their agreed price snapshot.</p></div></div>
-              {plansError && <div className="platform-directory-error" role="alert">{plansError}</div>}
+              {plansError && <div className="platform-directory-error" role="alert"><p>{plansError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
+              {loadingPlans && <p role="status">Loading subscription plans…</p>}
               {planMessage && <p role="status" className="platform-form-success">{planMessage}</p>}
               <form className="platform-school-form platform-plan-form" onSubmit={savePlan}>
                 <label>Plan name *<input required maxLength={100} value={planForm.name} onChange={(event) => setPlanForm((v) => ({ ...v, name: event.target.value }))} /></label>
@@ -1170,10 +1184,18 @@ export default function PlatformAdminWorkspace() {
               <div className="platform-form-heading"><div><h2>Invoices & payments</h2><p>Platform billing only. Student fee collections remain within each school's finance records.</p></div><button type="button" className="platform-secondary-button" onClick={() => setReloadCount((count) => count + 1)}>Refresh</button></div>
               {billingError && <div className="platform-directory-error" role="alert">{billingError}<button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
               <div className="platform-table-wrap"><table className="platform-school-table" aria-label="Platform invoices"><thead><tr><th>Invoice</th><th>School</th><th>Issued / due</th><th>Total</th><th>Status</th><th>Record payment</th></tr></thead><tbody>
-                {invoices.map((invoice) => { const key = invoice.id || invoice._id; const form = paymentForms[key] || { amount: "", method: "bank_transfer", reference: "" }; return <>
-                  <tr key={key}><td><strong>{invoice.invoiceNumber}</strong></td><td>{invoice.tenantId?.name || "School"}</td><td>{formatDate(invoice.issuedAt)} / {formatDate(invoice.dueAt)}</td><td>{invoice.currency} {Number(invoice.totalAmount).toLocaleString("en-IN")}</td><td>{statusLabel(invoice.status)}</td><td>{["paid", "void"].includes(invoice.status) ? "—" : <div className="platform-payment-inline"><input aria-label={`Payment amount for ${invoice.invoiceNumber}`} type="number" min="0.01" max={invoice.outstandingAmount} step="0.01" value={form.amount} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, amount: event.target.value } }))} /><select aria-label={`Payment method for ${invoice.invoiceNumber}`} value={form.method} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, method: event.target.value } }))}><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="card">Card</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="other">Other</option></select><input aria-label={`Payment reference for ${invoice.invoiceNumber}`} placeholder="Reference" value={form.reference || ""} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, reference: event.target.value } }))} /><button className="platform-primary-button" type="button" disabled={paymentBusyId === key || !form.amount} onClick={() => void recordPayment(invoice)}>{paymentBusyId === key ? "Saving…" : "Record"}</button></div>}</td></tr>{(invoice.payments || []).map((payment) => <tr key={payment.id || payment._id}><td colSpan="2">Payment · {formatDate(payment.paymentDate)} · {payment.method?.replaceAll("_", " ")}</td><td>{payment.reference || "—"}</td><td>{payment.currency} {Number(payment.amount).toLocaleString("en-IN")}</td><td>{statusLabel(payment.status)}</td><td>{payment.status === "recorded" && <button type="button" className="platform-secondary-button" onClick={() => void reversePayment(payment)}>Reverse</button>}</td></tr>)}</>; })}
+                {invoices.map((invoice) => { const key = invoice.id || invoice._id; const form = paymentForms[key] || { amount: "", method: "bank_transfer", reference: "" }; return <Fragment key={key}>
+                  <tr key={key}><td><strong>{invoice.invoiceNumber}</strong></td><td>{invoice.tenantId?.name || "School"}</td><td>{formatDate(invoice.issuedAt)} / {formatDate(invoice.dueAt)}</td><td>{invoice.currency} {Number(invoice.totalAmount).toLocaleString("en-IN")}</td><td>{statusLabel(invoice.status)}</td><td>{["paid", "void"].includes(invoice.status) ? "—" : <div className="platform-payment-inline"><input aria-label={`Payment amount for ${invoice.invoiceNumber}`} type="number" min="0.01" max={invoice.outstandingAmount} step="0.01" value={form.amount} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, amount: event.target.value } }))} /><select aria-label={`Payment method for ${invoice.invoiceNumber}`} value={form.method} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, method: event.target.value } }))}><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="card">Card</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="other">Other</option></select><input aria-label={`Payment reference for ${invoice.invoiceNumber}`} placeholder="Reference" value={form.reference || ""} onChange={(event) => setPaymentForms((v) => ({ ...v, [key]: { ...form, reference: event.target.value } }))} /><button className="platform-primary-button" type="button" disabled={Boolean(paymentBusyId) || !form.amount} onClick={() => void recordPayment(invoice)}>{paymentBusyId === key ? "Saving…" : "Record"}</button></div>}</td></tr>{(invoice.payments || []).map((payment) => <tr key={payment.id || payment._id}><td colSpan="2">Payment · {formatDate(payment.paymentDate)} · {payment.method?.replaceAll("_", " ")}</td><td>{payment.reference || "—"}</td><td>{payment.currency} {Number(payment.amount).toLocaleString("en-IN")}</td><td>{statusLabel(payment.status)}</td><td>{payment.status === "recorded" && <button type="button" className="platform-secondary-button" onClick={() => void reversePayment(payment)}>Reverse</button>}</td></tr>)}</Fragment>; })}
                 {!invoices.length && <tr><td colSpan="6" className="platform-table-message">No platform invoices found.</td></tr>}
               </tbody></table></div>
+              <div className="platform-pagination">
+                <span>{invoicePagination.total === 0 ? "No invoices" : `Showing ${(invoicePagination.page - 1) * invoicePagination.limit + 1}–${Math.min(invoicePagination.page * invoicePagination.limit, invoicePagination.total)} of ${invoicePagination.total}`}</span>
+                <div>
+                  <button type="button" className="platform-page-button" disabled={invoicePagination.page <= 1} onClick={() => setInvoicePagination((current) => ({ ...current, page: current.page - 1 }))}>Previous</button>
+                  <span className="platform-page-count">Page {invoicePagination.page}{invoicePagination.totalPages > 0 ? ` of ${invoicePagination.totalPages}` : ""}</span>
+                  <button type="button" className="platform-page-button" disabled={invoicePagination.totalPages === 0 || invoicePagination.page >= invoicePagination.totalPages} onClick={() => setInvoicePagination((current) => ({ ...current, page: current.page + 1 }))}>Next</button>
+                </div>
+              </div>
             </section>
           ) : activePage === "System audit" ? (
             <section className="platform-directory" aria-label="System audit records">
@@ -1250,7 +1272,18 @@ export default function PlatformAdminWorkspace() {
           ) : activePage === "Commercial audit" ? (
             <section className="platform-directory" aria-label="Commercial audit events">
               <div className="platform-form-heading"><div><h2>Commercial event history</h2><p>Plan changes, subscription assignments, activations, renewals and payment actions.</p></div><button type="button" className="platform-secondary-button" onClick={() => setReloadCount((count) => count + 1)}>Refresh</button></div>
-              {eventsError && <div className="platform-directory-error" role="alert">{eventsError}</div>}
+              <div className="platform-audit-filters">
+                <label>Action
+                  <select aria-label="Filter commercial event action" value={commercialActionFilter} onChange={(event) => { setCommercialActionFilter(event.target.value); setCommercialPagination((current) => ({ ...current, page: 1 })); }}>
+                    <option value="">All commercial actions</option>
+                    <option value="PLAN_CREATED">Plan created</option><option value="PLAN_UPDATED">Plan updated</option><option value="PLAN_ARCHIVED">Plan archived</option>
+                    <option value="SUBSCRIPTION_ASSIGNED">Subscription assigned</option><option value="SUBSCRIPTION_ACTIVATED">Subscription activated</option><option value="SUBSCRIPTION_RENEWED">Subscription renewed</option>
+                    <option value="PAYMENT_RECORDED">Payment recorded</option><option value="PAYMENT_REVERSED">Payment reversed</option><option value="RENEWAL_INVOICED">Renewal invoiced</option><option value="TRIAL_STARTED">Trial started</option><option value="SUBSCRIPTION_GRACE_EXPIRED">Grace expired</option>
+                  </select>
+                </label>
+                <label>School ID<input aria-label="Filter commercial events by school ID" value={commercialSchoolFilter} onChange={(event) => { setCommercialSchoolFilter(event.target.value); setCommercialPagination((current) => ({ ...current, page: 1 })); }} placeholder="MongoDB school ID" /></label>
+              </div>
+              {eventsError && <div className="platform-directory-error" role="alert"><p>{eventsError}</p><button type="button" onClick={() => setReloadCount((count) => count + 1)}>Retry</button></div>}
               <div className="platform-table-wrap"><table className="platform-school-table platform-commercial-table" aria-label="Commercial audit events"><thead><tr><th>Date</th><th>School</th><th>Activity</th><th>Summary</th><th>References</th></tr></thead><tbody>
                 {commercialEvents.map((item) => {
                   const details = item.details || {};
@@ -1284,7 +1317,7 @@ export default function PlatformAdminWorkspace() {
               {createSchoolError && <div className="platform-directory-error" role="alert"><p>{createSchoolError}</p></div>}
               <form className="platform-school-form" onSubmit={submitCreateSchool}>
                 <h3>School details</h3>
-                <label>School name *<input name="name" value={schoolForm.name} onChange={updateSchoolForm} required maxLength={160} autoComplete="organization" /></label>
+                <label>School name *<input name="name" value={schoolForm.name} onChange={updateSchoolForm} required maxLength={150} autoComplete="organization" /></label>
                 <label>School ID / slug *<input name="slug" value={schoolForm.slug} onChange={(event) => setSchoolForm((current) => ({ ...current, slug: event.target.value.toLowerCase().replace(/\s+/g, "-") }))} required pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={80} aria-describedby="platform-school-slug-help" /><small id="platform-school-slug-help">Use lowercase letters, numbers, and hyphens. This ID is used for school sign-in.</small></label>
                 <label>School contact email<input type="email" name="contactEmail" value={schoolForm.contactEmail} onChange={updateSchoolForm} maxLength={254} autoComplete="email" /></label>
                 <label>Timezone *<input name="timezone" value={schoolForm.timezone} onChange={updateSchoolForm} required maxLength={80} placeholder="Asia/Kolkata" /></label>
@@ -1292,7 +1325,7 @@ export default function PlatformAdminWorkspace() {
                 <label>First name *<input name="adminFirstName" value={schoolForm.adminFirstName} onChange={updateSchoolForm} required maxLength={80} autoComplete="given-name" /></label>
                 <label>Last name<input name="adminLastName" value={schoolForm.adminLastName} onChange={updateSchoolForm} maxLength={80} autoComplete="family-name" /></label>
                 <label>Administrator email *<input type="email" name="adminEmail" value={schoolForm.adminEmail} onChange={updateSchoolForm} required maxLength={254} autoComplete="email" /></label>
-                <label>Temporary password *<input type="password" name="adminPassword" value={schoolForm.adminPassword} onChange={updateSchoolForm} required minLength={8} maxLength={128} autoComplete="new-password" /><small>Use at least 8 characters and share it securely with the administrator.</small></label>
+                <label>Temporary password *<input type="password" name="adminPassword" value={schoolForm.adminPassword} onChange={updateSchoolForm} required minLength={8} maxLength={72} autoComplete="new-password" /><small>Use at least 8 characters and share it securely with the administrator.</small></label>
                 <div className="platform-form-actions"><button type="button" className="platform-secondary-button" onClick={() => setActivePage("Schools")} disabled={creatingSchool}>Cancel</button><button type="submit" className="platform-primary-button" disabled={creatingSchool}>{creatingSchool ? "Creating school…" : "Create school"}</button></div>
               </form>
             </section>
@@ -1310,6 +1343,7 @@ export default function PlatformAdminWorkspace() {
                     <div><dt>School ID</dt><dd>{school.slug || "—"}</dd></div>
                     <div><dt>Contact email</dt><dd>{school.contactEmail || "—"}</dd></div>
                     <div><dt>Status</dt><dd>{statusLabel(school.status)}</dd></div>
+                    {school.subscriptionSuspendedAt && <div><dt>Billing suspension</dt><dd>Since {formatDate(school.subscriptionSuspendedAt)} · payment required</dd></div>}
                     <div><dt>Timezone</dt><dd>{school.timezone || "—"}</dd></div>
                     <div><dt>Created</dt><dd>{formatDate(school.createdAt)}</dd></div>
                   </dl>
@@ -1335,10 +1369,13 @@ export default function PlatformAdminWorkspace() {
                           </button>
                         </div>
                       )}
-                      {school.status === "suspended" && (
+                      {school.status === "suspended" && !school.subscriptionSuspendedAt && (
                         <button type="button" className="platform-primary-button" onClick={() => void updateSchoolStatus("active")} disabled={updatingSchoolStatus}>
                           {updatingSchoolStatus ? "Updating…" : "Reactivate school"}
                         </button>
+                      )}
+                      {school.status === "suspended" && school.subscriptionSuspendedAt && (
+                        <p className="platform-trial-expired" role="status">Access is suspended for overdue billing. Record the outstanding invoice payment to restore this school; manual reactivation is blocked.</p>
                       )}
                     </div>
                     {schoolStatusSuccess && <p role="status">{schoolStatusSuccess}</p>}
@@ -1600,7 +1637,6 @@ export default function PlatformAdminWorkspace() {
                     <option value="pending">Pending</option>
                     <option value="active">Active</option>
                     <option value="suspended">Suspended</option>
-                    <option value="trial_expired">Trial expired</option>
                   </select>
                 </label>
                 <label className="platform-status-filter">
