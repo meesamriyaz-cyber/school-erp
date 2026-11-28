@@ -50,5 +50,6 @@ schoolSubscriptionSchema.pre("validate", function validateBillingTerm() {
 });
 
 schoolSubscriptionSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
+schoolSubscriptionSchema.index({ status: 1, graceEndsAt: 1 });
 
 export default mongoose.model("SchoolSubscription", schoolSubscriptionSchema);
