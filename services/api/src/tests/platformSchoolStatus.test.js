@@ -69,7 +69,7 @@ describe("updateSchoolStatus", () => {
       { _id: schoolId, status: "active", subscriptionSuspendedAt: null },
       expect.objectContaining({
         $set: { status: "suspended", subscriptionSuspendedAt: null, suspensionReason: "Valid school suspension reason" },
-        $push: { suspensionHistory: expect.objectContaining({ reason: "Valid school suspension reason", suspendedBy: null, suspendedAt: expect.any(Date) }) },
+        $push: { suspensionHistory: expect.objectContaining({ reason: "Valid school suspension reason", suspendedBy: req.auth.userId, suspendedAt: expect.any(Date) }) },
       }),
       { new: true, runValidators: true, session: dbSession },
     );
@@ -160,7 +160,8 @@ describe("updateSchoolStatus", () => {
       { session: dbSession },
     );
     expect(updateMany).not.toHaveBeenCalled();
-    expect(findOneAndUpdate).not.toHaveBeenCalled();
+    // The school write is staged before auth invalidation; the transaction aborts on failure.
+    expect(findOneAndUpdate).toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith(error);
   });
 
