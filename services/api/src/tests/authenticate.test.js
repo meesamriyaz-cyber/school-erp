@@ -2,28 +2,12 @@
 import mongoose from "mongoose";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../models/User.js", () => ({
-  default: {
-    findById: vi.fn(),
-  },
-}));
-
-vi.mock("../models/Tenant.js", () => ({
-  default: {
-    findById: vi.fn(),
-    findOneAndUpdate: vi.fn(),
-  },
-}));
-
-vi.mock("../models/SchoolSubscription.js", () => ({ default: { updateMany: vi.fn() } }));
-
-vi.mock("../utils/tokens.js", () => ({
-  verifyAccessToken: vi.fn(),
-}));
+vi.mock("../models/User.js", () => ({ default: { findById: vi.fn() } }));
+vi.mock("../models/Tenant.js", () => ({ default: { findById: vi.fn() } }));
+vi.mock("../utils/tokens.js", () => ({ verifyAccessToken: vi.fn() }));
 
 import User from "../models/User.js";
 import Tenant from "../models/Tenant.js";
-import SchoolSubscription from "../models/SchoolSubscription.js";
 import { verifyAccessToken } from "../utils/tokens.js";
 import authenticate from "../middleware/authenticate.js";
 
@@ -34,243 +18,121 @@ describe("authenticate middleware", () => {
 
   const userId = new mongoose.Types.ObjectId().toString();
   const tenantId = new mongoose.Types.ObjectId().toString();
-
-  const activeUser = {
-    _id: userId,
-    tenantId,
-    role: "school_admin",
-    status: "active",
-    authVersion: 0,
-  };
-
-  const validPayload = {
-    sub: userId,
-    tenantId,
-    role: "school_admin",
-    authVersion: 0,
-  };
+  const activeUser = { _id: userId, tenantId, role: "school_admin", status: "active", authVersion: 0 };
+  const validPayload = { sub: userId, tenantId, role: "school_admin", authVersion: 0 };
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    req = {
-      headers: {
-        authorization: "Bearer valid-access-token",
-      },
-    };
-
-    res = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-    };
-
+    req = { headers: { authorization: "Bearer valid-access-token" } };
+    res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
     next = vi.fn();
-
     verifyAccessToken.mockReturnValue({ ...validPayload });
-
     User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({ ...activeUser }),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ ...activeUser }) }),
     });
-
     Tenant.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          _id: tenantId,
-          status: "active",
-        }),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: tenantId, status: "active" }) }),
     });
   });
 
   it("rejects a missing authorization header", async () => {
     req.headers.authorization = undefined;
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Authentication required",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Authentication required" });
     expect(verifyAccessToken).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
   });
 
   it("rejects a non-Bearer authorization header", async () => {
     req.headers.authorization = "Basic some-token";
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Authentication required",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Authentication required" });
     expect(verifyAccessToken).not.toHaveBeenCalled();
   });
 
   it("rejects an empty Bearer token", async () => {
     req.headers.authorization = "Bearer    ";
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Authentication required",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Authentication required" });
     expect(verifyAccessToken).not.toHaveBeenCalled();
   });
 
   it("rejects a token without a valid subject", async () => {
-    verifyAccessToken.mockReturnValue({
-      ...validPayload,
-      sub: "",
-    });
-
+    verifyAccessToken.mockReturnValue({ ...validPayload, sub: "" });
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Invalid or expired access token",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Invalid or expired access token" });
     expect(User.findById).not.toHaveBeenCalled();
   });
 
   it("rejects when token verification throws", async () => {
-    verifyAccessToken.mockImplementation(() => {
-      throw new Error("Invalid token");
-    });
-
+    verifyAccessToken.mockImplementation(() => { throw new Error("Invalid token"); });
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Invalid or expired access token",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Invalid or expired access token" });
     expect(next).not.toHaveBeenCalled();
   });
 
   it("rejects a user who does not exist", async () => {
-    User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue(null),
-      }),
-    });
-
+    User.findById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(null) }) });
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Invalid or inactive account",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Invalid or inactive account" });
   });
 
   it("rejects an inactive user", async () => {
     User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          ...activeUser,
-          status: "suspended",
-        }),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ ...activeUser, status: "suspended" }) }),
     });
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Invalid or inactive account",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Invalid or inactive account" });
   });
 
   it("rejects an outdated authVersion", async () => {
-    verifyAccessToken.mockReturnValue({
-      ...validPayload,
-      authVersion: 1,
-    });
-
+    verifyAccessToken.mockReturnValue({ ...validPayload, authVersion: 1 });
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Session invalidated; please sign in again",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Session invalidated; please sign in again" });
   });
 
   it("rejects a token with a missing authVersion", async () => {
     const payload = { ...validPayload };
     delete payload.authVersion;
     verifyAccessToken.mockReturnValue(payload);
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Session invalidated; please sign in again",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Session invalidated; please sign in again" });
   });
 
   it("rejects when the user's role has changed", async () => {
-    verifyAccessToken.mockReturnValue({
-      ...validPayload,
-      role: "teacher",
-    });
-
+    verifyAccessToken.mockReturnValue({ ...validPayload, role: "teacher" });
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Account permissions have changed; sign in again",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Account permissions have changed; sign in again" });
   });
 
   it("rejects when the user's tenant does not match the token", async () => {
-    verifyAccessToken.mockReturnValue({
-      ...validPayload,
-      tenantId: new mongoose.Types.ObjectId().toString(),
-    });
-
+    verifyAccessToken.mockReturnValue({ ...validPayload, tenantId: new mongoose.Types.ObjectId().toString() });
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Account permissions have changed; sign in again",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Account permissions have changed; sign in again" });
   });
 
-  it("automatically expires a trial and restricts school access after 30 days", async () => {
-    const expiredTenant = { _id: tenantId, status: "trial_expired" };
+  it("denies access to a trial-expired school without mutating tenant or subscription state", async () => {
     Tenant.findById.mockReturnValue({
       select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({ _id: tenantId, status: "active", trialEndsAt: new Date(Date.now() - 1000) }),
+        lean: vi.fn().mockResolvedValue({ _id: tenantId, status: "trial_expired" }),
       }),
     });
-    Tenant.findOneAndUpdate.mockReturnValue({
-      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(expiredTenant) }),
-    });
-    SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 1 });
 
     await authenticate(req, res, next);
 
-    expect(Tenant.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: tenantId, status: "active", trialEndsAt: expect.objectContaining({ $lte: expect.any(Date) }) }),
-      expect.objectContaining({ $set: expect.objectContaining({ status: "trial_expired" }) }),
-      { new: true },
-    );
-    expect(SchoolSubscription.updateMany).toHaveBeenCalledWith(
-      { tenantId, isTrial: true, status: "active" }, { $set: { status: "expired" } },
-    );
+    expect(Tenant.findById).toHaveBeenCalledWith(tenantId);
+    expect(Tenant.findById.mock.results[0].value.select).toHaveBeenCalledWith("_id status");
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
@@ -281,173 +143,84 @@ describe("authenticate middleware", () => {
 
   it("rejects a school user when the school is suspended", async () => {
     Tenant.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          _id: tenantId,
-          status: "suspended",
-        }),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: tenantId, status: "suspended" }) }),
     });
-
     await authenticate(req, res, next);
-
     expect(Tenant.findById).toHaveBeenCalledWith(tenantId);
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "School is inactive; access is not available",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "School is inactive; access is not available" });
     expect(next).not.toHaveBeenCalled();
   });
 
   it("rejects a school user when the school record is missing", async () => {
     Tenant.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue(null),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(null) }),
     });
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "School is inactive; access is not available",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "School is inactive; access is not available" });
     expect(next).not.toHaveBeenCalled();
   });
 
   it("sets authentication context for a valid school user", async () => {
     await authenticate(req, res, next);
-
     expect(User.findById).toHaveBeenCalledWith(userId);
-    expect(req.auth).toEqual({
-      userId,
-      tenantId,
-      role: "school_admin",
-    });
+    expect(req.auth).toEqual({ userId, tenantId, role: "school_admin" });
     expect(next).toHaveBeenCalledOnce();
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it("allows a platform administrator without a tenant", async () => {
-    verifyAccessToken.mockReturnValue({
-      sub: userId,
-      tenantId: null,
-      role: "platform_admin",
-      authVersion: 0,
-    });
-
+    verifyAccessToken.mockReturnValue({ sub: userId, tenantId: null, role: "platform_admin", authVersion: 0 });
     User.findById.mockReturnValue({
       select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          _id: userId,
-          tenantId: null,
-          role: "platform_admin",
-          status: "active",
-          authVersion: 0,
-        }),
+        lean: vi.fn().mockResolvedValue({ _id: userId, tenantId: null, role: "platform_admin", status: "active", authVersion: 0 }),
       }),
     });
-
     await authenticate(req, res, next);
-
-    expect(req.auth).toEqual({
-      userId,
-      tenantId: null,
-      role: "platform_admin",
-    });
+    expect(req.auth).toEqual({ userId, tenantId: null, role: "platform_admin" });
     expect(next).toHaveBeenCalledOnce();
     expect(res.status).not.toHaveBeenCalled();
+    expect(Tenant.findById).not.toHaveBeenCalled();
   });
 
   it("rejects a platform administrator incorrectly assigned to a tenant", async () => {
-    verifyAccessToken.mockReturnValue({
-      ...validPayload,
-      role: "platform_admin",
-    });
-
+    verifyAccessToken.mockReturnValue({ ...validPayload, role: "platform_admin" });
     User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          ...activeUser,
-          role: "platform_admin",
-        }),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ ...activeUser, role: "platform_admin" }) }),
     });
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Account permissions have changed; sign in again",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Account permissions have changed; sign in again" });
   });
 
   it("rejects a school user with no tenant", async () => {
-    verifyAccessToken.mockReturnValue({
-      ...validPayload,
-      tenantId: null,
-    });
-
+    verifyAccessToken.mockReturnValue({ ...validPayload, tenantId: null });
     User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue({
-          ...activeUser,
-          tenantId: null,
-        }),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ ...activeUser, tenantId: null }) }),
     });
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Account permissions have changed; sign in again",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Account permissions have changed; sign in again" });
   });
 
   it("defaults a missing database authVersion to zero", async () => {
     const user = { ...activeUser };
     delete user.authVersion;
-
-    User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockResolvedValue(user),
-      }),
-    });
-
-    verifyAccessToken.mockReturnValue({
-      ...validPayload,
-      authVersion: 0,
-    });
-
+    User.findById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(user) }) });
+    verifyAccessToken.mockReturnValue({ ...validPayload, authVersion: 0 });
     await authenticate(req, res, next);
-
-    expect(req.auth).toEqual({
-      userId,
-      tenantId,
-      role: "school_admin",
-    });
+    expect(req.auth).toEqual({ userId, tenantId, role: "school_admin" });
     expect(next).toHaveBeenCalledOnce();
   });
 
   it("rejects database lookup errors with a 401 response", async () => {
     User.findById.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        lean: vi.fn().mockRejectedValue(new Error("Database unavailable")),
-      }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockRejectedValue(new Error("Database unavailable")) }),
     });
-
     await authenticate(req, res, next);
-
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      message: "Invalid or expired access token",
-    });
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: "Invalid or expired access token" });
     expect(next).not.toHaveBeenCalled();
   });
 });
