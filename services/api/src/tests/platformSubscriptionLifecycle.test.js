@@ -136,6 +136,7 @@ describe("platform subscription payment lifecycle", () => {
     SchoolSubscription.findOne.mockReturnValue(query(subscription));
     SchoolSubscription.updateMany.mockResolvedValue({ modifiedCount: 0 });
     PlatformCommercialEvent.create.mockResolvedValue(undefined);
+    Tenant.findById.mockReturnValue(query({ _id: tenantId, status: "active" }));
     const req = {
       params: { invoiceId: invoice._id.toString() },
       body: { amount: 100, method: "upi" },
