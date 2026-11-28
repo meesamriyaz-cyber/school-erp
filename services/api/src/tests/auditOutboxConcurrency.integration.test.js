@@ -37,7 +37,7 @@ integrationDescribe("audit outbox concurrency integration", () => {
     const [record] = await AuditOutbox.create([{
       event: {
         eventId: new mongoose.Types.ObjectId(), actorUserId, actorRole: "platform_admin",
-        tenantId: null, targetUserId, targetTenantId: null, action: "USER_CREATED",
+        tenantId: null, targetUserId, targetTenantId: new mongoose.Types.ObjectId(), action: "USER_CREATED",
         changedFields: ["status"], previousValue: null, newValue: "pending",
       },
       ...overrides,
