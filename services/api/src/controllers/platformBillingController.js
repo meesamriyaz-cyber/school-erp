@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Tenant from "../models/Tenant.js";
 import User from "../models/User.js";
+import Session from "../models/Session.js";
 import SubscriptionPlan from "../models/SubscriptionPlan.js";
 import SchoolSubscription from "../models/SchoolSubscription.js";
 import PlatformInvoice from "../models/PlatformInvoice.js";
@@ -270,7 +271,26 @@ export async function recordPlatformPayment(req, res, next) {
           subscription.status = "active";
           await subscription.save({ session });
           await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: wasPending ? "SUBSCRIPTION_ACTIVATED" : "SUBSCRIPTION_RENEWED", details: { billingInterval: subscription.billingInterval, lifetimeAccess: subscription.lifetimeAccess } }], { session });
-          await Tenant.updateOne({ _id: invoice.tenantId, status: { $in: ["pending", "active", "trial_expired"] } }, { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } }, { session });
+          const tenant = await Tenant.findById(invoice.tenantId).session(session);
+          if (tenant?.status === "trial_expired") {
+            // A trial-expired school must not regain access with credentials
+            // issued before expiry. Keep invalidation in the payment transaction.
+            await User.updateMany(
+              { tenantId: tenant._id },
+              { $inc: { authVersion: 1 } },
+              { session },
+            );
+            await Session.updateMany(
+              { tenantId: tenant._id, revokedAt: null },
+              { $set: { revokedAt: new Date() } },
+              { session },
+            );
+          }
+          await Tenant.updateOne(
+            { _id: invoice.tenantId, status: { $in: ["pending", "active", "trial_expired"] } },
+            { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } },
+            { session },
+          );
         }
       }
       result = { payment, invoice };
