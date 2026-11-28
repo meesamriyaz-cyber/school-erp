@@ -5,8 +5,8 @@ vi.mock("../models/Tenant.js", () => ({ default: { findById: vi.fn(), updateOne:
 vi.mock("../models/User.js", () => ({ default: { updateMany: vi.fn() } }));
 vi.mock("../models/Session.js", () => ({ default: { updateMany: vi.fn() } }));
 vi.mock("../models/SubscriptionPlan.js", () => ({ default: {} }));
-vi.mock("../models/SchoolSubscription.js", () => ({ default: { findOne: vi.fn(), updateMany: vi.fn() } }));
-vi.mock("../models/PlatformInvoice.js", () => ({ default: { findById: vi.fn() } }));
+vi.mock("../models/SchoolSubscription.js", () => ({ default: { findOne: vi.fn(), findById: vi.fn(), updateMany: vi.fn() } }));
+vi.mock("../models/PlatformInvoice.js", () => ({ default: { findById: vi.fn(), findOne: vi.fn(), create: vi.fn() } }));
 vi.mock("../models/PlatformPayment.js", () => ({ default: { findOne: vi.fn(), aggregate: vi.fn(), create: vi.fn() } }));
 vi.mock("../models/PlatformCommercialEvent.js", () => ({ default: { create: vi.fn() } }));
 
@@ -17,7 +17,7 @@ import SchoolSubscription from "../models/SchoolSubscription.js";
 import PlatformInvoice from "../models/PlatformInvoice.js";
 import PlatformPayment from "../models/PlatformPayment.js";
 import PlatformCommercialEvent from "../models/PlatformCommercialEvent.js";
-import { recordPlatformPayment, reversePlatformPayment } from "../controllers/platformBillingController.js";
+import { createRenewalInvoice, recordPlatformPayment, reversePlatformPayment } from "../controllers/platformBillingController.js";
 
 const id = () => new mongoose.Types.ObjectId();
 const date = value => new Date(value);
@@ -30,6 +30,9 @@ function sessionStub() {
 }
 function query(value) {
   return { session: vi.fn().mockResolvedValue(value) };
+}
+function queryWithSelect(value) {
+  return { select: vi.fn().mockReturnThis(), session: vi.fn().mockResolvedValue(value) };
 }
 function response() {
   return { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
@@ -293,6 +296,40 @@ describe("platform subscription payment lifecycle", () => {
     expect(Tenant.updateOne).toHaveBeenCalled();
     expect(User.updateMany).not.toHaveBeenCalled();
     expect(Session.updateMany).not.toHaveBeenCalled();
+  });
+
+
+  it("starts the seven-calendar-day grace period when a renewal invoice is issued", async () => {
+    const session = sessionStub();
+    vi.spyOn(mongoose, "startSession").mockResolvedValue(session);
+    const tenantId = id();
+    const subscription = {
+      _id: id(), tenantId, billingInterval: "monthly", status: "active",
+      amount: 100, currency: "INR", planName: "Standard",
+      currentPeriodStartsAt: date("2026-10-01T09:00:00.000Z"),
+      currentPeriodEndsAt: date("2026-11-01T09:00:00.000Z"),
+      nextBillingAt: date("2026-11-01T09:00:00.000Z"),
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    const invoice = { _id: id(), invoiceNumber: "RN-TEST" };
+    SchoolSubscription.findById.mockReturnValue(query(subscription));
+    PlatformInvoice.findOne.mockReturnValue(query(null));
+    PlatformInvoice.create.mockResolvedValue([invoice]);
+    Tenant.findById.mockReturnValue(queryWithSelect({ name: "Test School" }));
+    PlatformCommercialEvent.create.mockResolvedValue(undefined);
+
+    const res = response();
+    await createRenewalInvoice({
+      params: { subscriptionId: subscription._id.toString() },
+      auth: { userId: id().toString() },
+    }, res, vi.fn());
+
+    expect(subscription.status).toBe("past_due");
+    expect(subscription.pastDueSince).toBeInstanceOf(Date);
+    expect(subscription.graceEndsAt.getTime() - subscription.pastDueSince.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(subscription.graceExpiredAt).toBeNull();
+    expect(subscription.save).toHaveBeenCalledWith({ session });
+    expect(res.status).toHaveBeenCalledWith(201);
   });
 
 });
