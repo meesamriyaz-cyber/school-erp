@@ -210,10 +210,14 @@ export default function PlatformAdminWorkspace() {
     if (activePage !== "Plans" && activePage !== "SchoolDetails") return undefined;
     const controller = new AbortController();
     if (activePage === "Plans") {
-      setLoadingPlans(true);
-      setPlansError("");
-      apiRequest("/platform/subscription-plans?includeArchived=true", { accessToken, signal: controller.signal })
-        .then((response) => { if (!controller.signal.aborted) setPlans(Array.isArray(response?.data) ? response.data : []); })
+      Promise.resolve()
+        .then(() => {
+          if (controller.signal.aborted) return null;
+          setLoadingPlans(true);
+          setPlansError("");
+          return apiRequest("/platform/subscription-plans?includeArchived=true", { accessToken, signal: controller.signal });
+        })
+        .then((response) => { if (!controller.signal.aborted && response) setPlans(Array.isArray(response?.data) ? response.data : []); })
         .catch((error) => { if (!controller.signal.aborted) setPlansError(error.message || "Unable to load subscription plans."); })
         .finally(() => { if (!controller.signal.aborted) setLoadingPlans(false); });
     } else {
@@ -230,11 +234,11 @@ export default function PlatformAdminWorkspace() {
   useEffect(() => {
     if (activePage !== "Billing") return undefined;
     const controller = new AbortController();
-    setBillingError("");
     const params = new URLSearchParams({ page: String(invoicePagination.page), limit: String(invoicePagination.limit) });
     apiRequest(`/platform/invoices?${params.toString()}`, { accessToken, signal: controller.signal })
       .then((response) => {
         if (controller.signal.aborted) return;
+        setBillingError("");
         setInvoices(Array.isArray(response?.data) ? response.data : []);
         setInvoicePagination((current) => ({ ...current, ...(response?.pagination ?? {}) }));
       })
@@ -251,7 +255,6 @@ export default function PlatformAdminWorkspace() {
     });
     if (commercialActionFilter) params.set("action", commercialActionFilter);
     if (commercialSchoolFilter.trim()) params.set("schoolId", commercialSchoolFilter.trim());
-    setEventsError("");
     apiRequest(`/platform/commercial-events?${params.toString()}`, { accessToken, signal: controller.signal })
       .then((response) => {
         if (controller.signal.aborted) return;
@@ -279,13 +282,17 @@ export default function PlatformAdminWorkspace() {
     if (auditTenantFilter.trim()) params.set("tenantId", auditTenantFilter.trim());
     if (auditFromFilter) params.set("from", new Date(`${auditFromFilter}T00:00:00.000`).toISOString());
     if (auditToFilter) params.set("to", new Date(`${auditToFilter}T23:59:59.999`).toISOString());
-    setLoadingAuditLogs(true);
-    setAuditLogsError("");
-    setAuditOutboxError("");
-    const logsRequest = apiRequest(`/platform/audit-logs?${params.toString()}`, { accessToken, signal: controller.signal });
-    const outboxRequest = apiRequest("/platform/audit-outbox", { accessToken, signal: controller.signal });
-    Promise.allSettled([logsRequest, outboxRequest]).then(([logsResult, outboxResult]) => {
-      if (controller.signal.aborted) return;
+    Promise.resolve().then(() => {
+      if (controller.signal.aborted) return null;
+      setLoadingAuditLogs(true);
+      setAuditLogsError("");
+      setAuditOutboxError("");
+      const logsRequest = apiRequest(`/platform/audit-logs?${params.toString()}`, { accessToken, signal: controller.signal });
+      const outboxRequest = apiRequest("/platform/audit-outbox", { accessToken, signal: controller.signal });
+      return Promise.allSettled([logsRequest, outboxRequest]);
+    }).then((results) => {
+      if (controller.signal.aborted || !results) return;
+      const [logsResult, outboxResult] = results;
       if (logsResult.status === "fulfilled") {
         const logsResponse = logsResult.value;
         setAuditLogs(Array.isArray(logsResponse?.data) ? logsResponse.data : []);
