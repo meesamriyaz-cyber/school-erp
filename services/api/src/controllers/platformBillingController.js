@@ -13,6 +13,12 @@ const validId = (value) => mongoose.isObjectIdOrHexString(value);
 const actorId = (req) => req.auth?.userId;
 const finiteAmount = (value) => Number.isFinite(Number(value)) && Number(value) >= 0;
 const money = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const PAST_DUE_GRACE_DAYS = 7;
+const addCalendarDays = (value, days) => {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+};
 
 function periodEnd(start, interval) {
   if (interval === "monthly") return new Date(new Date(start).setMonth(new Date(start).getMonth() + 1));
@@ -240,7 +246,14 @@ export async function recordPlatformPayment(req, res, next) {
       await invoice.save({ session });
       await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: invoice.subscriptionId, invoiceId: invoice._id, paymentId: payment._id, action: "PAYMENT_RECORDED", details: { amount: payment.amount, currency: payment.currency, method: payment.method, invoiceStatus: invoice.status } }], { session });
       if (invoice.subscriptionId && invoice.status === "paid") {
-        const subscription = await SchoolSubscription.findOne({ _id: invoice.subscriptionId, tenantId: invoice.tenantId, status: { $in: ["pending", "active", "past_due"] } }).session(session);
+        const subscription = await SchoolSubscription.findOne({
+          _id: invoice.subscriptionId,
+          tenantId: invoice.tenantId,
+          $or: [
+            { status: { $in: ["pending", "active", "past_due"] } },
+            { status: "expired", graceExpiredAt: { $ne: null } },
+          ],
+        }).session(session);
         if (subscription) {
           await SchoolSubscription.updateMany({ tenantId: invoice.tenantId, _id: { $ne: subscription._id }, status: "active" }, { $set: { status: "cancelled", cancelledAt: new Date() } }, { session });
           const wasPending = subscription.status === "pending";
@@ -269,10 +282,15 @@ export async function recordPlatformPayment(req, res, next) {
             subscription.nextBillingAt = subscription.currentPeriodEndsAt;
           }
           subscription.status = "active";
+          subscription.pastDueSince = null;
+          subscription.graceEndsAt = null;
+          subscription.graceExpiredAt = null;
           await subscription.save({ session });
           await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: invoice.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: wasPending ? "SUBSCRIPTION_ACTIVATED" : "SUBSCRIPTION_RENEWED", details: { billingInterval: subscription.billingInterval, lifetimeAccess: subscription.lifetimeAccess } }], { session });
           const tenant = await Tenant.findById(invoice.tenantId).session(session);
-          if (tenant?.status === "trial_expired") {
+          const wasTrialExpired = tenant?.status === "trial_expired";
+          const wasGraceSuspended = tenant?.status === "suspended" && Boolean(tenant?.subscriptionSuspendedAt);
+          if (wasTrialExpired || wasGraceSuspended) {
             // A trial-expired school must not regain access with credentials
             // issued before expiry. Keep invalidation in the payment transaction.
             await User.updateMany(
@@ -287,8 +305,14 @@ export async function recordPlatformPayment(req, res, next) {
             );
           }
           await Tenant.updateOne(
-            { _id: invoice.tenantId, status: { $in: ["pending", "active", "trial_expired"] } },
-            { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null } },
+            {
+              _id: invoice.tenantId,
+              $or: [
+                { status: { $in: ["pending", "active", "trial_expired"] } },
+                { status: "suspended", subscriptionSuspendedAt: { $ne: null } },
+              ],
+            },
+            { $set: { status: "active", trialEndsAt: null, trialExpiredAt: null, subscriptionSuspendedAt: null, suspensionReason: null } },
             { session },
           );
         }
@@ -470,6 +494,9 @@ export async function createRenewalInvoice(req, res, next) {
         notes: "Automated subscription renewal", createdBy: actorId(req),
       }], { session });
       subscription.status = "past_due";
+      subscription.pastDueSince = now;
+      subscription.graceEndsAt = addCalendarDays(now, PAST_DUE_GRACE_DAYS);
+      subscription.graceExpiredAt = null;
       await subscription.save({ session });
       await PlatformCommercialEvent.create([{ actorUserId: actorId(req), tenantId: subscription.tenantId, subscriptionId: subscription._id, invoiceId: invoice._id, action: "RENEWAL_INVOICED", details: { amount: invoice.totalAmount, currency: invoice.currency, schoolName: school?.name } }], { session });
       result = { subscription, invoice };
@@ -515,6 +542,12 @@ export async function reversePlatformPayment(req, res, next) {
         } else if (subscription && invoiceMatchesCurrentPeriod) {
           // A reversal for an older invoice must not downgrade a newer paid period.
           subscription.status = "past_due";
+          if (!subscription.pastDueSince || !subscription.graceEndsAt) {
+            const pastDueAt = new Date();
+            subscription.pastDueSince = pastDueAt;
+            subscription.graceEndsAt = addCalendarDays(pastDueAt, PAST_DUE_GRACE_DAYS);
+          }
+          subscription.graceExpiredAt = null;
           await subscription.save({ session });
         }
       }
