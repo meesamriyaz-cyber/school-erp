@@ -44,7 +44,6 @@ const shutdown = async (signal) => {
     await stopNotificationDeliveryWorker();
     await stopTrialExpiryWorker();
     await stopPastDueGraceWorker();
-    await stopPastDueGraceWorker();
     await disconnectDatabase();
     process.exitCode = 0;
   } catch (error) {
